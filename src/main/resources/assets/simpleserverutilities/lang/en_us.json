@@ -1,0 +1,13 @@
+{
+  "itemGroup.simpleserverutilities": "Example Mod Tab",
+  "block.simpleserverutilities.example_block": "Example Block",
+  "item.simpleserverutilities.example_item": "Example Item",
+
+  "simpleserverutilities.configuration.title": "Simple Server Utilities Configs",
+  "simpleserverutilities.configuration.section.simpleserverutilities.common.toml": "Simple Server Utilities Configs",
+  "simpleserverutilities.configuration.section.simpleserverutilities.common.toml.title": "Simple Server Utilities Configs",
+  "simpleserverutilities.configuration.items": "Item List",
+  "simpleserverutilities.configuration.logDirtBlock": "Log Dirt Block",
+  "simpleserverutilities.configuration.magicNumberIntroduction": "Magic Number Text",
+  "simpleserverutilities.configuration.magicNumber": "Magic Number"
+}
