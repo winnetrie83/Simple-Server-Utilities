@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.protection;
 
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
+import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
@@ -14,11 +15,16 @@ public class ExplosionProtectionEvents {
         Level level = event.getLevel();
 
         event.getAffectedBlocks().removeIf(pos -> !canExplosionAffect(level, pos));
-
         event.getAffectedEntities().removeIf(entity -> !canExplosionAffect(level, entity));
     }
 
     private static boolean canExplosionAffect(Level level, BlockPos pos) {
+        Region region = ProtectionHelper.getRegionAt(level, pos);
+
+        if (region != null) {
+            return region.getSettings().isAllowExplosions();
+        }
+
         PlayerClaim claim = ProtectionHelper.getClaimAt(level, pos);
 
         if (claim == null) {
@@ -29,6 +35,12 @@ public class ExplosionProtectionEvents {
     }
 
     private static boolean canExplosionAffect(Level level, Entity entity) {
+        Region region = ProtectionHelper.getRegionAt(level, entity.blockPosition());
+
+        if (region != null) {
+            return region.getSettings().isAllowExplosions();
+        }
+
         PlayerClaim claim = ProtectionHelper.getClaimAt(level, entity.blockPosition());
 
         if (claim == null) {

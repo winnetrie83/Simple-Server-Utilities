@@ -1,9 +1,11 @@
 package be.winnetrie.mod.simpleserverutilities.protection;
 
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
+import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -12,9 +14,6 @@ import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.minecraft.world.entity.Entity;
-
-
 
 public class EntityProtectionEvents {
 
@@ -24,12 +23,12 @@ public class EntityProtectionEvents {
             return;
         }
 
-        if (ProtectionHelper.canPlayerModify(player, player.level(), event.getTarget().blockPosition())) {
+        if (ProtectionHelper.canPlayerInteract(player, player.level(), event.getTarget().blockPosition())) {
             return;
         }
 
         event.setCanceled(true);
-        player.sendSystemMessage(Component.literal("You cannot damage entities in this claim."));
+        player.sendSystemMessage(Component.literal("You cannot damage entities here."));
     }
 
     @SubscribeEvent
@@ -40,12 +39,12 @@ public class EntityProtectionEvents {
             return;
         }
 
-        if (ProtectionHelper.canPlayerModify(player, player.level(), event.getEntity().blockPosition())) {
+        if (ProtectionHelper.canPlayerInteract(player, player.level(), event.getEntity().blockPosition())) {
             return;
         }
 
         event.setCanceled(true);
-        player.sendSystemMessage(Component.literal("You cannot damage entities in this claim."));
+        player.sendSystemMessage(Component.literal("You cannot damage entities here."));
     }
 
     @SubscribeEvent
@@ -60,19 +59,7 @@ public class EntityProtectionEvents {
 
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.FAIL);
-        player.sendSystemMessage(Component.literal("You cannot interact with entities in this claim."));
-    }
-
-    private static ServerPlayer getAttackingPlayer(Entity sourceEntity) {
-        if (sourceEntity instanceof ServerPlayer player) {
-            return player;
-        }
-
-        if (sourceEntity instanceof Projectile projectile && projectile.getOwner() instanceof ServerPlayer player) {
-            return player;
-        }
-
-        return null;
+        player.sendSystemMessage(Component.literal("You cannot interact with entities here."));
     }
 
     @SubscribeEvent
@@ -90,10 +77,17 @@ public class EntityProtectionEvents {
         Entity hitEntity = entityHitResult.getEntity();
 
         if (projectile.getOwner() instanceof ServerPlayer player) {
-            if (ProtectionHelper.canPlayerModify(player, player.level(), hitEntity.blockPosition())) {
+            if (ProtectionHelper.canPlayerInteract(player, player.level(), hitEntity.blockPosition())) {
                 return;
             }
 
+            event.setCanceled(true);
+            return;
+        }
+
+        Region region = ProtectionHelper.getRegionAt(projectile.level(), hitEntity.blockPosition());
+
+        if (region != null) {
             event.setCanceled(true);
             return;
         }
@@ -111,5 +105,15 @@ public class EntityProtectionEvents {
         event.setCanceled(true);
     }
 
-    
+    private static ServerPlayer getAttackingPlayer(Entity sourceEntity) {
+        if (sourceEntity instanceof ServerPlayer player) {
+            return player;
+        }
+
+        if (sourceEntity instanceof Projectile projectile && projectile.getOwner() instanceof ServerPlayer player) {
+            return player;
+        }
+
+        return null;
+    }
 }

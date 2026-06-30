@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.protection;
 
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
+import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.FluidTags;
@@ -31,11 +32,6 @@ public class FluidProtectionEvents {
         }
 
         BlockPos targetPos = event.getPos();
-        PlayerClaim targetClaim = ProtectionHelper.getClaimAt(level, targetPos);
-
-        if (targetClaim == null) {
-            return;
-        }
 
         for (Direction direction : VANILLA_LIQUID_DIRECTIONS) {
             BlockPos sourcePos = targetPos.relative(direction.getOpposite());
@@ -44,13 +40,38 @@ public class FluidProtectionEvents {
                 continue;
             }
 
-            PlayerClaim sourceClaim = ProtectionHelper.getClaimAt(level, sourcePos);
-
-            if (sourceClaim == null || !sourceClaim.equals(targetClaim)) {
+            if (!canFluidAffect(level, sourcePos, targetPos)) {
                 blockForeignFluidFormation(event, level);
                 return;
             }
         }
+    }
+
+    private static boolean canFluidAffect(Level level, BlockPos sourcePos, BlockPos targetPos) {
+        Region sourceRegion = ProtectionHelper.getRegionAt(level, sourcePos);
+        Region targetRegion = ProtectionHelper.getRegionAt(level, targetPos);
+
+        if (sourceRegion != null || targetRegion != null) {
+            if (sourceRegion != null && targetRegion != null && sameRegion(sourceRegion, targetRegion)) {
+                return true;
+            }
+
+            if (targetRegion != null) {
+                return targetRegion.getSettings().isAllowWaterFlow()
+                        || targetRegion.getSettings().isAllowLavaFlow();
+            }
+
+            return true;
+        }
+
+        PlayerClaim sourceClaim = ProtectionHelper.getClaimAt(level, sourcePos);
+        PlayerClaim targetClaim = ProtectionHelper.getClaimAt(level, targetPos);
+
+        if (targetClaim == null) {
+            return true;
+        }
+
+        return sourceClaim != null && sourceClaim.equals(targetClaim);
     }
 
     private static void blockForeignFluidFormation(FluidPlaceBlockEvent event, Level level) {
@@ -85,5 +106,9 @@ public class FluidProtectionEvents {
     private static boolean isFlowingLava(BlockState state) {
         return state.getFluidState().is(FluidTags.LAVA)
                 && !state.getFluidState().isSource();
+    }
+
+    private static boolean sameRegion(Region a, Region b) {
+        return a.getName().equalsIgnoreCase(b.getName());
     }
 }

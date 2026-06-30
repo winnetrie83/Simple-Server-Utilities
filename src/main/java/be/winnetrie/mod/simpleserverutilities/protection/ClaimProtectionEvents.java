@@ -1,12 +1,8 @@
 package be.winnetrie.mod.simpleserverutilities.protection;
 
-import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
-import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
-import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.level.ChunkPos;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
@@ -20,23 +16,12 @@ public class ClaimProtectionEvents {
             return;
         }
 
-        if (PermissionService.has(player, PermissionService.CLAIM_BYPASS)) {
-            return;
-        }
-
-        ChunkPos chunkPos = new ChunkPos(event.getPos().getX() >> 4, event.getPos().getZ() >> 4);
-        PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaim(player.level(), chunkPos);
-
-        if (claim == null) {
-            return;
-        }
-
-        if (claim.canBuild(player.getUUID())) {
+        if (ProtectionHelper.canPlayerBreak(player, player.level(), event.getPos())) {
             return;
         }
 
         event.setCanceled(true);
-        player.sendSystemMessage(Component.literal("You cannot break blocks in this claim."));
+        player.sendSystemMessage(Component.literal("You cannot break blocks here."));
     }
 
     @SubscribeEvent
@@ -45,23 +30,12 @@ public class ClaimProtectionEvents {
             return;
         }
 
-        if (PermissionService.has(player, PermissionService.CLAIM_BYPASS)) {
-            return;
-        }
-
-        ChunkPos chunkPos = new ChunkPos(event.getPos().getX() >> 4, event.getPos().getZ() >> 4);
-        PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaim(player.level(), chunkPos);
-
-        if (claim == null) {
-            return;
-        }
-
-        if (claim.canBuild(player.getUUID())) {
+        if (ProtectionHelper.canPlayerPlace(player, player.level(), event.getPos())) {
             return;
         }
 
         event.setCanceled(true);
-        player.sendSystemMessage(Component.literal("You cannot place blocks in this claim."));
+        player.sendSystemMessage(Component.literal("You cannot place blocks here."));
     }
 
     @SubscribeEvent
@@ -70,24 +44,12 @@ public class ClaimProtectionEvents {
             return;
         }
 
-        if (PermissionService.has(player, PermissionService.CLAIM_BYPASS)) {
-            return;
-        }
-
-        ChunkPos chunkPos = new ChunkPos(event.getPos().getX() >> 4, event.getPos().getZ() >> 4);
-
-        PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaim(player.level(), chunkPos);
-
-        if (claim == null) {
-            return;
-        }
-
-        if (claim.canBuild(player.getUUID())) {
+        if (ProtectionHelper.canPlayerInteract(player, player.level(), event.getPos())) {
             return;
         }
 
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.FAIL);
-        player.sendSystemMessage(Component.literal("You cannot interact with blocks in this claim."));
+        player.sendSystemMessage(Component.literal("You cannot interact with blocks here."));
     }
 }

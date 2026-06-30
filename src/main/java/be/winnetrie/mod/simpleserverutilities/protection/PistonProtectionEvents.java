@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.protection;
 
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
+import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
@@ -32,6 +33,25 @@ public class PistonProtectionEvents {
     }
 
     private static boolean canMoveBetween(Level level, BlockPos from, BlockPos to) {
+        Region fromRegion = ProtectionHelper.getRegionAt(level, from);
+        Region toRegion = ProtectionHelper.getRegionAt(level, to);
+
+        if (fromRegion != null || toRegion != null) {
+            if (fromRegion != null && toRegion != null && sameRegion(fromRegion, toRegion)) {
+                return fromRegion.getSettings().isAllowPistons();
+            }
+
+            if (fromRegion != null && !fromRegion.getSettings().isAllowPistons()) {
+                return false;
+            }
+
+            if (toRegion != null && !toRegion.getSettings().isAllowPistons()) {
+                return false;
+            }
+
+            return true;
+        }
+
         PlayerClaim fromClaim = ProtectionHelper.getClaimAt(level, from);
         PlayerClaim toClaim = ProtectionHelper.getClaimAt(level, to);
 
@@ -52,6 +72,10 @@ public class PistonProtectionEvents {
         }
 
         return true;
+    }
+
+    private static boolean sameRegion(Region a, Region b) {
+        return a.getName().equalsIgnoreCase(b.getName());
     }
 
     private static boolean sameClaim(PlayerClaim a, PlayerClaim b) {
