@@ -72,6 +72,8 @@ public class RegionManager {
 
                 Region region = new Region(name, dimension, point1, point2);
 
+                region.setPriority(getInt(json, "priority", 0));
+
                 loadUuidSet(json, "owners", region.getOwners());
                 loadUuidSet(json, "members", region.getMembers());
 
@@ -143,6 +145,7 @@ public class RegionManager {
 
                 json.addProperty("name", region.getName());
                 json.addProperty("dimension", region.getDimension().identifier().toString());
+                json.addProperty("priority", region.getPriority());
 
                 json.addProperty("minX", region.getMinX());
                 json.addProperty("minY", region.getMinY());
@@ -227,13 +230,30 @@ public class RegionManager {
     }
 
     public Region getAt(ResourceKey<Level> dimension, BlockPos pos) {
+        Region bestRegion = null;
+
         for (Region region : regions.values()) {
-            if (region.contains(dimension, pos)) {
-                return region;
+            if (!region.contains(dimension, pos)) {
+                continue;
+            }
+
+            if (bestRegion == null) {
+                bestRegion = region;
+                continue;
+            }
+
+            if (region.getPriority() > bestRegion.getPriority()) {
+                bestRegion = region;
+                continue;
+            }
+
+            if (region.getPriority() == bestRegion.getPriority()
+                    && region.getVolume() < bestRegion.getVolume()) {
+                bestRegion = region;
             }
         }
 
-        return null;
+        return bestRegion;
     }
 
     public Collection<Region> getAll() {

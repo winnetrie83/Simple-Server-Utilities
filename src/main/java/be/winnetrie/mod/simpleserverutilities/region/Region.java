@@ -20,6 +20,8 @@ public class Region {
     private final int maxY;
     private final int maxZ;
 
+    private int priority = 0;
+
     private final Set<UUID> owners = new HashSet<>();
     private final Set<UUID> members = new HashSet<>();
 
@@ -150,5 +152,19 @@ public class Region {
     public String getBoundsText() {
         return "(" + minX + ", " + minY + ", " + minZ + ") -> ("
                 + maxX + ", " + maxY + ", " + maxZ + ")";
+    }
+
+    public int getPriority() {
+        return priority;
+    }
+
+    public void setPriority(int priority) {
+        this.priority = priority;
+    }
+
+    public long getVolume() {
+        return (long) (maxX - minX + 1)
+                * (maxY - minY + 1)
+                * (maxZ - minZ + 1);
     }
 }
