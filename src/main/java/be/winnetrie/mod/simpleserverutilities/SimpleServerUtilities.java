@@ -5,7 +5,7 @@ import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaimManager;
-import be.winnetrie.mod.simpleserverutilities.command.ClaimCommands;
+import be.winnetrie.mod.simpleserverutilities.command.SSUCommands;
 import be.winnetrie.mod.simpleserverutilities.protection.ClaimProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.EntityProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.ExplosionProtectionEvents;
@@ -21,6 +21,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import be.winnetrie.mod.simpleserverutilities.region.RegionManager;
 
 @Mod(SimpleServerUtilities.MODID)
 public class SimpleServerUtilities {
@@ -29,6 +30,7 @@ public class SimpleServerUtilities {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public static final PlayerClaimManager PLAYER_CLAIMS = new PlayerClaimManager();
+    public static final RegionManager REGIONS = new RegionManager();
 
     public SimpleServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
@@ -51,17 +53,19 @@ public class SimpleServerUtilities {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         PLAYER_CLAIMS.load(event.getServer());
+        REGIONS.load(event.getServer());
         LOGGER.info("Simple Server Utilities server starting");
     }
 
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
         PLAYER_CLAIMS.save();
+        REGIONS.save();
         LOGGER.info("Simple Server Utilities server stopping");
     }
 
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
-        ClaimCommands.register(event.getDispatcher());
+        SSUCommands.register(event.getDispatcher());
     }
 }

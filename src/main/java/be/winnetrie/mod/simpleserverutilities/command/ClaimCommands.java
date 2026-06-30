@@ -8,9 +8,9 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -21,107 +21,50 @@ import net.minecraft.world.level.ChunkPos;
 
 public class ClaimCommands {
 
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("claim")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
-                .executes(context -> claim(context.getSource())));
-
-        dispatcher.register(Commands.literal("unclaim")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
-                .executes(context -> unclaim(context.getSource())));
-
-        dispatcher.register(Commands.literal("claiminfo")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
-                .executes(context -> claimInfo(context.getSource())));
-
-        dispatcher.register(Commands.literal("claims")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
-                .executes(context -> claimCount(context.getSource())));
-
-        dispatcher.register(Commands.literal("trust")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
-                .then(Commands.argument("player", StringArgumentType.word())
-                        .executes(context -> trust(
-                                context.getSource(),
-                                StringArgumentType.getString(context, "player")
-                        ))));
-
-        dispatcher.register(Commands.literal("untrust")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
-                .then(Commands.argument("player", StringArgumentType.word())
-                        .executes(context -> untrust(
-                                context.getSource(),
-                                StringArgumentType.getString(context, "player")
-                        ))));
-
-        dispatcher.register(Commands.literal("claimflag")
+    public static LiteralArgumentBuilder<CommandSourceStack> build() {
+        return Commands.literal("claims")
                 .requires(source -> source.getEntity() instanceof ServerPlayer)
 
-                .then(Commands.literal("pistons")
-                        .then(Commands.argument("value", BoolArgumentType.bool())
-                                .executes(context -> setFlag(
-                                        context.getSource(),
-                                        "pistons",
-                                        BoolArgumentType.getBool(context, "value")
-                                ))))
+                .then(Commands.literal("help")
+                        .executes(context -> help(context.getSource())))
 
-                .then(Commands.literal("explosions")
-                        .then(Commands.argument("value", BoolArgumentType.bool())
-                                .executes(context -> setFlag(
-                                        context.getSource(),
-                                        "explosions",
-                                        BoolArgumentType.getBool(context, "value")
-                                ))))
+                .then(Commands.literal("claim")
+                        .executes(context -> claim(context.getSource())))
 
-                .then(Commands.literal("water")
-                        .then(Commands.argument("value", BoolArgumentType.bool())
-                                .executes(context -> setFlag(
-                                        context.getSource(),
-                                        "water",
-                                        BoolArgumentType.getBool(context, "value")
-                                ))))
-
-                .then(Commands.literal("lava")
-                        .then(Commands.argument("value", BoolArgumentType.bool())
-                                .executes(context -> setFlag(
-                                        context.getSource(),
-                                        "lava",
-                                        BoolArgumentType.getBool(context, "value")
-                                ))))
-
-                .then(Commands.literal("otherfluids")
-                        .then(Commands.argument("value", BoolArgumentType.bool())
-                                .executes(context -> setFlag(
-                                        context.getSource(),
-                                        "otherfluids",
-                                        BoolArgumentType.getBool(context, "value")
-                                ))))
-
-                .then(Commands.literal("redstone")
-                        .then(Commands.argument("value", BoolArgumentType.bool())
-                                .executes(context -> setFlag(
-                                        context.getSource(),
-                                        "redstone",
-                                        BoolArgumentType.getBool(context, "value")
-                                ))))
-
-                .then(Commands.literal("hoppers")
-                        .then(Commands.argument("value", BoolArgumentType.bool())
-                                .executes(context -> setFlag(
-                                        context.getSource(),
-                                        "hoppers",
-                                        BoolArgumentType.getBool(context, "value")
-                                ))))
-                .then(Commands.literal("ownerlessprojectiles")
-                        .then(Commands.argument("value", BoolArgumentType.bool())
-                                .executes(context -> setFlag(
-                                        context.getSource(),
-                                        "ownerlessprojectiles",
-                                        BoolArgumentType.getBool(context, "value")
-                                ))))
+                .then(Commands.literal("unclaim")
+                        .executes(context -> unclaim(context.getSource())))
 
                 .then(Commands.literal("info")
-                        .executes(context -> flagInfo(context.getSource()))));
+                        .executes(context -> claimInfo(context.getSource())))
+
+                .then(Commands.literal("count")
+                        .executes(context -> claimCount(context.getSource())))
+
+                .then(Commands.literal("trust")
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .executes(context -> trust(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "player")
+                                ))))
+
+                .then(Commands.literal("untrust")
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .executes(context -> untrust(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "player")
+                                ))))
+
+                .then(Commands.literal("flag")
+                        .then(Commands.argument("flag", StringArgumentType.word())
+                                .then(Commands.argument("value", BoolArgumentType.bool())
+                                        .executes(context -> setFlag(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "flag"),
+                                                BoolArgumentType.getBool(context, "value")
+                                        )))))
+
+                .then(Commands.literal("flags")
+                        .executes(context -> flagInfo(context.getSource())));
     }
 
     private static int claim(CommandSourceStack source) {
@@ -193,15 +136,7 @@ public class ClaimCommands {
         player.sendSystemMessage(Component.literal("Owner UUID: " + claim.getOwner()));
         player.sendSystemMessage(Component.literal("Trusted players: " + claim.getTrustedPlayers().size()));
 
-        player.sendSystemMessage(Component.literal("Flags:"));
-        player.sendSystemMessage(Component.literal(" - Pistons: " + claim.getSettings().isAllowPistons()));
-        player.sendSystemMessage(Component.literal(" - Explosions: " + claim.getSettings().isAllowExplosions()));
-        player.sendSystemMessage(Component.literal(" - Water: " + claim.getSettings().isAllowWaterFlow()));
-        player.sendSystemMessage(Component.literal(" - Lava: " + claim.getSettings().isAllowLavaFlow()));
-        player.sendSystemMessage(Component.literal(" - Other fluids: " + claim.getSettings().isAllowOtherFluidFlow()));
-        player.sendSystemMessage(Component.literal(" - Redstone: " + claim.getSettings().isAllowRedstone()));
-        player.sendSystemMessage(Component.literal(" - Hoppers: " + claim.getSettings().isAllowHoppers()));
-        player.sendSystemMessage(Component.literal(" - Ownerless Projectiles: " + claim.getSettings().isAllowOwnerlessProjectiles()));
+        sendFlagInfo(player, claim);
 
         return 1;
     }
@@ -320,7 +255,12 @@ public class ClaimCommands {
             return 0;
         }
 
-        player.sendSystemMessage(Component.literal("Claim flags:"));
+        sendFlagInfo(player, claim);
+        return 1;
+    }
+
+    private static void sendFlagInfo(ServerPlayer player, PlayerClaim claim) {
+        player.sendSystemMessage(Component.literal("Flags:"));
         player.sendSystemMessage(Component.literal(" - Pistons: " + claim.getSettings().isAllowPistons()));
         player.sendSystemMessage(Component.literal(" - Explosions: " + claim.getSettings().isAllowExplosions()));
         player.sendSystemMessage(Component.literal(" - Water: " + claim.getSettings().isAllowWaterFlow()));
@@ -329,8 +269,6 @@ public class ClaimCommands {
         player.sendSystemMessage(Component.literal(" - Redstone: " + claim.getSettings().isAllowRedstone()));
         player.sendSystemMessage(Component.literal(" - Hoppers: " + claim.getSettings().isAllowHoppers()));
         player.sendSystemMessage(Component.literal(" - Ownerless Projectiles: " + claim.getSettings().isAllowOwnerlessProjectiles()));
-
-        return 1;
     }
 
     private static Optional<UUID> findPlayerUuid(ServerPlayer player, String name) {
@@ -342,5 +280,18 @@ public class ClaimCommands {
         }
 
         return Optional.empty();
+    }
+
+    private static int help(CommandSourceStack source) {
+        source.sendSystemMessage(Component.literal("Claim commands:"));
+        source.sendSystemMessage(Component.literal(" - /claims claim"));
+        source.sendSystemMessage(Component.literal(" - /claims unclaim"));
+        source.sendSystemMessage(Component.literal(" - /claims info"));
+        source.sendSystemMessage(Component.literal(" - /claims count"));
+        source.sendSystemMessage(Component.literal(" - /claims trust <player>"));
+        source.sendSystemMessage(Component.literal(" - /claims untrust <player>"));
+        source.sendSystemMessage(Component.literal(" - /claims flag <flag> <true|false>"));
+        source.sendSystemMessage(Component.literal(" - /claims flags"));
+        return 1;
     }
 }
