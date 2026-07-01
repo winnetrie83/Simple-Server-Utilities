@@ -1,5 +1,8 @@
 package be.winnetrie.mod.simpleserverutilities;
 
+import be.winnetrie.mod.simpleserverutilities.client.gui.ClaimMapScreen;
+import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
+import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -8,6 +11,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 
 // This class will not load on dedicated servers. Accessing client side code from here is safe.
 @Mod(value = SimpleServerUtilities.MODID, dist = Dist.CLIENT)
@@ -26,5 +30,14 @@ public class SimpleServerUtilitiesClient {
         // Some client setup code
         //SimpleServerUtilities.LOGGER.info("HELLO FROM CLIENT SETUP");
         //SimpleServerUtilities.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+    }
+
+    @SubscribeEvent
+    static void onRegisterClientPayloadHandlers(RegisterClientPayloadHandlersEvent event) {
+        event.register(ClaimMapDataPayload.TYPE, (payload, context) -> {
+            context.enqueueWork(() ->
+                    Minecraft.getInstance().setScreenAndShow(new ClaimMapScreen(payload))
+            );
+        });
     }
 }

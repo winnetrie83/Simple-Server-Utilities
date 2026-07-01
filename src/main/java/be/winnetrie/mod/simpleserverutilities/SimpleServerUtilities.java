@@ -6,6 +6,7 @@ import com.mojang.logging.LogUtils;
 
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaimManager;
 import be.winnetrie.mod.simpleserverutilities.command.SSUCommands;
+import be.winnetrie.mod.simpleserverutilities.network.ModNetworking;
 import be.winnetrie.mod.simpleserverutilities.protection.ClaimProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.EntityProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.ExplosionProtectionEvents;
@@ -35,8 +36,10 @@ public class SimpleServerUtilities {
 
     public SimpleServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(ModNetworking::register);
 
         NeoForge.EVENT_BUS.register(this);
+        
         NeoForge.EVENT_BUS.register(ClaimProtectionEvents.class);
         NeoForge.EVENT_BUS.register(PistonProtectionEvents.class);
         NeoForge.EVENT_BUS.register(ExplosionProtectionEvents.class);

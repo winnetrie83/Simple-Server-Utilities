@@ -6,7 +6,11 @@ import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapChunk;
+import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapData;
+import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimOperationResult;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
+import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 
 import com.mojang.brigadier.arguments.BoolArgumentType;
@@ -20,6 +24,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
 import net.minecraft.world.level.ChunkPos;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 public class ClaimCommands {
 
@@ -50,6 +55,20 @@ public class ClaimCommands {
                 .then(Commands.literal("info")
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(context -> info(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))))
+
+                .then(Commands.literal("map")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> map(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))))
+
+                .then(Commands.literal("gui")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> gui(
                                         context.getSource(),
                                         StringArgumentType.getString(context, "name")
                                 ))))
@@ -161,14 +180,14 @@ public class ClaimCommands {
             return 0;
         }
 
-        boolean success = SimpleServerUtilities.PLAYER_CLAIMS.createClaimGroup(
+        ClaimOperationResult result = SimpleServerUtilities.PLAYER_CLAIMS.createClaimGroupResult(
                 player.level(),
                 name,
                 player.getUUID()
         );
 
-        if (!success) {
-            player.sendSystemMessage(Component.literal("Could not create claim group. The name may already exist or you reached your group limit."));
+        if (!result.isSuccess()) {
+            sendClaimOperationFailure(player, result);
             return 0;
         }
 
@@ -247,15 +266,15 @@ public class ClaimCommands {
 
         ChunkPos chunkPos = player.chunkPosition();
 
-        boolean success = SimpleServerUtilities.PLAYER_CLAIMS.claimChunk(
+        ClaimOperationResult result = SimpleServerUtilities.PLAYER_CLAIMS.claimChunkResult(
                 player.level(),
                 chunkPos,
                 player.getUUID(),
                 name
         );
 
-        if (!success) {
-            player.sendSystemMessage(Component.literal("Could not claim this chunk. It may already be claimed, overlap a region, or you reached your chunk limit."));
+        if (!result.isSuccess()) {
+            sendClaimOperationFailure(player, result);
             return 0;
         }
 
@@ -269,15 +288,15 @@ public class ClaimCommands {
 
         boolean adminBypass = PermissionService.has(player, PermissionService.CLAIM_BYPASS);
 
-        boolean success = SimpleServerUtilities.PLAYER_CLAIMS.unclaim(
+        ClaimOperationResult result = SimpleServerUtilities.PLAYER_CLAIMS.unclaimResult(
                 player.level(),
                 chunkPos,
                 player.getUUID(),
                 adminBypass
         );
 
-        if (!success) {
-            player.sendSystemMessage(Component.literal("You cannot unclaim this chunk."));
+        if (!result.isSuccess()) {
+            sendClaimOperationFailure(player, result);
             return 0;
         }
 
@@ -546,11 +565,146 @@ public class ClaimCommands {
         source.sendSystemMessage(Component.literal(" - /claims flag <name> <flag> <true|false>"));
         source.sendSystemMessage(Component.literal(" - /claims flags <name>"));
         source.sendSystemMessage(Component.literal(" - /claims msg <name> <message>"));
+        source.sendSystemMessage(Component.literal(" - /claims map <name>"));
+
         source.sendSystemMessage(Component.literal("Admin commands:"));
         source.sendSystemMessage(Component.literal(" - /claims chunks <player> set <number>"));
         source.sendSystemMessage(Component.literal(" - /claims chunks <player> add <number>"));
         source.sendSystemMessage(Component.literal(" - /claims groups <player> set <number>"));
         source.sendSystemMessage(Component.literal(" - /claims groups <player> add <number>"));
+
+        return 1;
+    }
+
+    private static void sendClaimOperationFailure(ServerPlayer player, ClaimOperationResult result) {
+        switch (result.getType()) {
+            case PLAYER_CLAIMS_DISABLED ->
+                    player.sendSystemMessage(Component.literal("Player claims are disabled."));
+
+            case CLAIM_GROUP_NOT_FOUND ->
+                    player.sendSystemMessage(Component.literal("Claim group not found: " + result.getDetails()));
+
+            case CLAIM_GROUP_ALREADY_EXISTS ->
+                    player.sendSystemMessage(Component.literal("A claim group with that name already exists: " + result.getDetails()));
+
+            case CLAIM_GROUP_LIMIT_REACHED ->
+                    player.sendSystemMessage(Component.literal("You reached the maximum amount of claim groups. " + result.getDetails()));
+
+            case WRONG_DIMENSION ->
+                    player.sendSystemMessage(Component.literal("This claim group belongs to another dimension. " + result.getDetails()));
+
+            case CHUNK_ALREADY_CLAIMED ->
+                    player.sendSystemMessage(Component.literal("This chunk is already claimed. " + result.getDetails()));
+
+            case CHUNK_NOT_CLAIMED ->
+                    player.sendSystemMessage(Component.literal("This chunk is not claimed. " + result.getDetails()));
+
+            case CHUNK_LIMIT_REACHED ->
+                    player.sendSystemMessage(Component.literal("You reached the maximum amount of claim chunks. " + result.getDetails()));
+
+            case CHUNK_NOT_ADJACENT ->
+                    player.sendSystemMessage(Component.literal("This chunk must be adjacent to the claim group. " + result.getDetails()));
+
+            case CHUNK_OVERLAPS_REGION ->
+                    player.sendSystemMessage(Component.literal("This chunk overlaps a region and cannot be claimed. " + result.getDetails()));
+
+            case NOT_OWNER ->
+                    player.sendSystemMessage(Component.literal("You are not the owner of this claim group: " + result.getDetails()));
+
+            case SUCCESS ->
+                    player.sendSystemMessage(Component.literal("Operation completed successfully."));
+        }
+    }
+
+    private static int map(CommandSourceStack source, String claimName) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
+
+        if (claim == null) {
+            player.sendSystemMessage(Component.literal("Claim group not found: " + claimName));
+            return 0;
+        }
+
+        ClaimMapData data = SimpleServerUtilities.PLAYER_CLAIMS.getMapData(
+                player,
+                4,
+                claimName
+        );
+
+        player.sendSystemMessage(Component.literal("Claim map for '" + claimName + "':"));
+        player.sendSystemMessage(Component.literal("Legend: P=current, .=free, M=mine, T=trusted, O=other, R=region"));
+
+        //int size = data.getRadius() * 2 + 1;
+
+        for (int dz = -data.getRadius(); dz <= data.getRadius(); dz++) {
+            StringBuilder line = new StringBuilder();
+
+            for (int dx = -data.getRadius(); dx <= data.getRadius(); dx++) {
+                int chunkX = data.getCenterChunkX() + dx;
+                int chunkZ = data.getCenterChunkZ() + dz;
+
+                ClaimMapChunk chunk = findMapChunk(data, chunkX, chunkZ);
+
+                if (chunk == null) {
+                    line.append("? ");
+                    continue;
+                }
+
+                line.append(getMapSymbol(chunk)).append(" ");
+            }
+
+            player.sendSystemMessage(Component.literal(line.toString()));
+        }
+
+        return 1;
+    }
+
+    private static ClaimMapChunk findMapChunk(ClaimMapData data, int chunkX, int chunkZ) {
+        for (ClaimMapChunk chunk : data.getChunks()) {
+            if (chunk.getChunkX() == chunkX && chunk.getChunkZ() == chunkZ) {
+                return chunk;
+            }
+        }
+
+        return null;
+    }
+
+    private static String getMapSymbol(ClaimMapChunk chunk) {
+        if (chunk.isCurrentChunk()) {
+            return "P";
+        }
+
+        return switch (chunk.getStatus()) {
+            case WILDERNESS -> ".";
+            case OWNED_BY_SELF -> "M";
+            case OWNED_BY_TRUSTED -> "T";
+            case OWNED_BY_OTHER -> "O";
+            case REGION -> "R";
+        };
+    }
+
+    private static int gui(CommandSourceStack source, String claimName) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
+
+        if (claim == null) {
+            player.sendSystemMessage(Component.literal("Claim group not found: " + claimName));
+            return 0;
+        }
+
+        ClaimMapData data = SimpleServerUtilities.PLAYER_CLAIMS.getMapData(
+                player,
+                4,
+                claimName
+        );
+
+        PacketDistributor.sendToPlayer(
+                player,
+                ClaimMapDataPayload.from(data)
+        );
+
         return 1;
     }
 }
