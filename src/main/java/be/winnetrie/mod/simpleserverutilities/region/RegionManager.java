@@ -324,6 +324,7 @@ public class RegionManager {
         }
 
         Region newRegion = new Region(oldRegion.getName(), dimension, point1, point2);
+        newRegion.setPriority(oldRegion.getPriority());
 
         newRegion.getOwners().addAll(oldRegion.getOwners());
         newRegion.getMembers().addAll(oldRegion.getMembers());

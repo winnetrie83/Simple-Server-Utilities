@@ -1,6 +1,5 @@
 package be.winnetrie.mod.simpleserverutilities.mixin;
 
-import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.protection.ProtectionHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
@@ -8,7 +7,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -42,16 +40,8 @@ public abstract class LiquidBlockMixin {
             return fluidState;
         }
 
-        PlayerClaim lavaClaim = ProtectionHelper.getClaimAt(level, lavaPos);
-
-        if (lavaClaim == null) {
-            return fluidState;
-        }
-
-        PlayerClaim waterClaim = ProtectionHelper.getClaimAt(level, checkPos);
-
-        if (waterClaim == null || !waterClaim.equals(lavaClaim)) {
-            return Fluids.EMPTY.defaultFluidState();
+        if (!ProtectionHelper.canFluidAffect(level, checkPos, lavaPos, fluidState)) {
+            return net.minecraft.world.level.material.Fluids.EMPTY.defaultFluidState();
         }
 
         return fluidState;

@@ -1,14 +1,14 @@
 package be.winnetrie.mod.simpleserverutilities.mixin;
 
-import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
+import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.protection.ProtectionHelper;
+import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -35,36 +35,25 @@ public abstract class FlowingFluidMixin {
         }
 
         BlockPos targetPos = pos;
-        BlockPos sourcePos = pos.relative(direction.getOpposite());
+        BlockPos sourcePos = targetPos.relative(direction.getOpposite());
 
-        PlayerClaim targetClaim = ProtectionHelper.getClaimAt(level, targetPos);
+        Region sourceRegion = ProtectionHelper.getRegionAt(level, sourcePos);
+        Region targetRegion = ProtectionHelper.getRegionAt(level, targetPos);
 
-        if (targetClaim == null) {
-            return;
-        }
+        boolean allowed = ProtectionHelper.canFluidAffect(level, sourcePos, targetPos, fluidState);
 
-        PlayerClaim sourceClaim = ProtectionHelper.getClaimAt(level, sourcePos);
+        SimpleServerUtilities.LOGGER.info(
+                "[SSU Fluid Debug] dir={} source={} sourceRegion={} target={} targetRegion={} fluid={} allowed={}",
+                direction,
+                sourcePos,
+                sourceRegion == null ? "none" : sourceRegion.getName(),
+                targetPos,
+                targetRegion == null ? "none" : targetRegion.getName(),
+                fluidState.getType(),
+                allowed
+        );
 
-        // Allow fluid flow inside the same claim
-        if (sourceClaim != null && sourceClaim.equals(targetClaim)) {
-            return;
-        }
-
-        if (fluidState.is(Fluids.WATER) || fluidState.is(Fluids.FLOWING_WATER)) {
-            if (!targetClaim.getSettings().isAllowWaterFlow()) {
-                ci.cancel();
-            }
-            return;
-        }
-
-        if (fluidState.is(Fluids.LAVA) || fluidState.is(Fluids.FLOWING_LAVA)) {
-            if (!targetClaim.getSettings().isAllowLavaFlow()) {
-                ci.cancel();
-            }
-            return;
-        }
-
-        if (!targetClaim.getSettings().isAllowOtherFluidFlow()) {
+        if (!allowed) {
             ci.cancel();
         }
     }

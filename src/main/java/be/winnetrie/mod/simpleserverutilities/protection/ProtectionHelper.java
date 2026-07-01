@@ -9,6 +9,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.material.FluidState;
+
+import net.minecraft.world.level.material.Fluids;
 
 public class ProtectionHelper {
 
@@ -114,5 +117,59 @@ public class ProtectionHelper {
         }
 
         return getRegionAt(level, pos);
+    }
+
+    public static boolean canFluidAffect(LevelAccessor levelAccessor, BlockPos sourcePos, BlockPos targetPos, FluidState fluidState) {
+        if (!(levelAccessor instanceof Level level)) {
+            return true;
+        }
+
+        Region sourceRegion = getRegionAt(level, sourcePos);
+        Region targetRegion = getRegionAt(level, targetPos);
+
+        if (targetRegion != null) {
+            if (sourceRegion != null && sourceRegion.getName().equalsIgnoreCase(targetRegion.getName())) {
+                return true;
+            }
+
+            return isFluidAllowedInRegion(targetRegion, fluidState);
+        }
+
+        PlayerClaim sourceClaim = getClaimAt(level, sourcePos);
+        PlayerClaim targetClaim = getClaimAt(level, targetPos);
+
+        if (targetClaim == null) {
+            return true;
+        }
+
+        if (sourceClaim != null && sourceClaim.equals(targetClaim)) {
+            return true;
+        }
+
+        return isFluidAllowedInClaim(targetClaim, fluidState);
+    }
+
+    private static boolean isFluidAllowedInRegion(Region region, FluidState fluidState) {
+        if (fluidState.is(Fluids.WATER) || fluidState.is(Fluids.FLOWING_WATER)) {
+            return region.getSettings().isAllowWaterFlow();
+        }
+
+        if (fluidState.is(Fluids.LAVA) || fluidState.is(Fluids.FLOWING_LAVA)) {
+            return region.getSettings().isAllowLavaFlow();
+        }
+
+        return false;
+    }
+
+    private static boolean isFluidAllowedInClaim(PlayerClaim claim, FluidState fluidState) {
+        if (fluidState.is(Fluids.WATER) || fluidState.is(Fluids.FLOWING_WATER)) {
+            return claim.getSettings().isAllowWaterFlow();
+        }
+
+        if (fluidState.is(Fluids.LAVA) || fluidState.is(Fluids.FLOWING_LAVA)) {
+            return claim.getSettings().isAllowLavaFlow();
+        }
+
+        return claim.getSettings().isAllowOtherFluidFlow();
     }
 }

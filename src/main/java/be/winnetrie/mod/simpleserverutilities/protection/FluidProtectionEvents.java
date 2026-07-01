@@ -1,7 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.protection;
 
-import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
-import be.winnetrie.mod.simpleserverutilities.region.Region;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.FluidTags;
@@ -48,30 +47,12 @@ public class FluidProtectionEvents {
     }
 
     private static boolean canFluidAffect(Level level, BlockPos sourcePos, BlockPos targetPos) {
-        Region sourceRegion = ProtectionHelper.getRegionAt(level, sourcePos);
-        Region targetRegion = ProtectionHelper.getRegionAt(level, targetPos);
-
-        if (sourceRegion != null || targetRegion != null) {
-            if (sourceRegion != null && targetRegion != null && sameRegion(sourceRegion, targetRegion)) {
-                return true;
-            }
-
-            if (targetRegion != null) {
-                return targetRegion.getSettings().isAllowWaterFlow()
-                        || targetRegion.getSettings().isAllowLavaFlow();
-            }
-
-            return true;
-        }
-
-        PlayerClaim sourceClaim = ProtectionHelper.getClaimAt(level, sourcePos);
-        PlayerClaim targetClaim = ProtectionHelper.getClaimAt(level, targetPos);
-
-        if (targetClaim == null) {
-            return true;
-        }
-
-        return sourceClaim != null && sourceClaim.equals(targetClaim);
+        return ProtectionHelper.canFluidAffect(
+                level,
+                sourcePos,
+                targetPos,
+                level.getFluidState(sourcePos)
+        );
     }
 
     private static void blockForeignFluidFormation(FluidPlaceBlockEvent event, Level level) {
@@ -108,7 +89,5 @@ public class FluidProtectionEvents {
                 && !state.getFluidState().isSource();
     }
 
-    private static boolean sameRegion(Region a, Region b) {
-        return a.getName().equalsIgnoreCase(b.getName());
-    }
+
 }
