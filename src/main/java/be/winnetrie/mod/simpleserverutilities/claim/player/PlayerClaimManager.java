@@ -5,6 +5,7 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -24,7 +25,10 @@ public class PlayerClaimManager {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    private final Map<String, PlayerClaim> claims = new HashMap<>();
+    private final Map<UUID, PlayerClaim> claims = new HashMap<>();
+    private final Map<String, UUID> chunkIndex = new HashMap<>();
+    private final Map<UUID, PlayerClaimLimits> limits = new HashMap<>();
+
     private Path saveFile;
 
     public void load(MinecraftServer server) {
@@ -32,6 +36,8 @@ public class PlayerClaimManager {
         this.saveFile = folder.resolve("player_claims.json");
 
         claims.clear();
+        chunkIndex.clear();
+        limits.clear();
 
         try {
             Files.createDirectories(folder);
@@ -42,18 +48,30 @@ public class PlayerClaimManager {
             }
 
             try (Reader reader = Files.newBufferedReader(saveFile)) {
-                PlayerClaim[] loadedClaims = GSON.fromJson(reader, PlayerClaim[].class);
+                ClaimSaveData data = GSON.fromJson(reader, ClaimSaveData.class);
 
-                if (loadedClaims != null) {
-                    for (PlayerClaim claim : loadedClaims) {
-                        claims.put(claim.getKey(), claim);
+                if (data == null) {
+                    return;
+                }
+
+                if (data.claims != null) {
+                    for (PlayerClaim claim : data.claims) {
+                        claims.put(claim.getId(), claim);
                     }
                 }
+
+                if (data.limits != null) {
+                    for (PlayerClaimLimits limit : data.limits) {
+                        limits.put(limit.getPlayer(), limit);
+                    }
+                }
+
+                rebuildChunkIndex();
             }
 
-            SimpleServerUtilities.LOGGER.info("Loaded {} player claims.", claims.size());
-        } catch (IOException e) {
-            SimpleServerUtilities.LOGGER.error("Failed to load player claims.", e);
+            SimpleServerUtilities.LOGGER.info("Loaded {} claim groups.", claims.size());
+        } catch (Exception e) {
+            SimpleServerUtilities.LOGGER.error("Failed to load player claim groups.", e);
         }
     }
 
@@ -63,20 +81,91 @@ public class PlayerClaimManager {
         }
 
         try (Writer writer = Files.newBufferedWriter(saveFile)) {
-            GSON.toJson(claims.values(), writer);
+            ClaimSaveData data = new ClaimSaveData();
+            data.claims = new ArrayList<>(claims.values());
+            data.limits = new ArrayList<>(limits.values());
+
+            GSON.toJson(data, writer);
         } catch (IOException e) {
-            SimpleServerUtilities.LOGGER.error("Failed to save player claims.", e);
+            SimpleServerUtilities.LOGGER.error("Failed to save player claim groups.", e);
         }
     }
 
-    public boolean claim(Level level, ChunkPos chunkPos, UUID owner) {
+    public boolean createClaimGroup(Level level, String name, UUID owner) {
         if (!Config.ENABLE_PLAYER_CLAIMS.get()) {
+            return false;
+        }
+
+        if (getClaimGroup(owner, name) != null) {
+            return false;
+        }
+
+        if (countClaimGroups(owner) >= getMaxClaimGroups(owner)) {
+            return false;
+        }
+
+        long now = System.currentTimeMillis();
+
+        PlayerClaim claim = new PlayerClaim(
+                name,
+                getDimensionId(level),
+                owner,
+                now
+        );
+
+        claims.put(claim.getId(), claim);
+        save();
+        return true;
+    }
+
+    public boolean deleteClaimGroup(UUID owner, String name, boolean adminBypass) {
+        PlayerClaim claim = getClaimGroup(owner, name);
+
+        if (claim == null) {
+            return false;
+        }
+
+        if (!adminBypass && !claim.isOwner(owner)) {
+            return false;
+        }
+
+        for (ClaimChunk chunk : claim.getChunks()) {
+            chunkIndex.remove(createKey(claim.getDimension(), chunk.getX(), chunk.getZ()));
+        }
+
+        claims.remove(claim.getId());
+        save();
+        return true;
+    }
+
+    public boolean claimChunk(Level level, ChunkPos chunkPos, UUID owner, String claimName) {
+        if (!Config.ENABLE_PLAYER_CLAIMS.get()) {
+            return false;
+        }
+
+        PlayerClaim claim = getClaimGroup(owner, claimName);
+
+        if (claim == null) {
+            return false;
+        }
+
+        if (!claim.getDimension().equals(getDimensionId(level))) {
             return false;
         }
 
         String key = createKey(level, chunkPos);
 
-        if (claims.containsKey(key)) {
+        if (chunkIndex.containsKey(key)) {
+            return false;
+        }
+
+        if (claim.getChunkCount() > 0 && !claim.hasAdjacentChunk(chunkPos.x(), chunkPos.z())) {
+            return false;
+        }
+
+        
+
+        if (countClaimChunks(owner) >= getMaxChunks(owner)) {
             return false;
         }
 
@@ -95,19 +184,29 @@ public class PlayerClaimManager {
             return false;
         }
 
-        PlayerClaim claim = new PlayerClaim(
-            getDimensionId(level), chunkPos.x(), chunkPos.z(), owner);
+        long now = System.currentTimeMillis();
 
-        claims.put(key, claim);
+        if (!claim.addChunk(chunkPos.x(), chunkPos.z(), now)) {
+            return false;
+        }
+
+        chunkIndex.put(key, claim.getId());
         save();
         return true;
     }
 
     public boolean unclaim(Level level, ChunkPos chunkPos, UUID playerUuid, boolean adminBypass) {
         String key = createKey(level, chunkPos);
-        PlayerClaim claim = claims.get(key);
+        UUID claimId = chunkIndex.get(key);
+
+        if (claimId == null) {
+            return false;
+        }
+
+        PlayerClaim claim = claims.get(claimId);
 
         if (claim == null) {
+            chunkIndex.remove(key);
             return false;
         }
 
@@ -115,20 +214,46 @@ public class PlayerClaimManager {
             return false;
         }
 
-        claims.remove(key);
+        if (!claim.removeChunk(chunkPos.x(), chunkPos.z(), System.currentTimeMillis())) {
+            return false;
+        }
+
+        chunkIndex.remove(key);
         save();
         return true;
     }
 
     public PlayerClaim getClaim(Level level, ChunkPos chunkPos) {
-        return claims.get(createKey(level, chunkPos));
+        UUID claimId = chunkIndex.get(createKey(level, chunkPos));
+
+        if (claimId == null) {
+            return null;
+        }
+
+        return claims.get(claimId);
     }
 
-    public boolean isClaimed(Level level, ChunkPos chunkPos) {
-        return getClaim(level, chunkPos) != null;
+    public PlayerClaim getClaimGroup(UUID owner, String name) {
+        String normalizedName = normalizeName(name);
+
+        for (PlayerClaim claim : claims.values()) {
+            if (!claim.isOwner(owner)) {
+                continue;
+            }
+
+            if (normalizeName(claim.getName()).equals(normalizedName)) {
+                return claim;
+            }
+        }
+
+        return null;
     }
 
-    public int countClaims(UUID owner) {
+    public Collection<PlayerClaim> getClaims() {
+        return claims.values();
+    }
+
+    public int countClaimGroups(UUID owner) {
         int count = 0;
 
         for (PlayerClaim claim : claims.values()) {
@@ -140,15 +265,85 @@ public class PlayerClaimManager {
         return count;
     }
 
-    public Collection<PlayerClaim> getClaims() {
-        return claims.values();
+    public int countClaimChunks(UUID owner) {
+        int count = 0;
+
+        for (PlayerClaim claim : claims.values()) {
+            if (claim.isOwner(owner)) {
+                count += claim.getChunkCount();
+            }
+        }
+
+        return count;
+    }
+
+    public int getMaxChunks(UUID player) {
+        return getLimits(player).getMaxChunks();
+    }
+
+    public void setMaxChunks(UUID player, int amount) {
+        getLimits(player).setMaxChunks(amount);
+        save();
+    }
+
+    public void addMaxChunks(UUID player, int amount) {
+        getLimits(player).addMaxChunks(amount);
+        save();
+    }
+
+    public int getMaxClaimGroups(UUID player) {
+        return getLimits(player).getMaxClaimGroups();
+    }
+
+    public void setMaxClaimGroups(UUID player, int amount) {
+        getLimits(player).setMaxClaimGroups(amount);
+        save();
+    }
+
+    public void addMaxClaimGroups(UUID player, int amount) {
+        getLimits(player).addMaxClaimGroups(amount);
+        save();
+    }
+
+    private PlayerClaimLimits getLimits(UUID player) {
+        return limits.computeIfAbsent(player, uuid -> new PlayerClaimLimits(
+                uuid,
+                Config.MAX_PLAYER_CLAIMS.get(),
+                1
+        ));
+    }
+
+    private void rebuildChunkIndex() {
+        chunkIndex.clear();
+
+        for (PlayerClaim claim : claims.values()) {
+            for (ClaimChunk chunk : claim.getChunks()) {
+                chunkIndex.put(
+                        createKey(claim.getDimension(), chunk.getX(), chunk.getZ()),
+                        claim.getId()
+                );
+            }
+        }
     }
 
     private String createKey(Level level, ChunkPos chunkPos) {
-        return getDimensionId(level) + ":" + chunkPos.x() + "," + chunkPos.z();
+        return createKey(getDimensionId(level), chunkPos.x(), chunkPos.z());
+    }
+
+    private String createKey(String dimension, int chunkX, int chunkZ) {
+        return dimension + ":" + chunkX + "," + chunkZ;
     }
 
     private String getDimensionId(Level level) {
         return level.dimension().identifier().toString();
+    }
+
+    private String normalizeName(String name) {
+        return name.toLowerCase();
+    }
+
+    private static class ClaimSaveData {
+        private ArrayList<PlayerClaim> claims = new ArrayList<>();
+        private ArrayList<PlayerClaimLimits> limits = new ArrayList<>();
     }
 }

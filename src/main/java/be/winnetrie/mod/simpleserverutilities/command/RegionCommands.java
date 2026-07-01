@@ -576,6 +576,7 @@ public class RegionCommands {
             case "lava" -> region.getSettings().setAllowLavaFlow(value);
             case "redstone" -> region.getSettings().setAllowRedstone(value);
             case "hoppers" -> region.getSettings().setAllowHoppers(value);
+            case "allowfirespread" -> region.getSettings().setAllowFireSpread(value);
             default -> {
                 player.sendSystemMessage(Component.literal("Unknown region flag."));
                 player.sendSystemMessage(Component.literal("Flags: break, place, interact, pvp, explosions, pistons, water, lava, redstone, hoppers"));

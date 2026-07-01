@@ -74,7 +74,7 @@ public class ProtectionHelper {
         Region targetRegion = getRegionAt(level, targetPos);
 
         if (targetRegion != null) {
-            if (sourceRegion != null && sourceRegion.getName().equalsIgnoreCase(targetRegion.getName())) {
+            if (sourceRegion != null && sameRegion(sourceRegion, targetRegion)) {
                 return true;
             }
 
@@ -88,7 +88,7 @@ public class ProtectionHelper {
             return true;
         }
 
-        if (sourceClaim != null && sourceClaim.equals(targetClaim)) {
+        if (sourceClaim != null && sameClaim(sourceClaim, targetClaim)) {
             return true;
         }
 
@@ -182,9 +182,7 @@ public class ProtectionHelper {
     }
 
     private static boolean sameClaim(PlayerClaim a, PlayerClaim b) {
-        return a.getDimension().equals(b.getDimension())
-                && a.getChunkX() == b.getChunkX()
-                && a.getChunkZ() == b.getChunkZ();
+        return a.getId().equals(b.getId());
     }
 
     public static boolean canPlayerPerform(ServerPlayer player, Level level, BlockPos pos, ActionType action) {

@@ -15,6 +15,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -420,19 +421,21 @@ public class RegionManager {
                 continue;
             }
 
-            int chunkMinX = claim.getChunkX() << 4;
-            int chunkMaxX = chunkMinX + 15;
-            int chunkMinZ = claim.getChunkZ() << 4;
-            int chunkMaxZ = chunkMinZ + 15;
+            for (ClaimChunk chunk : claim.getChunks()) {
+                int chunkMinX = chunk.getX() << 4;
+                int chunkMaxX = chunkMinX + 15;
+                int chunkMinZ = chunk.getZ() << 4;
+                int chunkMaxZ = chunkMinZ + 15;
 
-            boolean overlaps =
-                    minX <= chunkMaxX
-                && maxX >= chunkMinX
-                && minZ <= chunkMaxZ
-                && maxZ >= chunkMinZ;
+                boolean overlaps =
+                        minX <= chunkMaxX
+                    && maxX >= chunkMinX
+                    && minZ <= chunkMaxZ
+                    && maxZ >= chunkMinZ;
 
-            if (overlaps) {
-                return claim;
+                if (overlaps) {
+                    return claim;
+                }
             }
         }
 
@@ -440,7 +443,8 @@ public class RegionManager {
     }
 
     private String describeClaim(PlayerClaim claim) {
-        return "chunk " + claim.getChunkX() + ", " + claim.getChunkZ()
-                + " in " + claim.getDimension();
+        return "'" + claim.getDisplayName() + "' owned by " + claim.getOwner()
+                + " in " + claim.getDimension()
+                + " (" + claim.getChunkCount() + " chunks)";
     }
 }
