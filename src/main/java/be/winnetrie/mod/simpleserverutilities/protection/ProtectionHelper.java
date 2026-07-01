@@ -15,83 +15,29 @@ import net.minecraft.world.level.material.Fluids;
 
 public class ProtectionHelper {
 
+    public enum ActionType {
+        BREAK,
+        PLACE,
+        INTERACT
+    }
+
     private ProtectionHelper() {
     }
 
     public static boolean canPlayerBreak(ServerPlayer player, Level level, BlockPos pos) {
-        if (PermissionService.has(player, PermissionService.CLAIM_BYPASS)) {
-            return true;
-        }
-
-        Region region = getRegionAt(level, pos);
-
-        if (region != null) {
-            if (region.getSettings().isAllowBlockBreak()) {
-                return true;
-            }
-
-            return region.hasAccess(player.getUUID());
-        }
-
-        PlayerClaim claim = getClaimAt(level, pos);
-
-        if (claim == null) {
-            return true;
-        }
-
-        return claim.canBuild(player.getUUID());
+        return canPlayerPerform(player, level, pos, ActionType.BREAK);
     }
 
     public static boolean canPlayerPlace(ServerPlayer player, Level level, BlockPos pos) {
-        if (PermissionService.has(player, PermissionService.CLAIM_BYPASS)) {
-            return true;
-        }
+        return canPlayerPerform(player, level, pos, ActionType.PLACE);
+    }
 
-        Region region = getRegionAt(level, pos);
-
-        if (region != null) {
-            if (region.getSettings().isAllowBlockPlace()) {
-                return true;
-            }
-
-            return region.hasAccess(player.getUUID());
-        }
-
-        PlayerClaim claim = getClaimAt(level, pos);
-
-        if (claim == null) {
-            return true;
-        }
-
-        return claim.canBuild(player.getUUID());
+    public static boolean canPlayerInteract(ServerPlayer player, Level level, BlockPos pos) {
+        return canPlayerPerform(player, level, pos, ActionType.INTERACT);
     }
 
     public static boolean canPlayerModify(ServerPlayer player, Level level, BlockPos pos) {
         return canPlayerBreak(player, level, pos) && canPlayerPlace(player, level, pos);
-    }
-
-    public static boolean canPlayerInteract(ServerPlayer player, Level level, BlockPos pos) {
-        if (PermissionService.has(player, PermissionService.CLAIM_BYPASS)) {
-            return true;
-        }
-
-        Region region = getRegionAt(level, pos);
-
-        if (region != null) {
-            if (region.getSettings().isAllowInteract()) {
-                return true;
-            }
-
-            return region.hasAccess(player.getUUID());
-        }
-
-        PlayerClaim claim = getClaimAt(level, pos);
-
-        if (claim == null) {
-            return true;
-        }
-
-        return claim.canBuild(player.getUUID());
     }
 
     public static PlayerClaim getClaimAt(Level level, BlockPos pos) {
@@ -171,5 +117,171 @@ public class ProtectionHelper {
         }
 
         return claim.getSettings().isAllowOtherFluidFlow();
+    }
+
+    public static boolean canExplosionAffect(Level level, BlockPos pos) {
+        Region region = getRegionAt(level, pos);
+
+        if (region != null) {
+            return region.getSettings().isAllowExplosions();
+        }
+
+        PlayerClaim claim = getClaimAt(level, pos);
+
+        if (claim == null) {
+            return true;
+        }
+
+        return claim.getSettings().isAllowExplosions();
+    }
+
+    public static boolean canPistonMove(Level level, BlockPos from, BlockPos to) {
+        Region fromRegion = getRegionAt(level, from);
+        Region toRegion = getRegionAt(level, to);
+
+        if (fromRegion != null || toRegion != null) {
+            if (fromRegion != null && toRegion != null && sameRegion(fromRegion, toRegion)) {
+                return fromRegion.getSettings().isAllowPistons();
+            }
+
+            if (fromRegion != null && !fromRegion.getSettings().isAllowPistons()) {
+                return false;
+            }
+
+            if (toRegion != null && !toRegion.getSettings().isAllowPistons()) {
+                return false;
+            }
+
+            return true;
+        }
+
+        PlayerClaim fromClaim = getClaimAt(level, from);
+        PlayerClaim toClaim = getClaimAt(level, to);
+
+        if (fromClaim == null && toClaim == null) {
+            return true;
+        }
+
+        if (fromClaim != null && toClaim != null && sameClaim(fromClaim, toClaim)) {
+            return true;
+        }
+
+        if (fromClaim != null && !fromClaim.getSettings().isAllowPistons()) {
+            return false;
+        }
+
+        if (toClaim != null && !toClaim.getSettings().isAllowPistons()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static boolean sameRegion(Region a, Region b) {
+        return a.getName().equalsIgnoreCase(b.getName());
+    }
+
+    private static boolean sameClaim(PlayerClaim a, PlayerClaim b) {
+        return a.getDimension().equals(b.getDimension())
+                && a.getChunkX() == b.getChunkX()
+                && a.getChunkZ() == b.getChunkZ();
+    }
+
+    public static boolean canPlayerPerform(ServerPlayer player, Level level, BlockPos pos, ActionType action) {
+        if (PermissionService.has(player, PermissionService.CLAIM_BYPASS)) {
+            return true;
+        }
+
+        Region region = getRegionAt(level, pos);
+
+        if (region != null) {
+            return switch (action) {
+                case BREAK -> region.getSettings().isAllowBlockBreak() || region.hasAccess(player.getUUID());
+                case PLACE -> region.getSettings().isAllowBlockPlace() || region.hasAccess(player.getUUID());
+                case INTERACT -> region.getSettings().isAllowInteract() || region.hasAccess(player.getUUID());
+            };
+        }
+
+        PlayerClaim claim = getClaimAt(level, pos);
+
+        if (claim == null) {
+            return true;
+        }
+
+        return claim.canBuild(player.getUUID());
+    }
+
+    public static boolean canOwnerlessProjectileHit(Level level, BlockPos pos) {
+        Region region = getRegionAt(level, pos);
+
+        if (region != null) {
+            return false;
+        }
+
+        PlayerClaim claim = getClaimAt(level, pos);
+
+        if (claim == null) {
+            return true;
+        }
+
+        return claim.getSettings().isAllowOwnerlessProjectiles();
+    }
+
+    public static boolean canHopperTransfer(Level level, BlockPos from, BlockPos to) {
+        Region fromRegion = getRegionAt(level, from);
+        Region toRegion = getRegionAt(level, to);
+
+        if (fromRegion != null || toRegion != null) {
+            if (fromRegion == null || toRegion == null) {
+                return false;
+            }
+
+            if (!sameRegion(fromRegion, toRegion)) {
+                return false;
+            }
+
+            return fromRegion.getSettings().isAllowHoppers();
+        }
+
+        PlayerClaim fromClaim = getClaimAt(level, from);
+        PlayerClaim toClaim = getClaimAt(level, to);
+
+        if (fromClaim != null || toClaim != null) {
+            if (fromClaim == null || toClaim == null) {
+                return false;
+            }
+
+            if (!sameClaim(fromClaim, toClaim)) {
+                return false;
+            }
+
+            return fromClaim.getSettings().isAllowHoppers();
+        }
+
+        return true;
+    }
+
+    public static boolean canFireAffect(Level level, BlockPos pos) {
+        Region region = getRegionAt(level, pos);
+
+        if (region != null) {
+            return region.getSettings().isAllowFireSpread();
+        }
+
+        PlayerClaim claim = getClaimAt(level, pos);
+
+        if (claim == null) {
+            return true;
+        }
+
+        return claim.getSettings().isAllowFireSpread();
+    }
+
+    public static boolean canFireAffect(LevelAccessor levelAccessor, BlockPos pos) {
+        if (!(levelAccessor instanceof Level level)) {
+            return true;
+        }
+
+        return canFireAffect(level, pos);
     }
 }

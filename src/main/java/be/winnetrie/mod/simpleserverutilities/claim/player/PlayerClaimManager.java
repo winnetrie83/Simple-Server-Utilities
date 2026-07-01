@@ -80,6 +80,21 @@ public class PlayerClaimManager {
             return false;
         }
 
+        int minX = chunkPos.getMinBlockX();
+        int maxX = chunkPos.getMaxBlockX();
+        int minZ = chunkPos.getMinBlockZ();
+        int maxZ = chunkPos.getMaxBlockZ();
+
+        if (SimpleServerUtilities.REGIONS.overlaps2D(
+                level.dimension(),
+                minX,
+                minZ,
+                maxX,
+                maxZ
+        )) {
+            return false;
+        }
+
         PlayerClaim claim = new PlayerClaim(
             getDimensionId(level), chunkPos.x(), chunkPos.z(), owner);
 

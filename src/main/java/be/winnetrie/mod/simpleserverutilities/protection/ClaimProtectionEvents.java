@@ -16,7 +16,12 @@ public class ClaimProtectionEvents {
             return;
         }
 
-        if (ProtectionHelper.canPlayerBreak(player, player.level(), event.getPos())) {
+        if (ProtectionHelper.canPlayerPerform(
+                player,
+                player.level(),
+                event.getPos(),
+                ProtectionHelper.ActionType.BREAK
+        )) {
             return;
         }
 
@@ -30,7 +35,12 @@ public class ClaimProtectionEvents {
             return;
         }
 
-        if (ProtectionHelper.canPlayerPlace(player, player.level(), event.getPos())) {
+        if (ProtectionHelper.canPlayerPerform(
+                player,
+                player.level(),
+                event.getPos(),
+                ProtectionHelper.ActionType.PLACE
+        )) {
             return;
         }
 
@@ -44,7 +54,12 @@ public class ClaimProtectionEvents {
             return;
         }
 
-        if (ProtectionHelper.canPlayerInteract(player, player.level(), event.getPos())) {
+        if (ProtectionHelper.canPlayerPerform(
+                player,
+                player.level(),
+                event.getPos(),
+                ProtectionHelper.ActionType.INTERACT
+        )) {
             return;
         }
 

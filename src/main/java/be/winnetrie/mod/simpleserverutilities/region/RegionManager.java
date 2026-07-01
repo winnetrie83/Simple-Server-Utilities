@@ -15,12 +15,14 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.Level;
+
 
 public class RegionManager {
 
@@ -90,6 +92,7 @@ public class RegionManager {
                     region.getSettings().setAllowLavaFlow(getBoolean(settings, "allowLavaFlow", false));
                     region.getSettings().setAllowRedstone(getBoolean(settings, "allowRedstone", true));
                     region.getSettings().setAllowHoppers(getBoolean(settings, "allowHoppers", false));
+                    region.getSettings().setAllowFireSpread(getBoolean(settings, "allowFireSpread", false));
                 }
 
                 if (json.has("rent")) {
@@ -168,6 +171,7 @@ public class RegionManager {
                 settings.addProperty("allowLavaFlow", region.getSettings().isAllowLavaFlow());
                 settings.addProperty("allowRedstone", region.getSettings().isAllowRedstone());
                 settings.addProperty("allowHoppers", region.getSettings().isAllowHoppers());
+                settings.addProperty("allowFireSpread", region.getSettings().isAllowFireSpread());
                 json.add("settings", settings);
 
                 JsonObject rent = new JsonObject();
@@ -202,16 +206,28 @@ public class RegionManager {
         }
     }
 
-    public boolean create(String name, ResourceKey<Level> dimension, BlockPos point1, BlockPos point2) {
+    public RegionOperationResult create(String name, ResourceKey<Level> dimension, BlockPos point1, BlockPos point2) {
         String key = normalizeName(name);
 
         if (regions.containsKey(key)) {
-            return false;
+            return RegionOperationResult.fail(
+                    RegionOperationResult.Type.NAME_ALREADY_EXISTS,
+                    name
+            );
+        }
+
+        PlayerClaim overlapClaim = findOverlappingPlayerClaim(dimension, point1, point2);
+
+        if (overlapClaim != null) {
+            return RegionOperationResult.fail(
+                    RegionOperationResult.Type.OVERLAPS_PLAYER_CLAIM,
+                    describeClaim(overlapClaim)
+            );
         }
 
         regions.put(key, new Region(name, dimension, point1, point2));
         save();
-        return true;
+        return RegionOperationResult.success();
     }
 
     public boolean delete(String name) {
@@ -286,6 +302,26 @@ public class RegionManager {
         }
     }
 
+    public boolean overlaps2D(ResourceKey<Level> dimension, int minX, int minZ, int maxX, int maxZ) {
+        for (Region region : regions.values()) {
+            if (!region.getDimension().equals(dimension)) {
+                continue;
+            }
+
+            boolean overlaps =
+                    minX <= region.getMaxX()
+                && maxX >= region.getMinX()
+                && minZ <= region.getMaxZ()
+                && maxZ >= region.getMinZ();
+
+            if (overlaps) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private String normalizeName(String name) {
         return name.toLowerCase();
     }
@@ -314,13 +350,25 @@ public class RegionManager {
         return json.get(key).getAsLong();
     }
 
-    public boolean redefine(String name, ResourceKey<Level> dimension, BlockPos point1, BlockPos point2) {
+    public RegionOperationResult redefine(String name, ResourceKey<Level> dimension, BlockPos point1, BlockPos point2) {
         String key = normalizeName(name);
 
         Region oldRegion = regions.get(key);
 
         if (oldRegion == null) {
-            return false;
+            return RegionOperationResult.fail(
+                    RegionOperationResult.Type.REGION_NOT_FOUND,
+                    name
+            );
+        }
+
+        PlayerClaim overlapClaim = findOverlappingPlayerClaim(dimension, point1, point2);
+
+        if (overlapClaim != null) {
+            return RegionOperationResult.fail(
+                    RegionOperationResult.Type.OVERLAPS_PLAYER_CLAIM,
+                    describeClaim(overlapClaim)
+            );
         }
 
         Region newRegion = new Region(oldRegion.getName(), dimension, point1, point2);
@@ -343,7 +391,7 @@ public class RegionManager {
 
         regions.put(key, newRegion);
         save();
-        return true;
+        return RegionOperationResult.success();
     }
 
     private void copySettings(Region from, Region to) {
@@ -357,5 +405,42 @@ public class RegionManager {
         to.getSettings().setAllowLavaFlow(from.getSettings().isAllowLavaFlow());
         to.getSettings().setAllowRedstone(from.getSettings().isAllowRedstone());
         to.getSettings().setAllowHoppers(from.getSettings().isAllowHoppers());
+        to.getSettings().setAllowFireSpread(from.getSettings().isAllowFireSpread());
+    }
+
+
+    private PlayerClaim findOverlappingPlayerClaim(ResourceKey<Level> dimension, BlockPos point1, BlockPos point2) {
+        int minX = Math.min(point1.getX(), point2.getX());
+        int maxX = Math.max(point1.getX(), point2.getX());
+        int minZ = Math.min(point1.getZ(), point2.getZ());
+        int maxZ = Math.max(point1.getZ(), point2.getZ());
+
+        for (PlayerClaim claim : SimpleServerUtilities.PLAYER_CLAIMS.getClaims()) {
+            if (!claim.getDimension().equals(dimension.identifier().toString())) {
+                continue;
+            }
+
+            int chunkMinX = claim.getChunkX() << 4;
+            int chunkMaxX = chunkMinX + 15;
+            int chunkMinZ = claim.getChunkZ() << 4;
+            int chunkMaxZ = chunkMinZ + 15;
+
+            boolean overlaps =
+                    minX <= chunkMaxX
+                && maxX >= chunkMinX
+                && minZ <= chunkMaxZ
+                && maxZ >= chunkMinZ;
+
+            if (overlaps) {
+                return claim;
+            }
+        }
+
+        return null;
+    }
+
+    private String describeClaim(PlayerClaim claim) {
+        return "chunk " + claim.getChunkX() + ", " + claim.getChunkZ()
+                + " in " + claim.getDimension();
     }
 }

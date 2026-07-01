@@ -12,6 +12,7 @@ public class RegionSettings {
     private boolean allowLavaFlow = false;
     private boolean allowRedstone = true;
     private boolean allowHoppers = false;
+    private boolean allowFireSpread = false;
 
     public boolean isAllowBlockBreak() {
         return allowBlockBreak;
@@ -91,5 +92,13 @@ public class RegionSettings {
 
     public void setAllowHoppers(boolean allowHoppers) {
         this.allowHoppers = allowHoppers;
+    }
+
+    public boolean isAllowFireSpread() {
+        return allowFireSpread;
+    }
+
+    public void setAllowFireSpread(boolean allowFireSpread) {
+        this.allowFireSpread = allowFireSpread;
     }
 }

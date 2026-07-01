@@ -5,7 +5,9 @@
   "mixins": [
 	"FlowingFluidMixin",
 	"BucketItemMixin",
-	"LiquidBlockMixin"
+	"LiquidBlockMixin",
+	"HopperBlockEntityMixin",
+	"FireBlockMixin"
   ],
   "injectors": {
     "defaultRequire": 1

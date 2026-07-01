@@ -1,7 +1,5 @@
 package be.winnetrie.mod.simpleserverutilities.protection;
 
-import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
-import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -85,24 +83,9 @@ public class EntityProtectionEvents {
             return;
         }
 
-        Region region = ProtectionHelper.getRegionAt(projectile.level(), hitEntity.blockPosition());
-
-        if (region != null) {
+        if (!ProtectionHelper.canOwnerlessProjectileHit(projectile.level(), hitEntity.blockPosition())) {
             event.setCanceled(true);
-            return;
         }
-
-        PlayerClaim claim = ProtectionHelper.getClaimAt(projectile.level(), hitEntity.blockPosition());
-
-        if (claim == null) {
-            return;
-        }
-
-        if (claim.getSettings().isAllowOwnerlessProjectiles()) {
-            return;
-        }
-
-        event.setCanceled(true);
     }
 
     private static ServerPlayer getAttackingPlayer(Entity sourceEntity) {

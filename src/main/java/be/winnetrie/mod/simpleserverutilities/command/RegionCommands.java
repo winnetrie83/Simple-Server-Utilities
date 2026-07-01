@@ -18,6 +18,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
+import be.winnetrie.mod.simpleserverutilities.region.RegionOperationResult;
+
 
 import java.util.Set;
 
@@ -249,16 +251,36 @@ public class RegionCommands {
             return 0;
         }
 
-        boolean success = SimpleServerUtilities.REGIONS.create( name, selection.getDimension(), selection.getPoint1(), selection.getPoint2());
+        RegionOperationResult result = SimpleServerUtilities.REGIONS.create(name, selection.getDimension(), selection.getPoint1(), selection.getPoint2());
 
-        if (!success) {
-            player.sendSystemMessage(Component.literal("A region with that name already exists."));
-            return 0;
+        switch (result.getType()) {
+            case SUCCESS -> {
+                player.sendSystemMessage(Component.literal("Region '" + name + "' created."));
+                SELECTIONS.clear(player);
+                return 1;
+            }
+
+            case NAME_ALREADY_EXISTS -> {
+                player.sendSystemMessage(Component.literal("A region with that name already exists: " + result.getDetails()));
+                return 0;
+            }
+
+            case OVERLAPS_PLAYER_CLAIM -> {
+                player.sendSystemMessage(Component.literal("This region overlaps an existing player claim: " + result.getDetails()));
+                return 0;
+            }
+
+            case INVALID_REGION_OVERLAP -> {
+                player.sendSystemMessage(Component.literal("This region overlaps another region incorrectly: " + result.getDetails()));
+                return 0;
+            }
+
+            case REGION_NOT_FOUND -> {
+                player.sendSystemMessage(Component.literal("Region not found: " + result.getDetails()));
+                return 0;
+            }
         }
-
-        player.sendSystemMessage(Component.literal("Region '" + name + "' created."));
-        SELECTIONS.clear(player);
-        return 1;
+        return 0;
     }
 
     private static int delete(CommandSourceStack source, String name) {
@@ -642,21 +664,37 @@ public class RegionCommands {
             return 0;
         }
 
-        boolean success = SimpleServerUtilities.REGIONS.redefine(
-                name,
-                selection.getDimension(),
-                selection.getPoint1(),
-                selection.getPoint2()
-        );
+        RegionOperationResult result = SimpleServerUtilities.REGIONS.redefine(name, selection.getDimension(), selection.getPoint1(), selection.getPoint2());
 
-        if (!success) {
-            player.sendSystemMessage(Component.literal("Region not found: " + name));
-            return 0;
+        switch (result.getType()) {
+            case SUCCESS -> {
+                player.sendSystemMessage(Component.literal("Region '" + name + "' redefined."));
+                SELECTIONS.clear(player);
+                return 1;
+            }
+
+            case NAME_ALREADY_EXISTS -> {
+                player.sendSystemMessage(Component.literal("A region with that name already exists: " + result.getDetails()));
+                return 0;
+            }
+
+            case OVERLAPS_PLAYER_CLAIM -> {
+                player.sendSystemMessage(Component.literal("This region overlaps an existing player claim: " + result.getDetails()));
+                return 0;
+            }
+
+            case INVALID_REGION_OVERLAP -> {
+                player.sendSystemMessage(Component.literal("This region overlaps another region incorrectly: " + result.getDetails()));
+                return 0;
+            }
+
+            case REGION_NOT_FOUND -> {
+                player.sendSystemMessage(Component.literal("Region not found: " + result.getDetails()));
+                return 0;
+            }
         }
 
-        SELECTIONS.clear(player);
-        player.sendSystemMessage(Component.literal("Region '" + name + "' redefined."));
-        return 1;
+        return 0;
     }
 
     private static int save(CommandSourceStack source, String name) {

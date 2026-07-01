@@ -1,6 +1,5 @@
 package be.winnetrie.mod.simpleserverutilities;
 
-import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -25,7 +24,7 @@ public class SimpleServerUtilitiesClient {
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
         // Some client setup code
-        SimpleServerUtilities.LOGGER.info("HELLO FROM CLIENT SETUP");
-        SimpleServerUtilities.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+        //SimpleServerUtilities.LOGGER.info("HELLO FROM CLIENT SETUP");
+        //SimpleServerUtilities.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
     }
 }

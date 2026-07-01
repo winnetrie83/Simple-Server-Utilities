@@ -9,6 +9,7 @@ import be.winnetrie.mod.simpleserverutilities.command.SSUCommands;
 import be.winnetrie.mod.simpleserverutilities.protection.ClaimProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.EntityProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.ExplosionProtectionEvents;
+import be.winnetrie.mod.simpleserverutilities.protection.FireProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.FluidProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.PistonProtectionEvents;
 import net.neoforged.bus.api.IEventBus;
@@ -41,6 +42,8 @@ public class SimpleServerUtilities {
         NeoForge.EVENT_BUS.register(ExplosionProtectionEvents.class);
         NeoForge.EVENT_BUS.register(EntityProtectionEvents.class);
         NeoForge.EVENT_BUS.register(FluidProtectionEvents.class);
+        NeoForge.EVENT_BUS.register(FireProtectionEvents.class);
+        
         
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);

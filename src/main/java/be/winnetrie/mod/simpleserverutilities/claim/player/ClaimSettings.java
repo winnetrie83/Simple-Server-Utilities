@@ -9,6 +9,7 @@ public class ClaimSettings {
     private boolean allowOtherFluidFlow = false;
     private boolean allowRedstone = true;
     private boolean allowHoppers = true;
+    private boolean allowFireSpread = false;
 
     public boolean isAllowPistons() {
         return allowPistons;
@@ -74,5 +75,13 @@ public class ClaimSettings {
 
     public void setAllowOwnerlessProjectiles(boolean allowOwnerlessProjectiles) {
         this.allowOwnerlessProjectiles = allowOwnerlessProjectiles;
+    }
+
+    public boolean isAllowFireSpread() {
+        return allowFireSpread;
+    }
+
+    public void setAllowFireSpread(boolean allowFireSpread) {
+        this.allowFireSpread = allowFireSpread;
     }
 }

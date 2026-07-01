@@ -1,8 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.mixin;
 
-import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.protection.ProtectionHelper;
-import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.LevelAccessor;
@@ -37,23 +35,7 @@ public abstract class FlowingFluidMixin {
         BlockPos targetPos = pos;
         BlockPos sourcePos = targetPos.relative(direction.getOpposite());
 
-        Region sourceRegion = ProtectionHelper.getRegionAt(level, sourcePos);
-        Region targetRegion = ProtectionHelper.getRegionAt(level, targetPos);
-
-        boolean allowed = ProtectionHelper.canFluidAffect(level, sourcePos, targetPos, fluidState);
-
-        SimpleServerUtilities.LOGGER.info(
-                "[SSU Fluid Debug] dir={} source={} sourceRegion={} target={} targetRegion={} fluid={} allowed={}",
-                direction,
-                sourcePos,
-                sourceRegion == null ? "none" : sourceRegion.getName(),
-                targetPos,
-                targetRegion == null ? "none" : targetRegion.getName(),
-                fluidState.getType(),
-                allowed
-        );
-
-        if (!allowed) {
+        if (!ProtectionHelper.canFluidAffect(level, sourcePos, targetPos, fluidState)) {
             ci.cancel();
         }
     }
