@@ -23,6 +23,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.LevelResource;
 
 
 public class RegionManager {
@@ -34,20 +35,37 @@ public class RegionManager {
     //private MinecraftServer server;
     private Path savePath;
 
-    public void load(MinecraftServer server) {
-        //this.server = server;
-        this.savePath = server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)
+    private Path getRegionSavePath(MinecraftServer server) {
+        return server.getWorldPath(LevelResource.ROOT)
+                .resolve("simpleserverutilities")
+                .resolve("regions.json");
+    }
+
+    private Path getLegacyRegionSavePath(MinecraftServer server) {
+        return server.getWorldPath(LevelResource.ROOT)
                 .resolve("simple_server_utilities")
                 .resolve("regions.json");
+    }
+
+    public void load(MinecraftServer server) {
+        this.savePath = getRegionSavePath(server);
+
+        Path loadPath = savePath;
+        Path legacySavePath = getLegacyRegionSavePath(server);
 
         regions.clear();
 
-        if (!Files.exists(savePath)) {
+        if (!Files.exists(loadPath) && Files.exists(legacySavePath)) {
+            loadPath = legacySavePath;
+            SimpleServerUtilities.LOGGER.info("Loading regions from legacy save path: {}", legacySavePath);
+        }
+
+        if (!Files.exists(loadPath)) {
             return;
         }
 
         try {
-            JsonObject root = JsonParser.parseString(Files.readString(savePath)).getAsJsonObject();
+            JsonObject root = JsonParser.parseString(Files.readString(loadPath)).getAsJsonObject();
             JsonArray array = root.getAsJsonArray("regions");
 
             if (array == null) {
@@ -125,6 +143,11 @@ public class RegionManager {
                 }
 
                 regions.put(normalizeName(name), region);
+            }
+
+            if (!loadPath.equals(savePath)) {
+                save();
+                SimpleServerUtilities.LOGGER.info("Migrated regions to new save path: {}", savePath);
             }
 
             SimpleServerUtilities.LOGGER.info("Loaded {} regions.", regions.size());

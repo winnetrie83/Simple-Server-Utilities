@@ -6,6 +6,7 @@ import com.mojang.logging.LogUtils;
 
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaimManager;
 import be.winnetrie.mod.simpleserverutilities.command.SSUCommands;
+import be.winnetrie.mod.simpleserverutilities.home.PlayerHomeManager;
 import be.winnetrie.mod.simpleserverutilities.network.ModNetworking;
 import be.winnetrie.mod.simpleserverutilities.protection.ClaimProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.EntityProtectionEvents;
@@ -24,6 +25,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import be.winnetrie.mod.simpleserverutilities.region.RegionManager;
+import be.winnetrie.mod.simpleserverutilities.warp.WarpManager;
 
 @Mod(SimpleServerUtilities.MODID)
 public class SimpleServerUtilities {
@@ -33,6 +35,8 @@ public class SimpleServerUtilities {
 
     public static final PlayerClaimManager PLAYER_CLAIMS = new PlayerClaimManager();
     public static final RegionManager REGIONS = new RegionManager();
+    public static final PlayerHomeManager HOMES = new PlayerHomeManager();
+    public static final WarpManager WARPS = new WarpManager();
 
     public SimpleServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
@@ -60,6 +64,8 @@ public class SimpleServerUtilities {
     public void onServerStarting(ServerStartingEvent event) {
         PLAYER_CLAIMS.load(event.getServer());
         REGIONS.load(event.getServer());
+        HOMES.load(event.getServer());
+        WARPS.load(event.getServer());
         LOGGER.info("Simple Server Utilities server starting");
     }
 
@@ -67,6 +73,8 @@ public class SimpleServerUtilities {
     public void onServerStopping(ServerStoppingEvent event) {
         PLAYER_CLAIMS.save();
         REGIONS.save();
+        HOMES.save();
+        WARPS.save();
         LOGGER.info("Simple Server Utilities server stopping");
     }
 

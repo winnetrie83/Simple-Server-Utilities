@@ -36,6 +36,27 @@ public class ProtectionHelper {
         return canPlayerPerform(player, level, pos, ActionType.INTERACT);
     }
 
+
+    public static boolean canPlayerPvp(ServerPlayer attacker, Level level, BlockPos targetPos) {
+        if (PermissionService.has(attacker, PermissionService.CLAIM_BYPASS)) {
+            return true;
+        }
+
+        Region region = getRegionAt(level, targetPos);
+
+        if (region != null) {
+            return region.getSettings().isAllowPvp();
+        }
+
+        PlayerClaim claim = getClaimAt(level, targetPos);
+
+        if (claim == null) {
+            return true;
+        }
+
+        return claim.getSettings().isAllowPvp();
+    }
+
     public static boolean canPlayerModify(ServerPlayer player, Level level, BlockPos pos) {
         return canPlayerBreak(player, level, pos) && canPlayerPlace(player, level, pos);
     }

@@ -1,6 +1,8 @@
 package be.winnetrie.mod.simpleserverutilities.permission;
 
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.NameAndId;
 
 public class PermissionService {
 
@@ -11,6 +13,9 @@ public class PermissionService {
     public static final String REGION_CREATE = "ssu.region.create";
     public static final String REGION_DELETE = "ssu.region.delete";
     public static final String REGION_EDIT = "ssu.region.edit";
+
+    public static final String WARP_ADMIN = "ssu.warp.admin";
+    public static final String WARP_USE = "ssu.warp.use";
 
     private PermissionService() {
     }
@@ -24,19 +29,20 @@ public class PermissionService {
             return true;
         }
 
+        if (permission.equals(WARP_USE)) {
+            return true;
+        }
+
         return isAdmin(player);
     }
 
     public static boolean isAdmin(ServerPlayer player) {
-        if (player.level().getServer() == null) {
+        MinecraftServer server = player.level().getServer();
+
+        if (server == null) {
             return false;
         }
-/* 
-        return player.level()
-                .getServer()
-                .getPlayerList()
-                .isOp(new NameAndId(player.getGameProfile()));
-*/
-    return false;
+
+        return server.getPlayerList().isOp(new NameAndId(player.getGameProfile()));
     }
 }

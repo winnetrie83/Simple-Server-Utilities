@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.command;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import be.winnetrie.mod.simpleserverutilities.region.RegionSelection;
 import be.winnetrie.mod.simpleserverutilities.region.RegionSelectionManager;
 
@@ -28,7 +29,6 @@ import java.util.UUID;
 
 import net.minecraft.server.players.PlayerList;
 
-import net.minecraft.server.players.NameAndId;
 
 public class RegionCommands {
 
@@ -793,7 +793,7 @@ public class RegionCommands {
     }
 
     private static boolean isOp(ServerPlayer player) {
-        return player.level().getServer().getPlayerList().isOp(new NameAndId(player.getGameProfile()));
+        return PermissionService.isAdmin(player);
     }
 
     private static Optional<UUID> findPlayerUuid(ServerPlayer player, String name) {

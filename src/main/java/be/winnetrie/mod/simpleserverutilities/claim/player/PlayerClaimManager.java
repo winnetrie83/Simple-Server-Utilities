@@ -5,10 +5,14 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
 import java.util.UUID;
 
 import com.google.gson.Gson;
@@ -207,6 +211,15 @@ public class PlayerClaimManager {
             );
         }
 
+        int maxChunksPerGroup = Config.MAX_PLAYER_CLAIM_CHUNKS_PER_GROUP.get();
+
+        if (maxChunksPerGroup > 0 && claim.getChunkCount() >= maxChunksPerGroup) {
+            return ClaimOperationResult.fail(
+                    ClaimOperationResult.Type.CLAIM_GROUP_CHUNK_LIMIT_REACHED,
+                    "max chunks in this claim: " + maxChunksPerGroup
+            );
+        }
+
         int minX = chunkPos.getMinBlockX();
         int maxX = chunkPos.getMaxBlockX();
         int minZ = chunkPos.getMinBlockZ();
@@ -270,6 +283,13 @@ public class PlayerClaimManager {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.NOT_OWNER,
                     claim.getDisplayName()
+            );
+        }
+        
+        if (wouldDisconnectClaim(claim, chunkPos.x(), chunkPos.z())) {
+            return ClaimOperationResult.fail(
+                    ClaimOperationResult.Type.CHUNK_REMOVAL_DISCONNECTS_CLAIM,
+                    "chunk " + chunkPos.x() + ", " + chunkPos.z()
             );
         }
 
@@ -368,11 +388,65 @@ public class PlayerClaimManager {
         save();
     }
 
+    private boolean wouldDisconnectClaim(PlayerClaim claim, int removedChunkX, int removedChunkZ) {
+        Set<ClaimChunk> remainingChunks = new HashSet<>();
+
+        for (ClaimChunk chunk : claim.getChunks()) {
+            if (chunk.getX() == removedChunkX && chunk.getZ() == removedChunkZ) {
+                continue;
+            }
+
+            remainingChunks.add(chunk);
+        }
+
+        if (remainingChunks.size() <= 1) {
+            return false;
+        }
+
+        Set<ClaimChunk> visited = new HashSet<>();
+        Queue<ClaimChunk> queue = new ArrayDeque<>();
+
+        ClaimChunk start = remainingChunks.iterator().next();
+        queue.add(start);
+        visited.add(start);
+
+        while (!queue.isEmpty()) {
+            ClaimChunk current = queue.poll();
+
+            addConnectedNeighbor(remainingChunks, visited, queue, current.getX() + 1, current.getZ());
+            addConnectedNeighbor(remainingChunks, visited, queue, current.getX() - 1, current.getZ());
+            addConnectedNeighbor(remainingChunks, visited, queue, current.getX(), current.getZ() + 1);
+            addConnectedNeighbor(remainingChunks, visited, queue, current.getX(), current.getZ() - 1);
+        }
+
+        return visited.size() != remainingChunks.size();
+    }
+
+    private void addConnectedNeighbor(
+            Set<ClaimChunk> remainingChunks,
+            Set<ClaimChunk> visited,
+            Queue<ClaimChunk> queue,
+            int chunkX,
+            int chunkZ
+    ) {
+        ClaimChunk neighbor = new ClaimChunk(chunkX, chunkZ);
+
+        if (!remainingChunks.contains(neighbor)) {
+            return;
+        }
+
+        if (!visited.add(neighbor)) {
+            return;
+        }
+
+        queue.add(neighbor);
+    }
+
     private PlayerClaimLimits getLimits(UUID player) {
         return limits.computeIfAbsent(player, uuid -> new PlayerClaimLimits(
                 uuid,
-                Config.MAX_PLAYER_CLAIMS.get(),
-                1
+                Config.MAX_PLAYER_CLAIM_CHUNKS.get(),
+                Config.MAX_PLAYER_CLAIM_GROUPS.get()
         ));
     }
 
@@ -507,6 +581,12 @@ public class PlayerClaimManager {
         }
 
         if (countClaimChunks(player.getUUID()) >= getMaxChunks(player.getUUID())) {
+            return false;
+        }
+
+        int maxChunksPerGroup = Config.MAX_PLAYER_CLAIM_CHUNKS_PER_GROUP.get();
+
+        if (maxChunksPerGroup > 0 && selectedClaim.getChunkCount() >= maxChunksPerGroup) {
             return false;
         }
 

@@ -10,6 +10,7 @@ public class ClaimOperationResult {
         CLAIM_GROUP_NOT_FOUND,
         CLAIM_GROUP_ALREADY_EXISTS,
         CLAIM_GROUP_LIMIT_REACHED,
+        CLAIM_GROUP_CHUNK_LIMIT_REACHED,
 
         WRONG_DIMENSION,
 
@@ -17,6 +18,7 @@ public class ClaimOperationResult {
         CHUNK_NOT_CLAIMED,
         CHUNK_LIMIT_REACHED,
         CHUNK_NOT_ADJACENT,
+        CHUNK_REMOVAL_DISCONNECTS_CLAIM,
         CHUNK_OVERLAPS_REGION,
 
         NOT_OWNER

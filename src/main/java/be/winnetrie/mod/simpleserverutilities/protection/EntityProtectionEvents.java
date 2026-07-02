@@ -21,7 +21,19 @@ public class EntityProtectionEvents {
             return;
         }
 
-        if (ProtectionHelper.canPlayerInteract(player, player.level(), event.getTarget().blockPosition())) {
+        Entity target = event.getTarget();
+
+        if (target instanceof ServerPlayer) {
+            if (ProtectionHelper.canPlayerPvp(player, player.level(), target.blockPosition())) {
+                return;
+            }
+
+            event.setCanceled(true);
+            player.sendSystemMessage(Component.literal("PvP is not allowed here."));
+            return;
+        }
+
+        if (ProtectionHelper.canPlayerInteract(player, player.level(), target.blockPosition())) {
             return;
         }
 
@@ -37,7 +49,19 @@ public class EntityProtectionEvents {
             return;
         }
 
-        if (ProtectionHelper.canPlayerInteract(player, player.level(), event.getEntity().blockPosition())) {
+        Entity target = event.getEntity();
+
+        if (target instanceof ServerPlayer) {
+            if (ProtectionHelper.canPlayerPvp(player, player.level(), target.blockPosition())) {
+                return;
+            }
+
+            event.setCanceled(true);
+            player.sendSystemMessage(Component.literal("PvP is not allowed here."));
+            return;
+        }
+
+        if (ProtectionHelper.canPlayerInteract(player, player.level(), target.blockPosition())) {
             return;
         }
 
@@ -75,6 +99,15 @@ public class EntityProtectionEvents {
         Entity hitEntity = entityHitResult.getEntity();
 
         if (projectile.getOwner() instanceof ServerPlayer player) {
+            if (hitEntity instanceof ServerPlayer) {
+                if (ProtectionHelper.canPlayerPvp(player, player.level(), hitEntity.blockPosition())) {
+                    return;
+                }
+
+                event.setCanceled(true);
+                return;
+            }
+
             if (ProtectionHelper.canPlayerInteract(player, player.level(), hitEntity.blockPosition())) {
                 return;
             }

@@ -4,12 +4,20 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+import net.minecraft.core.BlockPos;
+
 public class PlayerClaim {
 
     private UUID id;
     private String name;
     private String dimension;
     private UUID owner;
+
+    private Integer spawnX;
+    private Integer spawnY;
+    private Integer spawnZ;
+    private float spawnYaw;
+    private float spawnPitch;
 
     private long createdAt;
     private long lastChunkChangeAt;
@@ -89,6 +97,42 @@ public class PlayerClaim {
         this.welcomeMessage = welcomeMessage == null ? "" : welcomeMessage;
     }
 
+    public boolean hasSpawn() {
+        return spawnX != null && spawnY != null && spawnZ != null;
+    }
+
+    public BlockPos getSpawnPos() {
+        if (!hasSpawn()) {
+            return null;
+        }
+
+        return new BlockPos(spawnX, spawnY, spawnZ);
+    }
+
+    public void setSpawn(BlockPos pos, float yaw, float pitch) {
+        this.spawnX = pos.getX();
+        this.spawnY = pos.getY();
+        this.spawnZ = pos.getZ();
+        this.spawnYaw = yaw;
+        this.spawnPitch = pitch;
+    }
+
+    public void clearSpawn() {
+        this.spawnX = null;
+        this.spawnY = null;
+        this.spawnZ = null;
+        this.spawnYaw = 0.0F;
+        this.spawnPitch = 0.0F;
+    }
+
+    public float getSpawnYaw() {
+        return spawnYaw;
+    }
+
+    public float getSpawnPitch() {
+        return spawnPitch;
+    }
+
     public Set<ClaimChunk> getChunks() {
         ensureDefaults();
         return chunks;
@@ -121,6 +165,15 @@ public class PlayerClaim {
 
         if (removed) {
             lastChunkChangeAt = timestamp;
+
+            if (hasSpawn()) {
+                int spawnChunkX = spawnX >> 4;
+                int spawnChunkZ = spawnZ >> 4;
+
+                if (spawnChunkX == chunkX && spawnChunkZ == chunkZ) {
+                    clearSpawn();
+                }
+            }
         }
 
         return removed;

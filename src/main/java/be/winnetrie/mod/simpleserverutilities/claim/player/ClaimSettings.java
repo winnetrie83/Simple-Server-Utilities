@@ -10,6 +10,7 @@ public class ClaimSettings {
     private boolean allowRedstone = true;
     private boolean allowHoppers = true;
     private boolean allowFireSpread = false;
+    private boolean allowPvp = false;
 
     public boolean isAllowPistons() {
         return allowPistons;
@@ -83,5 +84,13 @@ public class ClaimSettings {
 
     public void setAllowFireSpread(boolean allowFireSpread) {
         this.allowFireSpread = allowFireSpread;
+    }
+
+    public boolean isAllowPvp() {
+        return allowPvp;
+    }
+
+    public void setAllowPvp(boolean allowPvp) {
+        this.allowPvp = allowPvp;
     }
 }
