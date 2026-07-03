@@ -12,6 +12,6 @@ public class SSUCommands {
         dispatcher.register(HomeCommands.build());
         dispatcher.register(WarpCommands.build());
         // dispatcher.register(KitCommands.build());
-        // dispatcher.register(PermissionCommands.build());
+        dispatcher.register(PermissionCommands.build());
     }
 }

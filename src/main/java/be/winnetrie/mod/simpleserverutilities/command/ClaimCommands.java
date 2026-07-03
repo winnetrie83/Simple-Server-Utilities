@@ -5,7 +5,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapData;
@@ -13,7 +12,8 @@ import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimOperationResult;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
-import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.ClaimPolicy;
 
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -147,7 +147,7 @@ public class ClaimCommands {
 
                 .then(Commands.literal("admin")
                         .requires(source -> source.getEntity() instanceof ServerPlayer player
-                                && PermissionService.has(player, PermissionService.CLAIM_BYPASS))
+                                && ClaimPolicy.hasAdminBypass(player))
 
                         .then(Commands.literal("list")
                                 .then(Commands.argument("player", StringArgumentType.word())
@@ -192,7 +192,7 @@ public class ClaimCommands {
 
                 .then(Commands.literal("chunks")
                         .requires(source -> source.getEntity() instanceof ServerPlayer player
-                                && PermissionService.has(player, PermissionService.CLAIM_BYPASS))
+                                && ClaimPolicy.hasAdminBypass(player))
                         .then(Commands.argument("player", StringArgumentType.word())
                                 .then(Commands.literal("set")
                                         .then(Commands.argument("number", IntegerArgumentType.integer(0))
@@ -211,7 +211,7 @@ public class ClaimCommands {
 
                 .then(Commands.literal("groups")
                         .requires(source -> source.getEntity() instanceof ServerPlayer player
-                                && PermissionService.has(player, PermissionService.CLAIM_BYPASS))
+                                && ClaimPolicy.hasAdminBypass(player))
                         .then(Commands.argument("player", StringArgumentType.word())
                                 .then(Commands.literal("set")
                                         .then(Commands.argument("number", IntegerArgumentType.integer(0))
@@ -232,20 +232,16 @@ public class ClaimCommands {
     private static int create(CommandSourceStack source, String name) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!Config.ENABLE_PLAYER_CLAIMS.get()) {
-            player.sendSystemMessage(Component.literal("Player claims are disabled."));
-            return 0;
-        }
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
 
-        if (!PermissionService.has(player, PermissionService.CLAIM_CREATE)) {
-            player.sendSystemMessage(Component.literal("You do not have permission to create claims."));
+        if (!ClaimPolicy.canCreateClaim(player, context)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to create claims here."));
             return 0;
         }
 
         ClaimOperationResult result = SimpleServerUtilities.PLAYER_CLAIMS.createClaimGroupResult(
-                player.level(),
-                name,
-                player.getUUID()
+                player,
+                name
         );
 
         if (!result.isSuccess()) {
@@ -259,7 +255,13 @@ public class ClaimCommands {
 
     private static int delete(CommandSourceStack source, String name) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
-        boolean adminBypass = PermissionService.has(player, PermissionService.CLAIM_BYPASS);
+
+        if (!ClaimPolicy.canDeleteClaim(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to delete claims."));
+            return 0;
+        }
+
+        boolean adminBypass = ClaimPolicy.hasAdminBypass(player);
 
         boolean success = SimpleServerUtilities.PLAYER_CLAIMS.deleteClaimGroup(
                 player.getUUID(),
@@ -279,8 +281,15 @@ public class ClaimCommands {
     private static int list(CommandSourceStack source) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
+
+        if (!ClaimPolicy.canUseClaims(player, context)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to use claims here."));
+            return 0;
+        }
+
         int count = SimpleServerUtilities.PLAYER_CLAIMS.countClaimGroups(player.getUUID());
-        int max = SimpleServerUtilities.PLAYER_CLAIMS.getMaxClaimGroups(player.getUUID());
+        int max = ClaimPolicy.getMaxClaimGroups(player, context);
 
         player.sendSystemMessage(Component.literal("Claims: " + count + " / " + max));
 
@@ -316,22 +325,18 @@ public class ClaimCommands {
     private static int claimChunk(CommandSourceStack source, String name) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!Config.ENABLE_PLAYER_CLAIMS.get()) {
-            player.sendSystemMessage(Component.literal("Player claims are disabled."));
-            return 0;
-        }
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
 
-        if (!PermissionService.has(player, PermissionService.CLAIM_CREATE)) {
-            player.sendSystemMessage(Component.literal("You do not have permission to claim chunks."));
+        if (!ClaimPolicy.canCreateClaim(player, context)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to claim chunks here."));
             return 0;
         }
 
         ChunkPos chunkPos = player.chunkPosition();
 
         ClaimOperationResult result = SimpleServerUtilities.PLAYER_CLAIMS.claimChunkResult(
-                player.level(),
+                player,
                 chunkPos,
-                player.getUUID(),
                 name
         );
 
@@ -348,7 +353,7 @@ public class ClaimCommands {
         ServerPlayer player = (ServerPlayer) source.getEntity();
         ChunkPos chunkPos = player.chunkPosition();
 
-        boolean adminBypass = PermissionService.has(player, PermissionService.CLAIM_BYPASS);
+        boolean adminBypass = ClaimPolicy.hasAdminBypass(player);
 
         ClaimOperationResult result = SimpleServerUtilities.PLAYER_CLAIMS.unclaimResult(
                 player.level(),
@@ -372,6 +377,11 @@ public class ClaimCommands {
 
         if (claim == null) {
             player.sendSystemMessage(Component.literal("Claim not found: " + claimName));
+            return 0;
+        }
+
+        if (!ClaimPolicy.canTrust(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to trust players in claims."));
             return 0;
         }
 
@@ -408,6 +418,11 @@ public class ClaimCommands {
             return 0;
         }
 
+        if (!ClaimPolicy.canTrust(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to untrust players in claims."));
+            return 0;
+        }
+
         if (!canEditClaim(player, claim)) {
             player.sendSystemMessage(Component.literal("Only the claim owner can untrust players."));
             return 0;
@@ -433,6 +448,11 @@ public class ClaimCommands {
 
         if (claim == null) {
             player.sendSystemMessage(Component.literal("Claim not found: " + claimName));
+            return 0;
+        }
+
+        if (!ClaimPolicy.canEditFlags(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to change claim flags."));
             return 0;
         }
 
@@ -598,6 +618,12 @@ public class ClaimCommands {
 
     private static int teleportToOwnClaim(CommandSourceStack source, String claimName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
+
+        if (!ClaimPolicy.canTeleportClaim(player, context)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to teleport to claims here."));
+            return 0;
+        }
 
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
 
@@ -828,7 +854,7 @@ public class ClaimCommands {
     }
 
     private static boolean canEditClaim(ServerPlayer player, PlayerClaim claim) {
-        return claim.isOwner(player.getUUID()) || PermissionService.has(player, PermissionService.CLAIM_BYPASS);
+        return claim.isOwner(player.getUUID()) || ClaimPolicy.hasAdminBypass(player);
     }
 
     private static String formatTimestamp(long timestamp) {
@@ -930,6 +956,11 @@ public class ClaimCommands {
     private static int map(CommandSourceStack source, String claimName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
+        if (!ClaimPolicy.canUseMap(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to use the claim map."));
+            return 0;
+        }
+
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
 
         if (claim == null) {
@@ -997,6 +1028,11 @@ public class ClaimCommands {
 
     private static int gui(CommandSourceStack source, String claimName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!ClaimPolicy.canUseMap(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to use the claim map."));
+            return 0;
+        }
 
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
 

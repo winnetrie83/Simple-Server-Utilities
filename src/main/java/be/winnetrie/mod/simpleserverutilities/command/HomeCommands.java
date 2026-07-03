@@ -1,12 +1,15 @@
 package be.winnetrie.mod.simpleserverutilities.command;
 
 import java.util.Collection;
-import java.util.Set;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 
-import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.HomePolicy;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportOptions;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportPolicy;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportType;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.home.PlayerHome;
 import net.minecraft.commands.CommandSourceStack;
@@ -73,6 +76,9 @@ public class HomeCommands {
                                         context.getSource(),
                                         StringArgumentType.getString(context, "name")
                                 ))))
+                // /homes cancel
+                .then(Commands.literal("cancel")
+                        .executes(context -> cancelTeleport(context.getSource())))
 
                 // /homes help
                 .then(Commands.literal("help")
@@ -82,15 +88,15 @@ public class HomeCommands {
     private static int setHome(CommandSourceStack source, String homeName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!Config.ENABLE_HOMES.get()) {
-            player.sendSystemMessage(Component.literal("Homes are disabled on this server."));
+        if (!HomePolicy.canSetHomeAt(player, player.blockPosition())) {
+            player.sendSystemMessage(Component.literal("You do not have permission to set homes here."));
             return 0;
         }
 
         boolean success = SimpleServerUtilities.HOMES.setHome(player, homeName);
 
         if (!success) {
-            int max = SimpleServerUtilities.HOMES.getMaxHomes(player.getUUID());
+            int max = HomePolicy.getMaxHomes(player);
             player.sendSystemMessage(Component.literal("You reached the maximum amount of homes: " + max));
             return 0;
         }
@@ -102,8 +108,10 @@ public class HomeCommands {
     private static int teleportHome(CommandSourceStack source, String homeName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!Config.ENABLE_HOMES.get()) {
-            player.sendSystemMessage(Component.literal("Homes are disabled on this server."));
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
+
+        if (!HomePolicy.canTeleportHome(player, context)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to teleport to homes here."));
             return 0;
         }
 
@@ -121,32 +129,24 @@ public class HomeCommands {
             return 0;
         }
 
-        player.teleportTo(
-                level,
-                home.getX(),
-                home.getY(),
-                home.getZ(),
-                Set.of(),
-                home.getYaw(),
-                home.getPitch(),
-                true
-        );
+        TeleportOptions options = TeleportPolicy.resolve(player, TeleportType.HOME, context);
 
-        player.sendSystemMessage(Component.literal("Teleported to home '" + home.getDisplayName() + "'."));
-        return 1;
+        return SimpleServerUtilities.TELEPORTS.requestTeleport(player, "homes", "home '" + home.getDisplayName() + "'", options, level, home.getX(), home.getY(), home.getZ(), home.getYaw(), home.getPitch());
     }
 
     private static int listHomes(CommandSourceStack source) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!Config.ENABLE_HOMES.get()) {
-            player.sendSystemMessage(Component.literal("Homes are disabled on this server."));
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
+
+        if (!HomePolicy.canUseHomes(player, context)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to use homes here."));
             return 0;
         }
 
         Collection<PlayerHome> homes = SimpleServerUtilities.HOMES.getHomes(player.getUUID());
         int count = SimpleServerUtilities.HOMES.countHomes(player.getUUID());
-        int max = SimpleServerUtilities.HOMES.getMaxHomes(player.getUUID());
+        int max = HomePolicy.getMaxHomes(player);
 
         player.sendSystemMessage(Component.literal("Homes: " + count + " / " + max));
 
@@ -171,8 +171,10 @@ public class HomeCommands {
     private static int deleteHome(CommandSourceStack source, String homeName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!Config.ENABLE_HOMES.get()) {
-            player.sendSystemMessage(Component.literal("Homes are disabled on this server."));
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
+
+        if (!HomePolicy.canDeleteHome(player, context)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to delete homes here."));
             return 0;
         }
 
@@ -199,6 +201,7 @@ public class HomeCommands {
         player.sendSystemMessage(Component.literal(" - /homes tp <name>"));
         player.sendSystemMessage(Component.literal(" - /homes delhome"));
         player.sendSystemMessage(Component.literal(" - /homes delhome <name>"));
+        player.sendSystemMessage(Component.literal(" - /homes cancel"));
 
         return 1;
     }
@@ -216,5 +219,19 @@ public class HomeCommands {
 
     private static String formatCoordinate(double coordinate) {
         return String.format("%.1f", coordinate);
+    }
+
+    private static int cancelTeleport(CommandSourceStack source) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        boolean cancelled = SimpleServerUtilities.TELEPORTS.cancel(player);
+
+        if (!cancelled) {
+            player.sendSystemMessage(Component.literal("You do not have a pending teleport."));
+            return 0;
+        }
+
+        player.sendSystemMessage(Component.literal("Pending teleport cancelled."));
+        return 1;
     }
 }

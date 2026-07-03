@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 import com.google.gson.Gson;
@@ -31,6 +32,7 @@ public class RegionManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private final Map<String, Region> regions = new HashMap<>();
+    private boolean rentingEnabled = true;
 
     //private MinecraftServer server;
     private Path savePath;
@@ -66,6 +68,8 @@ public class RegionManager {
 
         try {
             JsonObject root = JsonParser.parseString(Files.readString(loadPath)).getAsJsonObject();
+            rentingEnabled = getBoolean(root, "rentingEnabled", true);
+
             JsonArray array = root.getAsJsonArray("regions");
 
             if (array == null) {
@@ -97,6 +101,18 @@ public class RegionManager {
 
                 loadUuidSet(json, "owners", region.getOwners());
                 loadUuidSet(json, "members", region.getMembers());
+
+                if (json.has("permissions")) {
+                    JsonObject permissions = json.getAsJsonObject("permissions");
+
+                    for (Entry<String, com.google.gson.JsonElement> entry : permissions.entrySet()) {
+                        if (entry.getValue() == null || entry.getValue().isJsonNull()) {
+                            continue;
+                        }
+
+                        region.setPermissionOverride(entry.getKey(), entry.getValue().getAsString());
+                    }
+                }
 
                 if (json.has("settings")) {
                     JsonObject settings = json.getAsJsonObject("settings");
@@ -165,6 +181,8 @@ public class RegionManager {
             Files.createDirectories(savePath.getParent());
 
             JsonObject root = new JsonObject();
+            root.addProperty("rentingEnabled", rentingEnabled);
+
             JsonArray array = new JsonArray();
 
             for (Region region : regions.values()) {
@@ -183,6 +201,16 @@ public class RegionManager {
 
                 json.add("owners", saveUuidSet(region.getOwners()));
                 json.add("members", saveUuidSet(region.getMembers()));
+
+                if (!region.getPermissionOverrides().isEmpty()) {
+                    JsonObject permissions = new JsonObject();
+
+                    for (Entry<String, String> entry : region.getPermissionOverrides().entrySet()) {
+                        permissions.addProperty(entry.getKey(), entry.getValue());
+                    }
+
+                    json.add("permissions", permissions);
+                }
 
                 JsonObject settings = new JsonObject();
                 settings.addProperty("allowBlockBreak", region.getSettings().isAllowBlockBreak());
@@ -298,6 +326,15 @@ public class RegionManager {
 
     public Collection<Region> getAll() {
         return regions.values();
+    }
+
+    public boolean isRentingEnabled() {
+        return rentingEnabled;
+    }
+
+    public void setRentingEnabled(boolean rentingEnabled) {
+        this.rentingEnabled = rentingEnabled;
+        save();
     }
 
     public boolean exists(String name) {

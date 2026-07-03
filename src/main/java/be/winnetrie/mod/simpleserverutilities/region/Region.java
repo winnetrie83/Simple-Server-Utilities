@@ -1,6 +1,8 @@
 package be.winnetrie.mod.simpleserverutilities.region;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -27,6 +29,13 @@ public class Region {
 
     private final RegionSettings settings = new RegionSettings();
     private final RegionRentData rentData = new RegionRentData();
+
+    /**
+     * Optional permission overrides for this specific region.
+     * These are resolved only for the effective region, so nested regions keep priority.
+     * Values are stored as strings so the same map can hold booleans, integers and later enums.
+     */
+    private final Map<String, String> permissionOverrides = new HashMap<>();
 
     private BlockPos spawnPos;
     private float spawnYaw;
@@ -129,6 +138,31 @@ public class Region {
 
     public RegionRentData getRentData() {
         return rentData;
+    }
+
+    public Map<String, String> getPermissionOverrides() {
+        return permissionOverrides;
+    }
+
+    public String getPermissionOverride(String key) {
+        return permissionOverrides.get(key);
+    }
+
+    public void setPermissionOverride(String key, String value) {
+        if (key == null || key.isBlank()) {
+            return;
+        }
+
+        if (value == null || value.isBlank()) {
+            permissionOverrides.remove(key);
+            return;
+        }
+
+        permissionOverrides.put(key.trim(), value.trim());
+    }
+
+    public void removePermissionOverride(String key) {
+        permissionOverrides.remove(key);
     }
 
     public BlockPos getSpawnPos() {

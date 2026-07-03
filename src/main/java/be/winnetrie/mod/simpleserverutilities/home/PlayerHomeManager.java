@@ -16,6 +16,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.HomePolicy;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -116,7 +117,7 @@ public class PlayerHomeManager {
             return true;
         }
 
-        if (ownerHomes.size() >= getMaxHomes(owner)) {
+        if (ownerHomes.size() >= getMaxHomes(player)) {
             return false;
         }
 
@@ -186,6 +187,14 @@ public class PlayerHomeManager {
         return ownerHomes == null ? 0 : ownerHomes.size();
     }
 
+    public int getMaxHomes(ServerPlayer player) {
+        return HomePolicy.getMaxHomes(player);
+    }
+
+    /**
+     * Fallback for places that only know a UUID. Prefer getMaxHomes(ServerPlayer) when possible,
+     * because the permission/rank system is player-context aware.
+     */
     public int getMaxHomes(UUID owner) {
         return Config.MAX_PLAYER_HOMES.get();
     }

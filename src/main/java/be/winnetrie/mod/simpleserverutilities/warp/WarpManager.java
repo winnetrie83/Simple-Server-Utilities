@@ -14,7 +14,8 @@ import java.util.Map;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import be.winnetrie.mod.simpleserverutilities.Config;
+
+import be.winnetrie.mod.simpleserverutilities.permission.policy.WarpPolicy;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -104,7 +105,7 @@ public class WarpManager {
             return true;
         }
 
-        int maxWarps = Config.MAX_WARPS.get();
+        int maxWarps = WarpPolicy.getMaxWarps(player);
 
         if (maxWarps > 0 && warps.size() >= maxWarps) {
             return false;

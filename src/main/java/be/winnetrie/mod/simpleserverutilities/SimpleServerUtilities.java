@@ -8,6 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaimManager;
 import be.winnetrie.mod.simpleserverutilities.command.SSUCommands;
 import be.winnetrie.mod.simpleserverutilities.home.PlayerHomeManager;
 import be.winnetrie.mod.simpleserverutilities.network.ModNetworking;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionManager;
 import be.winnetrie.mod.simpleserverutilities.protection.ClaimProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.EntityProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.ExplosionProtectionEvents;
@@ -25,6 +26,10 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import be.winnetrie.mod.simpleserverutilities.region.RegionManager;
+import be.winnetrie.mod.simpleserverutilities.region.RegionRentEvents;
+import be.winnetrie.mod.simpleserverutilities.region.RegionSnapshotManager;
+import be.winnetrie.mod.simpleserverutilities.teleport.TeleportEvents;
+import be.winnetrie.mod.simpleserverutilities.teleport.TeleportManager;
 import be.winnetrie.mod.simpleserverutilities.warp.WarpManager;
 
 @Mod(SimpleServerUtilities.MODID)
@@ -35,8 +40,11 @@ public class SimpleServerUtilities {
 
     public static final PlayerClaimManager PLAYER_CLAIMS = new PlayerClaimManager();
     public static final RegionManager REGIONS = new RegionManager();
+    public static final RegionSnapshotManager REGION_SNAPSHOTS = new RegionSnapshotManager();
     public static final PlayerHomeManager HOMES = new PlayerHomeManager();
     public static final WarpManager WARPS = new WarpManager();
+    public static final PermissionManager PERMISSIONS = new PermissionManager();
+    public static final TeleportManager TELEPORTS = new TeleportManager();
 
     public SimpleServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
@@ -50,6 +58,8 @@ public class SimpleServerUtilities {
         NeoForge.EVENT_BUS.register(EntityProtectionEvents.class);
         NeoForge.EVENT_BUS.register(FluidProtectionEvents.class);
         NeoForge.EVENT_BUS.register(FireProtectionEvents.class);
+        NeoForge.EVENT_BUS.register(TeleportEvents.class);
+        NeoForge.EVENT_BUS.register(RegionRentEvents.class);
         
         
 
@@ -64,8 +74,10 @@ public class SimpleServerUtilities {
     public void onServerStarting(ServerStartingEvent event) {
         PLAYER_CLAIMS.load(event.getServer());
         REGIONS.load(event.getServer());
+        REGION_SNAPSHOTS.load(event.getServer());
         HOMES.load(event.getServer());
         WARPS.load(event.getServer());
+        PERMISSIONS.load(event.getServer());
         LOGGER.info("Simple Server Utilities server starting");
     }
 
@@ -75,6 +87,7 @@ public class SimpleServerUtilities {
         REGIONS.save();
         HOMES.save();
         WARPS.save();
+        PERMISSIONS.save();
         LOGGER.info("Simple Server Utilities server stopping");
     }
 

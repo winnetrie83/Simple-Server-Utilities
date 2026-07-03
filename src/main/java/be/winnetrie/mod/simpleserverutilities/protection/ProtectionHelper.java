@@ -2,7 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.protection;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
-import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.ClaimPolicy;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -38,7 +38,7 @@ public class ProtectionHelper {
 
 
     public static boolean canPlayerPvp(ServerPlayer attacker, Level level, BlockPos targetPos) {
-        if (PermissionService.has(attacker, PermissionService.CLAIM_BYPASS)) {
+        if (ClaimPolicy.hasAdminBypass(attacker)) {
             return true;
         }
 
@@ -207,7 +207,7 @@ public class ProtectionHelper {
     }
 
     public static boolean canPlayerPerform(ServerPlayer player, Level level, BlockPos pos, ActionType action) {
-        if (PermissionService.has(player, PermissionService.CLAIM_BYPASS)) {
+        if (ClaimPolicy.hasAdminBypass(player)) {
             return true;
         }
 

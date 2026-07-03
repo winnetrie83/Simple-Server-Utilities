@@ -2,14 +2,16 @@ package be.winnetrie.mod.simpleserverutilities.command;
 
 import java.util.Collection;
 import java.util.Locale;
-import java.util.Set;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 
-import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportOptions;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportPolicy;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportType;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.WarpPolicy;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
-import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import be.winnetrie.mod.simpleserverutilities.warp.Warp;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -48,7 +50,7 @@ public class WarpCommands {
                 // /warps set <name>
                 .then(Commands.literal("set")
                         .requires(source -> source.getEntity() instanceof ServerPlayer player
-                                && PermissionService.has(player, PermissionService.WARP_ADMIN))
+                                && WarpPolicy.canSetWarp(player))
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(context -> setWarp(
                                         context.getSource(),
@@ -58,7 +60,7 @@ public class WarpCommands {
                 // /warps delete <name>
                 .then(Commands.literal("delete")
                         .requires(source -> source.getEntity() instanceof ServerPlayer player
-                                && PermissionService.has(player, PermissionService.WARP_ADMIN))
+                                && WarpPolicy.canDeleteWarp(player))
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(context -> deleteWarp(
                                         context.getSource(),
@@ -68,12 +70,15 @@ public class WarpCommands {
                 // /warps info <name>
                 .then(Commands.literal("info")
                         .requires(source -> source.getEntity() instanceof ServerPlayer player
-                                && PermissionService.has(player, PermissionService.WARP_ADMIN))
+                                && WarpPolicy.canViewWarpInfo(player))
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(context -> infoWarp(
                                         context.getSource(),
                                         StringArgumentType.getString(context, "name")
                                 ))))
+                // /warps cancel
+                .then(Commands.literal("cancel")
+                        .executes(context -> cancelTeleport(context.getSource())))
 
                 // /warps help
                 .then(Commands.literal("help")
@@ -83,15 +88,17 @@ public class WarpCommands {
     private static int listWarps(CommandSourceStack source) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!Config.ENABLE_WARPS.get()) {
-            player.sendSystemMessage(Component.literal("Warps are disabled on this server."));
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
+
+        if (!WarpPolicy.canUseWarps(player, context)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to use warps here."));
             return 0;
         }
 
         Collection<Warp> warps = SimpleServerUtilities.WARPS.getWarps();
 
         int count = SimpleServerUtilities.WARPS.countWarps();
-        int max = Config.MAX_WARPS.get();
+        int max = WarpPolicy.getMaxWarps(player);
 
         if (max > 0) {
             player.sendSystemMessage(Component.literal("Warps: " + count + " / " + max));
@@ -115,13 +122,10 @@ public class WarpCommands {
     private static int teleportWarp(CommandSourceStack source, String warpName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!Config.ENABLE_WARPS.get()) {
-            player.sendSystemMessage(Component.literal("Warps are disabled on this server."));
-            return 0;
-        }
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
 
-        if (!PermissionService.has(player, PermissionService.WARP_USE)) {
-            player.sendSystemMessage(Component.literal("You do not have permission to use warps."));
+        if (!WarpPolicy.canTeleportWarp(player, context)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to use warps here."));
             return 0;
         }
 
@@ -139,33 +143,36 @@ public class WarpCommands {
             return 0;
         }
 
-        player.teleportTo(
+        TeleportOptions options = TeleportPolicy.resolve(player, TeleportType.WARP, context);
+
+        return SimpleServerUtilities.TELEPORTS.requestTeleport(
+                player,
+                "warps",
+                "warp '" + warp.getDisplayName() + "'",
+                options,
                 level,
                 warp.getX(),
                 warp.getY(),
                 warp.getZ(),
-                Set.of(),
                 warp.getYaw(),
-                warp.getPitch(),
-                true
+                warp.getPitch()
         );
-
-        player.sendSystemMessage(Component.literal("Teleported to warp '" + warp.getDisplayName() + "'."));
-        return 1;
     }
 
     private static int setWarp(CommandSourceStack source, String warpName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!Config.ENABLE_WARPS.get()) {
-            player.sendSystemMessage(Component.literal("Warps are disabled on this server."));
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
+
+        if (!WarpPolicy.canSetWarp(player, context)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to set warps here."));
             return 0;
         }
 
         boolean success = SimpleServerUtilities.WARPS.setWarp(player, warpName);
 
         if (!success) {
-            int max = Config.MAX_WARPS.get();
+            int max = WarpPolicy.getMaxWarps(player);
             player.sendSystemMessage(Component.literal("You reached the maximum amount of warps: " + max));
             return 0;
         }
@@ -177,8 +184,10 @@ public class WarpCommands {
     private static int deleteWarp(CommandSourceStack source, String warpName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!Config.ENABLE_WARPS.get()) {
-            player.sendSystemMessage(Component.literal("Warps are disabled on this server."));
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
+
+        if (!WarpPolicy.canDeleteWarp(player, context)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to delete warps here."));
             return 0;
         }
 
@@ -196,8 +205,10 @@ public class WarpCommands {
     private static int infoWarp(CommandSourceStack source, String warpName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!Config.ENABLE_WARPS.get()) {
-            player.sendSystemMessage(Component.literal("Warps are disabled on this server."));
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
+
+        if (!WarpPolicy.canViewWarpInfo(player, context)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to view warp info here."));
             return 0;
         }
 
@@ -230,8 +241,9 @@ public class WarpCommands {
         player.sendSystemMessage(Component.literal(" - /warps"));
         player.sendSystemMessage(Component.literal(" - /warps list"));
         player.sendSystemMessage(Component.literal(" - /warps tp <name>"));
+        player.sendSystemMessage(Component.literal(" - /warps cancel"));
 
-        if (PermissionService.has(player, PermissionService.WARP_ADMIN)) {
+        if (WarpPolicy.canAdminWarps(player)) {
             player.sendSystemMessage(Component.literal("Admin commands:"));
             player.sendSystemMessage(Component.literal(" - /warps set <name>"));
             player.sendSystemMessage(Component.literal(" - /warps delete <name>"));
@@ -254,5 +266,20 @@ public class WarpCommands {
 
     private static String formatCoordinate(double coordinate) {
         return String.format(Locale.ROOT, "%.1f", coordinate);
+    }
+
+
+    private static int cancelTeleport(CommandSourceStack source) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        boolean cancelled = SimpleServerUtilities.TELEPORTS.cancel(player);
+
+        if (!cancelled) {
+            player.sendSystemMessage(Component.literal("You do not have a pending teleport."));
+            return 0;
+        }
+
+        player.sendSystemMessage(Component.literal("Pending teleport cancelled."));
+        return 1;
     }
 }
