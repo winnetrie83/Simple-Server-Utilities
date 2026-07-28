@@ -97,14 +97,10 @@ public final class RegionWorldEditManager {
         Set<String> locks = new HashSet<>();
         locks.add(SsuJobLocks.cuboid(level.dimension(), minX, minY, minZ, maxX, maxY, maxZ));
 
-        for (Region region : SimpleServerUtilities.REGIONS.getAll()) {
-            if (!region.getDimension().equals(level.dimension())) {
-                continue;
-            }
-            boolean overlaps = minX <= region.getMaxX() && maxX >= region.getMinX()
-                    && minY <= region.getMaxY() && maxY >= region.getMinY()
-                    && minZ <= region.getMaxZ() && maxZ >= region.getMinZ();
-            if (overlaps) {
+        for (Region region : SimpleServerUtilities.REGIONS.getIntersecting2D(
+                level.dimension(), minX, minZ, maxX, maxZ)) {
+            boolean overlapsY = minY <= region.getMaxY() && maxY >= region.getMinY();
+            if (overlapsY) {
                 locks.add(SsuJobLocks.region(region.getDimension(), region.getName()));
             }
         }

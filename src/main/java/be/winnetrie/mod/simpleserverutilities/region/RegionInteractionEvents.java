@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.economy.MoneyFormat;
 import be.winnetrie.mod.simpleserverutilities.command.RegionCommands;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.RegionPolicy;
 import net.minecraft.ChatFormatting;
@@ -160,7 +161,10 @@ public class RegionInteractionEvents {
         RegionRentData rentData = region.getRentData();
 
         player.sendSystemMessage(Component.literal("Rent region: " + region.getName()).withStyle(ChatFormatting.GOLD));
-        player.sendSystemMessage(Component.literal("Price: " + rentData.getAmount() + " / " + formatPeriod(rentData)));
+        player.sendSystemMessage(Component.literal("Price: " + MoneyFormat.format(
+                rentData.getPriceMinor(SimpleServerUtilities.ECONOMY.settings()),
+                SimpleServerUtilities.ECONOMY.settings()
+        ) + " / " + formatPeriod(rentData)));
         player.sendSystemMessage(Component.literal("Remaining status: " + (rentData.isRented() ? "already rented" : "available")));
 
         if (rentData.isRented()) {

@@ -21,6 +21,7 @@ import com.google.gson.JsonParser;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
+import be.winnetrie.mod.simpleserverutilities.core.performance.RegionSpatialIndex;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
@@ -38,7 +39,9 @@ public class RegionManager {
     private final Map<String, Region> regions = new HashMap<>();
     private final DirtyJsonRecordStore regionRecordStore = new DirtyJsonRecordStore();
     private final DirtyJsonRecordStore settingsRecordStore = new DirtyJsonRecordStore();
+    private final RegionSpatialIndex spatialIndex = new RegionSpatialIndex();
     private boolean rentingEnabled = true;
+    private final RegionRentEconomySettings rentEconomySettings = new RegionRentEconomySettings();
 
     private Path rootFolder;
     private Path regionsFolder;
@@ -55,8 +58,12 @@ public class RegionManager {
 
         regions.clear();
         rentingEnabled = true;
+        rentEconomySettings.setOwnerSharePermille(0);
+        rentEconomySettings.setPlayerCancelRefundPermille(0);
+        rentEconomySettings.setAdminCancelRefundPermille(1_000);
         regionRecordStore.reset();
         settingsRecordStore.reset();
+        spatialIndex.clear();
 
         try {
             Files.createDirectories(rootFolder);
@@ -101,7 +108,8 @@ public class RegionManager {
                 save();
             }
 
-            SimpleServerUtilities.LOGGER.info("Loaded {} regions.", regions.size());
+            spatialIndex.rebuild(regions.values());
+            SimpleServerUtilities.LOGGER.info("Loaded {} regions into {} spatial cells.", regions.size(), spatialIndex.statistics().cells());
         } catch (Exception e) {
             SimpleServerUtilities.LOGGER.error("Failed to load regions.", e);
         }
@@ -112,12 +120,19 @@ public class RegionManager {
             return;
         }
 
+        // Region permission overrides are part of permission resolution.
+        SimpleServerUtilities.PERMISSIONS.invalidateResolutionCache();
+
         try {
             Files.createDirectories(regionEntriesFolder);
 
             JsonObject settings = new JsonObject();
-            settings.addProperty("schemaVersion", 1);
+            settings.addProperty("schemaVersion", 2);
             settings.addProperty("rentingEnabled", rentingEnabled);
+            rentEconomySettings.normalize();
+            settings.addProperty("rentOwnerSharePermille", rentEconomySettings.getOwnerSharePermille());
+            settings.addProperty("playerCancelRefundPermille", rentEconomySettings.getPlayerCancelRefundPermille());
+            settings.addProperty("adminCancelRefundPermille", rentEconomySettings.getAdminCancelRefundPermille());
             settingsRecordStore.queueJson(GSON, regionsFolder.resolve("_settings.json"), settings);
 
             Set<Path> keptFiles = new HashSet<>();
@@ -154,7 +169,9 @@ public class RegionManager {
             );
         }
 
-        regions.put(key, new Region(name, dimension, point1, point2));
+        Region region = new Region(name, dimension, point1, point2);
+        regions.put(key, region);
+        spatialIndex.add(region);
         save();
         return RegionOperationResult.success();
     }
@@ -162,10 +179,12 @@ public class RegionManager {
     public boolean delete(String name) {
         String key = normalizeName(name);
 
-        if (regions.remove(key) == null) {
+        Region removed = regions.remove(key);
+        if (removed == null) {
             return false;
         }
 
+        spatialIndex.remove(removed);
         save();
         return true;
     }
@@ -175,29 +194,22 @@ public class RegionManager {
     }
 
     public Region getAt(ResourceKey<Level> dimension, BlockPos pos) {
-        Region bestRegion = null;
+        RegionSpatialIndex.CandidateResult candidates = spatialIndex.candidatesAt(dimension, pos);
+        SimpleServerUtilities.PERFORMANCE.recordRegionLookup(candidates.regions().size(), candidates.fallback());
 
-        for (Region region : regions.values()) {
+        Region bestRegion = null;
+        for (Region region : candidates.regions()) {
             if (!region.contains(dimension, pos)) {
                 continue;
             }
 
-            if (bestRegion == null) {
-                bestRegion = region;
-                continue;
-            }
-
-            if (region.getPriority() > bestRegion.getPriority()) {
-                bestRegion = region;
-                continue;
-            }
-
-            if (region.getPriority() == bestRegion.getPriority()
-                    && region.getVolume() < bestRegion.getVolume()) {
+            if (bestRegion == null
+                    || region.getPriority() > bestRegion.getPriority()
+                    || (region.getPriority() == bestRegion.getPriority()
+                    && region.getVolume() < bestRegion.getVolume())) {
                 bestRegion = region;
             }
         }
-
         return bestRegion;
     }
 
@@ -214,16 +226,19 @@ public class RegionManager {
         save();
     }
 
+    public RegionRentEconomySettings rentEconomySettings() {
+        return rentEconomySettings;
+    }
+
     public boolean exists(String name) {
         return regions.containsKey(normalizeName(name));
     }
 
     public boolean overlaps2D(ResourceKey<Level> dimension, int minX, int minZ, int maxX, int maxZ) {
-        for (Region region : regions.values()) {
-            if (!region.getDimension().equals(dimension)) {
-                continue;
-            }
+        RegionSpatialIndex.CandidateResult candidates = spatialIndex.query2D(dimension, minX, minZ, maxX, maxZ);
+        SimpleServerUtilities.PERFORMANCE.recordRegionLookup(candidates.regions().size(), candidates.fallback());
 
+        for (Region region : candidates.regions()) {
             boolean overlaps =
                     minX <= region.getMaxX()
                 && maxX >= region.getMinX()
@@ -234,8 +249,33 @@ public class RegionManager {
                 return true;
             }
         }
-
         return false;
+    }
+
+    public Collection<Region> getIntersecting2D(
+            ResourceKey<Level> dimension,
+            int minX,
+            int minZ,
+            int maxX,
+            int maxZ
+    ) {
+        RegionSpatialIndex.CandidateResult candidates = spatialIndex.query2D(dimension, minX, minZ, maxX, maxZ);
+        SimpleServerUtilities.PERFORMANCE.recordRegionLookup(candidates.regions().size(), candidates.fallback());
+
+        java.util.List<Region> result = new java.util.ArrayList<>();
+        for (Region region : candidates.regions()) {
+            if (minX <= region.getMaxX()
+                    && maxX >= region.getMinX()
+                    && minZ <= region.getMaxZ()
+                    && maxZ >= region.getMinZ()) {
+                result.add(region);
+            }
+        }
+        return java.util.List.copyOf(result);
+    }
+
+    public RegionSpatialIndex.Statistics spatialIndexStatistics() {
+        return spatialIndex.statistics();
     }
 
     public RegionOperationResult redefine(String name, ResourceKey<Level> dimension, BlockPos point1, BlockPos point2) {
@@ -276,6 +316,16 @@ public class RegionManager {
         newRegion.getRentData().setPausedRemainingMillis(oldRegion.getRentData().getPausedRemainingMillis());
         newRegion.getRentData().setResetOnExpire(oldRegion.getRentData().isResetOnExpire());
         newRegion.getRentData().setResetOnUnrent(oldRegion.getRentData().isResetOnUnrent());
+        if (oldRegion.getRentData().getStoredPriceMinor() >= 0L) {
+            newRegion.getRentData().loadPriceMinor(oldRegion.getRentData().getStoredPriceMinor());
+        }
+        newRegion.getRentData().setRentalSequence(oldRegion.getRentData().getRentalSequence());
+        newRegion.getRentData().setCurrentTermPaidMinor(oldRegion.getRentData().getCurrentTermPaidMinor());
+        newRegion.getRentData().setTotalPaidMinor(oldRegion.getRentData().getTotalPaidMinor());
+        newRegion.getRentData().setRefundableAmountMinor(oldRegion.getRentData().getRefundableAmountMinor());
+        newRegion.getRentData().setRefundableWindowStartTime(oldRegion.getRentData().getRefundableWindowStartTime());
+        newRegion.getRentData().setRefundableWindowEndTime(oldRegion.getRentData().getRefundableWindowEndTime());
+        newRegion.getRentData().setLastPaymentTransactionId(oldRegion.getRentData().getLastPaymentTransactionId());
         newRegion.setWelcomeMessage(oldRegion.getWelcomeMessage());
         newRegion.setLeaveMessage(oldRegion.getLeaveMessage());
 
@@ -286,6 +336,7 @@ public class RegionManager {
         }
 
         regions.put(key, newRegion);
+        spatialIndex.replace(oldRegion, newRegion);
         save();
         return RegionOperationResult.success();
     }
@@ -297,6 +348,9 @@ public class RegionManager {
             try {
                 JsonObject settings = JsonParser.parseString(Files.readString(settingsFile)).getAsJsonObject();
                 rentingEnabled = getBoolean(settings, "rentingEnabled", true);
+                rentEconomySettings.setOwnerSharePermille(getInt(settings, "rentOwnerSharePermille", 0));
+                rentEconomySettings.setPlayerCancelRefundPermille(getInt(settings, "playerCancelRefundPermille", 0));
+                rentEconomySettings.setAdminCancelRefundPermille(getInt(settings, "adminCancelRefundPermille", 1_000));
             } catch (Exception e) {
                 Path archived = JsonStorage.archiveBrokenFile(settingsFile);
                 SimpleServerUtilities.LOGGER.error("Failed to load region settings file. Broken file archived as: {}", archived, e);
@@ -321,6 +375,9 @@ public class RegionManager {
         try {
             JsonObject root = JsonParser.parseString(Files.readString(loadPath)).getAsJsonObject();
             rentingEnabled = getBoolean(root, "rentingEnabled", true);
+            rentEconomySettings.setOwnerSharePermille(getInt(root, "rentOwnerSharePermille", 0));
+            rentEconomySettings.setPlayerCancelRefundPermille(getInt(root, "playerCancelRefundPermille", 0));
+            rentEconomySettings.setAdminCancelRefundPermille(getInt(root, "adminCancelRefundPermille", 1_000));
 
             JsonArray array = root.getAsJsonArray("regions");
 
@@ -398,6 +455,9 @@ public class RegionManager {
 
             region.getRentData().setRentable(getBoolean(rent, "rentable", false));
             region.getRentData().setAmount(getInt(rent, "amount", 0));
+            if (rent.has("priceMinor")) {
+                region.getRentData().loadPriceMinor(getLong(rent, "priceMinor", 0L));
+            }
             region.getRentData().setPeriodDays(getInt(rent, "periodDays", -1));
             region.getRentData().setRentEndTime(getLong(rent, "rentEndTime", -1L));
             region.getRentData().setRenterName(getString(rent, "renterName", ""));
@@ -405,6 +465,15 @@ public class RegionManager {
             region.getRentData().setPausedRemainingMillis(getLong(rent, "pausedRemainingMillis", -1L));
             region.getRentData().setResetOnExpire(getBoolean(rent, "resetOnExpire", true));
             region.getRentData().setResetOnUnrent(getBoolean(rent, "resetOnUnrent", true));
+            region.getRentData().setRentalSequence(getLong(rent, "rentalSequence", 0L));
+            region.getRentData().setCurrentTermPaidMinor(getLong(rent, "currentTermPaidMinor", 0L));
+            region.getRentData().setTotalPaidMinor(getLong(rent, "totalPaidMinor", 0L));
+            region.getRentData().setRefundableAmountMinor(getLong(rent, "refundableAmountMinor", 0L));
+            region.getRentData().setRefundableWindowStartTime(getLong(rent, "refundableWindowStartTime", -1L));
+            region.getRentData().setRefundableWindowEndTime(getLong(rent, "refundableWindowEndTime", -1L));
+            if (rent.has("lastPaymentTransactionId") && !rent.get("lastPaymentTransactionId").isJsonNull()) {
+                region.getRentData().setLastPaymentTransactionId(UUID.fromString(rent.get("lastPaymentTransactionId").getAsString()));
+            }
 
             if (rent.has("renter")) {
                 region.getRentData().setRenter(UUID.fromString(rent.get("renter").getAsString()));
@@ -432,7 +501,7 @@ public class RegionManager {
     private JsonObject regionToJson(Region region) {
         JsonObject json = new JsonObject();
 
-        json.addProperty("schemaVersion", 1);
+        json.addProperty("schemaVersion", 2);
         json.addProperty("name", region.getName());
         json.addProperty("dimension", region.getDimension().identifier().toString());
         json.addProperty("priority", region.getPriority());
@@ -482,6 +551,7 @@ public class RegionManager {
         JsonObject rent = new JsonObject();
         rent.addProperty("rentable", region.getRentData().isRentable());
         rent.addProperty("amount", region.getRentData().getAmount());
+        rent.addProperty("priceMinor", region.getRentData().getPriceMinor(SimpleServerUtilities.ECONOMY.settings()));
         rent.addProperty("periodDays", region.getRentData().getPeriodDays());
         rent.addProperty("rentEndTime", region.getRentData().getRentEndTime());
         rent.addProperty("renterName", region.getRentData().getRenterName());
@@ -489,6 +559,15 @@ public class RegionManager {
         rent.addProperty("pausedRemainingMillis", region.getRentData().getPausedRemainingMillis());
         rent.addProperty("resetOnExpire", region.getRentData().isResetOnExpire());
         rent.addProperty("resetOnUnrent", region.getRentData().isResetOnUnrent());
+        rent.addProperty("rentalSequence", region.getRentData().getRentalSequence());
+        rent.addProperty("currentTermPaidMinor", region.getRentData().getCurrentTermPaidMinor());
+        rent.addProperty("totalPaidMinor", region.getRentData().getTotalPaidMinor());
+        rent.addProperty("refundableAmountMinor", region.getRentData().getRefundableAmountMinor());
+        rent.addProperty("refundableWindowStartTime", region.getRentData().getRefundableWindowStartTime());
+        rent.addProperty("refundableWindowEndTime", region.getRentData().getRefundableWindowEndTime());
+        if (region.getRentData().getLastPaymentTransactionId() != null) {
+            rent.addProperty("lastPaymentTransactionId", region.getRentData().getLastPaymentTransactionId().toString());
+        }
 
         if (region.getRentData().getRenter() != null) {
             rent.addProperty("renter", region.getRentData().getRenter().toString());

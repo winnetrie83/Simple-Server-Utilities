@@ -1,5 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.command;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -195,6 +196,10 @@ public class PermissionCommands {
 
     private static int reload(CommandSourceStack source) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!SimpleServerUtilities.STORAGE.flush(Duration.ofSeconds(5))) {
+            player.sendSystemMessage(Component.literal("Permission writes are still pending; reload was cancelled."));
+            return 0;
+        }
         SimpleServerUtilities.PERMISSIONS.load(player.level().getServer());
         player.sendSystemMessage(Component.literal("Permissions reloaded."));
         return 1;
@@ -203,6 +208,10 @@ public class PermissionCommands {
     private static int save(CommandSourceStack source) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
         SimpleServerUtilities.PERMISSIONS.save();
+        if (!SimpleServerUtilities.STORAGE.flush(Duration.ofSeconds(5))) {
+            player.sendSystemMessage(Component.literal("Permissions were queued, but some writes are still pending."));
+            return 0;
+        }
         player.sendSystemMessage(Component.literal("Permissions saved."));
         return 1;
     }

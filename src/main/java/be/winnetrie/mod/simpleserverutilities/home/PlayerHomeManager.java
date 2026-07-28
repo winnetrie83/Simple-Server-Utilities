@@ -17,6 +17,7 @@ import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.HomePolicy;
+import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
@@ -29,6 +30,7 @@ public class PlayerHomeManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private final Map<UUID, Map<String, PlayerHome>> homesByOwner = new HashMap<>();
+    private final DirtyJsonRecordStore homeRecordStore = new DirtyJsonRecordStore();
 
     private Path rootFolder;
     private Path playersFolder;
@@ -40,22 +42,28 @@ public class PlayerHomeManager {
         this.legacySaveFile = rootFolder.resolve("homes.json");
 
         homesByOwner.clear();
+        homeRecordStore.reset();
 
         try {
             Files.createDirectories(rootFolder);
 
             if (JsonStorage.hasJsonFiles(playersFolder)) {
+                homeRecordStore.discover(playersFolder);
                 loadSplitHomes();
             } else if (Files.exists(legacySaveFile)) {
                 loadLegacyHomes();
                 save();
-                Path archived = JsonStorage.archiveLegacyFile(legacySaveFile);
-
-                if (archived != null) {
-                    SimpleServerUtilities.LOGGER.info("Migrated legacy homes to per-player storage. Legacy file archived as: {}", archived);
+                if (SimpleServerUtilities.STORAGE.flush(java.time.Duration.ofSeconds(10))) {
+                    Path archived = JsonStorage.archiveLegacyFile(legacySaveFile);
+                    if (archived != null) {
+                        SimpleServerUtilities.LOGGER.info("Migrated legacy homes to per-player storage. Legacy file archived as: {}", archived);
+                    }
+                } else {
+                    SimpleServerUtilities.LOGGER.error("Home migration writes did not flush; the legacy file was kept in place.");
                 }
             } else {
                 Files.createDirectories(playersFolder);
+                homeRecordStore.discover(playersFolder);
                 save();
             }
 
@@ -86,13 +94,13 @@ public class PlayerHomeManager {
                 data.homes.sort(Comparator.comparing(PlayerHome::getDisplayName, String::compareToIgnoreCase));
 
                 Path file = StoragePaths.jsonFile(playersFolder, owner.toString());
-                JsonStorage.write(GSON, file, data);
+                homeRecordStore.queueJson(GSON, file, data);
                 keptFiles.add(file);
             }
 
-            JsonStorage.deleteStaleJsonFiles(playersFolder, keptFiles);
+            homeRecordStore.queueDeleteMissing(keptFiles);
         } catch (IOException e) {
-            SimpleServerUtilities.LOGGER.error("Failed to save player homes.", e);
+            SimpleServerUtilities.LOGGER.error("Failed to queue player home saves.", e);
         }
     }
 

@@ -8,12 +8,17 @@ import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaimManager;
 import be.winnetrie.mod.simpleserverutilities.core.SsuCore;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobEvents;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler;
+import be.winnetrie.mod.simpleserverutilities.core.performance.SsuPerformanceMonitor;
 import be.winnetrie.mod.simpleserverutilities.core.storage.BatchedStorageService;
+import be.winnetrie.mod.simpleserverutilities.core.transaction.SsuTransactionManager;
+import be.winnetrie.mod.simpleserverutilities.economy.EconomyManager;
+import be.winnetrie.mod.simpleserverutilities.economy.EconomyModule;
 import be.winnetrie.mod.simpleserverutilities.command.SSUCommands;
 import be.winnetrie.mod.simpleserverutilities.home.PlayerHomeManager;
 import be.winnetrie.mod.simpleserverutilities.menu.SsuMenuService;
 import be.winnetrie.mod.simpleserverutilities.network.ModNetworking;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionManager;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionPlayerEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.ClaimProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.EntityProtectionEvents;
 import be.winnetrie.mod.simpleserverutilities.protection.ExplosionProtectionEvents;
@@ -33,9 +38,11 @@ import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import be.winnetrie.mod.simpleserverutilities.region.RegionInteractionEvents;
 import be.winnetrie.mod.simpleserverutilities.region.RegionManager;
+import be.winnetrie.mod.simpleserverutilities.region.RegionRentJournalManager;
 import be.winnetrie.mod.simpleserverutilities.region.RegionRentEvents;
 import be.winnetrie.mod.simpleserverutilities.region.RegionSelectionToolManager;
 import be.winnetrie.mod.simpleserverutilities.region.RegionSnapshotManager;
+import be.winnetrie.mod.simpleserverutilities.settings.PlayerUiPreferencesManager;
 import be.winnetrie.mod.simpleserverutilities.teleport.TeleportEvents;
 import be.winnetrie.mod.simpleserverutilities.teleport.TeleportManager;
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderVisualizationEvents;
@@ -52,9 +59,13 @@ public class SimpleServerUtilities {
     public static final SsuCore CORE = new SsuCore();
     public static final BatchedStorageService STORAGE = new BatchedStorageService();
     public static final SsuJobScheduler JOBS = new SsuJobScheduler();
+    public static final SsuPerformanceMonitor PERFORMANCE = new SsuPerformanceMonitor();
+    public static final SsuTransactionManager TRANSACTIONS = new SsuTransactionManager();
+    public static final EconomyManager ECONOMY = new EconomyManager();
 
     public static final PlayerClaimManager PLAYER_CLAIMS = new PlayerClaimManager();
     public static final RegionManager REGIONS = new RegionManager();
+    public static final RegionRentJournalManager REGION_RENT_JOURNAL = new RegionRentJournalManager();
     public static final RegionSnapshotManager REGION_SNAPSHOTS = new RegionSnapshotManager();
     public static final RegionSelectionToolManager REGION_SELECTION_TOOLS = new RegionSelectionToolManager();
     public static final PlayerHomeManager HOMES = new PlayerHomeManager();
@@ -64,15 +75,17 @@ public class SimpleServerUtilities {
     public static final BorderVisualizationSettingsManager BORDER_SETTINGS = new BorderVisualizationSettingsManager();
     public static final BorderVisualizationService BORDER_VISUALIZATIONS = new BorderVisualizationService();
     public static final SsuMenuService MENUS = new SsuMenuService();
+    public static final PlayerUiPreferencesManager UI_PREFERENCES = new PlayerUiPreferencesManager();
 
     public SimpleServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
         registerLegacyServices();
+        CORE.modules().register(new EconomyModule(ECONOMY));
         CORE.initialize();
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(ModNetworking::register);
 
         NeoForge.EVENT_BUS.register(this);
-        
+
         NeoForge.EVENT_BUS.register(ClaimProtectionEvents.class);
         NeoForge.EVENT_BUS.register(PistonProtectionEvents.class);
         NeoForge.EVENT_BUS.register(RedstoneProtectionEvents.class);
@@ -85,16 +98,15 @@ public class SimpleServerUtilities {
         NeoForge.EVENT_BUS.register(BorderVisualizationEvents.class);
         NeoForge.EVENT_BUS.register(RegionRentEvents.class);
         NeoForge.EVENT_BUS.register(RegionInteractionEvents.class);
-        
-        
+        NeoForge.EVENT_BUS.register(PermissionPlayerEvents.class);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
 
-
     private static void registerLegacyServices() {
         CORE.services().register(PlayerClaimManager.class, PLAYER_CLAIMS);
         CORE.services().register(RegionManager.class, REGIONS);
+        CORE.services().register(RegionRentJournalManager.class, REGION_RENT_JOURNAL);
         CORE.services().register(RegionSnapshotManager.class, REGION_SNAPSHOTS);
         CORE.services().register(RegionSelectionToolManager.class, REGION_SELECTION_TOOLS);
         CORE.services().register(PlayerHomeManager.class, HOMES);
@@ -103,9 +115,13 @@ public class SimpleServerUtilities {
         CORE.services().register(TeleportManager.class, TELEPORTS);
         CORE.services().register(BatchedStorageService.class, STORAGE);
         CORE.services().register(SsuJobScheduler.class, JOBS);
+        CORE.services().register(SsuPerformanceMonitor.class, PERFORMANCE);
+        CORE.services().register(SsuTransactionManager.class, TRANSACTIONS);
+        CORE.services().register(EconomyManager.class, ECONOMY);
         CORE.services().register(BorderVisualizationSettingsManager.class, BORDER_SETTINGS);
         CORE.services().register(BorderVisualizationService.class, BORDER_VISUALIZATIONS);
         CORE.services().register(SsuMenuService.class, MENUS);
+        CORE.services().register(PlayerUiPreferencesManager.class, UI_PREFERENCES);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
@@ -114,6 +130,7 @@ public class SimpleServerUtilities {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
+        PERFORMANCE.reset();
         STORAGE.start();
         PLAYER_CLAIMS.load(event.getServer());
         REGIONS.load(event.getServer());
@@ -121,8 +138,11 @@ public class SimpleServerUtilities {
         HOMES.load(event.getServer());
         WARPS.load(event.getServer());
         PERMISSIONS.load(event.getServer());
+        PERMISSIONS.migrateLegacyClaimLimitOverrides();
+        UI_PREFERENCES.load(event.getServer());
         BORDER_SETTINGS.load(event.getServer());
         CORE.onServerStarting(event.getServer());
+        REGION_RENT_JOURNAL.loadAndRecover(event.getServer());
         BORDER_VISUALIZATIONS.refreshAll(event.getServer());
         LOGGER.info("Simple Server Utilities server starting");
     }
@@ -137,6 +157,7 @@ public class SimpleServerUtilities {
         HOMES.save();
         WARPS.save();
         PERMISSIONS.save();
+        UI_PREFERENCES.save();
         STORAGE.stop(Duration.ofSeconds(10));
         LOGGER.info("Simple Server Utilities server stopping");
     }

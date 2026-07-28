@@ -1,9 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.permission.policy;
 
-import java.util.OptionalInt;
-
 import be.winnetrie.mod.simpleserverutilities.Config;
-import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
@@ -72,12 +69,6 @@ public class ClaimPolicy {
     }
 
     public static int getMaxClaimChunks(ServerPlayer player, PermissionContext context) {
-        OptionalInt override = SimpleServerUtilities.PLAYER_CLAIMS.getMaxChunksOverride(player.getUUID());
-
-        if (override.isPresent()) {
-            return override.getAsInt();
-        }
-
         return PermissionService.getInt(
                 player,
                 PermissionKeys.CLAIMS_MAX_CHUNKS,
@@ -91,12 +82,6 @@ public class ClaimPolicy {
     }
 
     public static int getMaxClaimGroups(ServerPlayer player, PermissionContext context) {
-        OptionalInt override = SimpleServerUtilities.PLAYER_CLAIMS.getMaxClaimGroupsOverride(player.getUUID());
-
-        if (override.isPresent()) {
-            return override.getAsInt();
-        }
-
         return PermissionService.getInt(
                 player,
                 PermissionKeys.CLAIMS_MAX_GROUPS,

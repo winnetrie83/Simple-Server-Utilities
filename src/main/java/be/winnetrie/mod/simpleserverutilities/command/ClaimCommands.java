@@ -18,7 +18,6 @@ import be.winnetrie.mod.simpleserverutilities.teleport.TeleportDestination;
 import be.winnetrie.mod.simpleserverutilities.teleport.TeleportSafety;
 
 import com.mojang.brigadier.arguments.BoolArgumentType;
-import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 
@@ -213,44 +212,6 @@ public class ClaimCommands {
                                                         context.getSource(),
                                                         StringArgumentType.getString(context, "player"),
                                                         StringArgumentType.getString(context, "name")
-                                                ))))))
-
-                .then(Commands.literal("chunks")
-                        .requires(source -> source.getEntity() instanceof ServerPlayer player
-                                && ClaimPolicy.hasAdminBypass(player))
-                        .then(Commands.argument("player", StringArgumentType.word())
-                                .then(Commands.literal("set")
-                                        .then(Commands.argument("number", IntegerArgumentType.integer(0))
-                                                .executes(context -> setMaxChunks(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "player"),
-                                                        IntegerArgumentType.getInteger(context, "number")
-                                                ))))
-                                .then(Commands.literal("add")
-                                        .then(Commands.argument("number", IntegerArgumentType.integer(0))
-                                                .executes(context -> addMaxChunks(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "player"),
-                                                        IntegerArgumentType.getInteger(context, "number")
-                                                ))))))
-
-                .then(Commands.literal("groups")
-                        .requires(source -> source.getEntity() instanceof ServerPlayer player
-                                && ClaimPolicy.hasAdminBypass(player))
-                        .then(Commands.argument("player", StringArgumentType.word())
-                                .then(Commands.literal("set")
-                                        .then(Commands.argument("number", IntegerArgumentType.integer(0))
-                                                .executes(context -> setMaxGroups(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "player"),
-                                                        IntegerArgumentType.getInteger(context, "number")
-                                                ))))
-                                .then(Commands.literal("add")
-                                        .then(Commands.argument("number", IntegerArgumentType.integer(0))
-                                                .executes(context -> addMaxGroups(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "player"),
-                                                        IntegerArgumentType.getInteger(context, "number")
                                                 ))))));
     }
 
@@ -548,66 +509,6 @@ public class ClaimCommands {
         return 1;
     }
 
-    private static int setMaxChunks(CommandSourceStack source, String playerName, int amount) {
-        ServerPlayer executor = (ServerPlayer) source.getEntity();
-        Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
-
-        if (targetUuid.isEmpty()) {
-            executor.sendSystemMessage(Component.literal("Player not found or not online: " + playerName));
-            return 0;
-        }
-
-        SimpleServerUtilities.PLAYER_CLAIMS.setMaxChunks(targetUuid.get(), amount);
-        executor.sendSystemMessage(Component.literal("Max claim chunks for " + playerName + " set to " + amount + "."));
-        return 1;
-    }
-
-    private static int addMaxChunks(CommandSourceStack source, String playerName, int amount) {
-        ServerPlayer executor = (ServerPlayer) source.getEntity();
-        Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
-
-        if (targetUuid.isEmpty()) {
-            executor.sendSystemMessage(Component.literal("Player not found or not online: " + playerName));
-            return 0;
-        }
-
-        SimpleServerUtilities.PLAYER_CLAIMS.addMaxChunks(targetUuid.get(), amount);
-        int newMax = SimpleServerUtilities.PLAYER_CLAIMS.getMaxChunks(targetUuid.get());
-
-        executor.sendSystemMessage(Component.literal("Added " + amount + " claim chunks to " + playerName + ". New max: " + newMax + "."));
-        return 1;
-    }
-
-    private static int setMaxGroups(CommandSourceStack source, String playerName, int amount) {
-        ServerPlayer executor = (ServerPlayer) source.getEntity();
-        Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
-
-        if (targetUuid.isEmpty()) {
-            executor.sendSystemMessage(Component.literal("Player not found or not online: " + playerName));
-            return 0;
-        }
-
-        SimpleServerUtilities.PLAYER_CLAIMS.setMaxClaimGroups(targetUuid.get(), amount);
-        executor.sendSystemMessage(Component.literal("Max claims for " + playerName + " set to " + amount + "."));
-        return 1;
-    }
-
-    private static int addMaxGroups(CommandSourceStack source, String playerName, int amount) {
-        ServerPlayer executor = (ServerPlayer) source.getEntity();
-        Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
-
-        if (targetUuid.isEmpty()) {
-            executor.sendSystemMessage(Component.literal("Player not found or not online: " + playerName));
-            return 0;
-        }
-
-        SimpleServerUtilities.PLAYER_CLAIMS.addMaxClaimGroups(targetUuid.get(), amount);
-        int newMax = SimpleServerUtilities.PLAYER_CLAIMS.getMaxClaimGroups(targetUuid.get());
-
-        executor.sendSystemMessage(Component.literal("Added " + amount + " claims to " + playerName + ". New max: " + newMax + "."));
-        return 1;
-    }
-
     private static int setClaimSpawn(CommandSourceStack source, String claimName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
@@ -853,7 +754,7 @@ public class ClaimCommands {
         if (claim.hasSpawn()) {
             BlockPos spawn = claim.getSpawnPos();
             player.sendSystemMessage(Component.literal("Spawn: " + spawn.getX() + ", " + spawn.getY() + ", " + spawn.getZ()));
-        } 
+        }
         else {
             player.sendSystemMessage(Component.literal("Spawn: not set"));
         }
@@ -930,10 +831,6 @@ public class ClaimCommands {
         source.sendSystemMessage(Component.literal(" - /claims setspawn <name>"));
 
         source.sendSystemMessage(Component.literal("Admin commands:"));
-        source.sendSystemMessage(Component.literal(" - /claims chunks <player> set <number>"));
-        source.sendSystemMessage(Component.literal(" - /claims chunks <player> add <number>"));
-        source.sendSystemMessage(Component.literal(" - /claims groups <player> set <number>"));
-        source.sendSystemMessage(Component.literal(" - /claims groups <player> add <number>"));
         source.sendSystemMessage(Component.literal(" - /claims admin list <player>"));
         source.sendSystemMessage(Component.literal(" - /claims admin info <player> <name>"));
         source.sendSystemMessage(Component.literal(" - /claims admin tp <player> <name>"));

@@ -61,11 +61,13 @@ public final class SsuJobScheduler {
         }
 
         scheduled.job().cancel();
-        invokeCompletion(scheduled, JobResult.cancelled(
+        JobResult result = JobResult.cancelled(
                 id,
                 scheduled.job().description(),
                 scheduled.operations()
-        ));
+        );
+        recordPerformance(scheduled, result);
+        invokeCompletion(scheduled, result);
         return true;
     }
 
@@ -124,7 +126,17 @@ public final class SsuJobScheduler {
             runnable.remove(scheduled.id());
             releaseLocks(scheduled);
         }
+        recordPerformance(scheduled, result);
         invokeCompletion(scheduled, result);
+    }
+
+    private void recordPerformance(ScheduledJob scheduled, JobResult result) {
+        long runtimeNanos = Math.max(0L, System.nanoTime() - scheduled.startedNanos());
+        switch (result.status()) {
+            case COMPLETED -> SimpleServerUtilities.PERFORMANCE.recordJobCompleted(result.operations(), runtimeNanos);
+            case CANCELLED -> SimpleServerUtilities.PERFORMANCE.recordJobCancelled(result.operations(), runtimeNanos);
+            case FAILED -> SimpleServerUtilities.PERFORMANCE.recordJobFailed(result.operations(), runtimeNanos);
+        }
     }
 
     private void invokeCompletion(ScheduledJob scheduled, JobResult result) {
@@ -164,11 +176,13 @@ public final class SsuJobScheduler {
 
         for (ScheduledJob scheduled : cancelled) {
             scheduled.job().cancel();
-            invokeCompletion(scheduled, JobResult.cancelled(
+            JobResult result = JobResult.cancelled(
                     scheduled.id(),
                     scheduled.job().description(),
                     scheduled.operations()
-            ));
+            );
+            recordPerformance(scheduled, result);
+            invokeCompletion(scheduled, result);
         }
     }
 
@@ -242,6 +256,7 @@ public final class SsuJobScheduler {
         private final SsuJob job;
         private final Consumer<JobResult> completion;
         private final Set<String> resourceLocks;
+        private final long startedNanos;
         private long operations;
 
         private ScheduledJob(
@@ -254,6 +269,7 @@ public final class SsuJobScheduler {
             this.job = job;
             this.completion = completion;
             this.resourceLocks = resourceLocks;
+            this.startedNanos = System.nanoTime();
         }
 
         UUID id() {
@@ -274,6 +290,10 @@ public final class SsuJobScheduler {
 
         long operations() {
             return operations;
+        }
+
+        long startedNanos() {
+            return startedNanos;
         }
 
         void addOperations(long amount) {

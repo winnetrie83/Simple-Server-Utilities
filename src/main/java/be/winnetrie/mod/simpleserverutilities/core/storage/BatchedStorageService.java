@@ -153,7 +153,7 @@ public final class BatchedStorageService {
                 });
                 long remainingNanos = Math.max(1L, deadline - System.nanoTime());
                 barrier.get(remainingNanos, TimeUnit.NANOSECONDS);
-                if (pending.isEmpty() && order.isEmpty() && !drainScheduled.get()) {
+                if (pending.isEmpty() && order.isEmpty() && !drainScheduled.get() && retryRequired.isEmpty()) {
                     return true;
                 }
             }

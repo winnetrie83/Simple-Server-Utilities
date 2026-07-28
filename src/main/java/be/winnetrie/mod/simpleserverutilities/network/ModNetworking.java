@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.network;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapService;
+import be.winnetrie.mod.simpleserverutilities.claim.map.MinimapService;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
@@ -11,7 +12,7 @@ public class ModNetworking {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("5");
+        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("10");
 
         registrar.playToClient(
                 ClaimMapDataPayload.TYPE,
@@ -38,6 +39,17 @@ public class ModNetworking {
         registrar.playToClient(
                 SsuMenuSnapshotPayload.TYPE,
                 SsuMenuSnapshotPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                MinimapRequestPayload.TYPE,
+                MinimapRequestPayload.STREAM_CODEC,
+                MinimapService::handleRequest
+        );
+
+        registrar.playToClient(
+                MinimapDataPayload.TYPE,
+                MinimapDataPayload.STREAM_CODEC
         );
     }
 }

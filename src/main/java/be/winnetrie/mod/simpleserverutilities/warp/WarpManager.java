@@ -14,6 +14,7 @@ import com.google.gson.GsonBuilder;
 
 
 import be.winnetrie.mod.simpleserverutilities.permission.policy.WarpPolicy;
+import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
@@ -25,6 +26,7 @@ public class WarpManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private final Map<String, Warp> warps = new HashMap<>();
+    private final DirtyJsonRecordStore warpRecordStore = new DirtyJsonRecordStore();
 
     private Path saveFile;
 
@@ -33,6 +35,7 @@ public class WarpManager {
         this.saveFile = folder.resolve("warps.json");
 
         warps.clear();
+        warpRecordStore.reset();
 
         try {
             Files.createDirectories(folder);
@@ -42,6 +45,7 @@ public class WarpManager {
                 return;
             }
 
+            warpRecordStore.discoverFile(saveFile);
             WarpSaveData data = JsonStorage.read(GSON, saveFile, WarpSaveData.class);
 
             if (data == null || data.warps == null) {
@@ -68,16 +72,10 @@ public class WarpManager {
             return;
         }
 
-        try {
-            WarpSaveData data = new WarpSaveData();
-            data.warps = new ArrayList<>(warps.values());
-
-            data.warps.sort(Comparator.comparing(Warp::getDisplayName));
-
-            JsonStorage.write(GSON, saveFile, data);
-        } catch (IOException e) {
-            SimpleServerUtilities.LOGGER.error("Failed to save server warps.", e);
-        }
+        WarpSaveData data = new WarpSaveData();
+        data.warps = new ArrayList<>(warps.values());
+        data.warps.sort(Comparator.comparing(Warp::getDisplayName));
+        warpRecordStore.queueJson(GSON, saveFile, data);
     }
 
     public boolean setWarp(ServerPlayer player, String rawName) {

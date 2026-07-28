@@ -284,10 +284,13 @@ public class BorderVisualizationService {
         String dimension = player.level().dimension().identifier().toString();
         List<BorderVisualizationPayload.Entry> entries = new ArrayList<>();
 
-        for (Region region : SimpleServerUtilities.REGIONS.getAll()) {
-            if (!dimension.equals(region.getDimension().identifier().toString())) {
-                continue;
-            }
+        int minX = (int) Math.floor(x - range);
+        int minZ = (int) Math.floor(z - range);
+        int maxX = (int) Math.ceil(x + range);
+        int maxZ = (int) Math.ceil(z + range);
+
+        for (Region region : SimpleServerUtilities.REGIONS.getIntersecting2D(
+                player.level().dimension(), minX, minZ, maxX, maxZ)) {
             if (distanceSquared2D(region, x, z) > rangeSquared) {
                 continue;
             }

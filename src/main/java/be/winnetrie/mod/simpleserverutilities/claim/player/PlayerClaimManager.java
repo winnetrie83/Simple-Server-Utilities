@@ -671,7 +671,7 @@ public class PlayerClaimManager {
                     claim.getDisplayName()
             );
         }
-        
+
         if (wouldDisconnectClaim(claim, chunkPos.x(), chunkPos.z())) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_REMOVAL_DISCONNECTS_CLAIM,
@@ -747,7 +747,10 @@ public class PlayerClaimManager {
     }
 
     public int getMaxChunks(UUID player) {
-        return getLimits(player).getMaxChunks();
+        PlayerClaimLimits limit = limits.get(player);
+        return limit != null && limit.hasMaxChunksOverride()
+                ? limit.getMaxChunks()
+                : Config.MAX_PLAYER_CLAIM_CHUNKS.get();
     }
 
     public void setMaxChunks(UUID player, int amount) {
@@ -756,12 +759,26 @@ public class PlayerClaimManager {
     }
 
     public void addMaxChunks(UUID player, int amount) {
-        getLimits(player).addMaxChunks(amount);
+        getLimits(player).addMaxChunks(amount, Config.MAX_PLAYER_CLAIM_CHUNKS.get());
+        save();
+    }
+
+    public void clearMaxChunksOverride(UUID player) {
+        PlayerClaimLimits limit = limits.get(player);
+        if (limit == null) {
+            return;
+        }
+
+        limit.clearMaxChunksOverride(Config.MAX_PLAYER_CLAIM_CHUNKS.get());
+        removeEmptyLimitRecord(player, limit);
         save();
     }
 
     public int getMaxClaimGroups(UUID player) {
-        return getLimits(player).getMaxClaimGroups();
+        PlayerClaimLimits limit = limits.get(player);
+        return limit != null && limit.hasMaxClaimGroupsOverride()
+                ? limit.getMaxClaimGroups()
+                : Config.MAX_PLAYER_CLAIM_GROUPS.get();
     }
 
     public void setMaxClaimGroups(UUID player, int amount) {
@@ -770,18 +787,53 @@ public class PlayerClaimManager {
     }
 
     public void addMaxClaimGroups(UUID player, int amount) {
-        getLimits(player).addMaxClaimGroups(amount);
+        getLimits(player).addMaxClaimGroups(amount, Config.MAX_PLAYER_CLAIM_GROUPS.get());
+        save();
+    }
+
+    public void clearMaxClaimGroupsOverride(UUID player) {
+        PlayerClaimLimits limit = limits.get(player);
+        if (limit == null) {
+            return;
+        }
+
+        limit.clearMaxClaimGroupsOverride(Config.MAX_PLAYER_CLAIM_GROUPS.get());
+        removeEmptyLimitRecord(player, limit);
         save();
     }
 
     public OptionalInt getMaxChunksOverride(UUID player) {
         PlayerClaimLimits limit = limits.get(player);
-        return limit == null ? OptionalInt.empty() : OptionalInt.of(limit.getMaxChunks());
+        return limit != null && limit.hasMaxChunksOverride()
+                ? OptionalInt.of(limit.getMaxChunks())
+                : OptionalInt.empty();
     }
 
     public OptionalInt getMaxClaimGroupsOverride(UUID player) {
         PlayerClaimLimits limit = limits.get(player);
-        return limit == null ? OptionalInt.empty() : OptionalInt.of(limit.getMaxClaimGroups());
+        return limit != null && limit.hasMaxClaimGroupsOverride()
+                ? OptionalInt.of(limit.getMaxClaimGroups())
+                : OptionalInt.empty();
+    }
+
+    /** Snapshot used once by the permission migration in 1.3.0-dev1. */
+    public Map<UUID, PlayerClaimLimits> getLegacyLimitOverridesSnapshot() {
+        Map<UUID, PlayerClaimLimits> snapshot = new HashMap<>();
+        for (Map.Entry<UUID, PlayerClaimLimits> entry : limits.entrySet()) {
+            if (entry.getValue() != null && entry.getValue().hasAnyOverride()) {
+                snapshot.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return Map.copyOf(snapshot);
+    }
+
+    /** Removes the old claim-specific override storage after successful migration. */
+    public void clearLegacyLimitOverrides() {
+        if (limits.isEmpty()) {
+            return;
+        }
+        limits.clear();
+        save();
     }
 
     private void loadSplitClaims() throws IOException {
@@ -811,7 +863,13 @@ public class PlayerClaimManager {
                     continue;
                 }
 
-                limits.put(limit.getPlayer(), limit);
+                limit.migrateLegacyOverrideState(
+                        Config.MAX_PLAYER_CLAIM_CHUNKS.get(),
+                        Config.MAX_PLAYER_CLAIM_GROUPS.get()
+                );
+                if (limit.hasAnyOverride()) {
+                    limits.put(limit.getPlayer(), limit);
+                }
             } catch (Exception e) {
                 Path archived = JsonStorage.archiveBrokenFile(file);
                 SimpleServerUtilities.LOGGER.error("Failed to load player claim limit file. Broken file archived as: {}", archived, e);
@@ -843,7 +901,13 @@ public class PlayerClaimManager {
                         continue;
                     }
 
+                    limit.migrateLegacyOverrideState(
+                        Config.MAX_PLAYER_CLAIM_CHUNKS.get(),
+                        Config.MAX_PLAYER_CLAIM_GROUPS.get()
+                );
+                if (limit.hasAnyOverride()) {
                     limits.put(limit.getPlayer(), limit);
+                }
                 }
             }
         } catch (Exception e) {
@@ -972,6 +1036,12 @@ public class PlayerClaimManager {
         }
 
         queue.add(neighbor);
+    }
+
+    private void removeEmptyLimitRecord(UUID player, PlayerClaimLimits limit) {
+        if (!limit.hasAnyOverride()) {
+            limits.remove(player);
+        }
     }
 
     private PlayerClaimLimits getLimits(UUID player) {

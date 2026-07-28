@@ -3,6 +3,7 @@ package be.winnetrie.mod.simpleserverutilities.permission;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -17,6 +18,7 @@ import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.server.MinecraftServer;
@@ -27,28 +29,49 @@ public class PermissionManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private PermissionData data = new PermissionData();
+    private PermissionSettings settings = new PermissionSettings();
+    private final PermissionResolutionCache resolutionCache = new PermissionResolutionCache();
+    private final DirtyJsonRecordStore rankRecordStore = new DirtyJsonRecordStore();
+    private final DirtyJsonRecordStore playerRecordStore = new DirtyJsonRecordStore();
+    private final DirtyJsonRecordStore dimensionRecordStore = new DirtyJsonRecordStore();
+    private final DirtyJsonRecordStore claimContextRecordStore = new DirtyJsonRecordStore();
+    private final DirtyJsonRecordStore settingsRecordStore = new DirtyJsonRecordStore();
     private Path rootFolder;
     private Path permissionsFolder;
+    private Path settingsFile;
     private Path legacySaveFile;
 
     public void load(MinecraftServer server) {
         this.rootFolder = StoragePaths.root(server);
         this.permissionsFolder = StoragePaths.permissions(rootFolder);
+        this.settingsFile = StoragePaths.permissionSettings(rootFolder);
         this.legacySaveFile = rootFolder.resolve("permissions.json");
 
         try {
             Files.createDirectories(rootFolder);
             data = new PermissionData();
+            settings = new PermissionSettings();
+            invalidateResolutionCache();
+            rankRecordStore.reset();
+            playerRecordStore.reset();
+            dimensionRecordStore.reset();
+            claimContextRecordStore.reset();
+            settingsRecordStore.reset();
+            loadSettings();
 
             if (JsonStorage.hasJsonFiles(permissionsFolder)) {
+                discoverSplitStores();
                 loadSplitData();
             } else if (Files.exists(legacySaveFile)) {
                 loadLegacyData();
                 save();
-                Path archived = JsonStorage.archiveLegacyFile(legacySaveFile);
-
-                if (archived != null) {
-                    SimpleServerUtilities.LOGGER.info("Migrated legacy permission data to split storage. Legacy file archived as: {}", archived);
+                if (SimpleServerUtilities.STORAGE.flush(java.time.Duration.ofSeconds(10))) {
+                    Path archived = JsonStorage.archiveLegacyFile(legacySaveFile);
+                    if (archived != null) {
+                        SimpleServerUtilities.LOGGER.info("Migrated legacy permission data to split storage. Legacy file archived as: {}", archived);
+                    }
+                } else {
+                    SimpleServerUtilities.LOGGER.error("Permission migration writes did not flush; the legacy file was kept in place.");
                 }
             } else {
                 data = createDefaultData();
@@ -79,6 +102,7 @@ public class PermissionManager {
             return;
         }
 
+        invalidateResolutionCache();
         try {
             saveSplitData();
         } catch (IOException e) {
@@ -91,6 +115,27 @@ public class PermissionManager {
             return null;
         }
 
+        PermissionResolutionCache.Key cacheKey = PermissionResolutionCache.key(player, key, context);
+        PermissionResolutionCache.Lookup cached = resolutionCache.get(cacheKey);
+        if (cached.found()) {
+            SimpleServerUtilities.PERFORMANCE.recordPermissionCheck(true);
+            return cached.value();
+        }
+
+        SimpleServerUtilities.PERFORMANCE.recordPermissionCheck(false);
+        String resolved = resolveUncached(player, key, context);
+        resolutionCache.put(cacheKey, resolved);
+        return resolved;
+    }
+
+    private String resolveUncached(ServerPlayer player, String key, PermissionContext context) {
+        // Personal permissions are always the final player-specific override.
+        String playerValue = getPlayerValue(player, key);
+        if (playerValue != null) {
+            return playerValue;
+        }
+
+        // Context rules remain compatible, but can never override a personal value.
         String regionValue = getRegionValue(key, context);
         if (regionValue != null) {
             return regionValue;
@@ -106,12 +151,16 @@ public class PermissionManager {
             return dimensionValue;
         }
 
-        String playerValue = getPlayerValue(player, key);
-        if (playerValue != null) {
-            return playerValue;
-        }
-
         return getRankValue(player, key);
+    }
+
+    public void invalidateResolutionCache() {
+        resolutionCache.clear();
+        SimpleServerUtilities.PERFORMANCE.recordPermissionCacheInvalidation();
+    }
+
+    public int cachedResolutionCount() {
+        return resolutionCache.size();
     }
 
     public PermissionRank getOrCreateRank(String rankName) {
@@ -323,6 +372,215 @@ public class PermissionManager {
         return data;
     }
 
+    public PermissionSettings getSettings() {
+        return settings;
+    }
+
+    public String getDefaultRankName() {
+        return settings.getDefaultRank();
+    }
+
+    public String getPrimaryRankName(UUID playerId) {
+        PlayerPermissionData playerData = getPlayerData(playerId);
+        if (playerData == null || playerData.getRanks().isEmpty()) {
+            return settings.getDefaultRank();
+        }
+        return normalizeRankName(playerData.getRanks().get(0));
+    }
+
+    public void setDefaultRankName(String rankName) {
+        String normalized = normalizeRankName(rankName);
+        PermissionRank rank = getOrCreateRank(normalized);
+        fillDefaultRank(rank);
+        settings.setDefaultRank(normalized);
+        save();
+    }
+
+    /**
+     * Ensures a persistent player permission profile exists and assigns the
+     * configured default rank only when the player has no ranks yet.
+     */
+    public boolean ensurePlayerProfile(ServerPlayer player) {
+        if (player == null) {
+            return false;
+        }
+
+        PlayerPermissionData playerData = getOrCreatePlayerData(player.getUUID());
+        boolean changed = false;
+        String currentName = player.getName().getString();
+        if (!currentName.equals(playerData.getLastKnownName())) {
+            playerData.setLastKnownName(currentName);
+            changed = true;
+        }
+
+        if (settings.isAssignDefaultRankOnFirstJoin() && playerData.getRanks().isEmpty()) {
+            playerData.addRank(settings.getDefaultRank());
+            changed = true;
+        }
+
+        if (changed) {
+            save();
+        }
+        return changed;
+    }
+
+    /** Assigns one base rank. Personal permissions remain untouched. */
+    public void assignPlayerRank(UUID playerId, String rankName) {
+        String normalized = normalizeRankName(rankName);
+        getOrCreateRank(normalized);
+        PlayerPermissionData playerData = getOrCreatePlayerData(playerId);
+        playerData.getRanks().clear();
+        playerData.addRank(normalized);
+        save();
+    }
+
+    public boolean deleteRank(String rankName) {
+        String normalized = normalizeRankName(rankName);
+        if (normalized.equals(settings.getDefaultRank()) || normalized.equals("admin")) {
+            return false;
+        }
+        if (data.getRanks().remove(normalized) == null) {
+            return false;
+        }
+        for (PlayerPermissionData playerData : data.getPlayers().values()) {
+            playerData.removeRank(normalized);
+            if (playerData.getRanks().isEmpty()) {
+                playerData.addRank(settings.getDefaultRank());
+            }
+        }
+        for (PermissionRank rank : data.getRanks().values()) {
+            rank.getInherits().remove(normalized);
+        }
+        save();
+        return true;
+    }
+
+    public boolean renameRank(String oldName, String newName) {
+        String oldNormalized = normalizeRankName(oldName);
+        String newNormalized = normalizeRankName(newName);
+        if (oldNormalized.equals(newNormalized) || data.getRanks().containsKey(newNormalized)) {
+            return false;
+        }
+        PermissionRank rank = data.getRanks().remove(oldNormalized);
+        if (rank == null) {
+            return false;
+        }
+        data.getRanks().put(newNormalized, rank);
+        for (PlayerPermissionData playerData : data.getPlayers().values()) {
+            if (playerData.getRanks().remove(oldNormalized)) {
+                playerData.addRank(newNormalized);
+            }
+        }
+        for (PermissionRank other : data.getRanks().values()) {
+            int index = other.getInherits().indexOf(oldNormalized);
+            if (index >= 0) {
+                other.getInherits().set(index, newNormalized);
+            }
+        }
+        if (settings.getDefaultRank().equals(oldNormalized)) {
+            settings.setDefaultRank(newNormalized);
+        }
+        save();
+        return true;
+    }
+
+    public UUID findKnownPlayerId(String playerName) {
+        if (playerName == null || playerName.isBlank()) {
+            return null;
+        }
+        for (Map.Entry<String, PlayerPermissionData> entry : data.getPlayers().entrySet()) {
+            if (entry.getValue().getLastKnownName().equalsIgnoreCase(playerName.trim())) {
+                try {
+                    return UUID.fromString(entry.getKey());
+                } catch (IllegalArgumentException ignored) {
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    public String resolvePersonalValue(ServerPlayer player, String key) {
+        return getPlayerValue(player, key);
+    }
+
+    /**
+     * Moves former claim-specific player limits into normal personal
+     * permissions. Existing personal values win and are never overwritten.
+     */
+    public int migrateLegacyClaimLimitOverrides() {
+        var legacyOverrides = SimpleServerUtilities.PLAYER_CLAIMS.getLegacyLimitOverridesSnapshot();
+        int migrated = 0;
+        for (Map.Entry<UUID, be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaimLimits> entry
+                : legacyOverrides.entrySet()) {
+            PlayerPermissionData playerData = getOrCreatePlayerData(entry.getKey());
+            var limits = entry.getValue();
+            if (limits.hasMaxChunksOverride()
+                    && !playerData.getPermissions().containsKey(PermissionKeys.CLAIMS_MAX_CHUNKS)) {
+                playerData.setPermission(PermissionKeys.CLAIMS_MAX_CHUNKS, Integer.toString(limits.getMaxChunks()));
+                migrated++;
+            }
+            if (limits.hasMaxClaimGroupsOverride()
+                    && !playerData.getPermissions().containsKey(PermissionKeys.CLAIMS_MAX_GROUPS)) {
+                playerData.setPermission(PermissionKeys.CLAIMS_MAX_GROUPS, Integer.toString(limits.getMaxClaimGroups()));
+                migrated++;
+            }
+        }
+        if (!legacyOverrides.isEmpty()) {
+            if (migrated > 0) {
+                save();
+                if (!SimpleServerUtilities.STORAGE.flush(Duration.ofSeconds(10))) {
+                    SimpleServerUtilities.LOGGER.error(
+                            "Claim-limit permission migration did not flush. Legacy override records were retained."
+                    );
+                    return migrated;
+                }
+            }
+
+            SimpleServerUtilities.PLAYER_CLAIMS.clearLegacyLimitOverrides();
+            SimpleServerUtilities.LOGGER.info(
+                    "Migrated {} legacy claim-limit override(s) to personal permissions and retired {} legacy record(s).",
+                    migrated,
+                    legacyOverrides.size()
+            );
+        }
+        return migrated;
+    }
+
+    private void discoverSplitStores() {
+        settingsRecordStore.discoverFile(settingsFile);
+        rankRecordStore.discover(StoragePaths.permissionRanks(rootFolder));
+        playerRecordStore.discover(StoragePaths.permissionPlayers(rootFolder));
+        dimensionRecordStore.discover(StoragePaths.permissionDimensions(rootFolder));
+        claimContextRecordStore.discover(StoragePaths.permissionClaimContext(rootFolder));
+    }
+
+    private void loadSettings() {
+        if (settingsFile == null || !Files.exists(settingsFile)) {
+            settings = new PermissionSettings();
+            settings.normalize();
+            return;
+        }
+        try {
+            PermissionSettings loaded = JsonStorage.read(GSON, settingsFile, PermissionSettings.class);
+            settings = loaded == null ? new PermissionSettings() : loaded;
+            settings.normalize();
+        } catch (Exception e) {
+            Path archived = JsonStorage.archiveBrokenFile(settingsFile);
+            settings = new PermissionSettings();
+            settings.normalize();
+            SimpleServerUtilities.LOGGER.error("Failed to load permission settings. Broken file archived as: {}", archived, e);
+        }
+    }
+
+    private void saveSettings() {
+        if (settingsFile == null) {
+            return;
+        }
+        settings.normalize();
+        settingsRecordStore.queueJson(GSON, settingsFile, settings);
+    }
+
     private void loadLegacyData() throws IOException {
         try {
             PermissionData loadedData = JsonStorage.read(GSON, legacySaveFile, PermissionData.class);
@@ -434,6 +692,7 @@ public class PermissionManager {
     }
 
     private void saveSplitData() throws IOException {
+        saveSettings();
         saveRanks();
         savePlayers();
         saveDimensions();
@@ -447,11 +706,11 @@ public class PermissionManager {
 
         for (Map.Entry<String, PermissionRank> entry : data.getRanks().entrySet()) {
             Path file = StoragePaths.jsonFile(folder, normalizeRankName(entry.getKey()));
-            JsonStorage.write(GSON, file, entry.getValue());
+            rankRecordStore.queueJson(GSON, file, entry.getValue());
             keptFiles.add(file);
         }
 
-        JsonStorage.deleteStaleJsonFiles(folder, keptFiles);
+        rankRecordStore.queueDeleteMissing(keptFiles);
     }
 
     private void savePlayers() throws IOException {
@@ -466,14 +725,14 @@ public class PermissionManager {
                 playerData.setUuid(uuid);
 
                 Path file = StoragePaths.jsonFile(folder, uuid.toString());
-                JsonStorage.write(GSON, file, playerData);
+                playerRecordStore.queueJson(GSON, file, playerData);
                 keptFiles.add(file);
             } catch (IllegalArgumentException e) {
                 SimpleServerUtilities.LOGGER.warn("Skipping player permission entry with invalid UUID: {}", entry.getKey());
             }
         }
 
-        JsonStorage.deleteStaleJsonFiles(folder, keptFiles);
+        playerRecordStore.queueDeleteMissing(keptFiles);
     }
 
     private void saveDimensions() throws IOException {
@@ -484,11 +743,11 @@ public class PermissionManager {
         for (Map.Entry<String, PermissionScope> entry : data.getDimensions().entrySet()) {
             ScopeSaveData scopeData = new ScopeSaveData(entry.getKey(), entry.getValue().getPermissions());
             Path file = StoragePaths.jsonFile(folder, entry.getKey());
-            JsonStorage.write(GSON, file, scopeData);
+            dimensionRecordStore.queueJson(GSON, file, scopeData);
             keptFiles.add(file);
         }
 
-        JsonStorage.deleteStaleJsonFiles(folder, keptFiles);
+        dimensionRecordStore.queueDeleteMissing(keptFiles);
     }
 
     private void savePlayerClaimContexts() throws IOException {
@@ -500,11 +759,11 @@ public class PermissionManager {
             String roleName = normalizeRoleName(entry.getKey());
             ScopeSaveData scopeData = new ScopeSaveData(roleName, entry.getValue().getPermissions());
             Path file = StoragePaths.jsonFile(folder, roleName);
-            JsonStorage.write(GSON, file, scopeData);
+            claimContextRecordStore.queueJson(GSON, file, scopeData);
             keptFiles.add(file);
         }
 
-        JsonStorage.deleteStaleJsonFiles(folder, keptFiles);
+        claimContextRecordStore.queueDeleteMissing(keptFiles);
     }
 
     private String getRegionValue(String key, PermissionContext context) {
@@ -574,7 +833,7 @@ public class PermissionManager {
         }
 
         if (rankNames.isEmpty()) {
-            rankNames.add("default");
+            rankNames.add(settings.getDefaultRank());
         }
 
         rankNames.sort(Comparator.comparingInt(rankName -> {
@@ -617,10 +876,12 @@ public class PermissionManager {
     private boolean ensureDefaultDataUpToDate() {
         boolean changed = false;
 
-        PermissionRank defaultRank = data.getRanks().get("default");
+        settings.normalize();
+        String defaultRankName = settings.getDefaultRank();
+        PermissionRank defaultRank = data.getRanks().get(defaultRankName);
 
         if (defaultRank == null) {
-            data.getRanks().put("default", createDefaultRank());
+            data.getRanks().put(defaultRankName, createDefaultRank());
             changed = true;
         } else {
             changed |= fillDefaultRank(defaultRank);
@@ -699,6 +960,9 @@ public class PermissionManager {
         changed |= setDefaultPermission(rank, PermissionKeys.BORDER_REGIONS_VIEW, true);
         changed |= setDefaultPermission(rank, PermissionKeys.VISUALIZATION_ADMIN, false);
         changed |= setDefaultPermission(rank, PermissionKeys.CORE_ADMIN, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.SETTINGS_USE, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.ADMIN_MENU, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.MINIMAP_USE, true);
 
         changed |= setDefaultPermission(rank, PermissionKeys.HOMES_TELEPORT_DELAY, 0);
         changed |= setDefaultPermission(rank, PermissionKeys.HOMES_TELEPORT_COOLDOWN, 0);
@@ -728,7 +992,7 @@ public class PermissionManager {
 
     private PermissionData createDefaultData() {
         PermissionData defaultData = new PermissionData();
-        defaultData.getRanks().put("default", createDefaultRank());
+        defaultData.getRanks().put(settings.getDefaultRank(), createDefaultRank());
         defaultData.getRanks().put("admin", createAdminRank());
 
         defaultData.getPlayerClaimContext().put("owner", new PermissionScope());
@@ -754,7 +1018,7 @@ public class PermissionManager {
 
     private String normalizeRankName(String rankName) {
         if (rankName == null || rankName.isBlank()) {
-            return "default";
+            return settings == null ? "default" : settings.getDefaultRank();
         }
 
         return rankName.trim().toLowerCase(java.util.Locale.ROOT);

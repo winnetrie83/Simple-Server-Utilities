@@ -60,3 +60,7 @@ Planned reusable additions include:
 The Claims page now opens the interactive claim-management map rather than only focusing a world border. The map remains a separate screen because it needs a large square canvas, panning, zooming and multi-chunk selection. Returning through **Back to SSU menu** requests a fresh server-authoritative dashboard snapshot.
 
 The map uses the same design rule as the dashboard: client-side interaction and presentation, followed by a bounded server request that revalidates permissions and state before mutation.
+
+## Dev2 dashboard redesign
+
+SSU 1.3.0-dev2 replaces the initial vanilla-button shell with the custom dashboard presentation while retaining the same server-authoritative architecture. A 3D skin portrait, texture-backed tiles, graphical settings and a dedicated Admin Center are now part of the common GUI Core. The interactive claim map remains a separate full-canvas screen.

@@ -29,6 +29,20 @@ public final class DirtyJsonRecordStore {
         knownFiles.clear();
     }
 
+
+    public synchronized void discoverFile(Path rawFile) {
+        Path file = normalize(rawFile);
+        if (!Files.exists(file)) {
+            return;
+        }
+        try {
+            knownFiles.add(file);
+            lastQueuedContent.put(file, Files.readString(file, StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            SimpleServerUtilities.LOGGER.error("Failed to discover dirty-record storage file: {}", file, e);
+        }
+    }
+
     public synchronized void discover(Path folder) {
         try {
             for (Path file : JsonStorage.listJsonFiles(folder)) {

@@ -22,14 +22,20 @@ public class SSUCommands {
                 .then(Commands.literal("reload")
                         .executes(context -> reload(context.getSource())))
                 .then(BorderCommands.build())
-                .then(CoreCommands.build()));
+                .then(CoreCommands.build())
+                .then(EconomyCommands.buildAdmin())
+                .then(UnifiedPermissionCommands.buildRank())
+                .then(UnifiedPermissionCommands.buildPermission())
+                .then(PlayerSettingsCommands.build()));
 
         dispatcher.register(ClaimCommands.build());
         dispatcher.register(RegionCommands.build());
         dispatcher.register(HomeCommands.build());
         dispatcher.register(WarpCommands.build());
         // dispatcher.register(KitCommands.build());
-        dispatcher.register(PermissionCommands.build());
+        dispatcher.register(EconomyCommands.buildPlayerRoot());
+        dispatcher.register(EconomyCommands.buildBalanceAlias());
+        dispatcher.register(EconomyCommands.buildPayAlias());
     }
 
 
@@ -75,7 +81,10 @@ public class SSUCommands {
         SimpleServerUtilities.HOMES.load(server);
         SimpleServerUtilities.WARPS.load(server);
         SimpleServerUtilities.PERMISSIONS.load(server);
+        SimpleServerUtilities.PERMISSIONS.migrateLegacyClaimLimitOverrides();
+        SimpleServerUtilities.UI_PREFERENCES.load(server);
         SimpleServerUtilities.BORDER_SETTINGS.load(server);
+        SimpleServerUtilities.ECONOMY.load(server);
         SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(server);
     }
 }

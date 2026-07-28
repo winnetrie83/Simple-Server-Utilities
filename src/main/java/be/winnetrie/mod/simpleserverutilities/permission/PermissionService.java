@@ -130,7 +130,13 @@ public class PermissionService {
                     PermissionKeys.HOMES_TELEPORT,
                     PermissionKeys.WARPS_USE,
                     PermissionKeys.WARPS_TELEPORT,
-                    PermissionKeys.REGIONS_RENT -> true;
+                    PermissionKeys.REGIONS_RENT,
+                    PermissionKeys.ECONOMY_USE,
+                    PermissionKeys.ECONOMY_BALANCE,
+                    PermissionKeys.ECONOMY_PAY,
+                    PermissionKeys.ECONOMY_HISTORY,
+                    PermissionKeys.SETTINGS_USE,
+                    PermissionKeys.MINIMAP_USE -> true;
             default -> false;
         };
     }

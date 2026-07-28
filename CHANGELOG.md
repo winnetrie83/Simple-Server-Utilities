@@ -1,3 +1,94 @@
+## 1.3.0-dev3
+
+- Added the first real always-visible SSU HUD minimap.
+- Added a 128×128 dynamic terrain texture sampled incrementally from chunks already loaded by the client.
+- Added circular and rectangular map shapes, all four screen corners and sizes from 64 to 256 GUI pixels.
+- Added north-up and player-up rotation modes with a centered heading marker, north indicator and live X/Z coordinates.
+- Added server-authoritative nearby claim overlays for owned, trusted and other-player claim chunks.
+- Added server-authoritative region-area overlays with stronger outer boundaries.
+- Reused the existing semantic border colors and persistent dev1/dev2 minimap settings.
+- Added immediate minimap refresh after graphical or command-based settings changes.
+- Added periodic compact overlay synchronization and an early refresh after large movement or same-dimension teleportation.
+- Kept terrain generation clientside and limited it to locally available chunks; the minimap never requests or force-loads world chunks.
+- Added safe payload limits and normalization for shape, position, dimensions, region names and overlay counts.
+- Increased the network protocol from 9 to 10 because dev3 adds minimap request and snapshot payloads.
+- Existing claims, regions, economy, rents, ranks, permissions, homes, warps and player-settings data remain compatible.
+
+### Current limitations
+
+- This first renderer is a surface minimap, not a cave map. In ceiling dimensions such as the Nether it may primarily show the upper surface or roof.
+- Waypoints, entity radar, biome labels, zoom controls and a shared full-screen advanced map remain future work.
+- Terrain can only be shown for chunks the Minecraft client has already received. Unavailable terrain is displayed as a dark checker pattern.
+
+## 1.3.0-dev2
+
+- Replaced the first vanilla-button dashboard with a Bedrock-inspired SSU dashboard shell.
+- Added a framed, draggable 3D player portrait using the active Minecraft skin.
+- Added a responsive profile panel with player name, base rank, wallet balance and module counts.
+- Added texture-backed module tiles with hover glow for Claims, Travel, Wallet and Regions.
+- Added dedicated Settings and admin-only shield buttons in the dashboard header.
+- Added an Admin Center with Players & Permissions, Economy, Regions and Core sections.
+- Added a graphical player/rank administration page for rank assignment and personal permission overrides while preserving server-side validation.
+- Added a fully functional settings page for dashboard hints and all prepared minimap preferences.
+- Added responsive layouts that hide the profile panel and switch the tile grid when the available GUI width is limited.
+- Preserved the existing claim map, economy, renting, home, warp, border, rank and permission command paths as the authoritative action layer.
+- Kept network protocol version 9 because the dashboard payload schema and save formats are unchanged.
+- The actual always-visible HUD minimap and shared advanced map renderer remain scheduled for 1.3.0-dev3.
+
+## 1.3.0-dev1
+
+- Reworked permission precedence so personal permissions always override contextual and rank values.
+- Added persistent permission settings with a configurable default rank.
+- New players now receive the configured default rank automatically on first join.
+- Added unified `/ssu rank` and `/ssu perm` command trees and stopped registering the old `/permissions` root.
+- Rank assignment now selects one base rank while preserving all personal permissions.
+- Removed the separate `/claims chunks` and `/claims groups` administration paths. Claim limits are now ordinary personal or rank permissions.
+- Added one-time migration of old claim-limit overrides into `ssu.claims.max_chunks` and `ssu.claims.max_groups` personal permissions.
+- Added `ssu.settings.use`, `ssu.admin.menu` and `ssu.minimap.use`.
+- Added persistent player UI/minimap preferences as groundwork for the new dashboard and minimap.
+- Added the supplied dashboard button, glow, portrait-frame and section icon textures to the resource pack.
+- Extended the dashboard payload with player name, primary rank and validated UI/minimap settings.
+- Network protocol increased from 8 to 9.
+
+## 1.2.0-dev2
+
+- Connected server-region renting to the built-in Economy Core with exact minor-unit rent and renewal payments.
+- Added a durable cross-module region-rent journal that reconciles economy transactions with region rental sequences after a restart.
+- Added deterministic owner payouts and configurable server share through `/regions rentconfig ownershare <0-100>`.
+- Added configurable pro-rata cancellation refunds for player cancellations and administrative cancellations.
+- Added `REGION_RENT`, `REGION_RENEW`, owner-payout, refund and rollback economy transaction types.
+- Rent and extension offers now show Belgian-formatted prices and the player's current balance before confirmation.
+- Region cancellation confirmation now shows the configured refund percentage and current estimated refund.
+- Added Wallet-admin controls for owner share, player refund and admin refund policy.
+- Added rentable and currently rented regions to the player dashboard with Rent, Extend and Unrent actions.
+- Added exact `priceMinor`, rental sequence and refundable-value metadata while preserving the legacy whole-unit `amount` field.
+- Added safe recovery for uncertain storage outcomes: money is never automatically charged twice, and incomplete compensation remains visible as a pending rent operation.
+- Fixed paused rentals so their refundable value no longer decreases while the timer is paused.
+- Prevented deletion of actively rented regions until the rental is safely cancelled.
+- Network protocol increased from 7 to 8 because the dashboard payload now contains rental and policy data.
+
+## 1.2.0-dev1
+
+- Added the reusable `SsuTransactionManager` with ordered steps, reverse rollback and idempotency protection.
+- Added exact long-based economy accounts, Belgian Dutch euro formatting, player payments and administration commands.
+- Added durable PREPARED/COMMITTED economy journals with account revisions and startup recovery.
+- Added the Wallet dashboard with current balance, recent transaction history and player payment fields.
+- Added `ssu.economy.*` permissions and isolated economy storage below `simpleserverutilities/economy`.
+- Network protocol increased from 6 to 7.
+
+## 1.1.0-dev6
+
+- Added a coarse spatial index for admin regions, using 8×8-chunk cells with a safe overflow path for extremely large regions.
+- Region protection and nearby-region visualization now query spatial candidates instead of linearly scanning every region.
+- Added a bounded LRU permission-resolution cache with automatic invalidation after permission data changes and context-aware region fingerprints.
+- Added internal performance counters for region lookups, permission cache efficiency, jobs and storage.
+- Added `/ssu core performance` and `/ssu core performance reset`.
+- Expanded the admin Core GUI with permission-cache and region-index statistics.
+- Migrated homes, warps, ranks, player permissions, dimension scopes and claim-role scopes to the batched dirty-record storage layer without changing their JSON schemas.
+- Storage flushes now remain unsuccessful while a path still requires retry, preventing legacy files from being archived after a terminal write failure.
+- Network protocol increased from 5 to 6 because the menu snapshot now carries Core performance data.
+- Includes the corrected dev5.2.1 claim-map widget baseline.
+
 ## 1.1.0-dev5.2.1
 
 - Fixed `ClaimMapWidget` compilation errors introduced in dev5.2.

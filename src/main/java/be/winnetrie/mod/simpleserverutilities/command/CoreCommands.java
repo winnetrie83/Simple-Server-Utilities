@@ -8,6 +8,8 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler.JobSnapshot;
+import be.winnetrie.mod.simpleserverutilities.core.performance.RegionSpatialIndex;
+import be.winnetrie.mod.simpleserverutilities.core.performance.SsuPerformanceMonitor;
 import be.winnetrie.mod.simpleserverutilities.core.storage.BatchedStorageService.StorageStatistics;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
@@ -25,6 +27,10 @@ public final class CoreCommands {
         return Commands.literal("core")
                 .then(Commands.literal("status")
                         .executes(context -> status(context.getSource())))
+                .then(Commands.literal("performance")
+                        .executes(context -> performance(context.getSource()))
+                        .then(Commands.literal("reset")
+                                .executes(context -> resetPerformance(context.getSource()))))
                 .then(Commands.literal("jobs")
                         .then(Commands.literal("list")
                                 .executes(context -> listJobs(context.getSource())))
@@ -53,6 +59,66 @@ public final class CoreCommands {
                         + ", retryRequired=" + storage.retryRequired()
         ));
         source.sendSystemMessage(Component.literal(" - Active jobs: " + SimpleServerUtilities.JOBS.size()));
+        return 1;
+    }
+
+
+    private static int performance(CommandSourceStack source) {
+        if (!canManage(source)) {
+            source.sendFailure(Component.literal("You do not have permission to view SSU performance data."));
+            return 0;
+        }
+
+        SsuPerformanceMonitor.Snapshot performance = SimpleServerUtilities.PERFORMANCE.snapshot();
+        RegionSpatialIndex.Statistics index = SimpleServerUtilities.REGIONS.spatialIndexStatistics();
+        StorageStatistics storage = SimpleServerUtilities.STORAGE.statistics();
+
+        source.sendSystemMessage(Component.literal("SSU performance:"));
+        source.sendSystemMessage(Component.literal(String.format(
+                Locale.ROOT,
+                " - Regions: %d lookup(s), %.2f candidate(s)/lookup, %d fallback(s)",
+                performance.regionLookups(),
+                performance.averageRegionCandidates(),
+                performance.regionIndexFallbacks()
+        )));
+        source.sendSystemMessage(Component.literal(
+                " - Region index: " + index.regions() + " region(s), "
+                        + index.cells() + " cell(s), " + index.references() + " reference(s), "
+                        + index.largeRegions() + " overflow region(s), max bucket " + index.maxBucketSize()
+        ));
+        source.sendSystemMessage(Component.literal(String.format(
+                Locale.ROOT,
+                " - Permissions: %d check(s), %.1f%% cache hit rate (%d hit / %d miss), %d cached result(s)",
+                performance.permissionChecks(),
+                performance.permissionCacheHitRate() * 100.0D,
+                performance.permissionCacheHits(),
+                performance.permissionCacheMisses(),
+                SimpleServerUtilities.PERMISSIONS.cachedResolutionCount()
+        )));
+        source.sendSystemMessage(Component.literal(String.format(
+                Locale.ROOT,
+                " - Jobs: %d completed, %d cancelled, %d failed, %.2f ms average runtime",
+                performance.jobsCompleted(),
+                performance.jobsCancelled(),
+                performance.jobsFailed(),
+                performance.averageJobRuntimeMillis()
+        )));
+        source.sendSystemMessage(Component.literal(
+                " - Storage: pending=" + storage.pending()
+                        + ", completed=" + storage.completed()
+                        + ", coalesced=" + storage.coalesced()
+                        + ", failed=" + storage.failed()
+        ));
+        return 1;
+    }
+
+    private static int resetPerformance(CommandSourceStack source) {
+        if (!canManage(source)) {
+            source.sendFailure(Component.literal("You do not have permission to reset SSU performance counters."));
+            return 0;
+        }
+        SimpleServerUtilities.PERFORMANCE.reset();
+        source.sendSystemMessage(Component.literal("SSU performance counters were reset."));
         return 1;
     }
 

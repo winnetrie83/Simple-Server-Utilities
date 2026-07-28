@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.command;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.RegionPolicy;
+import be.winnetrie.mod.simpleserverutilities.economy.MoneyFormat;
 import be.winnetrie.mod.simpleserverutilities.region.RegionInteractionEvents;
 import be.winnetrie.mod.simpleserverutilities.region.RegionRentalService;
 import be.winnetrie.mod.simpleserverutilities.region.RegionRentalService.RentalResult;
@@ -152,12 +153,12 @@ public class RegionCommands {
 
                 .then(Commands.literal("setrent")
                         .then(Commands.argument("name", StringArgumentType.word())
-                                .then(Commands.argument("amount", IntegerArgumentType.integer(0))
+                                .then(Commands.argument("amount", StringArgumentType.word())
                                         .then(Commands.argument("days", IntegerArgumentType.integer(-1))
                                                 .executes(context -> setRent(
                                                         context.getSource(),
                                                         StringArgumentType.getString(context, "name"),
-                                                        IntegerArgumentType.getInteger(context, "amount"),
+                                                        StringArgumentType.getString(context, "amount"),
                                                         IntegerArgumentType.getInteger(context, "days")
                                                 ))))))
 
@@ -275,6 +276,13 @@ public class RegionCommands {
 
                 .then(Commands.literal("extend")
                         .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> extendOffer(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))))
+
+                .then(Commands.literal("extendaccept")
+                        .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(context -> extendRent(
                                         context.getSource(),
                                         StringArgumentType.getString(context, "name")
@@ -282,11 +290,11 @@ public class RegionCommands {
 
                 .then(Commands.literal("setrentprice")
                         .then(Commands.argument("name", StringArgumentType.word())
-                                .then(Commands.argument("amount", IntegerArgumentType.integer(0))
+                                .then(Commands.argument("amount", StringArgumentType.word())
                                         .executes(context -> setRentPrice(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "name"),
-                                                IntegerArgumentType.getInteger(context, "amount")
+                                                StringArgumentType.getString(context, "amount")
                                         )))))
 
                 .then(Commands.literal("setrentperiod")
@@ -332,6 +340,29 @@ public class RegionCommands {
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "name"),
                                                 BoolArgumentType.getBool(context, "value")
+                                        )))))
+
+                .then(Commands.literal("rentconfig")
+                        .then(Commands.literal("ownershare")
+                                .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
+                                        .executes(context -> setRentConfig(
+                                                context.getSource(),
+                                                "ownershare",
+                                                IntegerArgumentType.getInteger(context, "percent")
+                                        ))))
+                        .then(Commands.literal("playerrefund")
+                                .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
+                                        .executes(context -> setRentConfig(
+                                                context.getSource(),
+                                                "playerrefund",
+                                                IntegerArgumentType.getInteger(context, "percent")
+                                        ))))
+                        .then(Commands.literal("adminrefund")
+                                .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
+                                        .executes(context -> setRentConfig(
+                                                context.getSource(),
+                                                "adminrefund",
+                                                IntegerArgumentType.getInteger(context, "percent")
                                         )))))
 
                 .then(Commands.literal("welcome")
@@ -503,10 +534,21 @@ public class RegionCommands {
             return 0;
         }
 
-        boolean success = SimpleServerUtilities.REGIONS.delete(name);
-
-        if (!success) {
+        Region existing = SimpleServerUtilities.REGIONS.get(name);
+        if (existing == null) {
             player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+        if (existing.getRentData().isRented()) {
+            player.sendSystemMessage(Component.literal(
+                    "This region is rented. Unrent it first so any configured refund can be processed safely."
+            ));
+            return 0;
+        }
+
+        boolean success = SimpleServerUtilities.REGIONS.delete(name);
+        if (!success) {
+            player.sendSystemMessage(Component.literal("Region could not be deleted: " + name));
             return 0;
         }
 
@@ -545,7 +587,7 @@ public class RegionCommands {
         source.sendSystemMessage(Component.literal("Global renting enabled: " + SimpleServerUtilities.REGIONS.isRentingEnabled()));
         source.sendSystemMessage(Component.literal("Rentable: " + rentData.isRentable()));
         source.sendSystemMessage(Component.literal("Rented: " + rentData.isRented()));
-        source.sendSystemMessage(Component.literal("Rent amount: " + rentData.getAmount()));
+        source.sendSystemMessage(Component.literal("Rent amount: " + formatMoney(rentData.getPriceMinor(SimpleServerUtilities.ECONOMY.settings()))));
         source.sendSystemMessage(Component.literal("Rent period days: " + rentData.getPeriodDays()));
         source.sendSystemMessage(Component.literal("Reset on expire: " + rentData.isResetOnExpire()));
         source.sendSystemMessage(Component.literal("Reset on unrent: " + rentData.isResetOnUnrent()));
@@ -781,6 +823,17 @@ public class RegionCommands {
             return 0;
         }
 
+        boolean selfCancellation = player.getUUID().equals(region.getRentData().getRenter());
+        int refundPermille = selfCancellation
+                ? SimpleServerUtilities.REGIONS.rentEconomySettings().getPlayerCancelRefundPermille()
+                : SimpleServerUtilities.REGIONS.rentEconomySettings().getAdminCancelRefundPermille();
+        long estimatedRefund = region.getRentData().calculateRefundMinor(System.currentTimeMillis(), refundPermille);
+
+        player.sendSystemMessage(Component.literal(
+                "Configured refund: " + (refundPermille / 10) + "% of the remaining eligible rent value"
+                        + " (currently " + formatMoney(estimatedRefund) + ")."
+        ));
+
         Component confirm = Component.literal("[CONFIRM UNRENT]")
                 .withStyle(style -> style.withColor(ChatFormatting.RED)
                         .withClickEvent(new ClickEvent.RunCommand("/regions confirmunrent " + region.getName())));
@@ -791,7 +844,7 @@ public class RegionCommands {
     }
 
 
-    private static int setRent(CommandSourceStack source, String name, int amount, int days) {
+    private static int setRent(CommandSourceStack source, String name, String amountText, int days) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -805,16 +858,28 @@ public class RegionCommands {
             return 0;
         }
 
+        if (days == 0 || days < -1) {
+            player.sendSystemMessage(Component.literal("Rent period must be -1 for permanent or at least 1 day."));
+            return 0;
+        }
+
+        Long amountMinor = parseMoney(player, amountText);
+        if (amountMinor == null) {
+            return 0;
+        }
+
         region.getRentData().setRentable(true);
-        region.getRentData().setAmount(amount);
+        region.getRentData().setPriceMinor(amountMinor, SimpleServerUtilities.ECONOMY.settings());
         region.getRentData().setPeriodDays(days);
 
         SimpleServerUtilities.REGIONS.save();
 
         if (days == -1) {
-            player.sendSystemMessage(Component.literal("Region '" + name + "' is now rentable for " + amount + " permanently."));
+            player.sendSystemMessage(Component.literal("Region '" + name + "' is now rentable for "
+                    + formatMoney(amountMinor) + " permanently."));
         } else {
-            player.sendSystemMessage(Component.literal("Region '" + name + "' is now rentable for " + amount + " every " + days + " day(s)."));
+            player.sendSystemMessage(Component.literal("Region '" + name + "' is now rentable for "
+                    + formatMoney(amountMinor) + " every " + days + " day(s)."));
         }
 
         if (region.getRentData().isRented()) {
@@ -921,9 +986,37 @@ public class RegionCommands {
             return 0;
         }
 
-        RentalResult result = RegionRentalService.unrent(player.level().getServer(), region, true);
+        RentalResult result = RegionRentalService.unrent(player, player.level().getServer(), region, true);
         player.sendSystemMessage(Component.literal(result.message()));
         return result.success() ? 1 : 0;
+    }
+
+    private static int extendOffer(CommandSourceStack source, String name) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+        RegionRentData rent = region.getRentData();
+        if (!player.getUUID().equals(rent.getRenter())) {
+            player.sendSystemMessage(Component.literal("You are not the renter of this region."));
+            return 0;
+        }
+        if (rent.isPermanent()) {
+            player.sendSystemMessage(Component.literal("This rental is permanent and cannot be extended."));
+            return 0;
+        }
+        long priceMinor = rent.getPriceMinor(SimpleServerUtilities.ECONOMY.settings());
+        player.sendSystemMessage(Component.literal("Extend region '" + region.getName() + "' for "
+                + rent.getPeriodDays() + " day(s) at " + formatMoney(priceMinor) + "."));
+        player.sendSystemMessage(Component.literal("Your balance: "
+                + SimpleServerUtilities.ECONOMY.formattedBalance(player)));
+        Component accept = Component.literal("[CONFIRM EXTENSION]")
+                .withStyle(style -> style.withColor(ChatFormatting.GREEN)
+                        .withClickEvent(new ClickEvent.RunCommand("/regions extendaccept " + region.getName())));
+        player.sendSystemMessage(Component.literal("Click to confirm: ").append(accept));
+        return 1;
     }
 
     private static int extendRent(CommandSourceStack source, String name) {
@@ -940,7 +1033,7 @@ public class RegionCommands {
         return result.success() ? 1 : 0;
     }
 
-    private static int setRentPrice(CommandSourceStack source, String name, int amount) {
+    private static int setRentPrice(CommandSourceStack source, String name, String amountText) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -954,10 +1047,16 @@ public class RegionCommands {
             return 0;
         }
 
-        region.getRentData().setAmount(amount);
+        Long amountMinor = parseMoney(player, amountText);
+        if (amountMinor == null) {
+            return 0;
+        }
+
+        region.getRentData().setPriceMinor(amountMinor, SimpleServerUtilities.ECONOMY.settings());
         SimpleServerUtilities.REGIONS.save();
 
-        player.sendSystemMessage(Component.literal("Rent price for region '" + name + "' is now " + amount + "."));
+        player.sendSystemMessage(Component.literal("Rent price for region '" + name + "' is now "
+                + formatMoney(amountMinor) + "."));
 
         if (region.getRentData().isRented()) {
             player.sendSystemMessage(Component.literal("Current rent timer was not reset. New price applies to the next extension."));
@@ -977,6 +1076,11 @@ public class RegionCommands {
 
         if (region == null) {
             player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        if (days == 0 || days < -1) {
+            player.sendSystemMessage(Component.literal("Rent period must be -1 for permanent or at least 1 day."));
             return 0;
         }
 
@@ -1723,6 +1827,45 @@ public class RegionCommands {
         return true;
     }
 
+    private static int setRentConfig(CommandSourceStack source, String key, int percent) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!canEditRegions(player)) {
+            return 0;
+        }
+
+        int permille = Math.max(0, Math.min(100, percent)) * 10;
+        switch (key) {
+            case "ownershare" -> SimpleServerUtilities.REGIONS.rentEconomySettings().setOwnerSharePermille(permille);
+            case "playerrefund" -> SimpleServerUtilities.REGIONS.rentEconomySettings().setPlayerCancelRefundPermille(permille);
+            case "adminrefund" -> SimpleServerUtilities.REGIONS.rentEconomySettings().setAdminCancelRefundPermille(permille);
+            default -> {
+                player.sendSystemMessage(Component.literal("Unknown rent economy setting: " + key));
+                return 0;
+            }
+        }
+        SimpleServerUtilities.REGIONS.save();
+        player.sendSystemMessage(Component.literal("Rent setting '" + key + "' is now " + percent + "%."));
+        return 1;
+    }
+
+    private static Long parseMoney(ServerPlayer player, String raw) {
+        try {
+            long amount = MoneyFormat.parseMinor(raw, SimpleServerUtilities.ECONOMY.settings());
+            if (amount < 0L || amount > SimpleServerUtilities.ECONOMY.settings().getMaximumBalanceMinor()) {
+                player.sendSystemMessage(Component.literal("Rent amount is outside the allowed economy range."));
+                return null;
+            }
+            return amount;
+        } catch (IllegalArgumentException e) {
+            player.sendSystemMessage(Component.literal(e.getMessage()));
+            return null;
+        }
+    }
+
+    private static String formatMoney(long amountMinor) {
+        return MoneyFormat.format(amountMinor, SimpleServerUtilities.ECONOMY.settings());
+    }
+
     private static String formatPos(BlockPos pos) {
         return pos.getX() + ", " + pos.getY() + ", " + pos.getZ();
     }
@@ -1759,7 +1902,7 @@ public class RegionCommands {
 
         String line = " - " + region.getName()
                 + " | " + status
-                + " | " + rentData.getAmount()
+                + " | " + formatMoney(rentData.getPriceMinor(SimpleServerUtilities.ECONOMY.settings()))
                 + " / " + period
                 + " | reset expire: " + rentData.isResetOnExpire();
 
@@ -1794,8 +1937,11 @@ public class RegionCommands {
         }
 
         player.sendSystemMessage(Component.literal("Rent region: " + region.getName()).withStyle(ChatFormatting.GOLD));
-        player.sendSystemMessage(Component.literal("Price: " + rentData.getAmount() + " / "
+        long priceMinor = rentData.getPriceMinor(SimpleServerUtilities.ECONOMY.settings());
+        player.sendSystemMessage(Component.literal("Price: " + formatMoney(priceMinor) + " / "
                 + (rentData.isPermanent() ? "permanent" : rentData.getPeriodDays() + " day(s)")));
+        player.sendSystemMessage(Component.literal("Your balance: "
+                + SimpleServerUtilities.ECONOMY.formattedBalance(player)));
 
         Component accept = Component.literal("[ACCEPT]")
                 .withStyle(style -> style.withColor(ChatFormatting.GREEN)
@@ -1840,6 +1986,7 @@ public class RegionCommands {
         source.sendSystemMessage(Component.literal(" - /regions myrentals"));
         source.sendSystemMessage(Component.literal(" - /regions extend <name>"));
         source.sendSystemMessage(Component.literal(" - /regions setrentable <name> <true|false>"));
+        source.sendSystemMessage(Component.literal(" - /regions rentconfig ownershare|playerrefund|adminrefund <0-100>"));
         source.sendSystemMessage(Component.literal(" - /regions setrentprice <name> <amount>"));
         source.sendSystemMessage(Component.literal(" - /regions setrentperiod <name> <days>"));
         source.sendSystemMessage(Component.literal(" - /regions addtime <name> <days>"));

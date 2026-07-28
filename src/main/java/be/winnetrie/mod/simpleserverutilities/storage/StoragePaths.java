@@ -26,6 +26,10 @@ public final class StoragePaths {
         return root.resolve("permissions");
     }
 
+    public static Path permissionSettings(Path root) {
+        return permissions(root).resolve("settings.json");
+    }
+
     public static Path permissionRanks(Path root) {
         return permissions(root).resolve("ranks");
     }
@@ -40,6 +44,10 @@ public final class StoragePaths {
 
     public static Path permissionClaimContext(Path root) {
         return permissions(root).resolve("claim_context");
+    }
+
+    public static Path playerSettings(Path root) {
+        return root.resolve("player_settings");
     }
 
     public static Path homes(Path root) {
@@ -62,12 +70,28 @@ public final class StoragePaths {
         return playerClaims(root).resolve("limits");
     }
 
+    public static Path economy(Path root) {
+        return root.resolve("economy");
+    }
+
+    public static Path economyAccounts(Path root) {
+        return economy(root).resolve("accounts");
+    }
+
+    public static Path economyTransactions(Path root) {
+        return economy(root).resolve("transactions");
+    }
+
     public static Path regions(Path root) {
         return root.resolve("regions");
     }
 
     public static Path regionEntries(Path root) {
         return regions(root).resolve("entries");
+    }
+
+    public static Path regionRentTransactions(Path root) {
+        return regions(root).resolve("rent_transactions");
     }
 
     public static Path jsonFile(Path folder, String name) {

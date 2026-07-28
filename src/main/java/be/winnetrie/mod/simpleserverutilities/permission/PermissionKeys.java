@@ -61,6 +61,15 @@ public final class PermissionKeys {
     public static final String BORDER_REGIONS_VIEW = "ssu.borders.regions.view";
     public static final String VISUALIZATION_ADMIN = "ssu.visualization.admin";
     public static final String CORE_ADMIN = "ssu.core.admin";
+    public static final String SETTINGS_USE = "ssu.settings.use";
+    public static final String ADMIN_MENU = "ssu.admin.menu";
+    public static final String MINIMAP_USE = "ssu.minimap.use";
+
+    public static final String ECONOMY_USE = "ssu.economy.use";
+    public static final String ECONOMY_BALANCE = "ssu.economy.balance";
+    public static final String ECONOMY_PAY = "ssu.economy.pay";
+    public static final String ECONOMY_HISTORY = "ssu.economy.history";
+    public static final String ECONOMY_ADMIN = "ssu.economy.admin";
 
     public static final String TELEPORT_DELAY_BYPASS = "ssu.teleport.delay.bypass";
     public static final String TELEPORT_COOLDOWN_BYPASS = "ssu.teleport.cooldown.bypass";
@@ -121,6 +130,15 @@ public final class PermissionKeys {
             BORDER_REGIONS_VIEW,
             VISUALIZATION_ADMIN,
             CORE_ADMIN,
+            SETTINGS_USE,
+            ADMIN_MENU,
+            MINIMAP_USE,
+
+            ECONOMY_USE,
+            ECONOMY_BALANCE,
+            ECONOMY_PAY,
+            ECONOMY_HISTORY,
+            ECONOMY_ADMIN,
 
             TELEPORT_DELAY_BYPASS,
             TELEPORT_COOLDOWN_BYPASS,
@@ -136,6 +154,10 @@ public final class PermissionKeys {
             "ssu.borders.*",
             "ssu.visualization.*",
             "ssu.core.*",
+            "ssu.settings.*",
+            "ssu.admin.*",
+            "ssu.minimap.*",
+            "ssu.economy.*",
             "ssu.teleport.*",
             "*"
     );

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "spawn",
   "dimension": "minecraft:overworld",
   "priority": 100,
@@ -31,13 +31,20 @@
   "rent": {
     "rentable": false,
     "amount": 0,
+    "priceMinor": 0,
     "periodDays": -1,
     "rentEndTime": -1,
     "renterName": "",
     "rentPaused": false,
     "pausedRemainingMillis": -1,
     "resetOnExpire": true,
-    "resetOnUnrent": true
+    "resetOnUnrent": true,
+    "rentalSequence": 0,
+    "currentTermPaidMinor": 0,
+    "totalPaidMinor": 0,
+    "refundableAmountMinor": 0,
+    "refundableWindowStartTime": -1,
+    "refundableWindowEndTime": -1
   },
   "spawn": {
     "x": 0,
