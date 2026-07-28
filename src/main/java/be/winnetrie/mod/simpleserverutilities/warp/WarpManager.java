@@ -1,8 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.warp;
 
 import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -17,9 +15,10 @@ import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.permission.policy.WarpPolicy;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
+import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.storage.LevelResource;
 
 public class WarpManager {
 
@@ -30,7 +29,7 @@ public class WarpManager {
     private Path saveFile;
 
     public void load(MinecraftServer server) {
-        Path folder = server.getWorldPath(LevelResource.ROOT).resolve("simpleserverutilities");
+        Path folder = StoragePaths.root(server);
         this.saveFile = folder.resolve("warps.json");
 
         warps.clear();
@@ -43,25 +42,24 @@ public class WarpManager {
                 return;
             }
 
-            try (Reader reader = Files.newBufferedReader(saveFile)) {
-                WarpSaveData data = GSON.fromJson(reader, WarpSaveData.class);
+            WarpSaveData data = JsonStorage.read(GSON, saveFile, WarpSaveData.class);
 
-                if (data == null || data.warps == null) {
-                    return;
+            if (data == null || data.warps == null) {
+                return;
+            }
+
+            for (Warp warp : data.warps) {
+                if (warp.getName() == null || warp.getName().isBlank()) {
+                    continue;
                 }
 
-                for (Warp warp : data.warps) {
-                    if (warp.getName() == null || warp.getName().isBlank()) {
-                        continue;
-                    }
-
-                    warps.put(normalizeName(warp.getName()), warp);
-                }
+                warps.put(normalizeName(warp.getName()), warp);
             }
 
             SimpleServerUtilities.LOGGER.info("Loaded {} server warps.", warps.size());
         } catch (Exception e) {
-            SimpleServerUtilities.LOGGER.error("Failed to load server warps.", e);
+            Path archived = JsonStorage.archiveBrokenFile(saveFile);
+            SimpleServerUtilities.LOGGER.error("Failed to load server warps. Broken file archived as: {}", archived, e);
         }
     }
 
@@ -70,13 +68,13 @@ public class WarpManager {
             return;
         }
 
-        try (Writer writer = Files.newBufferedWriter(saveFile)) {
+        try {
             WarpSaveData data = new WarpSaveData();
             data.warps = new ArrayList<>(warps.values());
 
             data.warps.sort(Comparator.comparing(Warp::getDisplayName));
 
-            GSON.toJson(data, writer);
+            JsonStorage.write(GSON, saveFile, data);
         } catch (IOException e) {
             SimpleServerUtilities.LOGGER.error("Failed to save server warps.", e);
         }
@@ -167,7 +165,7 @@ public class WarpManager {
     }
 
     private String normalizeName(String name) {
-        return name.toLowerCase();
+        return name.toLowerCase(java.util.Locale.ROOT);
     }
 
     private static class WarpSaveData {

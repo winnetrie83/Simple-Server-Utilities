@@ -1,8 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.permission;
 
 import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -19,43 +17,57 @@ import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
+import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.storage.LevelResource;
 
 public class PermissionManager {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private PermissionData data = new PermissionData();
-    private Path saveFile;
+    private Path rootFolder;
+    private Path permissionsFolder;
+    private Path legacySaveFile;
 
     public void load(MinecraftServer server) {
-        Path folder = server.getWorldPath(LevelResource.ROOT).resolve("simpleserverutilities");
-        this.saveFile = folder.resolve("permissions.json");
+        this.rootFolder = StoragePaths.root(server);
+        this.permissionsFolder = StoragePaths.permissions(rootFolder);
+        this.legacySaveFile = rootFolder.resolve("permissions.json");
 
         try {
-            Files.createDirectories(folder);
+            Files.createDirectories(rootFolder);
+            data = new PermissionData();
 
-            if (!Files.exists(saveFile)) {
+            if (JsonStorage.hasJsonFiles(permissionsFolder)) {
+                loadSplitData();
+            } else if (Files.exists(legacySaveFile)) {
+                loadLegacyData();
+                save();
+                Path archived = JsonStorage.archiveLegacyFile(legacySaveFile);
+
+                if (archived != null) {
+                    SimpleServerUtilities.LOGGER.info("Migrated legacy permission data to split storage. Legacy file archived as: {}", archived);
+                }
+            } else {
                 data = createDefaultData();
                 save();
                 SimpleServerUtilities.LOGGER.info("Created default permission data.");
                 return;
             }
 
-            try (Reader reader = Files.newBufferedReader(saveFile)) {
-                PermissionData loadedData = GSON.fromJson(reader, PermissionData.class);
-                data = loadedData == null ? createDefaultData() : loadedData;
-            }
-
             if (ensureDefaultDataUpToDate()) {
                 save();
             }
 
-            SimpleServerUtilities.LOGGER.info("Loaded permission data: {} ranks, {} player overrides.",
+            SimpleServerUtilities.LOGGER.info(
+                    "Loaded permission data: {} ranks, {} player overrides, {} dimension scopes, {} claim context scopes.",
                     data.getRanks().size(),
-                    data.getPlayers().size());
+                    data.getPlayers().size(),
+                    data.getDimensions().size(),
+                    data.getPlayerClaimContext().size()
+            );
         } catch (Exception e) {
             data = createDefaultData();
             SimpleServerUtilities.LOGGER.error("Failed to load permission data. Using defaults.", e);
@@ -63,12 +75,12 @@ public class PermissionManager {
     }
 
     public void save() {
-        if (saveFile == null) {
+        if (permissionsFolder == null) {
             return;
         }
 
-        try (Writer writer = Files.newBufferedWriter(saveFile)) {
-            GSON.toJson(data, writer);
+        try {
+            saveSplitData();
         } catch (IOException e) {
             SimpleServerUtilities.LOGGER.error("Failed to save permission data.", e);
         }
@@ -217,7 +229,9 @@ public class PermissionManager {
     }
 
     public PlayerPermissionData getOrCreatePlayerData(UUID playerId) {
-        return data.getPlayers().computeIfAbsent(playerId.toString(), ignored -> new PlayerPermissionData());
+        PlayerPermissionData playerData = data.getPlayers().computeIfAbsent(playerId.toString(), ignored -> new PlayerPermissionData());
+        playerData.setUuid(playerId);
+        return playerData;
     }
 
     public PlayerPermissionData getPlayerData(UUID playerId) {
@@ -307,6 +321,190 @@ public class PermissionManager {
 
     public PermissionData getData() {
         return data;
+    }
+
+    private void loadLegacyData() throws IOException {
+        try {
+            PermissionData loadedData = JsonStorage.read(GSON, legacySaveFile, PermissionData.class);
+            data = loadedData == null ? createDefaultData() : loadedData;
+        } catch (Exception e) {
+            Path archived = JsonStorage.archiveBrokenFile(legacySaveFile);
+            data = createDefaultData();
+            SimpleServerUtilities.LOGGER.error("Failed to read legacy permission file. Using defaults. Broken file archived as: {}", archived, e);
+        }
+    }
+
+    private void loadSplitData() throws IOException {
+        data = new PermissionData();
+
+        loadRanks();
+        loadPlayers();
+        loadDimensions();
+        loadPlayerClaimContexts();
+    }
+
+    private void loadRanks() throws IOException {
+        Path folder = StoragePaths.permissionRanks(rootFolder);
+
+        for (Path file : JsonStorage.listJsonFiles(folder)) {
+            try {
+                PermissionRank rank = JsonStorage.read(GSON, file, PermissionRank.class);
+
+                if (rank == null) {
+                    continue;
+                }
+
+                data.getRanks().put(normalizeRankName(StoragePaths.fileBaseName(file)), rank);
+            } catch (Exception e) {
+                Path archived = JsonStorage.archiveBrokenFile(file);
+                SimpleServerUtilities.LOGGER.error("Failed to load permission rank file. Broken file archived as: {}", archived, e);
+            }
+        }
+    }
+
+    private void loadPlayers() throws IOException {
+        Path folder = StoragePaths.permissionPlayers(rootFolder);
+
+        for (Path file : JsonStorage.listJsonFiles(folder)) {
+            try {
+                PlayerPermissionData playerData = JsonStorage.read(GSON, file, PlayerPermissionData.class);
+
+                if (playerData == null) {
+                    continue;
+                }
+
+                String playerId = playerData.getUuid().isBlank()
+                        ? StoragePaths.fileBaseName(file)
+                        : playerData.getUuid();
+
+                UUID uuid = UUID.fromString(playerId);
+                playerData.setUuid(uuid);
+                data.getPlayers().put(uuid.toString(), playerData);
+            } catch (Exception e) {
+                Path archived = JsonStorage.archiveBrokenFile(file);
+                SimpleServerUtilities.LOGGER.error("Failed to load player permission file. Broken file archived as: {}", archived, e);
+            }
+        }
+    }
+
+    private void loadDimensions() throws IOException {
+        Path folder = StoragePaths.permissionDimensions(rootFolder);
+
+        for (Path file : JsonStorage.listJsonFiles(folder)) {
+            try {
+                ScopeSaveData scopeData = JsonStorage.read(GSON, file, ScopeSaveData.class);
+
+                if (scopeData == null) {
+                    continue;
+                }
+
+                String dimensionId = scopeData.id == null || scopeData.id.isBlank()
+                        ? StoragePaths.fileBaseName(file)
+                        : scopeData.id;
+
+                data.getDimensions().put(dimensionId, new PermissionScope(scopeData.permissions));
+            } catch (Exception e) {
+                Path archived = JsonStorage.archiveBrokenFile(file);
+                SimpleServerUtilities.LOGGER.error("Failed to load dimension permission file. Broken file archived as: {}", archived, e);
+            }
+        }
+    }
+
+    private void loadPlayerClaimContexts() throws IOException {
+        Path folder = StoragePaths.permissionClaimContext(rootFolder);
+
+        for (Path file : JsonStorage.listJsonFiles(folder)) {
+            try {
+                ScopeSaveData scopeData = JsonStorage.read(GSON, file, ScopeSaveData.class);
+
+                if (scopeData == null) {
+                    continue;
+                }
+
+                String roleName = scopeData.id == null || scopeData.id.isBlank()
+                        ? StoragePaths.fileBaseName(file)
+                        : scopeData.id;
+
+                data.getPlayerClaimContext().put(normalizeRoleName(roleName), new PermissionScope(scopeData.permissions));
+            } catch (Exception e) {
+                Path archived = JsonStorage.archiveBrokenFile(file);
+                SimpleServerUtilities.LOGGER.error("Failed to load player claim context permission file. Broken file archived as: {}", archived, e);
+            }
+        }
+    }
+
+    private void saveSplitData() throws IOException {
+        saveRanks();
+        savePlayers();
+        saveDimensions();
+        savePlayerClaimContexts();
+    }
+
+    private void saveRanks() throws IOException {
+        Path folder = StoragePaths.permissionRanks(rootFolder);
+        Files.createDirectories(folder);
+        Set<Path> keptFiles = new HashSet<>();
+
+        for (Map.Entry<String, PermissionRank> entry : data.getRanks().entrySet()) {
+            Path file = StoragePaths.jsonFile(folder, normalizeRankName(entry.getKey()));
+            JsonStorage.write(GSON, file, entry.getValue());
+            keptFiles.add(file);
+        }
+
+        JsonStorage.deleteStaleJsonFiles(folder, keptFiles);
+    }
+
+    private void savePlayers() throws IOException {
+        Path folder = StoragePaths.permissionPlayers(rootFolder);
+        Files.createDirectories(folder);
+        Set<Path> keptFiles = new HashSet<>();
+
+        for (Map.Entry<String, PlayerPermissionData> entry : data.getPlayers().entrySet()) {
+            try {
+                UUID uuid = UUID.fromString(entry.getKey());
+                PlayerPermissionData playerData = entry.getValue();
+                playerData.setUuid(uuid);
+
+                Path file = StoragePaths.jsonFile(folder, uuid.toString());
+                JsonStorage.write(GSON, file, playerData);
+                keptFiles.add(file);
+            } catch (IllegalArgumentException e) {
+                SimpleServerUtilities.LOGGER.warn("Skipping player permission entry with invalid UUID: {}", entry.getKey());
+            }
+        }
+
+        JsonStorage.deleteStaleJsonFiles(folder, keptFiles);
+    }
+
+    private void saveDimensions() throws IOException {
+        Path folder = StoragePaths.permissionDimensions(rootFolder);
+        Files.createDirectories(folder);
+        Set<Path> keptFiles = new HashSet<>();
+
+        for (Map.Entry<String, PermissionScope> entry : data.getDimensions().entrySet()) {
+            ScopeSaveData scopeData = new ScopeSaveData(entry.getKey(), entry.getValue().getPermissions());
+            Path file = StoragePaths.jsonFile(folder, entry.getKey());
+            JsonStorage.write(GSON, file, scopeData);
+            keptFiles.add(file);
+        }
+
+        JsonStorage.deleteStaleJsonFiles(folder, keptFiles);
+    }
+
+    private void savePlayerClaimContexts() throws IOException {
+        Path folder = StoragePaths.permissionClaimContext(rootFolder);
+        Files.createDirectories(folder);
+        Set<Path> keptFiles = new HashSet<>();
+
+        for (Map.Entry<String, PermissionScope> entry : data.getPlayerClaimContext().entrySet()) {
+            String roleName = normalizeRoleName(entry.getKey());
+            ScopeSaveData scopeData = new ScopeSaveData(roleName, entry.getValue().getPermissions());
+            Path file = StoragePaths.jsonFile(folder, roleName);
+            JsonStorage.write(GSON, file, scopeData);
+            keptFiles.add(file);
+        }
+
+        JsonStorage.deleteStaleJsonFiles(folder, keptFiles);
     }
 
     private String getRegionValue(String key, PermissionContext context) {
@@ -478,6 +676,7 @@ public class PermissionManager {
         changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_TRUST, true);
         changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_FLAGS, true);
         changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_MAP, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_VISUALIZE, true);
         changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_TELEPORT, true);
         changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_ADMIN_BYPASS, false);
         changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_MAX_CHUNKS, Config.MAX_PLAYER_CLAIM_CHUNKS.get());
@@ -489,12 +688,26 @@ public class PermissionManager {
         changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_DELETE, false);
         changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_EDIT, false);
         changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_TELEPORT, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_RENT, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_RENT_ADMIN, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_SELECTION, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_VISUALIZE, true);
         changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_ADMIN, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_ADMIN_BYPASS, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.SSU_RELOAD, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.BORDER_CLAIMS_VIEW, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.BORDER_REGIONS_VIEW, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.VISUALIZATION_ADMIN, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.CORE_ADMIN, false);
 
         changed |= setDefaultPermission(rank, PermissionKeys.HOMES_TELEPORT_DELAY, 0);
         changed |= setDefaultPermission(rank, PermissionKeys.HOMES_TELEPORT_COOLDOWN, 0);
         changed |= setDefaultPermission(rank, PermissionKeys.WARPS_TELEPORT_DELAY, 0);
         changed |= setDefaultPermission(rank, PermissionKeys.WARPS_TELEPORT_COOLDOWN, 0);
+        changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_TELEPORT_DELAY, 0);
+        changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_TELEPORT_COOLDOWN, 0);
+        changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_TELEPORT_DELAY, 0);
+        changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_TELEPORT_COOLDOWN, 0);
         changed |= setDefaultPermission(rank, PermissionKeys.TELEPORT_CANCEL_ON_MOVE, true);
         changed |= setDefaultPermission(rank, PermissionKeys.TELEPORT_DELAY_BYPASS, false);
         changed |= setDefaultPermission(rank, PermissionKeys.TELEPORT_COOLDOWN_BYPASS, false);
@@ -544,7 +757,7 @@ public class PermissionManager {
             return "default";
         }
 
-        return rankName.trim().toLowerCase();
+        return rankName.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     private String normalizeRoleName(String roleName) {
@@ -552,6 +765,20 @@ public class PermissionManager {
             return "none";
         }
 
-        return roleName.trim().toLowerCase();
+        return roleName.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static class ScopeSaveData {
+        private String id = "";
+        private Map<String, String> permissions = new HashMap<>();
+
+        public ScopeSaveData() {
+            // Required for Gson
+        }
+
+        public ScopeSaveData(String id, Map<String, String> permissions) {
+            this.id = id == null ? "" : id;
+            this.permissions = permissions == null ? new HashMap<>() : permissions;
+        }
     }
 }

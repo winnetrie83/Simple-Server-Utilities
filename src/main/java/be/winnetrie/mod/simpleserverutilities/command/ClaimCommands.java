@@ -8,12 +8,14 @@ import java.util.UUID;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapData;
+import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapService;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimOperationResult;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
-import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.ClaimPolicy;
+import be.winnetrie.mod.simpleserverutilities.teleport.TeleportDestination;
+import be.winnetrie.mod.simpleserverutilities.teleport.TeleportSafety;
 
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -31,7 +33,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.Level;
 
@@ -70,18 +71,42 @@ public class ClaimCommands {
                                 ))))
 
                 .then(Commands.literal("map")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(context -> map(
-                                        context.getSource(),
-                                        StringArgumentType.getString(context, "name")
-                                ))))
-
-                .then(Commands.literal("gui")
+                        .executes(context -> gui(context.getSource(), ""))
+                        .then(Commands.literal("text")
+                                .then(Commands.argument("name", StringArgumentType.word())
+                                        .executes(context -> mapText(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "name")
+                                        ))))
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(context -> gui(
                                         context.getSource(),
                                         StringArgumentType.getString(context, "name")
                                 ))))
+
+                .then(Commands.literal("gui")
+                        .executes(context -> gui(context.getSource(), ""))
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> gui(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))))
+
+                .then(Commands.literal("borders")
+                        .then(Commands.literal("on")
+                                .executes(context -> BorderCommands.setClaims(context.getSource(), true)))
+                        .then(Commands.literal("off")
+                                .executes(context -> BorderCommands.setClaims(context.getSource(), false))))
+
+                .then(Commands.literal("show")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> showClaimBoundary(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))))
+
+                .then(Commands.literal("hide")
+                        .executes(context -> hideClaimBoundary(context.getSource())))
 
                 .then(Commands.literal("tp")
                         .then(Commands.argument("name", StringArgumentType.word())
@@ -274,6 +299,7 @@ public class ClaimCommands {
             return 0;
         }
 
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownClaim(player);
         player.sendSystemMessage(Component.literal("Claim '" + name + "' deleted."));
         return 1;
     }
@@ -345,6 +371,7 @@ public class ClaimCommands {
             return 0;
         }
 
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownClaim(player);
         player.sendSystemMessage(Component.literal("Chunk " + chunkPos.x() + ", " + chunkPos.z() + " added to claim '" + name + "'."));
         return 1;
     }
@@ -367,6 +394,7 @@ public class ClaimCommands {
             return 0;
         }
 
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownClaim(player);
         player.sendSystemMessage(Component.literal("Chunk " + chunkPos.x() + ", " + chunkPos.z() + " unclaimed."));
         return 1;
     }
@@ -461,7 +489,7 @@ public class ClaimCommands {
             return 0;
         }
 
-        String normalizedFlag = flag.toLowerCase();
+        String normalizedFlag = flag.toLowerCase(java.util.Locale.ROOT);
 
         switch (normalizedFlag) {
             case "pvp", "allowpvp" -> claim.getSettings().setAllowPvp(value);
@@ -743,39 +771,42 @@ public class ClaimCommands {
             return 0;
         }
 
-        BlockPos spawnPos = claim.getSpawnPos();
+        BlockPos targetPos = claim.getSpawnPos();
+        float yaw = claim.getSpawnYaw();
+        float pitch = claim.getSpawnPitch();
 
-        if (spawnPos != null) {
-            player.teleportTo(
-                    level,
-                    spawnPos.getX() + 0.5,
-                    spawnPos.getY(),
-                    spawnPos.getZ() + 0.5,
-                    Set.of(),
-                    claim.getSpawnYaw(),
-                    claim.getSpawnPitch(),
-                    true
-            );
-
-            player.sendSystemMessage(Component.literal(successMessage));
-            return 1;
+        if (targetPos == null) {
+            targetPos = findClaimTeleportPos(level, claim);
+            yaw = player.getYRot();
+            pitch = player.getXRot();
         }
 
-        BlockPos teleportPos = findClaimTeleportPos(level, claim);
-
-        if (teleportPos == null) {
+        if (targetPos == null) {
             player.sendSystemMessage(Component.literal("This claim has no chunks to teleport to."));
             return 0;
         }
 
+        Optional<TeleportDestination> destination = TeleportSafety.findSafeDestination(
+                level,
+                targetPos.getX() + 0.5,
+                targetPos.getY(),
+                targetPos.getZ() + 0.5
+        );
+
+        if (destination.isEmpty()) {
+            player.sendSystemMessage(Component.literal("No safe teleport location was found in this claim."));
+            return 0;
+        }
+
+        TeleportDestination safe = destination.get();
         player.teleportTo(
                 level,
-                teleportPos.getX() + 0.5,
-                teleportPos.getY(),
-                teleportPos.getZ() + 0.5,
+                safe.x(),
+                safe.y(),
+                safe.z(),
                 Set.of(),
-                player.getYRot(),
-                player.getXRot(),
+                yaw,
+                pitch,
                 true
         );
 
@@ -890,7 +921,11 @@ public class ClaimCommands {
         //source.sendSystemMessage(Component.literal(" - /claims flag <name> <pvp|pistons|explosions|water|lava|otherfluids|redstone|hoppers|ownerlessprojectiles|fire> <true|false>"));
         source.sendSystemMessage(Component.literal(" - /claims flags <name>"));
         source.sendSystemMessage(Component.literal(" - /claims msg <name> <message>"));
-        source.sendSystemMessage(Component.literal(" - /claims map <name>"));
+        source.sendSystemMessage(Component.literal(" - /claims map [name]"));
+        source.sendSystemMessage(Component.literal(" - /claims map text <name>"));
+        source.sendSystemMessage(Component.literal(" - /claims gui [name]"));
+        source.sendSystemMessage(Component.literal(" - /claims show <name>"));
+        source.sendSystemMessage(Component.literal(" - /claims hide"));
         source.sendSystemMessage(Component.literal(" - /claims tp <name>"));
         source.sendSystemMessage(Component.literal(" - /claims setspawn <name>"));
 
@@ -945,6 +980,15 @@ public class ClaimCommands {
             case CHUNK_OVERLAPS_REGION ->
                     player.sendSystemMessage(Component.literal("This chunk overlaps a region and cannot be claimed. " + result.getDetails()));
 
+            case EMPTY_SELECTION ->
+                    player.sendSystemMessage(Component.literal("Select at least one chunk. " + result.getDetails()));
+
+            case INVALID_SELECTION ->
+                    player.sendSystemMessage(Component.literal("This claim selection is not valid. " + result.getDetails()));
+
+            case INVALID_CLAIM_NAME ->
+                    player.sendSystemMessage(Component.literal("Invalid claim name. " + result.getDetails()));
+
             case NOT_OWNER ->
                     player.sendSystemMessage(Component.literal("You are not the owner of this claim: " + result.getDetails()));
 
@@ -953,7 +997,42 @@ public class ClaimCommands {
         }
     }
 
-    private static int map(CommandSourceStack source, String claimName) {
+
+    private static int showClaimBoundary(CommandSourceStack source, String claimName) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!ClaimPolicy.canVisualizeClaims(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to visualize claim boundaries."));
+            return 0;
+        }
+
+        PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
+
+        if (claim == null) {
+            player.sendSystemMessage(Component.literal("Claim not found: " + claimName));
+            return 0;
+        }
+
+        if (claim.getChunks().isEmpty()) {
+            player.sendSystemMessage(Component.literal("Claim '" + claim.getDisplayName() + "' does not contain any chunks yet."));
+            return 0;
+        }
+
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.showClaim(player, claim);
+        player.sendSystemMessage(Component.literal(
+                "Showing border for claim '" + claim.getDisplayName() + "'. Use /claims hide to stop."
+        ));
+        return 1;
+    }
+
+    private static int hideClaimBoundary(CommandSourceStack source) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player);
+        player.sendSystemMessage(Component.literal("Claim boundary visualization hidden."));
+        return 1;
+    }
+
+    private static int mapText(CommandSourceStack source, String claimName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!ClaimPolicy.canUseMap(player)) {
@@ -1034,24 +1113,13 @@ public class ClaimCommands {
             return 0;
         }
 
-        PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
-
-        if (claim == null) {
+        if (!claimName.isBlank()
+                && SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName) == null) {
             player.sendSystemMessage(Component.literal("Claim not found: " + claimName));
             return 0;
         }
 
-        ClaimMapData data = SimpleServerUtilities.PLAYER_CLAIMS.getMapData(
-                player,
-                4,
-                claimName
-        );
-
-        PacketDistributor.sendToPlayer(
-                player,
-                ClaimMapDataPayload.from(data)
-        );
-
+        ClaimMapService.open(player, claimName);
         return 1;
     }
 }

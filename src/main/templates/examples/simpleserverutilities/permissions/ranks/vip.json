@@ -1,0 +1,12 @@
+{
+  "priority": 10,
+  "inherits": [
+    "default"
+  ],
+  "permissions": {
+    "ssu.homes.max": "10",
+    "ssu.claims.max_chunks": "96",
+    "ssu.claims.max_groups": "6",
+    "ssu.warps.teleport": "true"
+  }
+}

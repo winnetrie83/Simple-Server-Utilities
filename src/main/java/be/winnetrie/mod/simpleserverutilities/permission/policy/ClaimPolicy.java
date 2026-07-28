@@ -52,6 +52,11 @@ public class ClaimPolicy {
                 && PermissionService.getBoolean(player, PermissionKeys.CLAIMS_MAP, true);
     }
 
+    public static boolean canVisualizeClaims(ServerPlayer player) {
+        return canUseClaims(player)
+                && PermissionService.getBoolean(player, PermissionKeys.CLAIMS_VISUALIZE, true);
+    }
+
     public static boolean canTeleportClaim(ServerPlayer player, PermissionContext context) {
         return canUseClaims(player, context)
                 && PermissionService.getBoolean(player, PermissionKeys.CLAIMS_TELEPORT, true, context);

@@ -15,7 +15,10 @@ public final class PermissionKeys {
     public static final String CLAIMS_TRUST = "ssu.claims.trust";
     public static final String CLAIMS_FLAGS = "ssu.claims.flags";
     public static final String CLAIMS_MAP = "ssu.claims.map";
+    public static final String CLAIMS_VISUALIZE = "ssu.claims.visualize";
     public static final String CLAIMS_TELEPORT = "ssu.claims.teleport";
+    public static final String CLAIMS_TELEPORT_DELAY = "ssu.claims.teleport.delay";
+    public static final String CLAIMS_TELEPORT_COOLDOWN = "ssu.claims.teleport.cooldown";
     public static final String CLAIMS_ADMIN_BYPASS = "ssu.claims.admin.bypass";
 
     public static final String CLAIMS_MAX_CHUNKS = "ssu.claims.max_chunks";
@@ -45,7 +48,19 @@ public final class PermissionKeys {
     public static final String REGIONS_DELETE = "ssu.regions.delete";
     public static final String REGIONS_EDIT = "ssu.regions.edit";
     public static final String REGIONS_TELEPORT = "ssu.regions.teleport";
+    public static final String REGIONS_TELEPORT_DELAY = "ssu.regions.teleport.delay";
+    public static final String REGIONS_TELEPORT_COOLDOWN = "ssu.regions.teleport.cooldown";
+    public static final String REGIONS_RENT = "ssu.regions.rent";
+    public static final String REGIONS_RENT_ADMIN = "ssu.regions.rent.admin";
+    public static final String REGIONS_SELECTION = "ssu.regions.selection";
+    public static final String REGIONS_VISUALIZE = "ssu.regions.visualize";
     public static final String REGIONS_ADMIN = "ssu.regions.admin";
+    public static final String REGIONS_ADMIN_BYPASS = "ssu.regions.admin.bypass";
+    public static final String SSU_RELOAD = "ssu.reload";
+    public static final String BORDER_CLAIMS_VIEW = "ssu.borders.claims.view";
+    public static final String BORDER_REGIONS_VIEW = "ssu.borders.regions.view";
+    public static final String VISUALIZATION_ADMIN = "ssu.visualization.admin";
+    public static final String CORE_ADMIN = "ssu.core.admin";
 
     public static final String TELEPORT_DELAY_BYPASS = "ssu.teleport.delay.bypass";
     public static final String TELEPORT_COOLDOWN_BYPASS = "ssu.teleport.cooldown.bypass";
@@ -61,7 +76,10 @@ public final class PermissionKeys {
             CLAIMS_TRUST,
             CLAIMS_FLAGS,
             CLAIMS_MAP,
+            CLAIMS_VISUALIZE,
             CLAIMS_TELEPORT,
+            CLAIMS_TELEPORT_DELAY,
+            CLAIMS_TELEPORT_COOLDOWN,
             CLAIMS_ADMIN_BYPASS,
             CLAIMS_MAX_CHUNKS,
             CLAIMS_MAX_GROUPS,
@@ -90,7 +108,19 @@ public final class PermissionKeys {
             REGIONS_DELETE,
             REGIONS_EDIT,
             REGIONS_TELEPORT,
+            REGIONS_TELEPORT_DELAY,
+            REGIONS_TELEPORT_COOLDOWN,
+            REGIONS_RENT,
+            REGIONS_RENT_ADMIN,
+            REGIONS_SELECTION,
+            REGIONS_VISUALIZE,
             REGIONS_ADMIN,
+            REGIONS_ADMIN_BYPASS,
+            SSU_RELOAD,
+            BORDER_CLAIMS_VIEW,
+            BORDER_REGIONS_VIEW,
+            VISUALIZATION_ADMIN,
+            CORE_ADMIN,
 
             TELEPORT_DELAY_BYPASS,
             TELEPORT_COOLDOWN_BYPASS,
@@ -103,6 +133,9 @@ public final class PermissionKeys {
             "ssu.homes.*",
             "ssu.warps.*",
             "ssu.regions.*",
+            "ssu.borders.*",
+            "ssu.visualization.*",
+            "ssu.core.*",
             "ssu.teleport.*",
             "*"
     );

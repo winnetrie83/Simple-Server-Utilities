@@ -7,11 +7,33 @@ import java.util.Map;
 
 public class PlayerPermissionData {
 
+    private String uuid = "";
+    private String lastKnownName = "";
     private List<String> ranks = new ArrayList<>();
     private Map<String, String> permissions = new HashMap<>();
 
     public PlayerPermissionData() {
         // Required for Gson
+    }
+
+    public String getUuid() {
+        return uuid == null ? "" : uuid;
+    }
+
+    public void setUuid(java.util.UUID uuid) {
+        this.uuid = uuid == null ? "" : uuid.toString();
+    }
+
+    public void setUuid(String uuid) {
+        this.uuid = uuid == null ? "" : uuid.trim();
+    }
+
+    public String getLastKnownName() {
+        return lastKnownName == null ? "" : lastKnownName;
+    }
+
+    public void setLastKnownName(String lastKnownName) {
+        this.lastKnownName = lastKnownName == null ? "" : lastKnownName.trim();
     }
 
     public List<String> getRanks() {
@@ -72,6 +94,6 @@ public class PlayerPermissionData {
     }
 
     private String normalizeRankName(String rankName) {
-        return rankName.trim().toLowerCase();
+        return rankName.trim().toLowerCase(java.util.Locale.ROOT);
     }
 }

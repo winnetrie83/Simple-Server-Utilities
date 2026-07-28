@@ -3,6 +3,7 @@ package be.winnetrie.mod.simpleserverutilities.teleport;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -52,13 +53,32 @@ public class TeleportManager {
             return 0;
         }
 
+        if (cooldownEndTick != 0L) {
+            cooldownUntilTick.remove(cooldownMapKey);
+        }
+
         if (pendingTeleports.containsKey(player.getUUID())) {
             player.sendSystemMessage(Component.literal("You already have a pending teleport."));
             return 0;
         }
 
+        Optional<TeleportDestination> safeDestination = TeleportSafety.findSafeDestination(
+                targetLevel,
+                x,
+                y,
+                z
+        );
+
+        if (safeDestination.isEmpty()) {
+            player.sendSystemMessage(Component.literal(
+                    "Teleport failed: no safe destination was found near " + targetName + "."
+            ));
+            return 0;
+        }
+
         if (options.delaySeconds() <= 0) {
-            doTeleport(player, targetLevel, x, y, z, yaw, pitch);
+            TeleportDestination destination = safeDestination.get();
+            doTeleport(player, targetLevel, destination.x(), destination.y(), destination.z(), yaw, pitch);
             applyCooldown(server, player, cooldownKey, options.cooldownSeconds());
 
             player.sendSystemMessage(Component.literal("Teleported to " + targetName + "."));
@@ -123,19 +143,34 @@ public class TeleportManager {
                 continue;
             }
 
-            doTeleport(
-                    player,
+            Optional<TeleportDestination> safeDestination = TeleportSafety.findSafeDestination(
                     pendingTeleport.targetLevel(),
                     pendingTeleport.x(),
                     pendingTeleport.y(),
-                    pendingTeleport.z(),
+                    pendingTeleport.z()
+            );
+
+            iterator.remove();
+
+            if (safeDestination.isEmpty()) {
+                player.sendSystemMessage(Component.literal(
+                        "Teleport failed: the destination near " + pendingTeleport.targetName() + " is no longer safe."
+                ));
+                continue;
+            }
+
+            TeleportDestination destination = safeDestination.get();
+            doTeleport(
+                    player,
+                    pendingTeleport.targetLevel(),
+                    destination.x(),
+                    destination.y(),
+                    destination.z(),
                     pendingTeleport.yaw(),
                     pendingTeleport.pitch()
             );
 
             applyCooldown(server, player, pendingTeleport.cooldownKey(), pendingTeleport.cooldownSeconds());
-
-            iterator.remove();
 
             player.sendSystemMessage(Component.literal(
                     "Teleported to " + pendingTeleport.targetName() + "."

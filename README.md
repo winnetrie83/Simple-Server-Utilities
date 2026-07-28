@@ -1,25 +1,36 @@
+# Simple Server Utilities
 
-Installation information
-=======
+Simple Server Utilities (SSU) is a modular NeoForge server utility mod for Minecraft 26.2.
 
-This template repository can be directly cloned to get you started with a new
-mod. Simply create a new repository cloned from this one, by following the
-instructions provided by [GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
+## Current systems
 
-Once you have your clone, simply open the repository in the IDE of your choice. The usual recommendation for an IDE is either IntelliJ IDEA or Eclipse.
+- Player chunk claims with connected claim groups, trust, limits, flags and claim spawns
+- Three-dimensional admin regions with priorities, nesting, members, renting and snapshots
+- Internal ranks and permissions with inheritance, wildcards and contextual overrides
+- Homes, global warps and delayed teleports with cooldowns
+- Protection for blocks, entities, PvP, explosions, pistons, fluids, hoppers, fire and redstone
+- A first interactive player/admin dashboard opened with `U` or `/ssu menu`
+- An interactive, server-authoritative chunk claim map for creating, expanding and shrinking connected claim groups
+- Client-rendered claim ribbons and exact 3D region/selection borders with persistent player toggles, multiple selected regions and admin colors
+- Batched claim/region storage and bounded multi-tick region world-edit jobs
 
-If at any point you are missing libraries in your IDE, or you've run into problems you can
-run `gradlew --refresh-dependencies` to refresh the local cache. `gradlew clean` to reset everything 
-{this does not affect your code} and then start the process again.
+## Development requirements
 
-Mapping Names:
-============
-By default, the MDK is configured to use the official mapping names from Mojang for methods and fields 
-in the Minecraft codebase. These names are covered by a specific license. All modders should be aware of this
-license. For the latest license text, refer to the mapping file itself, or the reference copy here:
-https://github.com/NeoForged/NeoForm/blob/main/Mojang.md
+- Java 25
+- Gradle 9.2.1 through the included wrapper
+- NeoForge 26.2.0.7-beta
+- Minecraft 26.2
 
-Additional Resources: 
-==========
-Community Documentation: https://docs.neoforged.net/  
-NeoForged Discord: https://discord.neoforged.net/
+Build with:
+
+```bash
+./gradlew build
+```
+
+The distributable JAR is written to `build/libs/`.
+
+## Data compatibility
+
+SSU stores server data below the world save in the `simpleserverutilities` folder. Development builds in the 1.1.0 line keep the existing 1.0.0 JSON formats unless a changelog explicitly announces a migration.
+
+Always back up a world before installing a development build.

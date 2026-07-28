@@ -1,0 +1,7 @@
+{
+  "id": "minecraft:the_nether",
+  "permissions": {
+    "ssu.homes.set": "false",
+    "ssu.warps.teleport.cooldown": "30"
+  }
+}

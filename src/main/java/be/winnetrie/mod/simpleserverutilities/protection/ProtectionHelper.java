@@ -3,6 +3,7 @@ package be.winnetrie.mod.simpleserverutilities.protection;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.ClaimPolicy;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.RegionPolicy;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -38,14 +39,10 @@ public class ProtectionHelper {
 
 
     public static boolean canPlayerPvp(ServerPlayer attacker, Level level, BlockPos targetPos) {
-        if (ClaimPolicy.hasAdminBypass(attacker)) {
-            return true;
-        }
-
         Region region = getRegionAt(level, targetPos);
 
         if (region != null) {
-            return region.getSettings().isAllowPvp();
+            return RegionPolicy.hasAdminBypass(attacker) || region.getSettings().isAllowPvp();
         }
 
         PlayerClaim claim = getClaimAt(level, targetPos);
@@ -54,7 +51,7 @@ public class ProtectionHelper {
             return true;
         }
 
-        return claim.getSettings().isAllowPvp();
+        return ClaimPolicy.hasAdminBypass(attacker) || claim.getSettings().isAllowPvp();
     }
 
     public static boolean canPlayerModify(ServerPlayer player, Level level, BlockPos pos) {
@@ -184,7 +181,7 @@ public class ProtectionHelper {
         }
 
         if (fromClaim != null && toClaim != null && sameClaim(fromClaim, toClaim)) {
-            return true;
+            return fromClaim.getSettings().isAllowPistons();
         }
 
         if (fromClaim != null && !fromClaim.getSettings().isAllowPistons()) {
@@ -192,6 +189,36 @@ public class ProtectionHelper {
         }
 
         if (toClaim != null && !toClaim.getSettings().isAllowPistons()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public static boolean canRedstoneAffect(Level level, BlockPos sourcePos, BlockPos targetPos) {
+        Region sourceRegion = getRegionAt(level, sourcePos);
+        Region targetRegion = getRegionAt(level, targetPos);
+
+        if (sourceRegion != null || targetRegion != null) {
+            if (sourceRegion != null && !sourceRegion.getSettings().isAllowRedstone()) {
+                return false;
+            }
+
+            if (targetRegion != null && !targetRegion.getSettings().isAllowRedstone()) {
+                return false;
+            }
+
+            return true;
+        }
+
+        PlayerClaim sourceClaim = getClaimAt(level, sourcePos);
+        PlayerClaim targetClaim = getClaimAt(level, targetPos);
+
+        if (sourceClaim != null && !sourceClaim.getSettings().isAllowRedstone()) {
+            return false;
+        }
+
+        if (targetClaim != null && !targetClaim.getSettings().isAllowRedstone()) {
             return false;
         }
 
@@ -207,13 +234,13 @@ public class ProtectionHelper {
     }
 
     public static boolean canPlayerPerform(ServerPlayer player, Level level, BlockPos pos, ActionType action) {
-        if (ClaimPolicy.hasAdminBypass(player)) {
-            return true;
-        }
-
         Region region = getRegionAt(level, pos);
 
         if (region != null) {
+            if (RegionPolicy.hasAdminBypass(player)) {
+                return true;
+            }
+
             return switch (action) {
                 case BREAK -> region.getSettings().isAllowBlockBreak() || region.hasAccess(player.getUUID());
                 case PLACE -> region.getSettings().isAllowBlockPlace() || region.hasAccess(player.getUUID());
@@ -227,7 +254,7 @@ public class ProtectionHelper {
             return true;
         }
 
-        return claim.canBuild(player.getUUID());
+        return ClaimPolicy.hasAdminBypass(player) || claim.canBuild(player.getUUID());
     }
 
     public static boolean canOwnerlessProjectileHit(Level level, BlockPos pos) {

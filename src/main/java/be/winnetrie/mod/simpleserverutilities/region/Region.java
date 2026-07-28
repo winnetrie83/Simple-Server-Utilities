@@ -41,6 +41,9 @@ public class Region {
     private float spawnYaw;
     private float spawnPitch;
 
+    private String welcomeMessage = "";
+    private String leaveMessage = "";
+
     public Region(String name, ResourceKey<Level> dimension, BlockPos point1, BlockPos point2) {
         this.name = name;
         this.dimension = dimension;
@@ -138,6 +141,22 @@ public class Region {
 
     public RegionRentData getRentData() {
         return rentData;
+    }
+
+    public String getWelcomeMessage() {
+        return welcomeMessage;
+    }
+
+    public void setWelcomeMessage(String welcomeMessage) {
+        this.welcomeMessage = welcomeMessage == null ? "" : welcomeMessage;
+    }
+
+    public String getLeaveMessage() {
+        return leaveMessage;
+    }
+
+    public void setLeaveMessage(String leaveMessage) {
+        this.leaveMessage = leaveMessage == null ? "" : leaveMessage;
     }
 
     public Map<String, String> getPermissionOverrides() {

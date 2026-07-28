@@ -1,43 +1,94 @@
 package be.winnetrie.mod.simpleserverutilities;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import be.winnetrie.mod.simpleserverutilities.client.gui.ClaimMapScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.SsuDashboardScreen;
+import be.winnetrie.mod.simpleserverutilities.client.visualization.BorderVisualizationClientState;
+import be.winnetrie.mod.simpleserverutilities.client.visualization.ClaimRegionBorderRenderer;
+import be.winnetrie.mod.simpleserverutilities.network.BorderVisualizationPayload;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
+import be.winnetrie.mod.simpleserverutilities.network.SsuMenuSnapshotPayload;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.RegisterDebugRenderersEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import org.lwjgl.glfw.GLFW;
 
-// This class will not load on dedicated servers. Accessing client side code from here is safe.
 @Mod(value = SimpleServerUtilities.MODID, dist = Dist.CLIENT)
-// You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
 @EventBusSubscriber(modid = SimpleServerUtilities.MODID, value = Dist.CLIENT)
 public class SimpleServerUtilitiesClient {
+
+    private static final KeyMapping.Category SSU_CATEGORY = new KeyMapping.Category(
+            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "general")
+    );
+    private static final KeyMapping OPEN_MENU = new KeyMapping(
+            "key.simpleserverutilities.open_menu",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_U,
+            SSU_CATEGORY
+    );
+
     public SimpleServerUtilitiesClient(ModContainer container) {
-        // Allows NeoForge to create a config screen for this mod's configs.
-        // The config screen is accessed by going to the Mods screen > clicking on your mod > clicking on config.
-        // Do not forget to add translations for your config options to the en_us.json file.
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+        NeoForge.EVENT_BUS.addListener(SimpleServerUtilitiesClient::onClientLogout);
+        NeoForge.EVENT_BUS.addListener(SimpleServerUtilitiesClient::onClientTick);
     }
 
     @SubscribeEvent
-    static void onClientSetup(FMLClientSetupEvent event) {
-        // Some client setup code
-        //SimpleServerUtilities.LOGGER.info("HELLO FROM CLIENT SETUP");
-        //SimpleServerUtilities.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+    static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
+        event.registerCategory(SSU_CATEGORY);
+        event.register(OPEN_MENU);
     }
 
     @SubscribeEvent
     static void onRegisterClientPayloadHandlers(RegisterClientPayloadHandlersEvent event) {
-        event.register(ClaimMapDataPayload.TYPE, (payload, context) -> {
-            context.enqueueWork(() ->
-                    Minecraft.getInstance().setScreenAndShow(new ClaimMapScreen(payload))
-            );
-        });
+        event.register(ClaimMapDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof ClaimMapScreen screen) {
+                        screen.acceptSnapshot(payload);
+                    } else {
+                        minecraft.setScreenAndShow(new ClaimMapScreen(payload));
+                    }
+                })
+        );
+
+        event.register(BorderVisualizationPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> BorderVisualizationClientState.apply(payload))
+        );
+
+        event.register(SsuMenuSnapshotPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> Minecraft.getInstance().setScreenAndShow(new SsuDashboardScreen(payload)))
+        );
+    }
+
+    @SubscribeEvent
+    static void onRegisterDebugRenderers(RegisterDebugRenderersEvent event) {
+        event.register(ClaimRegionBorderRenderer::new);
+    }
+
+    private static void onClientTick(ClientTickEvent.Post event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        while (OPEN_MENU.consumeClick()) {
+            if (minecraft.player != null && minecraft.gui.screen() == null) {
+                minecraft.player.connection.sendUnattendedCommand("ssu menu", null);
+            }
+        }
+    }
+
+    private static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        BorderVisualizationClientState.clear();
     }
 }

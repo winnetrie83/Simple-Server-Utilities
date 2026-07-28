@@ -3,9 +3,12 @@ package be.winnetrie.mod.simpleserverutilities.region;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Set;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -22,7 +25,11 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
-import net.minecraft.world.level.storage.LevelResource;
+
+import be.winnetrie.mod.simpleserverutilities.core.job.SsuJob;
+import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobLocks;
+import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
+import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 
 public class RegionSnapshotManager {
 
@@ -31,8 +38,7 @@ public class RegionSnapshotManager {
     private Path snapshotFolder;
 
     public void load(MinecraftServer server) {
-        this.snapshotFolder = server.getWorldPath(LevelResource.ROOT)
-                .resolve("simpleserverutilities")
+        this.snapshotFolder = StoragePaths.root(server)
                 .resolve("region_snapshots");
     }
 
@@ -88,9 +94,41 @@ public class RegionSnapshotManager {
 
         root.add("blocks", blocks);
 
-        Files.writeString(getSnapshotPath(region.getName()), GSON.toJson(root));
+        JsonStorage.write(GSON, getSnapshotPath(region.getName()), root);
 
         return savedBlocks;
+    }
+
+    public RegionSnapshotResetJob createResetJob(ServerLevel level, Region region) throws IOException {
+        ensureInitialized();
+
+        Path path = getSnapshotPath(region.getName());
+        if (!Files.exists(path)) {
+            throw new IOException("No snapshot exists for region '" + region.getName() + "'.");
+        }
+
+        JsonObject root = JsonParser.parseString(Files.readString(path)).getAsJsonObject();
+        validateSnapshot(root, region);
+
+        List<SavedBlock> savedBlocks = new ArrayList<>();
+        JsonArray blocks = root.getAsJsonArray("blocks");
+        if (blocks != null) {
+            for (int i = 0; i < blocks.size(); i++) {
+                JsonObject blockJson = blocks.get(i).getAsJsonObject();
+                int x = region.getMinX() + blockJson.get("x").getAsInt();
+                int y = region.getMinY() + blockJson.get("y").getAsInt();
+                int z = region.getMinZ() + blockJson.get("z").getAsInt();
+
+                if (x < region.getMinX() || x > region.getMaxX()
+                        || y < region.getMinY() || y > region.getMaxY()
+                        || z < region.getMinZ() || z > region.getMaxZ()) {
+                    continue;
+                }
+                savedBlocks.add(new SavedBlock(x, y, z, blockStateFromJson(blockJson)));
+            }
+        }
+
+        return new RegionSnapshotResetJob(level, region, List.copyOf(savedBlocks));
     }
 
     public int reset(ServerLevel level, Region region) throws IOException {
@@ -246,10 +284,116 @@ public class RegionSnapshotManager {
     }
 
     private Path getSnapshotPath(String regionName) {
-        return snapshotFolder.resolve(normalizeName(regionName) + ".json");
+        return snapshotFolder.resolve(StoragePaths.sanitizeFileName(normalizeName(regionName)) + ".json");
     }
 
     private String normalizeName(String regionName) {
         return regionName.toLowerCase(Locale.ROOT);
     }
+    private record SavedBlock(int x, int y, int z, BlockState state) {
+    }
+
+    public static final class RegionSnapshotResetJob implements SsuJob {
+        private enum Phase {
+            CLEAR,
+            RESTORE,
+            COMPLETE
+        }
+
+        private final ServerLevel level;
+        private final Region region;
+        private final List<SavedBlock> savedBlocks;
+        private final long clearVolume;
+        private final long totalOperations;
+        private final BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+
+        private Phase phase = Phase.CLEAR;
+        private int x;
+        private int y;
+        private int z;
+        private int restoreIndex;
+        private long completedOperations;
+        private int restoredBlocks;
+
+        private RegionSnapshotResetJob(ServerLevel level, Region region, List<SavedBlock> savedBlocks) {
+            this.level = level;
+            this.region = region;
+            this.savedBlocks = savedBlocks;
+            this.clearVolume = region.getVolume();
+            this.totalOperations = clearVolume + savedBlocks.size();
+            this.x = region.getMinX();
+            this.y = region.getMinY();
+            this.z = region.getMinZ();
+        }
+
+        @Override
+        public String description() {
+            return "Reset region '" + region.getName() + "' from snapshot";
+        }
+
+        @Override
+        public int runStep(MinecraftServer server, int operationBudget) {
+            int used = 0;
+            while (used < operationBudget && phase != Phase.COMPLETE) {
+                if (phase == Phase.CLEAR) {
+                    mutablePos.set(x, y, z);
+                    if (!level.isEmptyBlock(mutablePos)) {
+                        level.setBlock(mutablePos, Blocks.AIR.defaultBlockState(), 3);
+                    }
+                    completedOperations++;
+                    used++;
+                    advanceClear();
+                    continue;
+                }
+
+                SavedBlock saved = savedBlocks.get(restoreIndex++);
+                mutablePos.set(saved.x(), saved.y(), saved.z());
+                level.setBlock(mutablePos, saved.state(), 3);
+                restoredBlocks++;
+                completedOperations++;
+                used++;
+                if (restoreIndex >= savedBlocks.size()) {
+                    phase = Phase.COMPLETE;
+                }
+            }
+            return used;
+        }
+
+        private void advanceClear() {
+            z++;
+            if (z <= region.getMaxZ()) {
+                return;
+            }
+            z = region.getMinZ();
+            y++;
+            if (y <= region.getMaxY()) {
+                return;
+            }
+            y = region.getMinY();
+            x++;
+            if (x > region.getMaxX()) {
+                phase = savedBlocks.isEmpty() ? Phase.COMPLETE : Phase.RESTORE;
+            }
+        }
+
+        @Override
+        public Set<String> resourceLocks() {
+            return Set.of(SsuJobLocks.region(region.getDimension(), region.getName()));
+        }
+
+        @Override
+        public boolean isComplete() {
+            return phase == Phase.COMPLETE;
+        }
+
+        @Override
+        public double progress() {
+            return totalOperations == 0L ? 1.0D : Math.min(1.0D, completedOperations / (double) totalOperations);
+        }
+
+        public int restoredBlocks() {
+            return restoredBlocks;
+        }
+    }
+
 }

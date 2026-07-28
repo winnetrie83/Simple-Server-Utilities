@@ -1,0 +1,6 @@
+{
+  "id": "visitor",
+  "permissions": {
+    "ssu.homes.set": "false"
+  }
+}

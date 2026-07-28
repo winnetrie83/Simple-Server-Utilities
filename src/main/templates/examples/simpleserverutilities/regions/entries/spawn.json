@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "name": "spawn",
+  "dimension": "minecraft:overworld",
+  "priority": 100,
+  "minX": -32,
+  "minY": -64,
+  "minZ": -32,
+  "maxX": 32,
+  "maxY": 320,
+  "maxZ": 32,
+  "owners": [],
+  "members": [],
+  "welcomeMessage": "Welcome to spawn!",
+  "permissions": {
+    "ssu.homes.set": "false"
+  },
+  "settings": {
+    "allowBlockBreak": false,
+    "allowBlockPlace": false,
+    "allowInteract": true,
+    "allowPvp": false,
+    "allowExplosions": false,
+    "allowPistons": false,
+    "allowWaterFlow": false,
+    "allowLavaFlow": false,
+    "allowRedstone": true,
+    "allowHoppers": false,
+    "allowFireSpread": false
+  },
+  "rent": {
+    "rentable": false,
+    "amount": 0,
+    "periodDays": -1,
+    "rentEndTime": -1,
+    "renterName": "",
+    "rentPaused": false,
+    "pausedRemainingMillis": -1,
+    "resetOnExpire": true,
+    "resetOnUnrent": true
+  },
+  "spawn": {
+    "x": 0,
+    "y": 64,
+    "z": 0,
+    "yaw": 0.0,
+    "pitch": 0.0
+  }
+}

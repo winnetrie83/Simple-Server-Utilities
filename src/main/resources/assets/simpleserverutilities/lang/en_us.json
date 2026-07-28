@@ -1,13 +1,18 @@
 {
-  "itemGroup.simpleserverutilities": "Example Mod Tab",
-  "block.simpleserverutilities.example_block": "Example Block",
-  "item.simpleserverutilities.example_item": "Example Item",
-
-  "simpleserverutilities.configuration.title": "Simple Server Utilities Configs",
-  "simpleserverutilities.configuration.section.simpleserverutilities.common.toml": "Simple Server Utilities Configs",
-  "simpleserverutilities.configuration.section.simpleserverutilities.common.toml.title": "Simple Server Utilities Configs",
-  "simpleserverutilities.configuration.items": "Item List",
-  "simpleserverutilities.configuration.logDirtBlock": "Log Dirt Block",
-  "simpleserverutilities.configuration.magicNumberIntroduction": "Magic Number Text",
-  "simpleserverutilities.configuration.magicNumber": "Magic Number"
+  "simpleserverutilities.configuration.title": "Simple Server Utilities",
+  "simpleserverutilities.configuration.section.simpleserverutilities.common.toml": "Common Settings",
+  "simpleserverutilities.configuration.section.simpleserverutilities.common.toml.title": "Common Settings",
+  "simpleserverutilities.configuration.enablePlayerClaims": "Enable Player Claims",
+  "simpleserverutilities.configuration.maxPlayerClaimChunks": "Maximum Claim Chunks",
+  "simpleserverutilities.configuration.maxPlayerClaimGroups": "Maximum Claim Groups",
+  "simpleserverutilities.configuration.maxPlayerClaimChunksPerGroup": "Maximum Chunks per Claim",
+  "simpleserverutilities.configuration.enableHomes": "Enable Homes",
+  "simpleserverutilities.configuration.maxPlayerHomes": "Maximum Homes",
+  "simpleserverutilities.configuration.enableWarps": "Enable Warps",
+  "simpleserverutilities.configuration.maxWarps": "Maximum Warps",
+  "simpleserverutilities.configuration.enableAdminRegions": "Enable Admin Regions",
+  "simpleserverutilities.configuration.enablePermissionSystem": "Enable Permission System",
+  "key.category.simpleserverutilities.general": "Simple Server Utilities",
+  "key.simpleserverutilities.open_menu": "Open SSU menu",
+  "screen.simpleserverutilities.dashboard": "Simple Server Utilities"
 }

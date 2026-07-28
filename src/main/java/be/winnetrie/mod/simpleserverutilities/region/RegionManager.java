@@ -5,165 +5,100 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.UUID;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
+import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
+import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
+import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.storage.LevelResource;
-
 
 public class RegionManager {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private final Map<String, Region> regions = new HashMap<>();
+    private final DirtyJsonRecordStore regionRecordStore = new DirtyJsonRecordStore();
+    private final DirtyJsonRecordStore settingsRecordStore = new DirtyJsonRecordStore();
     private boolean rentingEnabled = true;
 
-    //private MinecraftServer server;
-    private Path savePath;
-
-    private Path getRegionSavePath(MinecraftServer server) {
-        return server.getWorldPath(LevelResource.ROOT)
-                .resolve("simpleserverutilities")
-                .resolve("regions.json");
-    }
-
-    private Path getLegacyRegionSavePath(MinecraftServer server) {
-        return server.getWorldPath(LevelResource.ROOT)
-                .resolve("simple_server_utilities")
-                .resolve("regions.json");
-    }
+    private Path rootFolder;
+    private Path regionsFolder;
+    private Path regionEntriesFolder;
+    private Path legacySaveFile;
+    private Path veryOldLegacySaveFile;
 
     public void load(MinecraftServer server) {
-        this.savePath = getRegionSavePath(server);
-
-        Path loadPath = savePath;
-        Path legacySavePath = getLegacyRegionSavePath(server);
+        this.rootFolder = StoragePaths.root(server);
+        this.regionsFolder = StoragePaths.regions(rootFolder);
+        this.regionEntriesFolder = StoragePaths.regionEntries(rootFolder);
+        this.legacySaveFile = rootFolder.resolve("regions.json");
+        this.veryOldLegacySaveFile = StoragePaths.legacyRoot(server).resolve("regions.json");
 
         regions.clear();
-
-        if (!Files.exists(loadPath) && Files.exists(legacySavePath)) {
-            loadPath = legacySavePath;
-            SimpleServerUtilities.LOGGER.info("Loading regions from legacy save path: {}", legacySavePath);
-        }
-
-        if (!Files.exists(loadPath)) {
-            return;
-        }
+        rentingEnabled = true;
+        regionRecordStore.reset();
+        settingsRecordStore.reset();
 
         try {
-            JsonObject root = JsonParser.parseString(Files.readString(loadPath)).getAsJsonObject();
-            rentingEnabled = getBoolean(root, "rentingEnabled", true);
+            Files.createDirectories(rootFolder);
+            regionRecordStore.discover(regionEntriesFolder);
 
-            JsonArray array = root.getAsJsonArray("regions");
-
-            if (array == null) {
-                return;
-            }
-
-            for (int i = 0; i < array.size(); i++) {
-                JsonObject json = array.get(i).getAsJsonObject();
-
-                String name = json.get("name").getAsString();
-                Identifier dimensionId = Identifier.parse(json.get("dimension").getAsString());
-                ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimensionId);
-
-                BlockPos point1 = new BlockPos(
-                        json.get("minX").getAsInt(),
-                        json.get("minY").getAsInt(),
-                        json.get("minZ").getAsInt()
-                );
-
-                BlockPos point2 = new BlockPos(
-                        json.get("maxX").getAsInt(),
-                        json.get("maxY").getAsInt(),
-                        json.get("maxZ").getAsInt()
-                );
-
-                Region region = new Region(name, dimension, point1, point2);
-
-                region.setPriority(getInt(json, "priority", 0));
-
-                loadUuidSet(json, "owners", region.getOwners());
-                loadUuidSet(json, "members", region.getMembers());
-
-                if (json.has("permissions")) {
-                    JsonObject permissions = json.getAsJsonObject("permissions");
-
-                    for (Entry<String, com.google.gson.JsonElement> entry : permissions.entrySet()) {
-                        if (entry.getValue() == null || entry.getValue().isJsonNull()) {
-                            continue;
-                        }
-
-                        region.setPermissionOverride(entry.getKey(), entry.getValue().getAsString());
-                    }
-                }
-
-                if (json.has("settings")) {
-                    JsonObject settings = json.getAsJsonObject("settings");
-
-                    region.getSettings().setAllowBlockBreak(getBoolean(settings, "allowBlockBreak", false));
-                    region.getSettings().setAllowBlockPlace(getBoolean(settings, "allowBlockPlace", false));
-                    region.getSettings().setAllowInteract(getBoolean(settings, "allowInteract", false));
-                    region.getSettings().setAllowPvp(getBoolean(settings, "allowPvp", false));
-                    region.getSettings().setAllowExplosions(getBoolean(settings, "allowExplosions", false));
-                    region.getSettings().setAllowPistons(getBoolean(settings, "allowPistons", false));
-                    region.getSettings().setAllowWaterFlow(getBoolean(settings, "allowWaterFlow", false));
-                    region.getSettings().setAllowLavaFlow(getBoolean(settings, "allowLavaFlow", false));
-                    region.getSettings().setAllowRedstone(getBoolean(settings, "allowRedstone", true));
-                    region.getSettings().setAllowHoppers(getBoolean(settings, "allowHoppers", false));
-                    region.getSettings().setAllowFireSpread(getBoolean(settings, "allowFireSpread", false));
-                }
-
-                if (json.has("rent")) {
-                    JsonObject rent = json.getAsJsonObject("rent");
-
-                    region.getRentData().setRentable(getBoolean(rent, "rentable", false));
-                    region.getRentData().setAmount(getInt(rent, "amount", 0));
-                    region.getRentData().setPeriodDays(getInt(rent, "periodDays", -1));
-                    region.getRentData().setRentEndTime(getLong(rent, "rentEndTime", -1L));
-
-                    if (rent.has("renter")) {
-                        region.getRentData().setRenter(UUID.fromString(rent.get("renter").getAsString()));
-                    }
-                }
-
-                if (json.has("spawn")) {
-                    JsonObject spawn = json.getAsJsonObject("spawn");
-                    BlockPos spawnPos = new BlockPos(
-                            spawn.get("x").getAsInt(),
-                            spawn.get("y").getAsInt(),
-                            spawn.get("z").getAsInt()
-                    );
-
-                    region.setSpawn(
-                            spawnPos,
-                            spawn.get("yaw").getAsFloat(),
-                            spawn.get("pitch").getAsFloat()
-                    );
-                }
-
-                regions.put(normalizeName(name), region);
-            }
-
-            if (!loadPath.equals(savePath)) {
+            if (JsonStorage.hasJsonFiles(regionsFolder)) {
+                loadSplitRegions();
+            } else if (Files.exists(legacySaveFile)) {
+                loadLegacyRegions(legacySaveFile);
                 save();
-                SimpleServerUtilities.LOGGER.info("Migrated regions to new save path: {}", savePath);
+                if (SimpleServerUtilities.STORAGE.flush(java.time.Duration.ofSeconds(10))) {
+                    Path archived = JsonStorage.archiveLegacyFile(legacySaveFile);
+                    if (archived != null) {
+                        SimpleServerUtilities.LOGGER.info(
+                                "Migrated legacy regions to per-region storage. Legacy file archived as: {}",
+                                archived
+                        );
+                    }
+                } else {
+                    SimpleServerUtilities.LOGGER.error(
+                            "Region migration writes did not flush successfully; the legacy file was kept in place."
+                    );
+                }
+            } else if (Files.exists(veryOldLegacySaveFile)) {
+                loadLegacyRegions(veryOldLegacySaveFile);
+                save();
+                if (SimpleServerUtilities.STORAGE.flush(java.time.Duration.ofSeconds(10))) {
+                    Path archived = JsonStorage.archiveLegacyFile(veryOldLegacySaveFile);
+                    if (archived != null) {
+                        SimpleServerUtilities.LOGGER.info(
+                                "Migrated very old regions path to per-region storage. Legacy file archived as: {}",
+                                archived
+                        );
+                    }
+                } else {
+                    SimpleServerUtilities.LOGGER.error(
+                            "Very old region migration writes did not flush successfully; the legacy file was kept in place."
+                    );
+                }
+            } else {
+                Files.createDirectories(regionEntriesFolder);
+                save();
             }
 
             SimpleServerUtilities.LOGGER.info("Loaded {} regions.", regions.size());
@@ -173,86 +108,28 @@ public class RegionManager {
     }
 
     public void save() {
-        if (savePath == null) {
+        if (regionsFolder == null || regionEntriesFolder == null) {
             return;
         }
 
         try {
-            Files.createDirectories(savePath.getParent());
+            Files.createDirectories(regionEntriesFolder);
 
-            JsonObject root = new JsonObject();
-            root.addProperty("rentingEnabled", rentingEnabled);
+            JsonObject settings = new JsonObject();
+            settings.addProperty("schemaVersion", 1);
+            settings.addProperty("rentingEnabled", rentingEnabled);
+            settingsRecordStore.queueJson(GSON, regionsFolder.resolve("_settings.json"), settings);
 
-            JsonArray array = new JsonArray();
+            Set<Path> keptFiles = new HashSet<>();
 
             for (Region region : regions.values()) {
-                JsonObject json = new JsonObject();
-
-                json.addProperty("name", region.getName());
-                json.addProperty("dimension", region.getDimension().identifier().toString());
-                json.addProperty("priority", region.getPriority());
-
-                json.addProperty("minX", region.getMinX());
-                json.addProperty("minY", region.getMinY());
-                json.addProperty("minZ", region.getMinZ());
-                json.addProperty("maxX", region.getMaxX());
-                json.addProperty("maxY", region.getMaxY());
-                json.addProperty("maxZ", region.getMaxZ());
-
-                json.add("owners", saveUuidSet(region.getOwners()));
-                json.add("members", saveUuidSet(region.getMembers()));
-
-                if (!region.getPermissionOverrides().isEmpty()) {
-                    JsonObject permissions = new JsonObject();
-
-                    for (Entry<String, String> entry : region.getPermissionOverrides().entrySet()) {
-                        permissions.addProperty(entry.getKey(), entry.getValue());
-                    }
-
-                    json.add("permissions", permissions);
-                }
-
-                JsonObject settings = new JsonObject();
-                settings.addProperty("allowBlockBreak", region.getSettings().isAllowBlockBreak());
-                settings.addProperty("allowBlockPlace", region.getSettings().isAllowBlockPlace());
-                settings.addProperty("allowInteract", region.getSettings().isAllowInteract());
-                settings.addProperty("allowPvp", region.getSettings().isAllowPvp());
-                settings.addProperty("allowExplosions", region.getSettings().isAllowExplosions());
-                settings.addProperty("allowPistons", region.getSettings().isAllowPistons());
-                settings.addProperty("allowWaterFlow", region.getSettings().isAllowWaterFlow());
-                settings.addProperty("allowLavaFlow", region.getSettings().isAllowLavaFlow());
-                settings.addProperty("allowRedstone", region.getSettings().isAllowRedstone());
-                settings.addProperty("allowHoppers", region.getSettings().isAllowHoppers());
-                settings.addProperty("allowFireSpread", region.getSettings().isAllowFireSpread());
-                json.add("settings", settings);
-
-                JsonObject rent = new JsonObject();
-                rent.addProperty("rentable", region.getRentData().isRentable());
-                rent.addProperty("amount", region.getRentData().getAmount());
-                rent.addProperty("periodDays", region.getRentData().getPeriodDays());
-                rent.addProperty("rentEndTime", region.getRentData().getRentEndTime());
-
-                if (region.getRentData().getRenter() != null) {
-                    rent.addProperty("renter", region.getRentData().getRenter().toString());
-                }
-
-                json.add("rent", rent);
-
-                if (region.getSpawnPos() != null) {
-                    JsonObject spawn = new JsonObject();
-                    spawn.addProperty("x", region.getSpawnPos().getX());
-                    spawn.addProperty("y", region.getSpawnPos().getY());
-                    spawn.addProperty("z", region.getSpawnPos().getZ());
-                    spawn.addProperty("yaw", region.getSpawnYaw());
-                    spawn.addProperty("pitch", region.getSpawnPitch());
-                    json.add("spawn", spawn);
-                }
-
-                array.add(json);
+                Path file = StoragePaths.jsonFile(regionEntriesFolder, region.getName());
+                regionRecordStore.queueJson(GSON, file, regionToJson(region));
+                keptFiles.add(file);
             }
 
-            root.add("regions", array);
-            Files.writeString(savePath, GSON.toJson(root));
+            regionRecordStore.queueDeleteMissing(keptFiles);
+            SimpleServerUtilities.BORDER_VISUALIZATIONS.markRegionsChanged();
         } catch (IOException e) {
             SimpleServerUtilities.LOGGER.error("Failed to save regions.", e);
         }
@@ -341,28 +218,6 @@ public class RegionManager {
         return regions.containsKey(normalizeName(name));
     }
 
-    private JsonArray saveUuidSet(Collection<UUID> uuids) {
-        JsonArray array = new JsonArray();
-
-        for (UUID uuid : uuids) {
-            array.add(uuid.toString());
-        }
-
-        return array;
-    }
-
-    private void loadUuidSet(JsonObject json, String key, Collection<UUID> target) {
-        if (!json.has(key)) {
-            return;
-        }
-
-        JsonArray array = json.getAsJsonArray(key);
-
-        for (int i = 0; i < array.size(); i++) {
-            target.add(UUID.fromString(array.get(i).getAsString()));
-        }
-    }
-
     public boolean overlaps2D(ResourceKey<Level> dimension, int minX, int minZ, int maxX, int maxZ) {
         for (Region region : regions.values()) {
             if (!region.getDimension().equals(dimension)) {
@@ -381,34 +236,6 @@ public class RegionManager {
         }
 
         return false;
-    }
-
-    private String normalizeName(String name) {
-        return name.toLowerCase();
-    }
-
-    private boolean getBoolean(JsonObject json, String key, boolean defaultValue) {
-        if (!json.has(key)) {
-            return defaultValue;
-        }
-
-        return json.get(key).getAsBoolean();
-    }
-
-    private int getInt(JsonObject json, String key, int defaultValue) {
-        if (!json.has(key)) {
-            return defaultValue;
-        }
-
-        return json.get(key).getAsInt();
-    }
-
-    private long getLong(JsonObject json, String key, long defaultValue) {
-        if (!json.has(key)) {
-            return defaultValue;
-        }
-
-        return json.get(key).getAsLong();
     }
 
     public RegionOperationResult redefine(String name, ResourceKey<Level> dimension, BlockPos point1, BlockPos point2) {
@@ -437,12 +264,20 @@ public class RegionManager {
 
         newRegion.getOwners().addAll(oldRegion.getOwners());
         newRegion.getMembers().addAll(oldRegion.getMembers());
+        newRegion.getPermissionOverrides().putAll(oldRegion.getPermissionOverrides());
 
         newRegion.getRentData().setRentable(oldRegion.getRentData().isRentable());
         newRegion.getRentData().setAmount(oldRegion.getRentData().getAmount());
         newRegion.getRentData().setPeriodDays(oldRegion.getRentData().getPeriodDays());
         newRegion.getRentData().setRenter(oldRegion.getRentData().getRenter());
+        newRegion.getRentData().setRenterName(oldRegion.getRentData().getRenterName());
         newRegion.getRentData().setRentEndTime(oldRegion.getRentData().getRentEndTime());
+        newRegion.getRentData().setRentPaused(oldRegion.getRentData().isRentPaused());
+        newRegion.getRentData().setPausedRemainingMillis(oldRegion.getRentData().getPausedRemainingMillis());
+        newRegion.getRentData().setResetOnExpire(oldRegion.getRentData().isResetOnExpire());
+        newRegion.getRentData().setResetOnUnrent(oldRegion.getRentData().isResetOnUnrent());
+        newRegion.setWelcomeMessage(oldRegion.getWelcomeMessage());
+        newRegion.setLeaveMessage(oldRegion.getLeaveMessage());
 
         copySettings(oldRegion, newRegion);
 
@@ -453,6 +288,247 @@ public class RegionManager {
         regions.put(key, newRegion);
         save();
         return RegionOperationResult.success();
+    }
+
+    private void loadSplitRegions() throws IOException {
+        Path settingsFile = regionsFolder.resolve("_settings.json");
+
+        if (Files.exists(settingsFile)) {
+            try {
+                JsonObject settings = JsonParser.parseString(Files.readString(settingsFile)).getAsJsonObject();
+                rentingEnabled = getBoolean(settings, "rentingEnabled", true);
+            } catch (Exception e) {
+                Path archived = JsonStorage.archiveBrokenFile(settingsFile);
+                SimpleServerUtilities.LOGGER.error("Failed to load region settings file. Broken file archived as: {}", archived, e);
+            }
+        }
+
+        Files.createDirectories(regionEntriesFolder);
+
+        for (Path file : JsonStorage.listJsonFiles(regionEntriesFolder)) {
+            try {
+                JsonObject json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+                Region region = regionFromJson(json);
+                regions.put(normalizeName(region.getName()), region);
+            } catch (Exception e) {
+                Path archived = JsonStorage.archiveBrokenFile(file);
+                SimpleServerUtilities.LOGGER.error("Failed to load region file. Broken file archived as: {}", archived, e);
+            }
+        }
+    }
+
+    private void loadLegacyRegions(Path loadPath) {
+        try {
+            JsonObject root = JsonParser.parseString(Files.readString(loadPath)).getAsJsonObject();
+            rentingEnabled = getBoolean(root, "rentingEnabled", true);
+
+            JsonArray array = root.getAsJsonArray("regions");
+
+            if (array == null) {
+                return;
+            }
+
+            for (int i = 0; i < array.size(); i++) {
+                JsonObject json = array.get(i).getAsJsonObject();
+                Region region = regionFromJson(json);
+                regions.put(normalizeName(region.getName()), region);
+            }
+        } catch (Exception e) {
+            Path archived = JsonStorage.archiveBrokenFile(loadPath);
+            SimpleServerUtilities.LOGGER.error("Failed to read legacy region file. Broken file archived as: {}", archived, e);
+        }
+    }
+
+    private Region regionFromJson(JsonObject json) {
+        String name = json.get("name").getAsString();
+        Identifier dimensionId = Identifier.parse(json.get("dimension").getAsString());
+        ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimensionId);
+
+        BlockPos point1 = new BlockPos(
+                json.get("minX").getAsInt(),
+                json.get("minY").getAsInt(),
+                json.get("minZ").getAsInt()
+        );
+
+        BlockPos point2 = new BlockPos(
+                json.get("maxX").getAsInt(),
+                json.get("maxY").getAsInt(),
+                json.get("maxZ").getAsInt()
+        );
+
+        Region region = new Region(name, dimension, point1, point2);
+        region.setPriority(getInt(json, "priority", 0));
+
+        loadUuidSet(json, "owners", region.getOwners());
+        loadUuidSet(json, "members", region.getMembers());
+
+        if (json.has("permissions")) {
+            JsonObject permissions = json.getAsJsonObject("permissions");
+
+            for (Entry<String, JsonElement> entry : permissions.entrySet()) {
+                if (entry.getValue() == null || entry.getValue().isJsonNull()) {
+                    continue;
+                }
+
+                region.setPermissionOverride(entry.getKey(), entry.getValue().getAsString());
+            }
+        }
+
+        if (json.has("settings")) {
+            JsonObject settings = json.getAsJsonObject("settings");
+
+            region.getSettings().setAllowBlockBreak(getBoolean(settings, "allowBlockBreak", false));
+            region.getSettings().setAllowBlockPlace(getBoolean(settings, "allowBlockPlace", false));
+            region.getSettings().setAllowInteract(getBoolean(settings, "allowInteract", false));
+            region.getSettings().setAllowPvp(getBoolean(settings, "allowPvp", false));
+            region.getSettings().setAllowExplosions(getBoolean(settings, "allowExplosions", false));
+            region.getSettings().setAllowPistons(getBoolean(settings, "allowPistons", false));
+            region.getSettings().setAllowWaterFlow(getBoolean(settings, "allowWaterFlow", false));
+            region.getSettings().setAllowLavaFlow(getBoolean(settings, "allowLavaFlow", false));
+            region.getSettings().setAllowRedstone(getBoolean(settings, "allowRedstone", true));
+            region.getSettings().setAllowHoppers(getBoolean(settings, "allowHoppers", false));
+            region.getSettings().setAllowFireSpread(getBoolean(settings, "allowFireSpread", false));
+        }
+
+        region.setWelcomeMessage(getString(json, "welcomeMessage", ""));
+        region.setLeaveMessage(getString(json, "leaveMessage", ""));
+
+        if (json.has("rent")) {
+            JsonObject rent = json.getAsJsonObject("rent");
+
+            region.getRentData().setRentable(getBoolean(rent, "rentable", false));
+            region.getRentData().setAmount(getInt(rent, "amount", 0));
+            region.getRentData().setPeriodDays(getInt(rent, "periodDays", -1));
+            region.getRentData().setRentEndTime(getLong(rent, "rentEndTime", -1L));
+            region.getRentData().setRenterName(getString(rent, "renterName", ""));
+            region.getRentData().setRentPaused(getBoolean(rent, "rentPaused", false));
+            region.getRentData().setPausedRemainingMillis(getLong(rent, "pausedRemainingMillis", -1L));
+            region.getRentData().setResetOnExpire(getBoolean(rent, "resetOnExpire", true));
+            region.getRentData().setResetOnUnrent(getBoolean(rent, "resetOnUnrent", true));
+
+            if (rent.has("renter")) {
+                region.getRentData().setRenter(UUID.fromString(rent.get("renter").getAsString()));
+            }
+        }
+
+        if (json.has("spawn")) {
+            JsonObject spawn = json.getAsJsonObject("spawn");
+            BlockPos spawnPos = new BlockPos(
+                    spawn.get("x").getAsInt(),
+                    spawn.get("y").getAsInt(),
+                    spawn.get("z").getAsInt()
+            );
+
+            region.setSpawn(
+                    spawnPos,
+                    spawn.get("yaw").getAsFloat(),
+                    spawn.get("pitch").getAsFloat()
+            );
+        }
+
+        return region;
+    }
+
+    private JsonObject regionToJson(Region region) {
+        JsonObject json = new JsonObject();
+
+        json.addProperty("schemaVersion", 1);
+        json.addProperty("name", region.getName());
+        json.addProperty("dimension", region.getDimension().identifier().toString());
+        json.addProperty("priority", region.getPriority());
+
+        json.addProperty("minX", region.getMinX());
+        json.addProperty("minY", region.getMinY());
+        json.addProperty("minZ", region.getMinZ());
+        json.addProperty("maxX", region.getMaxX());
+        json.addProperty("maxY", region.getMaxY());
+        json.addProperty("maxZ", region.getMaxZ());
+
+        json.add("owners", saveUuidSet(region.getOwners()));
+        json.add("members", saveUuidSet(region.getMembers()));
+
+        if (!region.getWelcomeMessage().isBlank()) {
+            json.addProperty("welcomeMessage", region.getWelcomeMessage());
+        }
+
+        if (!region.getLeaveMessage().isBlank()) {
+            json.addProperty("leaveMessage", region.getLeaveMessage());
+        }
+
+        if (!region.getPermissionOverrides().isEmpty()) {
+            JsonObject permissions = new JsonObject();
+
+            for (Entry<String, String> entry : region.getPermissionOverrides().entrySet()) {
+                permissions.addProperty(entry.getKey(), entry.getValue());
+            }
+
+            json.add("permissions", permissions);
+        }
+
+        JsonObject settings = new JsonObject();
+        settings.addProperty("allowBlockBreak", region.getSettings().isAllowBlockBreak());
+        settings.addProperty("allowBlockPlace", region.getSettings().isAllowBlockPlace());
+        settings.addProperty("allowInteract", region.getSettings().isAllowInteract());
+        settings.addProperty("allowPvp", region.getSettings().isAllowPvp());
+        settings.addProperty("allowExplosions", region.getSettings().isAllowExplosions());
+        settings.addProperty("allowPistons", region.getSettings().isAllowPistons());
+        settings.addProperty("allowWaterFlow", region.getSettings().isAllowWaterFlow());
+        settings.addProperty("allowLavaFlow", region.getSettings().isAllowLavaFlow());
+        settings.addProperty("allowRedstone", region.getSettings().isAllowRedstone());
+        settings.addProperty("allowHoppers", region.getSettings().isAllowHoppers());
+        settings.addProperty("allowFireSpread", region.getSettings().isAllowFireSpread());
+        json.add("settings", settings);
+
+        JsonObject rent = new JsonObject();
+        rent.addProperty("rentable", region.getRentData().isRentable());
+        rent.addProperty("amount", region.getRentData().getAmount());
+        rent.addProperty("periodDays", region.getRentData().getPeriodDays());
+        rent.addProperty("rentEndTime", region.getRentData().getRentEndTime());
+        rent.addProperty("renterName", region.getRentData().getRenterName());
+        rent.addProperty("rentPaused", region.getRentData().isRentPaused());
+        rent.addProperty("pausedRemainingMillis", region.getRentData().getPausedRemainingMillis());
+        rent.addProperty("resetOnExpire", region.getRentData().isResetOnExpire());
+        rent.addProperty("resetOnUnrent", region.getRentData().isResetOnUnrent());
+
+        if (region.getRentData().getRenter() != null) {
+            rent.addProperty("renter", region.getRentData().getRenter().toString());
+        }
+
+        json.add("rent", rent);
+
+        if (region.getSpawnPos() != null) {
+            JsonObject spawn = new JsonObject();
+            spawn.addProperty("x", region.getSpawnPos().getX());
+            spawn.addProperty("y", region.getSpawnPos().getY());
+            spawn.addProperty("z", region.getSpawnPos().getZ());
+            spawn.addProperty("yaw", region.getSpawnYaw());
+            spawn.addProperty("pitch", region.getSpawnPitch());
+            json.add("spawn", spawn);
+        }
+
+        return json;
+    }
+
+    private JsonArray saveUuidSet(Collection<UUID> uuids) {
+        JsonArray array = new JsonArray();
+
+        for (UUID uuid : uuids) {
+            array.add(uuid.toString());
+        }
+
+        return array;
+    }
+
+    private void loadUuidSet(JsonObject json, String key, Collection<UUID> target) {
+        if (!json.has(key)) {
+            return;
+        }
+
+        JsonArray array = json.getAsJsonArray(key);
+
+        for (int i = 0; i < array.size(); i++) {
+            target.add(UUID.fromString(array.get(i).getAsString()));
+        }
     }
 
     private void copySettings(Region from, Region to) {
@@ -468,7 +544,6 @@ public class RegionManager {
         to.getSettings().setAllowHoppers(from.getSettings().isAllowHoppers());
         to.getSettings().setAllowFireSpread(from.getSettings().isAllowFireSpread());
     }
-
 
     private PlayerClaim findOverlappingPlayerClaim(ResourceKey<Level> dimension, BlockPos point1, BlockPos point2) {
         int minX = Math.min(point1.getX(), point2.getX());
@@ -506,5 +581,41 @@ public class RegionManager {
         return "'" + claim.getDisplayName() + "' owned by " + claim.getOwner()
                 + " in " + claim.getDimension()
                 + " (" + claim.getChunkCount() + " chunks)";
+    }
+
+    private String normalizeName(String name) {
+        return name.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private String getString(JsonObject json, String key, String defaultValue) {
+        if (!json.has(key)) {
+            return defaultValue;
+        }
+
+        return json.get(key).getAsString();
+    }
+
+    private boolean getBoolean(JsonObject json, String key, boolean defaultValue) {
+        if (!json.has(key)) {
+            return defaultValue;
+        }
+
+        return json.get(key).getAsBoolean();
+    }
+
+    private int getInt(JsonObject json, String key, int defaultValue) {
+        if (!json.has(key)) {
+            return defaultValue;
+        }
+
+        return json.get(key).getAsInt();
+    }
+
+    private long getLong(JsonObject json, String key, long defaultValue) {
+        if (!json.has(key)) {
+            return defaultValue;
+        }
+
+        return json.get(key).getAsLong();
     }
 }

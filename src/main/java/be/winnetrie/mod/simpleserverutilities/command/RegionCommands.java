@@ -2,25 +2,33 @@ package be.winnetrie.mod.simpleserverutilities.command;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.RegionPolicy;
+import be.winnetrie.mod.simpleserverutilities.region.RegionInteractionEvents;
+import be.winnetrie.mod.simpleserverutilities.region.RegionRentalService;
+import be.winnetrie.mod.simpleserverutilities.region.RegionRentalService.RentalResult;
 import be.winnetrie.mod.simpleserverutilities.region.RegionSelection;
 import be.winnetrie.mod.simpleserverutilities.region.RegionSelectionManager;
+import be.winnetrie.mod.simpleserverutilities.region.RegionSnapshotManager;
+import be.winnetrie.mod.simpleserverutilities.region.RegionWorldEditManager;
+import be.winnetrie.mod.simpleserverutilities.teleport.TeleportDestination;
+import be.winnetrie.mod.simpleserverutilities.teleport.TeleportSafety;
 
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
 import be.winnetrie.mod.simpleserverutilities.region.RegionOperationResult;
 import be.winnetrie.mod.simpleserverutilities.region.RegionRentData;
-import net.minecraft.world.level.block.Blocks;
 
 
 import java.util.Set;
@@ -37,6 +45,10 @@ public class RegionCommands {
 
     private static final RegionSelectionManager SELECTIONS = new RegionSelectionManager();
     private static final long MAX_REGION_BLOCK_OPERATION_VOLUME = 1_000_000L;
+
+    public static RegionSelectionManager getSelectionManager() {
+        return SELECTIONS;
+    }
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("regions")
@@ -237,6 +249,162 @@ public class RegionCommands {
                                         StringArgumentType.getString(context, "name")
                                 ))))
 
+                .then(Commands.literal("myrentals")
+                        .executes(context -> myRentals(context.getSource())))
+
+                .then(Commands.literal("rentaccept")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> rentAccept(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))))
+
+                .then(Commands.literal("rentdecline")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> rentDecline(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))))
+
+                .then(Commands.literal("confirmunrent")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> confirmUnrent(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))))
+
+                .then(Commands.literal("extend")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> extendRent(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))))
+
+                .then(Commands.literal("setrentprice")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("amount", IntegerArgumentType.integer(0))
+                                        .executes(context -> setRentPrice(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "name"),
+                                                IntegerArgumentType.getInteger(context, "amount")
+                                        )))))
+
+                .then(Commands.literal("setrentperiod")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("days", IntegerArgumentType.integer(-1))
+                                        .executes(context -> setRentPeriod(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "name"),
+                                                IntegerArgumentType.getInteger(context, "days")
+                                        )))))
+
+                .then(Commands.literal("addtime")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("days", IntegerArgumentType.integer(1))
+                                        .executes(context -> addRentTime(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "name"),
+                                                IntegerArgumentType.getInteger(context, "days")
+                                        )))))
+
+                .then(Commands.literal("pause")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("value", BoolArgumentType.bool())
+                                        .executes(context -> pauseRent(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "name"),
+                                                BoolArgumentType.getBool(context, "value")
+                                        )))))
+
+                .then(Commands.literal("resetonexpire")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("value", BoolArgumentType.bool())
+                                        .executes(context -> setResetOnExpire(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "name"),
+                                                BoolArgumentType.getBool(context, "value")
+                                        )))))
+
+                .then(Commands.literal("resetonunrent")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("value", BoolArgumentType.bool())
+                                        .executes(context -> setResetOnUnrent(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "name"),
+                                                BoolArgumentType.getBool(context, "value")
+                                        )))))
+
+                .then(Commands.literal("welcome")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("message", StringArgumentType.greedyString())
+                                        .executes(context -> setWelcomeMessage(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "name"),
+                                                StringArgumentType.getString(context, "message")
+                                        )))))
+
+                .then(Commands.literal("leave")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("message", StringArgumentType.greedyString())
+                                        .executes(context -> setLeaveMessage(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "name"),
+                                                StringArgumentType.getString(context, "message")
+                                        )))))
+
+                .then(Commands.literal("clearwelcome")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> setWelcomeMessage(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name"),
+                                        ""
+                                ))))
+
+                .then(Commands.literal("clearleave")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> setLeaveMessage(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name"),
+                                        ""
+                                ))))
+
+                .then(Commands.literal("borders")
+                        .then(Commands.literal("on")
+                                .executes(context -> BorderCommands.setRegions(context.getSource(), true)))
+                        .then(Commands.literal("off")
+                                .executes(context -> BorderCommands.setRegions(context.getSource(), false))))
+
+                .then(Commands.literal("show")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> showRegionBoundary(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))))
+
+                .then(Commands.literal("hide")
+                        .executes(context -> hideAllRegionBoundaries(context.getSource()))
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(context -> hideRegionBoundary(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "name")
+                                ))))
+
+                .then(Commands.literal("selection")
+                        .then(Commands.literal("bind")
+                                .executes(context -> bindSelectionTool(context.getSource())))
+                        .then(Commands.literal("unbind")
+                                .executes(context -> unbindSelectionTool(context.getSource())))
+                        .then(Commands.literal("clear")
+                                .executes(context -> clearSelection(context.getSource())))
+                        .then(Commands.literal("fill")
+                                .then(Commands.argument("blocks", StringArgumentType.greedyString())
+                                        .executes(context -> fillSelection(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "blocks")
+                                        ))))
+                        .then(Commands.literal("regen")
+                                .executes(context -> regenerateSelection(context.getSource()))))
+
                 .then(Commands.literal("renting")
                         .then(Commands.argument("value", BoolArgumentType.bool())
                                 .executes(context -> enableRenting(
@@ -263,6 +431,7 @@ public class RegionCommands {
         }
 
         SELECTIONS.setPoint1(player, pos);
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, SELECTIONS.getSelection(player));
         player.sendSystemMessage(Component.literal("Region point 1 set to " + formatPos(pos) + "."));
         return 1;
     }
@@ -275,6 +444,7 @@ public class RegionCommands {
         }
 
         SELECTIONS.setPoint2(player, pos);
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, SELECTIONS.getSelection(player));
         player.sendSystemMessage(Component.literal("Region point 2 set to " + formatPos(pos) + "."));
         return 1;
     }
@@ -299,6 +469,7 @@ public class RegionCommands {
             case SUCCESS -> {
                 player.sendSystemMessage(Component.literal("Region '" + name + "' created."));
                 SELECTIONS.clear(player);
+                SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
                 return 1;
             }
 
@@ -339,17 +510,26 @@ public class RegionCommands {
             return 0;
         }
 
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownRegion(player);
         player.sendSystemMessage(Component.literal("Region '" + name + "' deleted."));
         return 1;
     }
 
     private static int info(CommandSourceStack source, String name) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
         Region region = SimpleServerUtilities.REGIONS.get(name);
 
         if (region == null) {
             source.sendSystemMessage(Component.literal("Region not found: " + name));
             return 0;
         }
+
+        if (!canViewRegion(player, region)) {
+            player.sendSystemMessage(Component.literal("You do not have access to this region info."));
+            return 0;
+        }
+
+        RegionRentData rentData = region.getRentData();
 
         source.sendSystemMessage(Component.literal("Region: " + region.getName()));
         source.sendSystemMessage(Component.literal("Bounds: " + region.getBoundsText()));
@@ -358,25 +538,32 @@ public class RegionCommands {
 
         if (region.getSpawnPos() != null) {
             source.sendSystemMessage(Component.literal("Spawn: " + formatPos(region.getSpawnPos()) + " yaw=" + region.getSpawnYaw() + " pitch=" + region.getSpawnPitch()));
-        } 
-        else {
+        } else {
             source.sendSystemMessage(Component.literal("Spawn: not set"));
         }
 
         source.sendSystemMessage(Component.literal("Global renting enabled: " + SimpleServerUtilities.REGIONS.isRentingEnabled()));
-        source.sendSystemMessage(Component.literal("Rentable: " + region.getRentData().isRentable()));
-
-        RegionRentData rentData = region.getRentData();
-
         source.sendSystemMessage(Component.literal("Rentable: " + rentData.isRentable()));
         source.sendSystemMessage(Component.literal("Rented: " + rentData.isRented()));
         source.sendSystemMessage(Component.literal("Rent amount: " + rentData.getAmount()));
         source.sendSystemMessage(Component.literal("Rent period days: " + rentData.getPeriodDays()));
+        source.sendSystemMessage(Component.literal("Reset on expire: " + rentData.isResetOnExpire()));
+        source.sendSystemMessage(Component.literal("Reset on unrent: " + rentData.isResetOnUnrent()));
+
+        if (!region.getWelcomeMessage().isBlank()) {
+            source.sendSystemMessage(Component.literal("Welcome message: " + region.getWelcomeMessage()));
+        }
+
+        if (!region.getLeaveMessage().isBlank()) {
+            source.sendSystemMessage(Component.literal("Leave message: " + region.getLeaveMessage()));
+        }
 
         if (rentData.isRented()) {
+            source.sendSystemMessage(Component.literal("Renter: " + rentData.getDisplayRenterName()));
             source.sendSystemMessage(Component.literal("Rent remaining: " + formatRentRemaining(rentData)));
+            source.sendSystemMessage(Component.literal("Rent paused: " + rentData.isRentPaused()));
 
-            if (isOp((ServerPlayer) source.getEntity()) && rentData.getRenter() != null) {
+            if (isOp(player) && rentData.getRenter() != null) {
                 source.sendSystemMessage(Component.literal("Renter UUID: " + rentData.getRenter()));
             }
         }
@@ -384,20 +571,31 @@ public class RegionCommands {
         return 1;
     }
 
+
     private static int list(CommandSourceStack source) {
-        if (SimpleServerUtilities.REGIONS.getAll().isEmpty()) {
-            source.sendSystemMessage(Component.literal("No regions exist yet."));
-            return 0;
-        }
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        boolean admin = isOp(player);
+        int count = 0;
 
         source.sendSystemMessage(Component.literal("Regions:"));
 
         for (Region region : SimpleServerUtilities.REGIONS.getAll()) {
+            if (!admin && !canViewRegion(player, region)) {
+                continue;
+            }
+
+            count++;
             source.sendSystemMessage(Component.literal(" - " + region.getName() + " " + region.getBoundsText()));
+        }
+
+        if (count == 0) {
+            source.sendSystemMessage(Component.literal("No regions found."));
+            return 0;
         }
 
         return 1;
     }
+
 
     private static int listRentals(CommandSourceStack source) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
@@ -410,38 +608,16 @@ public class RegionCommands {
         for (Region region : SimpleServerUtilities.REGIONS.getAll()) {
             RegionRentData rentData = region.getRentData();
 
+            if (!admin && !canViewRegion(player, region)) {
+                continue;
+            }
+
             if (!rentData.isRentable() && !rentData.isRented()) {
                 continue;
             }
 
             count++;
-
-            String status;
-
-            if (rentData.isRented()) {
-                status = rentData.isRentable() ? "rented" : "rented, disabled after end";
-            } else {
-                status = "available";
-            }
-
-            String period = rentData.isPermanent()
-                    ? "permanent"
-                    : rentData.getPeriodDays() + " day(s)";
-
-            String line = " - " + region.getName()
-                    + " | " + status
-                    + " | " + rentData.getAmount()
-                    + " / " + period;
-
-            if (rentData.isRented()) {
-                line += " | " + formatRentRemaining(rentData);
-
-                if (admin && rentData.getRenter() != null) {
-                    line += " | renter: " + rentData.getRenter();
-                }
-            }
-
-            source.sendSystemMessage(Component.literal(line));
+            source.sendSystemMessage(Component.literal(formatRentalLine(region, admin)));
         }
 
         if (count == 0) {
@@ -451,6 +627,7 @@ public class RegionCommands {
 
         return 1;
     }
+
 
     private static int addOwner(CommandSourceStack source, String name, String playerName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
@@ -573,36 +750,15 @@ public class RegionCommands {
             return 0;
         }
 
-        if (!SimpleServerUtilities.REGIONS.isRentingEnabled()) {
-            player.sendSystemMessage(Component.literal("Region renting is currently disabled."));
+        if (!RegionPolicy.canRentRegion(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to rent regions."));
             return 0;
         }
 
-        if (!region.getRentData().isRentable()) {
-            player.sendSystemMessage(Component.literal("This region is not rentable."));
-            return 0;
-        }
-
-        if (region.getRentData().isRented()) {
-            player.sendSystemMessage(Component.literal("This region is already rented."));
-            return 0;
-        }
-
-        region.getRentData().setRenter(player.getUUID());
-
-        if (region.getRentData().isPermanent()) {
-            region.getRentData().setRentEndTime(-1L);
-        } else {
-            long durationMillis = region.getRentData().getPeriodDays() * 24L * 60L * 60L * 1000L;
-            region.getRentData().setRentEndTime(System.currentTimeMillis() + durationMillis);
-        }
-
-        region.addMember(player.getUUID());
-        SimpleServerUtilities.REGIONS.save();
-
-        player.sendSystemMessage(Component.literal("You rented region '" + name + "'."));
+        sendRentOffer(player, region);
         return 1;
     }
+
 
     private static int unrent(CommandSourceStack source, String name) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
@@ -625,63 +781,15 @@ public class RegionCommands {
             return 0;
         }
 
-        if (!resetRegionIfSnapshotExists(player, region)) {
-            return 0;
-        }
+        Component confirm = Component.literal("[CONFIRM UNRENT]")
+                .withStyle(style -> style.withColor(ChatFormatting.RED)
+                        .withClickEvent(new ClickEvent.RunCommand("/regions confirmunrent " + region.getName())));
 
-        UUID renter = region.getRentData().getRenter();
-
-        if (renter != null) {
-            region.removeMember(renter);
-        }
-
-        region.getRentData().setRenter(null);
-        region.getRentData().setRentEndTime(-1L);
-
-        SimpleServerUtilities.REGIONS.save();
-
-        player.sendSystemMessage(Component.literal("Region '" + name + "' is no longer rented."));
+        player.sendSystemMessage(Component.literal("Unrenting may remove your access and may reset the region."));
+        player.sendSystemMessage(Component.literal("Click to confirm: ").append(confirm));
         return 1;
     }
 
-    private static boolean resetRegionIfSnapshotExists(ServerPlayer player, Region region) {
-        if (!SimpleServerUtilities.REGION_SNAPSHOTS.hasSnapshot(region.getName())) {
-            player.sendSystemMessage(Component.literal(
-                    "No saved snapshot exists for region '" + region.getName() + "'. Region was not reset."
-            ));
-            return true;
-        }
-
-        ServerLevel level = player.level().getServer().getLevel(region.getDimension());
-
-        if (level == null) {
-            player.sendSystemMessage(Component.literal("Region dimension is not loaded."));
-            return false;
-        }
-
-        long volume = region.getVolume();
-
-        if (volume > MAX_REGION_BLOCK_OPERATION_VOLUME) {
-            player.sendSystemMessage(Component.literal("Region is too large to reset safely: " + volume + " blocks."));
-            player.sendSystemMessage(Component.literal("Current safety limit: " + MAX_REGION_BLOCK_OPERATION_VOLUME + " blocks."));
-            return false;
-        }
-
-        try {
-            int restoredBlocks = SimpleServerUtilities.REGION_SNAPSHOTS.reset(level, region);
-
-            player.sendSystemMessage(Component.literal(
-                    "Region '" + region.getName() + "' was reset to its saved snapshot. Restored "
-                            + restoredBlocks + " block(s)."
-            ));
-
-            return true;
-        } catch (IOException | IllegalStateException e) {
-            SimpleServerUtilities.LOGGER.error("Failed to reset region snapshot for '{}'.", region.getName(), e);
-            player.sendSystemMessage(Component.literal("Failed to reset region snapshot: " + e.getMessage()));
-            return false;
-        }
-    }
 
     private static int setRent(CommandSourceStack source, String name, int amount, int days) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
@@ -709,8 +817,13 @@ public class RegionCommands {
             player.sendSystemMessage(Component.literal("Region '" + name + "' is now rentable for " + amount + " every " + days + " day(s)."));
         }
 
+        if (region.getRentData().isRented()) {
+            player.sendSystemMessage(Component.literal("Current rent was not reset. New price applies to the next extension."));
+        }
+
         return 1;
     }
+
 
     private static int setRentable(CommandSourceStack source, String name, boolean value) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
@@ -740,6 +853,418 @@ public class RegionCommands {
                 "Region '" + name + "' rentable set to " + value + "."
         ));
 
+        return 1;
+    }
+
+
+    private static int myRentals(CommandSourceStack source) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        int count = 0;
+
+        player.sendSystemMessage(Component.literal("Your rented regions:"));
+
+        for (Region region : SimpleServerUtilities.REGIONS.getAll()) {
+            if (!player.getUUID().equals(region.getRentData().getRenter())) {
+                continue;
+            }
+
+            count++;
+            player.sendSystemMessage(Component.literal(formatRentalLine(region, false)));
+        }
+
+        if (count == 0) {
+            player.sendSystemMessage(Component.literal("You are not renting any regions."));
+            return 0;
+        }
+
+        return 1;
+    }
+
+    private static int rentAccept(CommandSourceStack source, String name) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        if (!RegionPolicy.canRentRegion(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to rent regions."));
+            return 0;
+        }
+
+        RentalResult result = RegionRentalService.rent(player, region);
+        player.sendSystemMessage(Component.literal(result.message()));
+        return result.success() ? 1 : 0;
+    }
+
+    private static int rentDecline(CommandSourceStack source, String name) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        player.sendSystemMessage(Component.literal("Rent offer declined for region '" + name + "'."));
+        return 1;
+    }
+
+    private static int confirmUnrent(CommandSourceStack source, String name) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        boolean isRenter = player.getUUID().equals(region.getRentData().getRenter());
+
+        if (!isRenter && !canEditRegions(player)) {
+            player.sendSystemMessage(Component.literal("You cannot unrent this region."));
+            return 0;
+        }
+
+        RentalResult result = RegionRentalService.unrent(player.level().getServer(), region, true);
+        player.sendSystemMessage(Component.literal(result.message()));
+        return result.success() ? 1 : 0;
+    }
+
+    private static int extendRent(CommandSourceStack source, String name) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        RentalResult result = RegionRentalService.extend(player, region);
+        player.sendSystemMessage(Component.literal(result.message()));
+        return result.success() ? 1 : 0;
+    }
+
+    private static int setRentPrice(CommandSourceStack source, String name, int amount) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!canEditRegions(player)) {
+            return 0;
+        }
+
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        region.getRentData().setAmount(amount);
+        SimpleServerUtilities.REGIONS.save();
+
+        player.sendSystemMessage(Component.literal("Rent price for region '" + name + "' is now " + amount + "."));
+
+        if (region.getRentData().isRented()) {
+            player.sendSystemMessage(Component.literal("Current rent timer was not reset. New price applies to the next extension."));
+        }
+
+        return 1;
+    }
+
+    private static int setRentPeriod(CommandSourceStack source, String name, int days) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!canEditRegions(player)) {
+            return 0;
+        }
+
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        region.getRentData().setPeriodDays(days);
+        SimpleServerUtilities.REGIONS.save();
+        player.sendSystemMessage(Component.literal("Rent period for region '" + name + "' is now " + days + " day(s)."));
+        return 1;
+    }
+
+    private static int addRentTime(CommandSourceStack source, String name, int days) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!canEditRegions(player)) {
+            return 0;
+        }
+
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        RentalResult result = RegionRentalService.adminAddTime(region, days);
+        player.sendSystemMessage(Component.literal(result.message()));
+        return result.success() ? 1 : 0;
+    }
+
+    private static int pauseRent(CommandSourceStack source, String name, boolean value) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!canEditRegions(player)) {
+            return 0;
+        }
+
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        RentalResult result = RegionRentalService.setPaused(region, value);
+        player.sendSystemMessage(Component.literal(result.message()));
+        return result.success() ? 1 : 0;
+    }
+
+    private static int setResetOnExpire(CommandSourceStack source, String name, boolean value) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!canEditRegions(player)) {
+            return 0;
+        }
+
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        region.getRentData().setResetOnExpire(value);
+        SimpleServerUtilities.REGIONS.save();
+        player.sendSystemMessage(Component.literal("Reset on expire for region '" + name + "' set to " + value + "."));
+        return 1;
+    }
+
+    private static int setResetOnUnrent(CommandSourceStack source, String name, boolean value) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!canEditRegions(player)) {
+            return 0;
+        }
+
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        region.getRentData().setResetOnUnrent(value);
+        SimpleServerUtilities.REGIONS.save();
+        player.sendSystemMessage(Component.literal("Reset on unrent for region '" + name + "' set to " + value + "."));
+        return 1;
+    }
+
+    private static int setWelcomeMessage(CommandSourceStack source, String name, String message) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        if (!canManageOwnRegion(player, region)) {
+            player.sendSystemMessage(Component.literal("You cannot edit messages for this region."));
+            return 0;
+        }
+
+        region.setWelcomeMessage(message);
+        SimpleServerUtilities.REGIONS.save();
+        player.sendSystemMessage(Component.literal(message.isBlank()
+                ? "Welcome message cleared for region '" + name + "'."
+                : "Welcome message set for region '" + name + "'."));
+        return 1;
+    }
+
+    private static int setLeaveMessage(CommandSourceStack source, String name, String message) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        if (!canManageOwnRegion(player, region)) {
+            player.sendSystemMessage(Component.literal("You cannot edit messages for this region."));
+            return 0;
+        }
+
+        region.setLeaveMessage(message);
+        SimpleServerUtilities.REGIONS.save();
+        player.sendSystemMessage(Component.literal(message.isBlank()
+                ? "Leave message cleared for region '" + name + "'."
+                : "Leave message set for region '" + name + "'."));
+        return 1;
+    }
+
+    private static int clearSelection(CommandSourceStack source) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!canEditRegions(player)) {
+            return 0;
+        }
+
+        SELECTIONS.clear(player);
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+        player.sendSystemMessage(Component.literal("Region selection cleared."));
+        return 1;
+    }
+
+    private static int bindSelectionTool(CommandSourceStack source) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!RegionPolicy.canUseSelectionTool(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to bind a region selector tool."));
+            return 0;
+        }
+
+        if (player.getMainHandItem().isEmpty()) {
+            player.sendSystemMessage(Component.literal("Hold an item in your main hand first."));
+            return 0;
+        }
+
+        SimpleServerUtilities.REGION_SELECTION_TOOLS.bind(player, player.getMainHandItem());
+        player.sendSystemMessage(Component.literal("Region selector bound to: "
+                + SimpleServerUtilities.REGION_SELECTION_TOOLS.getBoundTool(player)));
+        return 1;
+    }
+
+    private static int unbindSelectionTool(CommandSourceStack source) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!RegionPolicy.canUseSelectionTool(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to unbind a region selector tool."));
+            return 0;
+        }
+
+        SimpleServerUtilities.REGION_SELECTION_TOOLS.unbind(player);
+        player.sendSystemMessage(Component.literal("Region selector tool unbound."));
+        return 1;
+    }
+
+    private static int fillSelection(CommandSourceStack source, String blocks) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!canEditRegions(player)) {
+            return 0;
+        }
+
+        RegionSelection selection = SELECTIONS.getSelection(player);
+
+        if (!selection.isComplete()) {
+            player.sendSystemMessage(Component.literal("You must set point1 and point2 first."));
+            return 0;
+        }
+
+        ServerLevel level = player.level().getServer().getLevel(selection.getDimension());
+
+        if (level == null) {
+            player.sendSystemMessage(Component.literal("Selection dimension is not loaded."));
+            return 0;
+        }
+
+        try {
+            RegionWorldEditManager.RegionFillJob job = RegionWorldEditManager.createFillJob(
+                    level,
+                    selection,
+                    blocks,
+                    MAX_REGION_BLOCK_OPERATION_VOLUME
+            );
+            java.util.UUID playerId = player.getUUID();
+            net.minecraft.server.MinecraftServer server = source.getServer();
+            java.util.UUID jobId = SimpleServerUtilities.JOBS.submit(job, result -> {
+                ServerPlayer online = server.getPlayerList().getPlayer(playerId);
+                if (online == null) {
+                    return;
+                }
+                if (result.status() == be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler.Status.COMPLETED) {
+                    online.sendSystemMessage(Component.literal(
+                            "Fill job completed. Changed " + job.changedBlocks() + " block(s)."
+                    ));
+                } else {
+                    online.sendSystemMessage(Component.literal(
+                            "Fill job " + result.status().name().toLowerCase(java.util.Locale.ROOT)
+                                    + (result.error().isBlank() ? "." : ": " + result.error())
+                    ));
+                }
+            });
+            player.sendSystemMessage(Component.literal("Scheduled fill job " + jobId + "."));
+            return 1;
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            player.sendSystemMessage(Component.literal("Failed to fill selection: " + e.getMessage()));
+            return 0;
+        }
+    }
+
+    private static int regenerateSelection(CommandSourceStack source) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!canEditRegions(player)) {
+            return 0;
+        }
+
+        player.sendSystemMessage(Component.literal("Selection regeneration is not enabled yet."));
+        player.sendSystemMessage(Component.literal("Reason: safe partial world-generation restore needs a dedicated chunk/worldgen implementation."));
+        return 0;
+    }
+
+    private static int showRegionBoundary(CommandSourceStack source, String name) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!RegionPolicy.canVisualizeRegions(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to visualize region boundaries."));
+            return 0;
+        }
+
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        RegionInteractionEvents.showBoundary(player, region.getName());
+        player.sendSystemMessage(Component.literal(
+                "Showing boundary for region '" + region.getName()
+                        + "'. Use /regions hide " + region.getName() + " to hide only this region."
+        ));
+        return 1;
+    }
+
+    private static int hideRegionBoundary(CommandSourceStack source, String name) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+
+        if (!RegionPolicy.canVisualizeRegions(player)) {
+            player.sendSystemMessage(Component.literal("You do not have permission to visualize region boundaries."));
+            return 0;
+        }
+
+        Region region = SimpleServerUtilities.REGIONS.get(name);
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        RegionInteractionEvents.hideBoundary(player, region.getName());
+        player.sendSystemMessage(Component.literal("Boundary hidden for region '" + region.getName() + "'."));
+        return 1;
+    }
+
+    private static int hideAllRegionBoundaries(CommandSourceStack source) {
+        ServerPlayer player = (ServerPlayer) source.getEntity();
+        RegionInteractionEvents.hideAllBoundaries(player);
+        player.sendSystemMessage(Component.literal("All individually selected region boundaries hidden."));
         return 1;
     }
 
@@ -911,11 +1436,24 @@ public class RegionCommands {
             return 0;
         }
 
-        player.teleportTo(
+        Optional<TeleportDestination> destination = TeleportSafety.findSafeDestination(
                 level,
                 region.getSpawnPos().getX() + 0.5,
                 region.getSpawnPos().getY(),
-                region.getSpawnPos().getZ() + 0.5,
+                region.getSpawnPos().getZ() + 0.5
+        );
+
+        if (destination.isEmpty()) {
+            player.sendSystemMessage(Component.literal("No safe teleport location was found near this region spawn."));
+            return 0;
+        }
+
+        TeleportDestination safe = destination.get();
+        player.teleportTo(
+                level,
+                safe.x(),
+                safe.y(),
+                safe.z(),
                 Set.of(),
                 region.getSpawnYaw(),
                 region.getSpawnPitch(),
@@ -946,6 +1484,8 @@ public class RegionCommands {
             case SUCCESS -> {
                 player.sendSystemMessage(Component.literal("Region '" + name + "' redefined."));
                 SELECTIONS.clear(player);
+                SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+                SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownRegion(player);
                 return 1;
             }
 
@@ -1053,15 +1593,30 @@ public class RegionCommands {
         }
 
         try {
-            int restoredBlocks = SimpleServerUtilities.REGION_SNAPSHOTS.reset(level, region);
-
-            player.sendSystemMessage(Component.literal(
-                    "Reset region '" + region.getName() + "' to saved snapshot. Restored " + restoredBlocks + " block(s)."
-            ));
-
+            RegionSnapshotManager.RegionSnapshotResetJob job =
+                    SimpleServerUtilities.REGION_SNAPSHOTS.createResetJob(level, region);
+            java.util.UUID playerId = player.getUUID();
+            net.minecraft.server.MinecraftServer server = source.getServer();
+            java.util.UUID jobId = SimpleServerUtilities.JOBS.submit(job, result -> {
+                ServerPlayer online = server.getPlayerList().getPlayer(playerId);
+                if (online == null) {
+                    return;
+                }
+                if (result.status() == be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler.Status.COMPLETED) {
+                    online.sendSystemMessage(Component.literal(
+                            "Reset region '" + region.getName() + "'. Restored " + job.restoredBlocks() + " block(s)."
+                    ));
+                } else {
+                    online.sendSystemMessage(Component.literal(
+                            "Region reset " + result.status().name().toLowerCase(java.util.Locale.ROOT)
+                                    + (result.error().isBlank() ? "." : ": " + result.error())
+                    ));
+                }
+            });
+            player.sendSystemMessage(Component.literal("Scheduled region reset job " + jobId + "."));
             return 1;
         } catch (IOException | IllegalStateException e) {
-            SimpleServerUtilities.LOGGER.error("Failed to reset region snapshot for '{}'.", region.getName(), e);
+            SimpleServerUtilities.LOGGER.error("Failed to schedule region snapshot reset for '{}'.", region.getName(), e);
             player.sendSystemMessage(Component.literal("Failed to reset region snapshot: " + e.getMessage()));
             return 0;
         }
@@ -1096,28 +1651,37 @@ public class RegionCommands {
             return 0;
         }
 
-        BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
-        int changedBlocks = 0;
-
-        for (int x = region.getMinX(); x <= region.getMaxX(); x++) {
-            for (int y = region.getMinY(); y <= region.getMaxY(); y++) {
-                for (int z = region.getMinZ(); z <= region.getMaxZ(); z++) {
-                    mutablePos.set(x, y, z);
-
-                    if (level.isEmptyBlock(mutablePos)) {
-                        continue;
-                    }
-
-                    level.setBlock(mutablePos, Blocks.AIR.defaultBlockState(), 3);
-                    changedBlocks++;
+        try {
+            RegionWorldEditManager.RegionClearJob job = RegionWorldEditManager.createClearJob(
+                    level,
+                    region,
+                    MAX_REGION_BLOCK_OPERATION_VOLUME
+            );
+            UUID playerId = player.getUUID();
+            net.minecraft.server.MinecraftServer server = source.getServer();
+            UUID jobId = SimpleServerUtilities.JOBS.submit(job, result -> {
+                ServerPlayer online = server.getPlayerList().getPlayer(playerId);
+                if (online == null) {
+                    return;
                 }
-            }
+                if (result.status() == be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler.Status.COMPLETED) {
+                    online.sendSystemMessage(Component.literal(
+                            "Cleared region '" + region.getName() + "'. Removed "
+                                    + job.changedBlocks() + " block(s)."
+                    ));
+                } else {
+                    online.sendSystemMessage(Component.literal(
+                            "Region clear " + result.status().name().toLowerCase(java.util.Locale.ROOT)
+                                    + (result.error().isBlank() ? "." : ": " + result.error())
+                    ));
+                }
+            });
+            player.sendSystemMessage(Component.literal("Scheduled region clear job " + jobId + "."));
+            return 1;
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            player.sendSystemMessage(Component.literal("Failed to schedule region clear: " + e.getMessage()));
+            return 0;
         }
-
-        player.sendSystemMessage(Component.literal(
-                "Cleared region '" + region.getName() + "'. Removed " + changedBlocks + " block(s)."
-        ));
-        return 1;
     }
 
     private static int enableRenting(CommandSourceStack source, boolean value) {
@@ -1163,6 +1727,87 @@ public class RegionCommands {
         return pos.getX() + ", " + pos.getY() + ", " + pos.getZ();
     }
 
+    private static boolean canViewRegion(ServerPlayer player, Region region) {
+        return isOp(player)
+                || RegionPolicy.canEditRegion(player)
+                || region.isOwner(player.getUUID())
+                || player.getUUID().equals(region.getRentData().getRenter());
+    }
+
+    private static boolean canManageOwnRegion(ServerPlayer player, Region region) {
+        return isOp(player)
+                || RegionPolicy.canEditRegion(player)
+                || region.isOwner(player.getUUID())
+                || player.getUUID().equals(region.getRentData().getRenter());
+    }
+
+    private static String formatRentalLine(Region region, boolean showAdminDetails) {
+        RegionRentData rentData = region.getRentData();
+        String status;
+
+        if (rentData.isRented()) {
+            status = rentData.isRentPaused() ? "rented, paused" : "rented";
+        } else if (rentData.isRentable()) {
+            status = "available";
+        } else {
+            status = "not rentable";
+        }
+
+        String period = rentData.isPermanent()
+                ? "permanent"
+                : rentData.getPeriodDays() + " day(s)";
+
+        String line = " - " + region.getName()
+                + " | " + status
+                + " | " + rentData.getAmount()
+                + " / " + period
+                + " | reset expire: " + rentData.isResetOnExpire();
+
+        if (rentData.isRented()) {
+            line += " | " + formatRentRemaining(rentData)
+                    + " | renter: " + rentData.getDisplayRenterName();
+
+            if (showAdminDetails && rentData.getRenter() != null) {
+                line += " (" + rentData.getRenter() + ")";
+            }
+        }
+
+        return line;
+    }
+
+    private static void sendRentOffer(ServerPlayer player, Region region) {
+        RegionRentData rentData = region.getRentData();
+
+        if (!SimpleServerUtilities.REGIONS.isRentingEnabled()) {
+            player.sendSystemMessage(Component.literal("Region renting is currently disabled."));
+            return;
+        }
+
+        if (!rentData.isRentable()) {
+            player.sendSystemMessage(Component.literal("This region is not rentable."));
+            return;
+        }
+
+        if (rentData.isRented()) {
+            player.sendSystemMessage(Component.literal("This region is already rented."));
+            return;
+        }
+
+        player.sendSystemMessage(Component.literal("Rent region: " + region.getName()).withStyle(ChatFormatting.GOLD));
+        player.sendSystemMessage(Component.literal("Price: " + rentData.getAmount() + " / "
+                + (rentData.isPermanent() ? "permanent" : rentData.getPeriodDays() + " day(s)")));
+
+        Component accept = Component.literal("[ACCEPT]")
+                .withStyle(style -> style.withColor(ChatFormatting.GREEN)
+                        .withClickEvent(new ClickEvent.RunCommand("/regions rentaccept " + region.getName())));
+
+        Component decline = Component.literal(" [DECLINE]")
+                .withStyle(style -> style.withColor(ChatFormatting.RED)
+                        .withClickEvent(new ClickEvent.RunCommand("/regions rentdecline " + region.getName())));
+
+        player.sendSystemMessage(Component.literal("").append(accept).append(decline));
+    }
+
     private static int help(CommandSourceStack source) {
         source.sendSystemMessage(Component.literal("Region commands:"));
         source.sendSystemMessage(Component.literal(" - /regions point1"));
@@ -1192,7 +1837,26 @@ public class RegionCommands {
         source.sendSystemMessage(Component.literal(" - /regions clear <name>"));
         source.sendSystemMessage(Component.literal(" - /regions renting <true|false>"));
         source.sendSystemMessage(Component.literal(" - /regions rentals"));
+        source.sendSystemMessage(Component.literal(" - /regions myrentals"));
+        source.sendSystemMessage(Component.literal(" - /regions extend <name>"));
         source.sendSystemMessage(Component.literal(" - /regions setrentable <name> <true|false>"));
+        source.sendSystemMessage(Component.literal(" - /regions setrentprice <name> <amount>"));
+        source.sendSystemMessage(Component.literal(" - /regions setrentperiod <name> <days>"));
+        source.sendSystemMessage(Component.literal(" - /regions addtime <name> <days>"));
+        source.sendSystemMessage(Component.literal(" - /regions pause <name> <true|false>"));
+        source.sendSystemMessage(Component.literal(" - /regions resetonexpire <name> <true|false>"));
+        source.sendSystemMessage(Component.literal(" - /regions resetonunrent <name> <true|false>"));
+        source.sendSystemMessage(Component.literal(" - /regions welcome <name> <message>"));
+        source.sendSystemMessage(Component.literal(" - /regions leave <name> <message>"));
+        source.sendSystemMessage(Component.literal(" - /regions clearwelcome <name>"));
+        source.sendSystemMessage(Component.literal(" - /regions clearleave <name>"));
+        source.sendSystemMessage(Component.literal(" - /regions show <name>"));
+        source.sendSystemMessage(Component.literal(" - /regions hide"));
+        source.sendSystemMessage(Component.literal(" - /regions selection bind"));
+        source.sendSystemMessage(Component.literal(" - /regions selection unbind"));
+        source.sendSystemMessage(Component.literal(" - /regions selection clear"));
+        source.sendSystemMessage(Component.literal(" - /regions selection fill <block=weight,block=weight>"));
+        source.sendSystemMessage(Component.literal(" - /regions selection regen"));
         return 1;
     }
 
@@ -1216,6 +1880,10 @@ public class RegionCommands {
             return "permanent";
         }
 
+        if (rentData.isRentPaused()) {
+            return "paused with " + formatDuration(Math.max(0L, rentData.getPausedRemainingMillis())) + " remaining";
+        }
+
         long endTime = rentData.getRentEndTime();
 
         if (endTime <= 0L) {
@@ -1228,19 +1896,24 @@ public class RegionCommands {
             return "expired, pending check";
         }
 
-        long totalMinutes = remainingMillis / 60_000L;
+        return formatDuration(remainingMillis) + " remaining";
+    }
+
+    private static String formatDuration(long millis) {
+        long totalMinutes = millis / 60_000L;
         long days = totalMinutes / (24L * 60L);
         long hours = (totalMinutes % (24L * 60L)) / 60L;
         long minutes = totalMinutes % 60L;
 
         if (days > 0L) {
-            return days + "d " + hours + "h remaining";
+            return days + "d " + hours + "h";
         }
 
         if (hours > 0L) {
-            return hours + "h " + minutes + "m remaining";
+            return hours + "h " + minutes + "m";
         }
 
-        return minutes + "m remaining";
+        return minutes + "m";
     }
+
 }

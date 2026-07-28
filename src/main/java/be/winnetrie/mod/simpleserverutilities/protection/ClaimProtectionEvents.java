@@ -1,8 +1,11 @@
 package be.winnetrie.mod.simpleserverutilities.protection;
 
+import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.level.block.SignBlock;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
@@ -52,6 +55,14 @@ public class ClaimProtectionEvents {
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
+        }
+
+        if (player.level().getBlockState(event.getPos()).getBlock() instanceof SignBlock) {
+            Region region = SimpleServerUtilities.REGIONS.getAt(player.level().dimension(), event.getPos());
+
+            if (region != null && region.getRentData().isRentable()) {
+                return;
+            }
         }
 
         if (ProtectionHelper.canPlayerPerform(

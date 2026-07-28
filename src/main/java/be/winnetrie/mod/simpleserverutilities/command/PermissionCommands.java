@@ -373,6 +373,7 @@ public class PermissionCommands {
 
     private static int claimContextSet(CommandSourceStack source, String role, String key, String value) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        warnIfUnknownKey(player, key);
         SimpleServerUtilities.PERMISSIONS.setPlayerClaimContextPermission(role, key, value);
         player.sendSystemMessage(Component.literal("Set " + key + " = " + value + " for player-claim role " + role + "."));
         return 1;

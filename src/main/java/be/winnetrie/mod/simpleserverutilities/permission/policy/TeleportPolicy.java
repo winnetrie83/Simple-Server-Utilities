@@ -14,13 +14,15 @@ public class TeleportPolicy {
         String delayKey = switch (type) {
             case HOME -> PermissionKeys.HOMES_TELEPORT_DELAY;
             case WARP -> PermissionKeys.WARPS_TELEPORT_DELAY;
-            case CLAIM, REGION -> "ssu." + type.name().toLowerCase() + ".teleport.delay";
+            case CLAIM -> PermissionKeys.CLAIMS_TELEPORT_DELAY;
+            case REGION -> PermissionKeys.REGIONS_TELEPORT_DELAY;
         };
 
         String cooldownKey = switch (type) {
             case HOME -> PermissionKeys.HOMES_TELEPORT_COOLDOWN;
             case WARP -> PermissionKeys.WARPS_TELEPORT_COOLDOWN;
-            case CLAIM, REGION -> "ssu." + type.name().toLowerCase() + ".teleport.cooldown";
+            case CLAIM -> PermissionKeys.CLAIMS_TELEPORT_COOLDOWN;
+            case REGION -> PermissionKeys.REGIONS_TELEPORT_COOLDOWN;
         };
 
         int delay = PermissionService.getInt(player, delayKey, 0, context);

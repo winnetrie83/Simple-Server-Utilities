@@ -1,0 +1,12 @@
+{
+  "priority": 100,
+  "inherits": [
+    "default"
+  ],
+  "permissions": {
+    "ssu.regions.use": "true",
+    "ssu.regions.teleport": "true",
+    "ssu.regions.visualize": "true",
+    "ssu.warps.info": "true"
+  }
+}

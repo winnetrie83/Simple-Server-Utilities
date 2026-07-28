@@ -1,0 +1,33 @@
+{
+  "id": "11111111-1111-1111-1111-111111111111",
+  "name": "base",
+  "dimension": "minecraft:overworld",
+  "owner": "00000000-0000-0000-0000-000000000000",
+  "createdAt": 1720000000000,
+  "lastChunkChangeAt": 1720000000000,
+  "welcomeMessage": "Welcome to my base!",
+  "chunks": [
+    {
+      "x": 10,
+      "z": -4
+    },
+    {
+      "x": 11,
+      "z": -4
+    }
+  ],
+  "trustedPlayers": [],
+  "settings": {
+    "allowBlockBreak": false,
+    "allowBlockPlace": false,
+    "allowInteract": false,
+    "allowPvp": false,
+    "allowExplosions": false,
+    "allowPistons": false,
+    "allowWaterFlow": false,
+    "allowLavaFlow": false,
+    "allowRedstone": true,
+    "allowHoppers": false,
+    "allowFireSpread": false
+  }
+}

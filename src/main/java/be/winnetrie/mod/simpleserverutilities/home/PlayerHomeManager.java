@@ -1,15 +1,15 @@
 package be.winnetrie.mod.simpleserverutilities.home;
 
 import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import com.google.gson.Gson;
@@ -18,9 +18,10 @@ import com.google.gson.GsonBuilder;
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.HomePolicy;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
+import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.storage.LevelResource;
 
 public class PlayerHomeManager {
 
@@ -29,64 +30,67 @@ public class PlayerHomeManager {
 
     private final Map<UUID, Map<String, PlayerHome>> homesByOwner = new HashMap<>();
 
-    private Path saveFile;
+    private Path rootFolder;
+    private Path playersFolder;
+    private Path legacySaveFile;
 
     public void load(MinecraftServer server) {
-        Path folder = server.getWorldPath(LevelResource.ROOT).resolve("simpleserverutilities");
-        this.saveFile = folder.resolve("homes.json");
+        this.rootFolder = StoragePaths.root(server);
+        this.playersFolder = StoragePaths.homePlayers(rootFolder);
+        this.legacySaveFile = rootFolder.resolve("homes.json");
 
         homesByOwner.clear();
 
         try {
-            Files.createDirectories(folder);
+            Files.createDirectories(rootFolder);
 
-            if (!Files.exists(saveFile)) {
+            if (JsonStorage.hasJsonFiles(playersFolder)) {
+                loadSplitHomes();
+            } else if (Files.exists(legacySaveFile)) {
+                loadLegacyHomes();
                 save();
-                return;
+                Path archived = JsonStorage.archiveLegacyFile(legacySaveFile);
+
+                if (archived != null) {
+                    SimpleServerUtilities.LOGGER.info("Migrated legacy homes to per-player storage. Legacy file archived as: {}", archived);
+                }
+            } else {
+                Files.createDirectories(playersFolder);
+                save();
             }
 
-            try (Reader reader = Files.newBufferedReader(saveFile)) {
-                HomeSaveData data = GSON.fromJson(reader, HomeSaveData.class);
-
-                if (data == null || data.homes == null) {
-                    return;
-                }
-
-                for (PlayerHome home : data.homes) {
-                    if (home.getOwner() == null || home.getName() == null) {
-                        continue;
-                    }
-
-                    homesByOwner
-                            .computeIfAbsent(home.getOwner(), uuid -> new HashMap<>())
-                            .put(normalizeName(home.getName()), home);
-                }
-            }
-
-            SimpleServerUtilities.LOGGER.info("Loaded {} player homes.", countAllHomes());
+            SimpleServerUtilities.LOGGER.info("Loaded {} player homes for {} players.", countAllHomes(), homesByOwner.size());
         } catch (Exception e) {
             SimpleServerUtilities.LOGGER.error("Failed to load player homes.", e);
         }
     }
 
     public void save() {
-        if (saveFile == null) {
+        if (playersFolder == null) {
             return;
         }
 
-        try (Writer writer = Files.newBufferedWriter(saveFile)) {
-            HomeSaveData data = new HomeSaveData();
-            data.homes = new ArrayList<>();
+        try {
+            Files.createDirectories(playersFolder);
+            Set<Path> keptFiles = new HashSet<>();
 
-            for (Map<String, PlayerHome> ownerHomes : homesByOwner.values()) {
-                data.homes.addAll(ownerHomes.values());
+            for (Map.Entry<UUID, Map<String, PlayerHome>> entry : homesByOwner.entrySet()) {
+                if (entry.getValue().isEmpty()) {
+                    continue;
+                }
+
+                UUID owner = entry.getKey();
+                HomePlayerSaveData data = new HomePlayerSaveData();
+                data.player = owner.toString();
+                data.homes = new ArrayList<>(entry.getValue().values());
+                data.homes.sort(Comparator.comparing(PlayerHome::getDisplayName, String::compareToIgnoreCase));
+
+                Path file = StoragePaths.jsonFile(playersFolder, owner.toString());
+                JsonStorage.write(GSON, file, data);
+                keptFiles.add(file);
             }
 
-            data.homes.sort(Comparator
-                    .comparing((PlayerHome home) -> home.getOwner().toString())
-                    .thenComparing(PlayerHome::getDisplayName));
-
-            GSON.toJson(data, writer);
+            JsonStorage.deleteStaleJsonFiles(playersFolder, keptFiles);
         } catch (IOException e) {
             SimpleServerUtilities.LOGGER.error("Failed to save player homes.", e);
         }
@@ -178,7 +182,7 @@ public class PlayerHomeManager {
         }
 
         ArrayList<PlayerHome> homes = new ArrayList<>(ownerHomes.values());
-        homes.sort(Comparator.comparing(PlayerHome::getDisplayName));
+        homes.sort(Comparator.comparing(PlayerHome::getDisplayName, String::compareToIgnoreCase));
         return homes;
     }
 
@@ -201,6 +205,73 @@ public class PlayerHomeManager {
 
     public String getDefaultHomeName() {
         return DEFAULT_HOME_NAME;
+    }
+
+    private void loadSplitHomes() throws IOException {
+        for (Path file : JsonStorage.listJsonFiles(playersFolder)) {
+            try {
+                HomePlayerSaveData data = JsonStorage.read(GSON, file, HomePlayerSaveData.class);
+
+                if (data == null || data.homes == null) {
+                    continue;
+                }
+
+                UUID owner = data.player == null || data.player.isBlank()
+                        ? UUID.fromString(StoragePaths.fileBaseName(file))
+                        : UUID.fromString(data.player);
+
+                loadOwnerHomes(owner, data.homes);
+            } catch (Exception e) {
+                Path archived = JsonStorage.archiveBrokenFile(file);
+                SimpleServerUtilities.LOGGER.error("Failed to load player home file. Broken file archived as: {}", archived, e);
+            }
+        }
+    }
+
+    private void loadLegacyHomes() {
+        try {
+            HomeSaveData data = JsonStorage.read(GSON, legacySaveFile, HomeSaveData.class);
+
+            if (data == null || data.homes == null) {
+                return;
+            }
+
+            for (PlayerHome home : data.homes) {
+                if (home.getOwner() == null || home.getName() == null) {
+                    continue;
+                }
+
+                homesByOwner
+                        .computeIfAbsent(home.getOwner(), uuid -> new HashMap<>())
+                        .put(normalizeName(home.getName()), home);
+            }
+        } catch (Exception e) {
+            Path archived = JsonStorage.archiveBrokenFile(legacySaveFile);
+            SimpleServerUtilities.LOGGER.error("Failed to read legacy homes file. Broken file archived as: {}", archived, e);
+        }
+    }
+
+    private void loadOwnerHomes(UUID owner, Collection<PlayerHome> homes) {
+        Map<String, PlayerHome> ownerHomes = homesByOwner.computeIfAbsent(owner, uuid -> new HashMap<>());
+
+        for (PlayerHome home : homes) {
+            if (home == null || home.getName() == null) {
+                continue;
+            }
+
+            UUID actualOwner = home.getOwner() == null ? owner : home.getOwner();
+
+            if (!actualOwner.equals(owner)) {
+                SimpleServerUtilities.LOGGER.warn("Skipping home '{}' in wrong owner file. Expected owner: {}, found owner: {}", home.getDisplayName(), owner, actualOwner);
+                continue;
+            }
+
+            ownerHomes.put(normalizeName(home.getName()), home);
+        }
+
+        if (ownerHomes.isEmpty()) {
+            homesByOwner.remove(owner);
+        }
     }
 
     private int countAllHomes() {
@@ -226,10 +297,17 @@ public class PlayerHomeManager {
     }
 
     private String normalizeName(String name) {
-        return name.toLowerCase();
+        return name.toLowerCase(java.util.Locale.ROOT);
     }
 
     private static class HomeSaveData {
+        private ArrayList<PlayerHome> homes = new ArrayList<>();
+    }
+
+    private static class HomePlayerSaveData {
+        private int schemaVersion = 1;
+        private String player = "";
+        private String lastKnownName = "";
         private ArrayList<PlayerHome> homes = new ArrayList<>();
     }
 }

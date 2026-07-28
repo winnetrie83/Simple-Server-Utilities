@@ -43,7 +43,7 @@ public class Config {
             .define("enableAdminRegions", true);
 
     public static final ModConfigSpec.BooleanValue ENABLE_PERMISSION_SYSTEM = BUILDER
-            .comment("Enable the internal permission system. Currently prepared for future use.")
+            .comment("Enable the internal rank and permission system.")
             .define("enablePermissionSystem", true);
 
     /**

@@ -21,6 +21,10 @@ public class ClaimOperationResult {
         CHUNK_REMOVAL_DISCONNECTS_CLAIM,
         CHUNK_OVERLAPS_REGION,
 
+        EMPTY_SELECTION,
+        INVALID_SELECTION,
+        INVALID_CLAIM_NAME,
+
         NOT_OWNER
     }
 

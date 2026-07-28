@@ -129,7 +129,8 @@ public class PermissionService {
                     PermissionKeys.HOMES_DELETE,
                     PermissionKeys.HOMES_TELEPORT,
                     PermissionKeys.WARPS_USE,
-                    PermissionKeys.WARPS_TELEPORT -> true;
+                    PermissionKeys.WARPS_TELEPORT,
+                    PermissionKeys.REGIONS_RENT -> true;
             default -> false;
         };
     }
