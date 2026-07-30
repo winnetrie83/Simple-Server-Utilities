@@ -3,6 +3,7 @@ package be.winnetrie.mod.simpleserverutilities.economy;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -39,6 +40,9 @@ import net.minecraft.server.level.ServerPlayer;
 public final class EconomyManager implements EconomyService {
 
     private static final int MAX_RECENT_IN_MEMORY = 5_000;
+    /** Removed in dev2.1; retained only to discard the experimental dev2 system account safely. */
+    private static final UUID LEGACY_TREASURY_ID = UUID.nameUUIDFromBytes(
+            (SimpleServerUtilities.MODID + ":server_treasury").getBytes(StandardCharsets.UTF_8));
 
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final Map<UUID, EconomyAccount> accounts = new HashMap<>();
@@ -69,10 +73,10 @@ public final class EconomyManager implements EconomyService {
         recentTransactionIds.clear();
         accountStore.reset();
         transactionStore.reset();
-        SimpleServerUtilities.TRANSACTIONS.clear();
 
         loadSettings();
         loadAccounts();
+        removeLegacyTreasuryAccount();
         loadTransactions();
         recoverJournal();
         save();
@@ -120,6 +124,15 @@ public final class EconomyManager implements EconomyService {
     }
 
     public synchronized EconomyAccount ensureAccount(UUID playerId, String name) {
+        return ensureAccount(playerId, name, settings.getStartingBalanceMinor());
+    }
+
+    /** Creates a non-player account with an explicit initial balance. */
+    public synchronized EconomyAccount ensureSystemAccount(UUID accountId, String name) {
+        return ensureAccount(accountId, name, 0L);
+    }
+
+    private EconomyAccount ensureAccount(UUID playerId, String name, long initialBalanceMinor) {
         Objects.requireNonNull(playerId, "playerId");
         EconomyAccount account = accounts.get(playerId);
         if (account != null) {
@@ -130,7 +143,7 @@ public final class EconomyManager implements EconomyService {
             return account;
         }
 
-        account = new EconomyAccount(playerId, name, settings.getStartingBalanceMinor());
+        account = new EconomyAccount(playerId, name, Math.max(0L, initialBalanceMinor));
         accounts.put(playerId, account);
         index(account);
         queueAccount(account);
@@ -189,6 +202,31 @@ public final class EconomyManager implements EconomyService {
             String reason,
             String idempotencyKey
     ) {
+        return transferTyped(
+                actorId,
+                actorName,
+                sourceId,
+                destinationId,
+                amountMinor,
+                EconomyTransactionType.TRANSFER,
+                module,
+                reason,
+                idempotencyKey
+        );
+    }
+
+    /** Module-facing account transfer with an explicit journal transaction type. */
+    public synchronized EconomyResult transferTyped(
+            UUID actorId,
+            String actorName,
+            UUID sourceId,
+            UUID destinationId,
+            long amountMinor,
+            EconomyTransactionType type,
+            String module,
+            String reason,
+            String idempotencyKey
+    ) {
         if (!settings.isEnabled()) {
             return EconomyResult.failure("disabled", "The economy module is disabled.");
         }
@@ -221,7 +259,7 @@ public final class EconomyManager implements EconomyService {
         return executeMutation(
                 actorId,
                 actorName,
-                EconomyTransactionType.TRANSFER,
+                type == null ? EconomyTransactionType.TRANSFER : type,
                 source,
                 destination,
                 amountMinor,
@@ -804,6 +842,17 @@ public final class EconomyManager implements EconomyService {
         } catch (IOException e) {
             SimpleServerUtilities.LOGGER.error("Failed to scan economy accounts.", e);
         }
+    }
+
+    private void removeLegacyTreasuryAccount() {
+        EconomyAccount removed = accounts.remove(LEGACY_TREASURY_ID);
+        if (removed == null) return;
+        rebuildNameIndex();
+        Path file = accountFile(LEGACY_TREASURY_ID);
+        Path archived = JsonStorage.archiveLegacyFile(file);
+        SimpleServerUtilities.LOGGER.info(
+                "Removed the experimental dev2 treasury account; {} minor unit(s) were retired from circulation. Archived account: {}",
+                removed.getBalanceMinor(), archived == null ? "none" : archived);
     }
 
     private void loadTransactions() {

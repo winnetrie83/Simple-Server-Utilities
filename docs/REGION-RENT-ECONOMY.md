@@ -1,171 +1,61 @@
-# SSU Paid Region Renting
+# Region Rent Economy
 
-## Scope of 1.2.0-dev2
+## Ownership model
 
-Server-region renting now uses the built-in Economy Core. Rent, renewal, owner payout, cancellation and refund are server-authoritative and use exact minor-unit values.
+Server regions are owned by the server. Players may be assigned as **managers** or **members**, but neither role receives economic ownership or rental income.
 
-The existing region model, members, timers, snapshots and reset jobs remain in place. This release connects those systems to durable economy transactions without changing claim or permission formats.
+- Managers may administer ordinary region settings where permissions allow it.
+- Members receive normal region access.
+- Renters receive temporary member access for the active rental.
+- Administrators act on behalf of the server and are not treated as owners.
 
-## Price representation and migration
+Older region files may contain an `owners` array. SSU 1.4.0-dev2.1 reads those UUIDs as `managers` and writes only the new `managers` field on the next save.
 
-New region records store an exact `priceMinor` value. With the default euro configuration:
+## Rent and renewal payments
 
-```text
-1 minor unit   = € 0,01
-100 minor units = € 1,00
-```
+A successful rent or renewal performs these steps:
 
-The old whole-unit `amount` field is preserved. A legacy region with `amount: 100` migrates to `€ 100,00` when first saved by dev2.
+1. Prepare a durable region-rent journal record.
+2. Debit the exact configured price from the renter in minor currency units.
+3. Persist the new renter, term and refundable-value state.
+4. Mark the linked journal operation complete.
 
-Prices can now include decimals:
+The payment is a deliberate **money sink**. It is not credited to an administrator, region manager or permanent server account.
 
-```text
-/regions setrent shop_a 250,50 7
-/regions setrentprice shop_a 275,00
-```
-
-A period is `-1` for permanent rent or at least `1` day. A zero-day period is rejected.
-
-## Rent transaction
-
-A normal rent or renewal uses this order:
-
-1. Validate region state, renter, permissions, job locks, price and balance.
-2. Write a durable `PREPARED` region-rent operation record.
-3. Debit the renter through the Economy Core.
-4. Credit the configured owner share, if applicable.
-5. Mark payment as committed in the region-rent journal.
-6. Update renter, members, timer, rental sequence and refundable value.
-7. Save and synchronously flush region storage.
-8. Mark the operation completed.
-
-If region persistence cannot be confirmed, SSU restores the previous in-memory region state and tries to flush that restoration before refunding. If neither state can be confirmed, it leaves the operation pending instead of guessing. Startup recovery then checks the stored rental sequence and economy idempotency keys.
-
-## Renewal
-
-```text
-/regions extend <name>
-```
-
-This command shows the price, period, current balance and a clickable confirmation. The actual charge occurs only through:
-
-```text
-/regions extendaccept <name>
-```
-
-Renewal adds a full configured period to the remaining rental time. When a rental is paused, the additional time is added to the paused remaining duration and the timer stays paused.
-
-## Owner payout and server share
-
-The global owner share is configured as a whole percentage:
-
-```text
-/regions rentconfig ownershare <0-100>
-```
-
-Example with rent price `€ 1.000,00` and owner share `80%`:
-
-```text
-Renter debit:        € 1.000,00
-Region owner credit:   € 800,00
-Server share:           € 200,00
-```
-
-When a region has several owners, the recipient is selected deterministically by UUID, excluding the renter. This avoids paying a renter to themselves and keeps restart recovery reproducible.
-
-The server share is removed from circulation in this release. A dedicated server treasury account is planned for a later economy milestone.
+This is useful for economy balance: currency introduced through rewards or other systems can leave circulation through server services such as region rent.
 
 ## Cancellation refunds
 
-Two global policies are available:
+Refund percentages remain configurable separately for:
 
-```text
-/regions rentconfig playerrefund <0-100>
-/regions rentconfig adminrefund <0-100>
-```
+- cancellation by the renter;
+- cancellation by an administrator.
 
-Defaults:
+The eligible value is frozen before a reset job starts. Timed rentals receive a pro-rata refund based on the remaining eligible term. Paused rentals keep their frozen remaining time and refundable value.
 
-```text
-Player cancels own rental: 0%
-Admin/server cancellation: 100%
-```
+A refund is recorded as a credit back to the former renter. It conceptually reverses part of the earlier money sink. The region-rent journal makes the operation idempotent: a failed or interrupted refund can be retried, but it cannot be paid twice.
 
-The configured percentage is applied to the **remaining eligible rent value**, not blindly to the original payment.
+Refunds do not depend on a treasury balance.
 
-Example:
+## Expiry
 
-- paid `€ 100,00` for ten days;
-- five days remain;
-- admin refund policy is `50%`.
+Natural expiry does not normally grant a cancellation refund. When configured, SSU first restores the saved region snapshot and only then removes the renter's access.
 
-The time-based remaining value is `€ 50,00`; the policy then refunds `€ 25,00`.
+## Snapshot interaction
 
-Renewal rolls remaining refundable value and the new payment into one new time window. Pausing freezes both the timer and refundable value. Natural expiry gives no refund.
+The existing region safety rules still apply:
 
-## Reset-before-removal behavior
+- region bounds may not be changed while rented;
+- destructive operations are blocked while a relevant job or unresolved journal operation exists;
+- reset-on-expiry and reset-on-cancellation use the saved region snapshot;
+- the rental's refundable value is frozen before reset work begins.
 
-When `resetOnUnrent` or `resetOnExpire` is enabled and a snapshot exists, the existing bounded reset job runs first. Rental access is removed only after that reset completes. This prevents the renter from losing access while their reset is still pending. For a manual cancellation, the refund value is frozen when the confirmed cancellation begins, so a long reset job cannot reduce it.
+## Legacy dev2 treasury compatibility
 
-An actively rented region cannot be deleted directly. It must first be cancelled so any configured refund and reset can be processed safely.
+The permanent treasury shipped only in the experimental 1.4.0-dev2 test source. Dev2.1 removes that account when the economy loads and retires any remaining balance instead of assigning it to a player.
 
-## Durable operation journal
+Historical transaction and rent-journal fields remain readable so an existing dev2 test world can migrate without corrupting old records. New dev2.1 rental operations do not create treasury income or owner-payout transactions.
 
-Cross-module operations are stored below:
+## Event funding later
 
-```text
-simpleserverutilities/
-└── regions/
-    └── rent_transactions/
-        └── <operation-uuid>.json
-```
-
-States include:
-
-```text
-PREPARED
-PAYMENT_COMMITTED
-REGION_COMMITTED
-COMPLETED
-ROLLED_BACK
-FAILED
-```
-
-Pending operations are shown in the Wallet admin panel. Economy mutations also retain their own separate transaction journals and idempotency keys.
-
-## Economy transaction types
-
-Dev2 adds:
-
-```text
-REGION_RENT
-REGION_RENEW
-REGION_OWNER_PAYOUT
-REGION_OWNER_PAYOUT_REVERSAL
-REGION_REFUND
-REGION_PAYMENT_ROLLBACK
-```
-
-These appear in player history and future transaction-detail screens.
-
-## Dashboard
-
-Players can see available rental regions and their own current rentals on the Regions page. Available regions have a Rent button. Their own rentals have Extend and Unrent actions.
-
-Rental actions close the dashboard and show a chat confirmation so the player can review the exact price or refund before committing.
-
-Economy administrators can edit:
-
-- owner share percentage;
-- player cancellation refund percentage;
-- admin cancellation refund percentage.
-
-The Wallet page also shows the number of unresolved region-rent operations.
-
-## Current limitations
-
-- Rent policy is global, not yet overridden per region.
-- Only one region owner receives the configured owner share.
-- Server share is currently removed from circulation instead of credited to a treasury account.
-- Refunds that would exceed the configured maximum account balance remain pending for administrative resolution.
-- Full transaction-detail and account-browser GUI pages are planned for the next economy milestone.
+Temporary community funding goals should be implemented as a separate event system rather than as a permanent server bank. Such a campaign can track contributions toward a specific unlock and remove the collected funds when the campaign completes or expires.

@@ -26,8 +26,9 @@ public final class MinimapClientState {
     }
 
     public static void apply(MinimapDataPayload payload) {
+        // Terrain.tick compares the effective overlay hash itself. Repeated,
+        // identical server snapshots must not invalidate the visible texture.
         data = payload;
-        TERRAIN.invalidate();
         requestCountdown = payload.enabled() ? ENABLED_REFRESH_TICKS : DISABLED_REFRESH_TICKS;
     }
 
@@ -50,7 +51,8 @@ public final class MinimapClientState {
                 data.claims(),
                 data.regions()
         );
-        TERRAIN.invalidate();
+        // Size, position and rotation are presentation-only. Shape and overlay
+        // changes are detected without clearing the currently visible map.
         requestCountdown = 0;
     }
 

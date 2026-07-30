@@ -43,6 +43,12 @@ public final class PermissionKeys {
     public static final String WARPS_TELEPORT_DELAY = "ssu.warps.teleport.delay";
     public static final String WARPS_TELEPORT_COOLDOWN = "ssu.warps.teleport.cooldown";
 
+    public static final String SPAWN_USE = "ssu.spawn.use";
+    public static final String SPAWN_ADMIN = "ssu.spawn.admin";
+    public static final String SPAWN_TELEPORT_DELAY = "ssu.spawn.teleport.delay";
+    public static final String SPAWN_TELEPORT_COOLDOWN = "ssu.spawn.teleport.cooldown";
+    public static final String SPAWN_REGION_BYPASS = "ssu.spawn.region_bypass";
+
     public static final String REGIONS_USE = "ssu.regions.use";
     public static final String REGIONS_CREATE = "ssu.regions.create";
     public static final String REGIONS_DELETE = "ssu.regions.delete";
@@ -71,11 +77,26 @@ public final class PermissionKeys {
     public static final String ECONOMY_HISTORY = "ssu.economy.history";
     public static final String ECONOMY_ADMIN = "ssu.economy.admin";
 
+    public static final String TELEPORT_ESCAPE = "ssu.teleport.escape";
+    public static final String TELEPORT_REGION_BYPASS = "ssu.teleport.region_bypass";
     public static final String TELEPORT_DELAY_BYPASS = "ssu.teleport.delay.bypass";
     public static final String TELEPORT_COOLDOWN_BYPASS = "ssu.teleport.cooldown.bypass";
+    public static final String TELEPORT_REQUIRE_STILL = "ssu.teleport.require_still";
+    /** Legacy alias retained for existing permission data. */
     public static final String TELEPORT_CANCEL_ON_MOVE = "ssu.teleport.cancel_on_move";
 
     public static final String PERMISSIONS_ADMIN = "ssu.permissions.admin";
+
+    public static final String MAIL_ACCESS = "ssu.mail.access";
+    public static final String MAIL_SEND = "ssu.mail.send";
+    public static final String MAIL_SEND_ITEMS = "ssu.mail.send.items";
+    public static final String MAIL_SEND_MONEY = "ssu.mail.send.money";
+    public static final String MAIL_MAX_ATTACHMENTS = "ssu.mail.max_attachments";
+    public static final String MAIL_INBOX_SOFT_CAP = "ssu.mail.inbox_soft_cap";
+    public static final String MAIL_SENT_LIMIT = "ssu.mail.sent_limit";
+    public static final String MAIL_DAILY_SEND_LIMIT = "ssu.mail.daily_send_limit";
+    public static final String MAIL_SEND_COOLDOWN = "ssu.mail.send_cooldown";
+    public static final String MAIL_ADMIN = "ssu.mail.admin";
 
 
     private static final Set<String> KNOWN_KEYS = Set.of(
@@ -112,6 +133,12 @@ public final class PermissionKeys {
             WARPS_TELEPORT_DELAY,
             WARPS_TELEPORT_COOLDOWN,
 
+            SPAWN_USE,
+            SPAWN_ADMIN,
+            SPAWN_TELEPORT_DELAY,
+            SPAWN_TELEPORT_COOLDOWN,
+            SPAWN_REGION_BYPASS,
+
             REGIONS_USE,
             REGIONS_CREATE,
             REGIONS_DELETE,
@@ -140,16 +167,31 @@ public final class PermissionKeys {
             ECONOMY_HISTORY,
             ECONOMY_ADMIN,
 
+            TELEPORT_ESCAPE,
+            TELEPORT_REGION_BYPASS,
             TELEPORT_DELAY_BYPASS,
             TELEPORT_COOLDOWN_BYPASS,
+            TELEPORT_REQUIRE_STILL,
             TELEPORT_CANCEL_ON_MOVE,
 
             PERMISSIONS_ADMIN,
+
+            MAIL_ACCESS,
+            MAIL_SEND,
+            MAIL_SEND_ITEMS,
+            MAIL_SEND_MONEY,
+            MAIL_MAX_ATTACHMENTS,
+            MAIL_INBOX_SOFT_CAP,
+            MAIL_SENT_LIMIT,
+            MAIL_DAILY_SEND_LIMIT,
+            MAIL_SEND_COOLDOWN,
+            MAIL_ADMIN,
 
             "ssu.*",
             "ssu.claims.*",
             "ssu.homes.*",
             "ssu.warps.*",
+            "ssu.spawn.*",
             "ssu.regions.*",
             "ssu.borders.*",
             "ssu.visualization.*",
@@ -159,6 +201,7 @@ public final class PermissionKeys {
             "ssu.minimap.*",
             "ssu.economy.*",
             "ssu.teleport.*",
+            "ssu.mail.*",
             "*"
     );
 

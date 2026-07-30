@@ -86,7 +86,7 @@ public final class MinimapService {
                         || Math.abs(chunk.getZ() - centerChunkZ) > CHUNK_RADIUS) {
                     continue;
                 }
-                result.add(new MinimapDataPayload.ClaimOverlay(chunk.getX(), chunk.getZ(), status));
+                result.add(new MinimapDataPayload.ClaimOverlay(chunk.getX(), chunk.getZ(), status, claim.getId()));
                 if (result.size() >= MAX_CLAIMS) {
                     return List.copyOf(result);
                 }

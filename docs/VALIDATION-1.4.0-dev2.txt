@@ -1,0 +1,73 @@
+SSU 1.4.0-dev2 validation report
+================================
+
+Scope
+-----
+- Core 2.0 lifecycle completion for storage, jobs, performance, transactions,
+  homes, warps and player UI preferences.
+- Persistent server treasury and dashboard administration.
+- Region rent/renew income distribution and treasury-funded cancellation refunds.
+- Removal of src/test, JUnit dependencies and ModDevGradle unit-test setup.
+
+Static and structural validation
+--------------------------------
+PASS - 181 main Java source files scanned for balanced braces, parentheses,
+       brackets, comments, strings and text blocks.
+PASS - A javac parse pass reported no Java syntax/grammar errors. Dependency
+       resolution errors are expected without the Minecraft/NeoForge classpath.
+PASS - All 13 JSON files parse successfully.
+PASS - All 13 PNG resources have a valid PNG signature and valid chunk CRCs.
+PASS - git diff --check reports no whitespace/patch errors.
+PASS - src/test is absent.
+PASS - No JUnit, testImplementation, testRuntimeOnly or neoForge.unitTest
+       configuration remains in the main project.
+PASS - PermissionCatalog references all 62 PermissionKeys constants, including
+       ssu.economy.treasury.view and ssu.economy.treasury.admin.
+PASS - All 15 SsuModule ids have resolvable dependencies and form an acyclic
+       topological order.
+
+Targeted compile/runtime harnesses
+----------------------------------
+PASS - SsuModule, SsuModuleRegistry, SsuServiceRegistry and SsuCore compiled
+       against a minimal MinecraftServer API stub.
+PASS - Lifecycle harness verified dependency-ordered startup and reverse-order
+       shutdown.
+PASS - New StorageModule, JobSchedulerModule, PerformanceModule,
+       TransactionModule, HomeModule, WarpModule and UiPreferencesModule
+       compiled against focused manager/API stubs.
+PASS - ServerTreasuryManager and TreasuryService compiled against focused
+       economy/Minecraft API stubs.
+PASS - Treasury accounting harness verified zero initial balance, region income,
+       treasury-to-player refund transfer and insufficient-funds rejection.
+PASS - RegionRentOperationRecord compiled with its backwards-compatible old and
+       new prepared()/markPaymentCommitted() overloads.
+PASS - SsuMenuSnapshotPayload, including the new treasury summary fields,
+       compiled against focused networking API stubs.
+
+Compatibility checks
+--------------------
+- Source version: 1.4.0-dev2.
+- Network protocol: 16. Client and server must use the same build.
+- Treasury account uses a deterministic UUID but is stored per world in the
+  existing isolated economy folder.
+- The treasury starts at zero and is excluded from player/account selectors.
+- Existing account/transaction JSON remains readable.
+- Existing rent-journal records omit treasury fields and therefore deserialize
+  with zero/null defaults.
+- Existing claim, region, snapshot v3, permission, home, warp, UI preference and
+  aerial map-cache formats are unchanged.
+
+Full build limitation in this environment
+-----------------------------------------
+NOT RUN - A complete ModDevGradle/NeoForge build.
+Reason: the available runtime is Java 21 while SSU targets Java 25, and the
+Gradle 9.2.1 wrapper could not download from services.gradle.org because DNS/
+internet access is unavailable in this environment.
+
+Required local verification
+---------------------------
+Run with Java 25:
+    gradlew.bat clean build
+
+Then follow docs/TESTING-1.4.0-dev2.md on a copied world before treating this as
+stable.

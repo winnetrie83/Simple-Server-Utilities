@@ -5,7 +5,7 @@ import java.util.UUID;
 /** Persistent player-side UI choices, validated by the server. */
 public final class PlayerUiPreferences {
 
-    public static final int CURRENT_SCHEMA = 1;
+    public static final int CURRENT_SCHEMA = 2;
 
     private int schema = CURRENT_SCHEMA;
     private String uuid = "";
@@ -18,6 +18,11 @@ public final class PlayerUiPreferences {
     private boolean minimapNorthUp = true;
     private boolean minimapShowClaims = true;
     private boolean minimapShowRegions = true;
+    private boolean worldMapShowClaims = true;
+    private boolean worldMapShowRegions = true;
+    private boolean mailAutoDeletePlayerAttachments;
+    private boolean mailAutoDeleteSystemAttachments;
+    private boolean mailAutoDeleteAuctionAttachments;
 
     public PlayerUiPreferences() {
         // Required for Gson.
@@ -29,6 +34,12 @@ public final class PlayerUiPreferences {
     }
 
     public void normalize() {
+        int previousSchema = schema;
+        if (previousSchema < 2) {
+            // Preserve the pre-dev2 world-map behaviour for existing players.
+            worldMapShowClaims = true;
+            worldMapShowRegions = true;
+        }
         schema = CURRENT_SCHEMA;
         minimapSize = Math.max(64, Math.min(256, minimapSize));
         if (minimapShape == null) {
@@ -118,4 +129,52 @@ public final class PlayerUiPreferences {
     public void setMinimapShowRegions(boolean minimapShowRegions) {
         this.minimapShowRegions = minimapShowRegions;
     }
+    public boolean isWorldMapShowClaims() {
+        return worldMapShowClaims;
+    }
+
+    public void setWorldMapShowClaims(boolean worldMapShowClaims) {
+        this.worldMapShowClaims = worldMapShowClaims;
+    }
+
+    public boolean isWorldMapShowRegions() {
+        return worldMapShowRegions;
+    }
+
+    public void setWorldMapShowRegions(boolean worldMapShowRegions) {
+        this.worldMapShowRegions = worldMapShowRegions;
+    }
+
+    public boolean isMailAutoDeletePlayerAttachments() {
+        return mailAutoDeletePlayerAttachments;
+    }
+
+    public void setMailAutoDeletePlayerAttachments(boolean value) {
+        mailAutoDeletePlayerAttachments = value;
+    }
+
+    public boolean isMailAutoDeleteSystemAttachments() {
+        return mailAutoDeleteSystemAttachments;
+    }
+
+    public void setMailAutoDeleteSystemAttachments(boolean value) {
+        mailAutoDeleteSystemAttachments = value;
+    }
+
+    public boolean isMailAutoDeleteAuctionAttachments() {
+        return mailAutoDeleteAuctionAttachments;
+    }
+
+    public void setMailAutoDeleteAuctionAttachments(boolean value) {
+        mailAutoDeleteAuctionAttachments = value;
+    }
+
+    public boolean shouldAutoDeleteAttachmentMail(be.winnetrie.mod.simpleserverutilities.mail.MailSource source) {
+        return switch (source == null ? be.winnetrie.mod.simpleserverutilities.mail.MailSource.SYSTEM : source) {
+            case PLAYER -> mailAutoDeletePlayerAttachments;
+            case AUCTION -> mailAutoDeleteAuctionAttachments;
+            case SYSTEM, RECOVERY -> mailAutoDeleteSystemAttachments;
+        };
+    }
+
 }

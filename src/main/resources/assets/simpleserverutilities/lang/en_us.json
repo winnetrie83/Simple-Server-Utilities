@@ -14,5 +14,6 @@
   "simpleserverutilities.configuration.enablePermissionSystem": "Enable Permission System",
   "key.category.simpleserverutilities.general": "Simple Server Utilities",
   "key.simpleserverutilities.open_menu": "Open SSU menu",
-  "screen.simpleserverutilities.dashboard": "Simple Server Utilities"
+  "screen.simpleserverutilities.dashboard": "Simple Server Utilities",
+  "key.simpleserverutilities.open_world_map": "Open SSU world map"
 }

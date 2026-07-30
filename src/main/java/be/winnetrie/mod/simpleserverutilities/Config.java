@@ -5,6 +5,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public class Config {
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
+    private static final ModConfigSpec.Builder CLIENT_BUILDER = new ModConfigSpec.Builder();
 
     public static final ModConfigSpec.BooleanValue ENABLE_PLAYER_CLAIMS = BUILDER
             .comment("Enable player chunk claims.")
@@ -42,6 +43,15 @@ public class Config {
             .comment("Enable admin/server regions.")
             .define("enableAdminRegions", true);
 
+
+    public static final ModConfigSpec.BooleanValue ENABLE_MAIL = BUILDER
+            .comment("Enable the durable player mail system.")
+            .define("enableMail", true);
+
+    public static final ModConfigSpec.IntValue MAIL_VISIBLE_RETENTION_DAYS = BUILDER
+            .comment("Days a mail may remain in the visible inbox before cleanup. Queued mail does not age until promoted.")
+            .defineInRange("mailVisibleRetentionDays", 30, 1, 3650);
+
     public static final ModConfigSpec.BooleanValue ENABLE_PERMISSION_SYSTEM = BUILDER
             .comment("Enable the internal rank and permission system.")
             .define("enablePermissionSystem", true);
@@ -53,5 +63,10 @@ public class Config {
     @Deprecated
     public static final ModConfigSpec.IntValue MAX_PLAYER_CLAIMS = MAX_PLAYER_CLAIM_CHUNKS;
 
+    public static final ModConfigSpec.IntValue AERIAL_MAP_CACHE_MIB = CLIENT_BUILDER
+            .comment("Maximum disk space for explored SSU aerial-map tiles, in MiB.")
+            .defineInRange("aerialMapCacheMiB", 512, 64, 8192);
+
     static final ModConfigSpec SPEC = BUILDER.build();
+    static final ModConfigSpec CLIENT_SPEC = CLIENT_BUILDER.build();
 }

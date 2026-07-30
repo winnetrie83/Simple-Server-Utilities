@@ -32,6 +32,10 @@ public class SSUCommands {
         dispatcher.register(RegionCommands.build());
         dispatcher.register(HomeCommands.build());
         dispatcher.register(WarpCommands.build());
+        dispatcher.register(SpawnCommands.build());
+        dispatcher.register(SpawnCommands.buildSetAlias());
+        dispatcher.register(SpawnCommands.buildClearAlias());
+        dispatcher.register(MailCommands.build());
         // dispatcher.register(KitCommands.build());
         dispatcher.register(EconomyCommands.buildPlayerRoot());
         dispatcher.register(EconomyCommands.buildBalanceAlias());
@@ -75,16 +79,22 @@ public class SSUCommands {
 
     private static void reloadAll(MinecraftServer server) {
         SimpleServerUtilities.STORAGE.flush(Duration.ofSeconds(5));
+
+        // Match the Core 2.0 dependency order while keeping the storage worker alive.
+        SimpleServerUtilities.TRANSACTIONS.clear();
+        SimpleServerUtilities.ECONOMY.load(server);
         SimpleServerUtilities.PLAYER_CLAIMS.load(server);
-        SimpleServerUtilities.REGIONS.load(server);
-        SimpleServerUtilities.REGION_SNAPSHOTS.load(server);
-        SimpleServerUtilities.HOMES.load(server);
-        SimpleServerUtilities.WARPS.load(server);
         SimpleServerUtilities.PERMISSIONS.load(server);
         SimpleServerUtilities.PERMISSIONS.migrateLegacyClaimLimitOverrides();
+        SimpleServerUtilities.MAIL.load(server);
+        SimpleServerUtilities.HOMES.load(server);
+        SimpleServerUtilities.WARPS.load(server);
+        SimpleServerUtilities.SERVER_SPAWN.load(server);
         SimpleServerUtilities.UI_PREFERENCES.load(server);
+        SimpleServerUtilities.REGIONS.load(server);
+        SimpleServerUtilities.REGION_SNAPSHOTS.load(server);
+        SimpleServerUtilities.REGION_RENT_JOURNAL.loadAndRecover(server);
         SimpleServerUtilities.BORDER_SETTINGS.load(server);
-        SimpleServerUtilities.ECONOMY.load(server);
         SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(server);
     }
 }

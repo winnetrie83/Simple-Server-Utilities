@@ -69,6 +69,15 @@ public final class SsuModuleRegistry {
         }
     }
 
+    public synchronized void beforeServerStopping(MinecraftServer server) {
+        ensureInitialized();
+        for (SsuModule module : startOrder) {
+            if (module.isEnabled()) {
+                module.beforeServerStopping(server);
+            }
+        }
+    }
+
     public synchronized void onServerStopping(MinecraftServer server) {
         ensureInitialized();
         for (int i = startOrder.size() - 1; i >= 0; i--) {

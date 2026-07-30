@@ -178,6 +178,63 @@ public class PermissionManager {
         return names;
     }
 
+    /** Snapshot used by the paged permission editor. */
+    public List<KnownPlayer> getKnownPlayers() {
+        ArrayList<KnownPlayer> players = new ArrayList<>();
+        for (Map.Entry<String, PlayerPermissionData> entry : data.getPlayers().entrySet()) {
+            try {
+                UUID playerId = UUID.fromString(entry.getKey());
+                PlayerPermissionData playerData = entry.getValue();
+                String name = playerData.getLastKnownName();
+                if (name.isBlank()) {
+                    name = playerId.toString().substring(0, 8);
+                }
+                players.add(new KnownPlayer(playerId, name, List.copyOf(playerData.getRanks())));
+            } catch (IllegalArgumentException ignored) {
+                // Invalid legacy entries are skipped here and reported by the normal save path.
+            }
+        }
+        players.sort(Comparator.comparing(KnownPlayer::name, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(value -> value.playerId().toString()));
+        return List.copyOf(players);
+    }
+
+    /** Returns direct plus inherited values for one rank. */
+    public Map<String, String> getEffectiveRankPermissions(String rankName) {
+        if (getRank(rankName) == null) {
+            return Map.of();
+        }
+        return Map.copyOf(getRankPermissionsWithInheritance(rankName, new HashSet<>()));
+    }
+
+    /** Returns the merged rank values for an online or offline known player. */
+    public Map<String, String> getEffectiveRankPermissions(UUID playerId) {
+        PlayerPermissionData playerData = getPlayerData(playerId);
+        ArrayList<String> rankNames = new ArrayList<>();
+        if (playerData != null) {
+            rankNames.addAll(playerData.getRanks());
+        }
+        if (rankNames.isEmpty()) {
+            rankNames.add(settings.getDefaultRank());
+        }
+        rankNames.sort(Comparator.comparingInt(rankName -> {
+            PermissionRank rank = getRank(rankName);
+            return rank == null ? 0 : rank.getPriority();
+        }));
+        Map<String, String> merged = new HashMap<>();
+        for (String rankName : rankNames) {
+            merged.putAll(getRankPermissionsWithInheritance(rankName, new HashSet<>()));
+        }
+        return Map.copyOf(merged);
+    }
+
+    public record KnownPlayer(UUID playerId, String name, List<String> ranks) {
+        public KnownPlayer {
+            name = name == null ? "" : name.trim();
+            ranks = ranks == null ? List.of() : List.copyOf(ranks);
+        }
+    }
+
     public void setRankPermission(String rankName, String key, String value) {
         getOrCreateRank(rankName).setPermission(key, value);
         save();
@@ -931,6 +988,10 @@ public class PermissionManager {
         changed |= setDefaultPermission(rank, PermissionKeys.WARPS_INFO, false);
         changed |= setDefaultPermission(rank, PermissionKeys.WARPS_MAX, Config.MAX_WARPS.get());
 
+        changed |= setDefaultPermission(rank, PermissionKeys.SPAWN_USE, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.SPAWN_ADMIN, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.SPAWN_REGION_BYPASS, false);
+
         changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_USE, true);
         changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_CREATE, true);
         changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_DELETE, true);
@@ -968,15 +1029,32 @@ public class PermissionManager {
         changed |= setDefaultPermission(rank, PermissionKeys.HOMES_TELEPORT_COOLDOWN, 0);
         changed |= setDefaultPermission(rank, PermissionKeys.WARPS_TELEPORT_DELAY, 0);
         changed |= setDefaultPermission(rank, PermissionKeys.WARPS_TELEPORT_COOLDOWN, 0);
+        changed |= setDefaultPermission(rank, PermissionKeys.SPAWN_TELEPORT_DELAY, 0);
+        changed |= setDefaultPermission(rank, PermissionKeys.SPAWN_TELEPORT_COOLDOWN, 0);
         changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_TELEPORT_DELAY, 0);
         changed |= setDefaultPermission(rank, PermissionKeys.CLAIMS_TELEPORT_COOLDOWN, 0);
         changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_TELEPORT_DELAY, 0);
         changed |= setDefaultPermission(rank, PermissionKeys.REGIONS_TELEPORT_COOLDOWN, 0);
+        changed |= setDefaultPermission(rank, PermissionKeys.TELEPORT_ESCAPE, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.TELEPORT_REGION_BYPASS, false);
+        // TELEPORT_REQUIRE_STILL intentionally has no stored default so legacy
+        // TELEPORT_CANCEL_ON_MOVE overrides remain effective until explicitly migrated.
         changed |= setDefaultPermission(rank, PermissionKeys.TELEPORT_CANCEL_ON_MOVE, true);
         changed |= setDefaultPermission(rank, PermissionKeys.TELEPORT_DELAY_BYPASS, false);
         changed |= setDefaultPermission(rank, PermissionKeys.TELEPORT_COOLDOWN_BYPASS, false);
 
         changed |= setDefaultPermission(rank, PermissionKeys.PERMISSIONS_ADMIN, false);
+
+        changed |= setDefaultPermission(rank, PermissionKeys.MAIL_ACCESS, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.MAIL_SEND, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.MAIL_SEND_ITEMS, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.MAIL_SEND_MONEY, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.MAIL_MAX_ATTACHMENTS, 1);
+        changed |= setDefaultPermission(rank, PermissionKeys.MAIL_INBOX_SOFT_CAP, 20);
+        changed |= setDefaultPermission(rank, PermissionKeys.MAIL_SENT_LIMIT, 20);
+        changed |= setDefaultPermission(rank, PermissionKeys.MAIL_DAILY_SEND_LIMIT, 20);
+        changed |= setDefaultPermission(rank, PermissionKeys.MAIL_SEND_COOLDOWN, 5);
+        changed |= setDefaultPermission(rank, PermissionKeys.MAIL_ADMIN, false);
 
         return changed;
     }

@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.network;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimChunkStatus;
@@ -72,6 +73,7 @@ public record MinimapDataPayload(
             buffer.writeVarInt(claim.chunkX());
             buffer.writeVarInt(claim.chunkZ());
             buffer.writeEnum(claim.status());
+            buffer.writeUUID(claim.claimId());
         }
 
         buffer.writeVarInt(payload.regions().size());
@@ -106,7 +108,8 @@ public record MinimapDataPayload(
             claims.add(new ClaimOverlay(
                     buffer.readVarInt(),
                     buffer.readVarInt(),
-                    buffer.readEnum(ClaimChunkStatus.class)
+                    buffer.readEnum(ClaimChunkStatus.class),
+                    buffer.readUUID()
             ));
         }
 
@@ -163,9 +166,10 @@ public record MinimapDataPayload(
         return TYPE;
     }
 
-    public record ClaimOverlay(int chunkX, int chunkZ, ClaimChunkStatus status) {
+    public record ClaimOverlay(int chunkX, int chunkZ, ClaimChunkStatus status, UUID claimId) {
         public ClaimOverlay {
             status = status == null ? ClaimChunkStatus.OWNED_BY_OTHER : status;
+            claimId = claimId == null ? new UUID(0L, 0L) : claimId;
         }
     }
 

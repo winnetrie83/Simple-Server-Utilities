@@ -79,8 +79,8 @@ final class ClaimMapWidget extends AbstractWidget {
         int cellSize = cellSize();
         int gridSize = gridSize();
         int gridPixels = cellSize * gridSize;
-        int startX = getX() + (getWidth() - gridPixels) / 2;
-        int startY = getY() + (getHeight() - gridPixels) / 2;
+        int startX = getX() + (getWidth() - gridPixels) / 2 + dragOffsetX();
+        int startY = getY() + (getHeight() - gridPixels) / 2 + dragOffsetY();
 
         if (mouseX < startX || mouseY < startY
                 || mouseX >= startX + gridPixels
@@ -113,10 +113,11 @@ final class ClaimMapWidget extends AbstractWidget {
         int cellSize = cellSize();
         int gridSize = gridSize();
         int gridPixels = cellSize * gridSize;
-        int startX = getX() + (getWidth() - gridPixels) / 2;
-        int startY = getY() + (getHeight() - gridPixels) / 2;
+        int startX = getX() + (getWidth() - gridPixels) / 2 + dragOffsetX();
+        int startY = getY() + (getHeight() - gridPixels) / 2 + dragOffsetY();
 
-        terrainMap.render(graphics, startX, startY, gridPixels);
+        graphics.enableScissor(getX(), getY(), getX() + getWidth(), getY() + getHeight());
+        terrainMap.render(graphics, startX, startY, gridPixels, payload);
 
         /*
          * Draw the chunk grid only over wilderness. Claimed areas and selected
@@ -134,16 +135,7 @@ final class ClaimMapWidget extends AbstractWidget {
         }
 
         drawCurrentChunk(graphics, startX, startY, cellSize);
-
-        if (rightDragging) {
-            graphics.text(
-                    MinecraftAccess.font(),
-                    "Release to pan",
-                    getX() + 6,
-                    getY() + 6,
-                    0xFFE0E0E0
-            );
-        }
+        graphics.disableScissor();
     }
 
     private Map<GroupId, GroupRenderInfo> buildRenderGroups() {
@@ -258,7 +250,7 @@ final class ClaimMapWidget extends AbstractWidget {
             int startY,
             int cellSize
     ) {
-        int lineWidth = group.selection || group.highlighted ? 3 : 2;
+        int lineWidth = group.selection || group.highlighted ? 2 : 1;
 
         for (long chunkKey : group.cells) {
             int chunkX = keyX(chunkKey);
@@ -332,7 +324,7 @@ final class ClaimMapWidget extends AbstractWidget {
                     right,
                     bottom,
                     CURRENT_OUTLINE,
-                    2
+                    1
             );
 
             graphics.text(
@@ -373,14 +365,7 @@ final class ClaimMapWidget extends AbstractWidget {
             return true;
         }
 
-        if (button == 1) {
-            rightDragging = true;
-            dragStartX = dragCurrentX = event.x();
-            dragStartY = dragCurrentY = event.y();
-            return true;
-        }
-
-        return false;
+        return button == 1 && beginRightDrag(event.x(), event.y());
     }
 
     @Override
@@ -389,32 +374,55 @@ final class ClaimMapWidget extends AbstractWidget {
             double deltaX,
             double deltaY
     ) {
-        if (rightDragging && event.buttonInfo().button() == 1) {
-            dragCurrentX = event.x();
-            dragCurrentY = event.y();
-            return true;
-        }
-
-        return false;
+        return updateRightDrag(event.x(), event.y());
     }
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
-        if (!rightDragging || event.buttonInfo().button() != 1) {
+        return finishRightDrag();
+    }
+
+    boolean beginRightDrag(double mouseX, double mouseY) {
+        if (!isMouseOver(mouseX, mouseY)) {
+            return false;
+        }
+        setFocused(true);
+        rightDragging = true;
+        dragStartX = dragCurrentX = mouseX;
+        dragStartY = dragCurrentY = mouseY;
+        return true;
+    }
+
+    boolean updateRightDrag(double mouseX, double mouseY) {
+        if (!rightDragging) {
+            return false;
+        }
+        dragCurrentX = mouseX;
+        dragCurrentY = mouseY;
+        return true;
+    }
+
+    boolean finishRightDrag() {
+        if (!rightDragging) {
             return false;
         }
 
+        int previewX = dragOffsetX();
+        int previewY = dragOffsetY();
         rightDragging = false;
 
         int size = Math.max(1, cellSize());
-        int chunkDeltaX = (int) Math.round((dragStartX - dragCurrentX) / size);
-        int chunkDeltaZ = (int) Math.round((dragStartY - dragCurrentY) / size);
+        int chunkDeltaX = MapPanMath.chunkDelta(previewX, size);
+        int chunkDeltaZ = MapPanMath.chunkDelta(previewY, size);
 
         if (chunkDeltaX != 0 || chunkDeltaZ != 0) {
             onPan.accept(chunkDeltaX, chunkDeltaZ);
         }
-
         return true;
+    }
+
+    boolean isRightDragging() {
+        return rightDragging;
     }
 
     @Override
@@ -432,12 +440,21 @@ final class ClaimMapWidget extends AbstractWidget {
         return true;
     }
 
+    private int dragOffsetX() {
+        return rightDragging ? (int) Math.round(dragCurrentX - dragStartX) : 0;
+    }
+
+    private int dragOffsetY() {
+        return rightDragging ? (int) Math.round(dragCurrentY - dragStartY) : 0;
+    }
+
     private boolean isSelectable(ClaimMapDataPayload.Entry entry) {
         return switch (operation) {
             case CREATE, ADD ->
                     entry.status() == ClaimChunkStatus.WILDERNESS;
             case REMOVE ->
                     entry.canUnclaim();
+            case DELETE -> false;
         };
     }
 

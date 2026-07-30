@@ -10,6 +10,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionCatalog;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionRank;
@@ -18,6 +19,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.PlayerPermissionData;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
@@ -361,22 +363,38 @@ public class PermissionCommands {
 
     private static int dimensionSet(CommandSourceStack source, String dimension, String key, String value) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
-        warnIfUnknownKey(player, key);
-        SimpleServerUtilities.PERMISSIONS.setDimensionPermission(dimension, key, value);
-        player.sendSystemMessage(Component.literal("Set " + key + " = " + value + " for dimension " + dimension + "."));
+        try {
+            Identifier.parse(dimension);
+        } catch (Exception exception) {
+            player.sendSystemMessage(Component.literal("Invalid dimension identifier: " + dimension));
+            return 0;
+        }
+        String normalizedKey = key.trim().toLowerCase(java.util.Locale.ROOT);
+        warnIfUnknownKey(player, normalizedKey);
+        final String normalizedValue;
+        try {
+            normalizedValue = PermissionCatalog.normalizeValue(normalizedKey, value);
+        } catch (IllegalArgumentException exception) {
+            player.sendSystemMessage(Component.literal(exception.getMessage()));
+            return 0;
+        }
+        SimpleServerUtilities.PERMISSIONS.setDimensionPermission(dimension, normalizedKey, normalizedValue);
+        player.sendSystemMessage(Component.literal("Set " + normalizedKey + " = " + normalizedValue
+                + " for dimension " + dimension + "."));
         return 1;
     }
 
     private static int dimensionUnset(CommandSourceStack source, String dimension, String key) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
-        boolean existed = SimpleServerUtilities.PERMISSIONS.removeDimensionPermission(dimension, key);
+        String normalizedKey = key.trim().toLowerCase(java.util.Locale.ROOT);
+        boolean existed = SimpleServerUtilities.PERMISSIONS.removeDimensionPermission(dimension, normalizedKey);
 
         if (!existed) {
-            player.sendSystemMessage(Component.literal("Permission was not set for dimension " + dimension + ": " + key));
+            player.sendSystemMessage(Component.literal("Permission was not set for dimension " + dimension + ": " + normalizedKey));
             return 0;
         }
 
-        player.sendSystemMessage(Component.literal("Removed " + key + " from dimension " + dimension + "."));
+        player.sendSystemMessage(Component.literal("Removed " + normalizedKey + " from dimension " + dimension + "."));
         return 1;
     }
 

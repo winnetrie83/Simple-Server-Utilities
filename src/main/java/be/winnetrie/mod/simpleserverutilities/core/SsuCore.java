@@ -28,6 +28,10 @@ public final class SsuCore {
         modules.onServerStarting(server);
     }
 
+    public void beforeServerStopping(MinecraftServer server) {
+        modules.beforeServerStopping(server);
+    }
+
     public void onServerStopping(MinecraftServer server) {
         modules.onServerStopping(server);
     }

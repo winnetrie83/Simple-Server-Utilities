@@ -1,0 +1,56 @@
+SSU 1.4.0-dev2.1 validation report
+====================================
+
+Scope
+-----
+Base: SSU 1.4.0-dev2
+Target: SSU 1.4.0-dev2.1
+Minecraft: 26.2
+NeoForge: 26.2.0.7-beta
+Java target: 25
+Network protocol: 17
+
+Implemented scope
+-----------------
+- Removed the experimental permanent treasury module, account, dashboard and permissions.
+- Removed live region owner-payout behaviour.
+- Migrated legacy region `owners` UUIDs to administrative `managers` and writes schema version 3.
+- Region rent/renewal is a journalled money sink; cancellation refunds remain frozen, idempotent and recoverable.
+- Added double-confirmed full claim deletion to the interactive claim map.
+- Added bounded typed request/action/data payloads for claim and region settings.
+- Added paged claim and region settings screens with type-specific controls and hover tooltips.
+- Added visual trusted-player, manager/member, protection, message, rental and spawn management.
+- Kept the separate JUnit/test source set removed, as requested.
+
+Checks performed
+----------------
+PASS: git diff --check reports no whitespace or patch-format errors.
+PASS: 183 Java source files passed a lexical brace/string/comment scanner.
+PASS: all 2 resource JSON files parse successfully.
+PASS: all 13 PNG resources have a valid PNG signature, chunk structure and CRC values.
+PASS: no files exist under src/test.
+PASS: no JUnit, unitTest, testImplementation or testRuntimeOnly configuration remains.
+PASS: no live SimpleServerUtilities.TREASURY, treasury module dependency or deleted treasury-package reference remains.
+PASS: no live getOwners/addOwner/removeOwner/ownerCount region API reference remains.
+PASS: all new property-settings payloads were compiled in a focused javac harness against bounded Minecraft networking stubs.
+PASS: PropertySettingsScreen was compiled in a focused client-API harness.
+PASS: PropertySettingsService was compiled in a focused server-API harness.
+PASS: Region, RegionSettings, RegionRentData and RegionRentEconomySettings were compiled in a focused model harness.
+PASS: version metadata is 1.4.0-dev2.1 and the payload registrar protocol is 17.
+
+Full Gradle/NeoForge build status
+---------------------------------
+NOT RUN in this container. The wrapper attempted to download Gradle 9.2.1 from
+services.gradle.org, but this isolated environment has no DNS/network access.
+The installed runtime is Java 21 while this project deliberately targets Java 25.
+
+Required local verification
+---------------------------
+Run on the development machine with Java 25:
+
+    gradlew.bat clean build
+
+Then test the generated JAR from build/libs on both client and server using a
+copy of the world. Follow docs/TESTING-1.4.0-dev2.1.md, especially treasury
+retirement, owners-to-managers migration, rent/refund accounting, claim deletion,
+settings permissions, persistence and two-client behaviour.

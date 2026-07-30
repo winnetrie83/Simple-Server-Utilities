@@ -1,0 +1,71 @@
+SSU 1.5.0-dev1 source validation
+Date: 2026-07-29
+
+Target
+------
+Minecraft: 26.2
+NeoForge: 26.2.0.7-beta
+Java: 25
+Mod version: 1.5.0-dev1
+Network protocol: 20
+Confirmed parent baseline: SSU 1.4.0-dev4
+
+Source inventory
+----------------
+Java source files: 212
+Java source lines: 38,732
+Mail-related Java lines: 2,025
+Separate src/test/JUnit source set: absent
+
+Completed validation
+--------------------
+PASS - 81/81 structural and integration checks.
+PASS - all Java package declarations match their source paths.
+PASS - lexical delimiter scan across all 212 Java files.
+PASS - javac parser scan reported no syntax/parser diagnostics; expected dependency-resolution diagnostics remain because Minecraft/NeoForge libraries are unavailable in this container.
+PASS - pure-Java mailbox model harness (queue timestamp, retention start, soft-cap clamping, unclaimed attachment state, durable correlation receipt migration, duplicate prevention and source isolation).
+PASS - version 1.5.0-dev1 and protocol 20 are wired consistently.
+PASS - five mail payloads are registered on the correct client/server directions and have client handlers where required.
+PASS - MailModule, MailManager, menu type, login/tick events, /mail and dashboard routing are registered.
+PASS - all nine mail permission keys are present in PermissionKeys, PermissionCatalog and default-rank migration.
+PASS - attachment hard cap is 9; default permission cap is 1.
+PASS - compose menu exposes nine attachment slots, 27 main-inventory slots and the nine-slot hotbar.
+PASS - visible inbox and durable queued states are separate; queued mail has no visible-retention clock.
+PASS - mailbox soft-cap overflow is stored in per-player JSON, not only in process memory.
+PASS - expired visible mail with unclaimed attachments is requeued instead of destroyed.
+PASS - dedicated mail escrow transaction types and idempotent money-claim keys are connected.
+PASS - durable delivery receipts support future Auction House correlation keys and survive message deletion.
+PASS - bounded maintenance processes at most 64 mailbox records per one-minute pass.
+PASS - storage, README, changelog, feature documentation and runtime test plan are present.
+
+Full build limitation in this environment
+-----------------------------------------
+The Gradle/NeoForge build could not be completed here. The included wrapper attempts to download Gradle 9.2.1 from services.gradle.org, but this container has no external network access. The container also provides Java 21 instead of the required Java 25.
+
+Observed wrapper failure:
+java.net.UnknownHostException: services.gradle.org
+
+Required local validation
+-------------------------
+Run on the user's Java 25 environment:
+
+    gradlew.bat clean build
+
+Then test the generated JAR from build\libs on both client and server. Client and server must use exactly the same protocol-20 build.
+
+Runtime priorities
+------------------
+1. Existing dev4 world migration/startup.
+2. /mail and dashboard access permission.
+3. Online and offline text delivery.
+4. Normal composer close returns unsent items.
+5. One-to-nine item attachments and exact component preservation.
+6. Money escrow/claim/restart/idempotency.
+7. Rolling send limit and cooldown permissions.
+8. Visible soft cap, durable overflow queue and promotion order across restart.
+9. Retention cleanup and unclaimed-attachment requeue.
+10. Explicit disposable-item abrupt-crash test while a compose draft is open; dev1 does not persist open drafts.
+
+Conclusion
+----------
+The source is structurally consistent and ready for a local Java 25 NeoForge build and Minecraft runtime test. It has not yet been confirmed in Minecraft by the user.

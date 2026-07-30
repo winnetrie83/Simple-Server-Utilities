@@ -2,7 +2,6 @@ package be.winnetrie.mod.simpleserverutilities.region;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Comparator;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -139,11 +138,6 @@ public final class RegionRentalService {
                 + region.getName().toLowerCase(java.util.Locale.ROOT) + ":"
                 + player.getUUID() + ":" + targetSequence;
 
-        UUID ownerRecipient = ownerRecipient(region, player.getUUID());
-        int ownerPermille = SimpleServerUtilities.REGIONS.rentEconomySettings().getOwnerSharePermille();
-        long ownerPayoutMinor = ownerRecipient == null
-                ? 0L
-                : multiplyDivideFloor(grossAmountMinor, ownerPermille, 1_000L);
 
         RegionRentOperationRecord journal = RegionRentOperationRecord.prepared(
                 operationId,
@@ -152,9 +146,9 @@ public final class RegionRentalService {
                 region,
                 player.getUUID(),
                 player.getName().getString(),
-                ownerRecipient,
+                null,
                 grossAmountMinor,
-                ownerPayoutMinor,
+                0L,
                 0L,
                 targetSequence
         );
@@ -185,26 +179,8 @@ public final class RegionRentalService {
             }
         }
 
-        EconomyResult ownerPayout = successfulNoop();
-        if (ownerPayoutMinor > 0L && ownerRecipient != null) {
-            ownerPayout = SimpleServerUtilities.ECONOMY.creditTyped(
-                    player.getUUID(),
-                    player.getName().getString(),
-                    ownerRecipient,
-                    ownerPayoutMinor,
-                    EconomyTransactionType.REGION_OWNER_PAYOUT,
-                    "region_rent",
-                    "Owner share for region " + region.getName(),
-                    baseKey + ":owner"
-            );
-            if (!ownerPayout.successful()) {
-                rollbackPaidRental(journal, player.getUUID(), ownerRecipient, grossAmountMinor, 0L, baseKey,
-                        "Owner payout failed: " + ownerPayout.message());
-                return RentalResult.fail("Rent could not be completed; the payment was returned.");
-            }
-        }
-
-        journal.markPaymentCommitted(debit.transactionId(), ownerPayout.transactionId());
+        // Region rent is a deliberate money sink: the renter is debited and no player/system account is credited.
+        journal.markPaymentCommitted(debit.transactionId(), null);
         SimpleServerUtilities.REGION_RENT_JOURNAL.persist(journal);
 
         long now = System.currentTimeMillis();
@@ -245,9 +221,7 @@ public final class RegionRentalService {
             rollbackPaidRental(
                     journal,
                     player.getUUID(),
-                    ownerRecipient,
                     grossAmountMinor,
-                    ownerPayoutMinor,
                     baseKey,
                     "Region storage did not flush, but the original region state was restored."
             );
@@ -271,32 +245,10 @@ public final class RegionRentalService {
     private static void rollbackPaidRental(
             RegionRentOperationRecord journal,
             UUID renter,
-            UUID ownerRecipient,
             long gross,
-            long paidOwner,
             String baseKey,
             String reason
     ) {
-        if (paidOwner > 0L && ownerRecipient != null) {
-            EconomyResult reverseOwner = SimpleServerUtilities.ECONOMY.debitTyped(
-                    null,
-                    "server",
-                    ownerRecipient,
-                    paidOwner,
-                    EconomyTransactionType.REGION_OWNER_PAYOUT_REVERSAL,
-                    "region_rent",
-                    "Reverse failed rent payout",
-                    baseKey + ":owner-reverse"
-            );
-            if (!reverseOwner.successful() && !"duplicate".equals(reverseOwner.code())) {
-                journal.markPaymentRecoveryPending(
-                        reason + " Owner payout reversal is still pending: " + reverseOwner.message()
-                );
-                SimpleServerUtilities.REGION_RENT_JOURNAL.persist(journal);
-                return;
-            }
-        }
-
         if (gross > 0L) {
             EconomyResult refund = SimpleServerUtilities.ECONOMY.creditTyped(
                     null,
@@ -630,15 +582,6 @@ public final class RegionRentalService {
         }
     }
 
-    private static UUID ownerRecipient(Region region, UUID renter) {
-        if (SimpleServerUtilities.REGIONS.rentEconomySettings().getOwnerSharePermille() <= 0) {
-            return null;
-        }
-        return region.getOwners().stream()
-                .filter(owner -> !owner.equals(renter))
-                .min(Comparator.comparing(UUID::toString))
-                .orElse(null);
-    }
 
     private static Object lockFor(Region region) {
         String key = region.getDimension().identifier() + ":" + region.getName().toLowerCase(java.util.Locale.ROOT);
@@ -657,16 +600,6 @@ public final class RegionRentalService {
         }
     }
 
-    private static long multiplyDivideFloor(long value, long multiplier, long divisor) {
-        if (value <= 0L || multiplier <= 0L || divisor <= 0L) {
-            return 0L;
-        }
-        return java.math.BigInteger.valueOf(value)
-                .multiply(java.math.BigInteger.valueOf(multiplier))
-                .divide(java.math.BigInteger.valueOf(divisor))
-                .min(java.math.BigInteger.valueOf(Long.MAX_VALUE))
-                .longValue();
-    }
 
     private static EconomyResult successfulNoop() {
         return EconomyResult.success(null, "No economy mutation required.", 0L, 0L);

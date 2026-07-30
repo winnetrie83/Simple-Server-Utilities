@@ -21,7 +21,7 @@ public final class EconomyModule implements SsuModule {
 
     @Override
     public Set<String> dependencies() {
-        return Set.of();
+        return Set.of("storage", "transactions");
     }
 
     @Override

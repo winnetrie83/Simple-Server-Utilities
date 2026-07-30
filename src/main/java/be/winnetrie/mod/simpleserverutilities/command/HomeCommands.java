@@ -111,7 +111,7 @@ public class HomeCommands {
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
 
         if (!HomePolicy.canTeleportHome(player, context)) {
-            player.sendSystemMessage(Component.literal("You do not have permission to teleport to homes here."));
+            player.sendSystemMessage(Component.literal(TeleportPolicy.denialMessage(TeleportType.HOME, context)));
             return 0;
         }
 
@@ -131,7 +131,18 @@ public class HomeCommands {
 
         TeleportOptions options = TeleportPolicy.resolve(player, TeleportType.HOME, context);
 
-        return SimpleServerUtilities.TELEPORTS.requestTeleport(player, "homes", "home '" + home.getDisplayName() + "'", options, level, home.getX(), home.getY(), home.getZ(), home.getYaw(), home.getPitch());
+        return SimpleServerUtilities.TELEPORTS.requestTeleport(
+                player,
+                "homes",
+                "home '" + home.getDisplayName() + "'",
+                options,
+                level,
+                home.getX(), home.getY(), home.getZ(), home.getYaw(), home.getPitch(),
+                candidate -> HomePolicy.canTeleportHome(candidate,
+                        PermissionContext.at(candidate, candidate.blockPosition())),
+                candidate -> TeleportPolicy.denialMessage(TeleportType.HOME,
+                        PermissionContext.at(candidate, candidate.blockPosition()))
+        );
     }
 
     private static int listHomes(CommandSourceStack source) {

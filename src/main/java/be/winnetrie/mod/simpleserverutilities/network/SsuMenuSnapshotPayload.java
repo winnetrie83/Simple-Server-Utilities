@@ -15,6 +15,7 @@ public record SsuMenuSnapshotPayload(
         boolean settingsAvailable,
         UiSettingsSummary uiSettings,
         boolean administrator,
+        AdminAccessSummary adminAccess,
         boolean claimBordersVisible,
         boolean regionBordersVisible,
         boolean canViewClaimBorders,
@@ -42,6 +43,7 @@ public record SsuMenuSnapshotPayload(
         playerName = playerName == null ? "" : playerName;
         primaryRank = primaryRank == null ? "" : primaryRank;
         uiSettings = uiSettings == null ? UiSettingsSummary.defaults() : uiSettings;
+        adminAccess = adminAccess == null ? AdminAccessSummary.none() : adminAccess;
         core = core == null ? CoreSummary.empty() : core;
         economy = economy == null ? EconomySummary.empty() : economy;
         claims = claims == null ? List.of() : List.copyOf(claims);
@@ -60,6 +62,7 @@ public record SsuMenuSnapshotPayload(
         buffer.writeBoolean(payload.settingsAvailable);
         writeUiSettings(buffer, payload.uiSettings);
         buffer.writeBoolean(payload.administrator);
+        writeAdminAccess(buffer, payload.adminAccess);
         buffer.writeBoolean(payload.claimBordersVisible);
         buffer.writeBoolean(payload.regionBordersVisible);
         buffer.writeBoolean(payload.canViewClaimBorders);
@@ -82,6 +85,7 @@ public record SsuMenuSnapshotPayload(
                 buffer.readBoolean(),
                 readUiSettings(buffer),
                 buffer.readBoolean(),
+                readAdminAccess(buffer),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
@@ -98,6 +102,17 @@ public record SsuMenuSnapshotPayload(
     }
 
 
+    private static void writeAdminAccess(RegistryFriendlyByteBuf buffer, AdminAccessSummary access) {
+        buffer.writeBoolean(access.permissions());
+        buffer.writeBoolean(access.core());
+        buffer.writeBoolean(access.rentPolicy());
+        buffer.writeBoolean(access.spawn());
+    }
+
+    private static AdminAccessSummary readAdminAccess(RegistryFriendlyByteBuf buffer) {
+        return new AdminAccessSummary(buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean());
+    }
+
     private static void writeUiSettings(RegistryFriendlyByteBuf buffer, UiSettingsSummary settings) {
         buffer.writeBoolean(settings.dashboardHints());
         buffer.writeBoolean(settings.minimapEnabled());
@@ -107,6 +122,11 @@ public record SsuMenuSnapshotPayload(
         buffer.writeBoolean(settings.minimapNorthUp());
         buffer.writeBoolean(settings.minimapShowClaims());
         buffer.writeBoolean(settings.minimapShowRegions());
+        buffer.writeBoolean(settings.worldMapShowClaims());
+        buffer.writeBoolean(settings.worldMapShowRegions());
+        buffer.writeBoolean(settings.mailAutoDeletePlayerAttachments());
+        buffer.writeBoolean(settings.mailAutoDeleteSystemAttachments());
+        buffer.writeBoolean(settings.mailAutoDeleteAuctionAttachments());
     }
 
     private static UiSettingsSummary readUiSettings(RegistryFriendlyByteBuf buffer) {
@@ -116,6 +136,11 @@ public record SsuMenuSnapshotPayload(
                 buffer.readVarInt(),
                 buffer.readUtf(16),
                 buffer.readUtf(16),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readBoolean()
@@ -130,6 +155,12 @@ public record SsuMenuSnapshotPayload(
         buffer.writeDouble(core.averageRegionCandidates());
         buffer.writeVarInt(core.regionIndexCells());
         buffer.writeVarInt(core.regionIndexReferences());
+        buffer.writeVarInt(core.claimCount());
+        buffer.writeVarInt(core.claimedChunkCount());
+        buffer.writeVarInt(core.regionCount());
+        buffer.writeVarInt(core.activeRentalCount());
+        buffer.writeVarInt(core.homeCount());
+        buffer.writeVarInt(core.warpCount());
     }
 
     private static CoreSummary readCore(RegistryFriendlyByteBuf buffer) {
@@ -139,6 +170,12 @@ public record SsuMenuSnapshotPayload(
                 buffer.readVarInt(),
                 buffer.readVarLong(),
                 buffer.readDouble(),
+                buffer.readVarInt(),
+                buffer.readVarInt(),
+                buffer.readVarInt(),
+                buffer.readVarInt(),
+                buffer.readVarInt(),
+                buffer.readVarInt(),
                 buffer.readVarInt(),
                 buffer.readVarInt()
         );
@@ -152,7 +189,6 @@ public record SsuMenuSnapshotPayload(
         buffer.writeBoolean(economy.canAdmin());
         buffer.writeVarInt(economy.accountCount());
         buffer.writeUtf(economy.formattedTotalSupply(), 128);
-        buffer.writeVarInt(economy.rentOwnerSharePercent());
         buffer.writeVarInt(economy.playerCancelRefundPercent());
         buffer.writeVarInt(economy.adminCancelRefundPercent());
         buffer.writeVarInt(economy.pendingRentOperations());
@@ -175,7 +211,6 @@ public record SsuMenuSnapshotPayload(
         boolean canAdmin = buffer.readBoolean();
         int accountCount = buffer.readVarInt();
         String formattedTotalSupply = buffer.readUtf(128);
-        int rentOwnerSharePercent = buffer.readVarInt();
         int playerCancelRefundPercent = buffer.readVarInt();
         int adminCancelRefundPercent = buffer.readVarInt();
         int pendingRentOperations = buffer.readVarInt();
@@ -199,7 +234,6 @@ public record SsuMenuSnapshotPayload(
                 canAdmin,
                 accountCount,
                 formattedTotalSupply,
-                rentOwnerSharePercent,
                 playerCancelRefundPercent,
                 adminCancelRefundPercent,
                 pendingRentOperations,
@@ -314,6 +348,12 @@ public record SsuMenuSnapshotPayload(
         return TYPE;
     }
 
+    public record AdminAccessSummary(boolean permissions, boolean core, boolean rentPolicy, boolean spawn) {
+        public static AdminAccessSummary none() {
+            return new AdminAccessSummary(false, false, false, false);
+        }
+    }
+
     public record UiSettingsSummary(
             boolean dashboardHints,
             boolean minimapEnabled,
@@ -322,7 +362,12 @@ public record SsuMenuSnapshotPayload(
             String minimapPosition,
             boolean minimapNorthUp,
             boolean minimapShowClaims,
-            boolean minimapShowRegions
+            boolean minimapShowRegions,
+            boolean worldMapShowClaims,
+            boolean worldMapShowRegions,
+            boolean mailAutoDeletePlayerAttachments,
+            boolean mailAutoDeleteSystemAttachments,
+            boolean mailAutoDeleteAuctionAttachments
     ) {
         public UiSettingsSummary {
             minimapSize = Math.max(64, Math.min(256, minimapSize));
@@ -331,7 +376,7 @@ public record SsuMenuSnapshotPayload(
         }
 
         public static UiSettingsSummary defaults() {
-            return new UiSettingsSummary(true, false, 96, "CIRCLE", "TOP_RIGHT", true, true, true);
+            return new UiSettingsSummary(true, false, 96, "CIRCLE", "TOP_RIGHT", true, true, true, true, true, false, false, false);
         }
     }
 
@@ -342,7 +387,13 @@ public record SsuMenuSnapshotPayload(
             long regionLookups,
             double averageRegionCandidates,
             int regionIndexCells,
-            int regionIndexReferences
+            int regionIndexReferences,
+            int claimCount,
+            int claimedChunkCount,
+            int regionCount,
+            int activeRentalCount,
+            int homeCount,
+            int warpCount
     ) {
         public CoreSummary {
             permissionChecks = Math.max(0L, permissionChecks);
@@ -352,10 +403,16 @@ public record SsuMenuSnapshotPayload(
             averageRegionCandidates = Math.max(0.0D, averageRegionCandidates);
             regionIndexCells = Math.max(0, regionIndexCells);
             regionIndexReferences = Math.max(0, regionIndexReferences);
+            claimCount = Math.max(0, claimCount);
+            claimedChunkCount = Math.max(0, claimedChunkCount);
+            regionCount = Math.max(0, regionCount);
+            activeRentalCount = Math.max(0, activeRentalCount);
+            homeCount = Math.max(0, homeCount);
+            warpCount = Math.max(0, warpCount);
         }
 
         public static CoreSummary empty() {
-            return new CoreSummary(0L, 0, 0, 0L, 0.0D, 0, 0);
+            return new CoreSummary(0L, 0, 0, 0L, 0.0D, 0, 0, 0, 0, 0, 0, 0, 0);
         }
     }
 
@@ -367,7 +424,6 @@ public record SsuMenuSnapshotPayload(
             boolean canAdmin,
             int accountCount,
             String formattedTotalSupply,
-            int rentOwnerSharePercent,
             int playerCancelRefundPercent,
             int adminCancelRefundPercent,
             int pendingRentOperations,
@@ -378,7 +434,6 @@ public record SsuMenuSnapshotPayload(
             balanceMinor = Math.max(0L, balanceMinor);
             accountCount = Math.max(0, accountCount);
             formattedTotalSupply = formattedTotalSupply == null ? "" : formattedTotalSupply;
-            rentOwnerSharePercent = Math.max(0, Math.min(100, rentOwnerSharePercent));
             playerCancelRefundPercent = Math.max(0, Math.min(100, playerCancelRefundPercent));
             adminCancelRefundPercent = Math.max(0, Math.min(100, adminCancelRefundPercent));
             pendingRentOperations = Math.max(0, pendingRentOperations);
@@ -389,7 +444,8 @@ public record SsuMenuSnapshotPayload(
         }
 
         public static EconomySummary empty() {
-            return new EconomySummary(false, "", 0L, false, false, 0, "", 0, 0, 100, 0, List.of());
+            return new EconomySummary(false, "", 0L, false, false,
+                    0, "", 0, 100, 0, List.of());
         }
     }
 

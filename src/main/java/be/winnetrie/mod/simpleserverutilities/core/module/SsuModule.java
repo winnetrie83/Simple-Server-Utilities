@@ -27,6 +27,10 @@ public interface SsuModule {
     default void onServerStarting(MinecraftServer server) {
     }
 
+    /** Called before any module performs its final persistence. */
+    default void beforeServerStopping(MinecraftServer server) {
+    }
+
     default void onServerStopping(MinecraftServer server) {
     }
 }

@@ -2,46 +2,69 @@ package be.winnetrie.mod.simpleserverutilities.client.minimap;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 import com.mojang.blaze3d.platform.NativeImage;
 
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimChunkStatus;
+import be.winnetrie.mod.simpleserverutilities.client.map.AerialMapAtlas;
 import be.winnetrie.mod.simpleserverutilities.network.MinimapDataPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.material.MapColor;
 import org.jspecify.annotations.Nullable;
 
-/** Incrementally creates the minimap terrain texture from chunks already loaded by the client. */
+/**
+ * Smooth double-buffered minimap terrain cache.
+ *
+ * <p>The visible texture is never cleared during a refresh. A larger terrain
+ * cache is rebuilt off-screen and swapped in atomically when complete. The
+ * 128-block viewport then moves inside that cache as the player walks, which
+ * removes the grey refresh flashes and keeps movement smooth.</p>
+ */
 final class MinimapTerrainMap implements AutoCloseable {
 
-    static final int TEXTURE_SIZE = 128;
+    static final int VISIBLE_BLOCKS = 128;
+    static final int PIXELS_PER_BLOCK = 1;
+    static final int DISPLAY_SIZE = VISIBLE_BLOCKS * PIXELS_PER_BLOCK;
 
-    private static final int ROWS_PER_TICK = 12;
-    private static final int HALF = TEXTURE_SIZE / 2;
+    private static final int CACHE_BLOCKS = 192;
+    private static final int CACHE_SIZE = CACHE_BLOCKS * PIXELS_PER_BLOCK;
+    private static final int CACHE_HALF_BLOCKS = CACHE_BLOCKS / 2;
+    private static final int VISIBLE_HALF_BLOCKS = VISIBLE_BLOCKS / 2;
+    private static final int SAFE_REBUILD_DISTANCE = 24;
+    private static final int BLOCK_ROWS_PER_TICK = 24;
     private static final int UNKNOWN_DARK = 0xFF20252A;
     private static final int UNKNOWN_LIGHT = 0xFF292F35;
-    private static final int VOID_COLOR = 0xFF111419;
-    private static final int CIRCLE_RADIUS = HALF - 1;
+    private static final int CIRCLE_RADIUS = DISPLAY_SIZE / 2 - 1;
 
-    private @Nullable DynamicTexture texture;
-    private int centerBlockX = Integer.MIN_VALUE;
-    private int centerBlockZ = Integer.MIN_VALUE;
-    private String dimension = "";
-    private String shape = "CIRCLE";
-    private int overlayHash;
-    private int nextRow = TEXTURE_SIZE;
-    private MinimapDataPayload data;
-    private Map<Long, ClaimChunkStatus> claimLookup = Map.of();
-    private List<MinimapDataPayload.RegionOverlay> regions = List.of();
+    private int[] publishedCachePixels;
+    private int[] buildingCachePixels;
+    private @Nullable DynamicTexture displayTexture;
+
+    private int publishedCenterX = Integer.MIN_VALUE;
+    private int publishedCenterZ = Integer.MIN_VALUE;
+    private String publishedDimension = "";
+    private int publishedTerrainHash = Integer.MIN_VALUE;
+    private int publishedGeneration;
+
+    private int buildCenterX = Integer.MIN_VALUE;
+    private int buildCenterZ = Integer.MIN_VALUE;
+    private String buildDimension = "";
+    private int buildTerrainHash = Integer.MIN_VALUE;
+    private int nextBuildBlockRow = CACHE_BLOCKS;
+    private MinimapDataPayload buildData;
+    private Map<Long, MinimapDataPayload.ClaimOverlay> buildClaimLookup = Map.of();
+    private List<MinimapDataPayload.RegionOverlay> buildRegions = List.of();
+
+    private int displayPlayerX = Integer.MIN_VALUE;
+    private int displayPlayerZ = Integer.MIN_VALUE;
+    private String displayShape = "";
+    private int displayGeneration = Integer.MIN_VALUE;
+    private boolean forceRebuild;
 
     void tick(MinimapDataPayload updated) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -50,46 +73,38 @@ final class MinimapTerrainMap implements AutoCloseable {
             return;
         }
 
-        String currentDimension = level.dimension().identifier().toString();
+        String dimension = level.dimension().identifier().toString();
         int playerX = (int) Math.floor(minecraft.player.getX());
         int playerZ = (int) Math.floor(minecraft.player.getZ());
-        int updatedOverlayHash = overlayHash(updated);
-        int movedX = centerBlockX == Integer.MIN_VALUE ? Integer.MAX_VALUE : Math.abs(playerX - centerBlockX);
-        int movedZ = centerBlockZ == Integer.MIN_VALUE ? Integer.MAX_VALUE : Math.abs(playerZ - centerBlockZ);
-        boolean moved = centerBlockX == Integer.MIN_VALUE
-                || movedX >= 16
-                || movedZ >= 16
-                || (nextRow >= TEXTURE_SIZE && (movedX >= 4 || movedZ >= 4));
-        boolean changed = texture == null
-                || !currentDimension.equals(dimension)
-                || !updated.shape().equalsIgnoreCase(shape)
-                || updatedOverlayHash != overlayHash;
+        int terrainHash = terrainHash(updated);
 
-        if (moved || changed) {
-            beginRebuild(level, updated, playerX, playerZ, currentDimension, updatedOverlayHash);
+        boolean publishedUsable = publishedCachePixels != null
+                && dimension.equals(publishedDimension)
+                && publishedTerrainHash == terrainHash;
+        boolean outsideComfortZone = publishedUsable
+                && (Math.abs(playerX - publishedCenterX) >= SAFE_REBUILD_DISTANCE
+                    || Math.abs(playerZ - publishedCenterZ) >= SAFE_REBUILD_DISTANCE);
+        boolean needsBuild = forceRebuild || !publishedUsable || outsideComfortZone;
+
+        if (needsBuild && !matchingBuild(playerX, playerZ, dimension, terrainHash)) {
+            beginBuild(updated, playerX, playerZ, dimension, terrainHash);
         }
 
-        if (texture == null || nextRow >= TEXTURE_SIZE) {
-            return;
-        }
+        processBuild(level);
 
-        NativeImage pixels = texture.getPixels();
-        int endRow = Math.min(TEXTURE_SIZE, nextRow + ROWS_PER_TICK);
-        for (int pixelZ = nextRow; pixelZ < endRow; pixelZ++) {
-            renderRow(level, pixels, pixelZ);
+        if (publishedCachePixels != null && dimension.equals(publishedDimension)) {
+            refreshDisplay(playerX, playerZ, updated.shape());
         }
-        nextRow = endRow;
-        texture.upload();
     }
 
     void render(GuiGraphicsExtractor graphics, int left, int top, int size) {
-        if (texture == null) {
+        if (displayTexture == null) {
             graphics.fill(left, top, left + size, top + size, UNKNOWN_DARK);
             return;
         }
         graphics.blit(
-                texture.getTextureView(),
-                texture.getSampler(),
+                displayTexture.getTextureView(),
+                displayTexture.getSampler(),
                 left,
                 top,
                 left + size,
@@ -101,192 +116,282 @@ final class MinimapTerrainMap implements AutoCloseable {
         );
     }
 
+    /** Requests a background rebuild without discarding the currently visible map. */
     void invalidate() {
-        overlayHash = Integer.MIN_VALUE;
+        forceRebuild = true;
     }
 
-    private void beginRebuild(
-            ClientLevel level,
+    private boolean matchingBuild(int playerX, int playerZ, String dimension, int terrainHash) {
+        if (nextBuildBlockRow >= CACHE_BLOCKS || buildingCachePixels == null) {
+            return false;
+        }
+        return dimension.equals(buildDimension)
+                && terrainHash == buildTerrainHash
+                && Math.abs(playerX - buildCenterX) < SAFE_REBUILD_DISTANCE
+                && Math.abs(playerZ - buildCenterZ) < SAFE_REBUILD_DISTANCE;
+    }
+
+    private void beginBuild(
             MinimapDataPayload updated,
             int playerX,
             int playerZ,
-            String currentDimension,
-            int updatedOverlayHash
+            String dimension,
+            int terrainHash
     ) {
-        ensureTexture();
-        centerBlockX = playerX;
-        centerBlockZ = playerZ;
-        dimension = currentDimension;
-        shape = updated.shape();
-        overlayHash = updatedOverlayHash;
-        data = updated;
-        regions = updated.showRegions() ? updated.regions() : List.of();
+        ensureBuildingPixels();
+        buildCenterX = playerX;
+        buildCenterZ = playerZ;
+        buildDimension = dimension;
+        buildTerrainHash = terrainHash;
+        buildData = updated;
+        buildRegions = updated.showRegions() ? updated.regions() : List.of();
 
         if (updated.showClaims()) {
-            Map<Long, ClaimChunkStatus> lookup = new HashMap<>();
+            Map<Long, MinimapDataPayload.ClaimOverlay> lookup = new HashMap<>();
             for (MinimapDataPayload.ClaimOverlay claim : updated.claims()) {
-                lookup.put(chunkKey(claim.chunkX(), claim.chunkZ()), claim.status());
+                lookup.put(chunkKey(claim.chunkX(), claim.chunkZ()), claim);
             }
-            claimLookup = Map.copyOf(lookup);
+            buildClaimLookup = Map.copyOf(lookup);
         } else {
-            claimLookup = Map.of();
+            buildClaimLookup = Map.of();
         }
 
-        fillUnknown(texture.getPixels());
-        texture.upload();
-        nextRow = 0;
+        fillUnknown(buildingCachePixels);
+        nextBuildBlockRow = 0;
+        forceRebuild = false;
     }
 
-    private void renderRow(ClientLevel level, NativeImage pixels, int pixelZ) {
-        int offsetZ = pixelZ - HALF;
-        int worldZ = centerBlockZ + offsetZ;
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-
-        for (int pixelX = 0; pixelX < TEXTURE_SIZE; pixelX++) {
-            int offsetX = pixelX - HALF;
-            if (isOutsideShape(offsetX, offsetZ)) {
-                pixels.setPixel(pixelX, pixelZ, 0x00000000);
-                continue;
-            }
-
-            int worldX = centerBlockX + offsetX;
-            int color = sampleSurfaceColor(level, pos, worldX, worldZ);
-            color = applyClaimOverlay(color, worldX, worldZ);
-            color = applyRegionOverlay(color, worldX, worldZ);
-            color = applyShapeBorder(color, offsetX, offsetZ);
-            pixels.setPixel(pixelX, pixelZ, color);
+    private void processBuild(ClientLevel level) {
+        if (buildingCachePixels == null || nextBuildBlockRow >= CACHE_BLOCKS || buildData == null) {
+            return;
         }
+
+        int[] pixels = buildingCachePixels;
+        int endRow = Math.min(CACHE_BLOCKS, nextBuildBlockRow + BLOCK_ROWS_PER_TICK);
+        for (int blockRow = nextBuildBlockRow; blockRow < endRow; blockRow++) {
+            int worldZ = buildCenterZ + blockRow - CACHE_HALF_BLOCKS;
+            for (int blockColumn = 0; blockColumn < CACHE_BLOCKS; blockColumn++) {
+                int worldX = buildCenterX + blockColumn - CACHE_HALF_BLOCKS;
+                writeDetailedBlock(pixels, level, blockColumn, blockRow, worldX, worldZ);
+            }
+        }
+        nextBuildBlockRow = endRow;
+
+        if (nextBuildBlockRow >= CACHE_BLOCKS) {
+            publishBuild();
+        }
+    }
+
+    private void publishBuild() {
+        if (buildingCachePixels == null) {
+            return;
+        }
+
+        int[] oldPublished = publishedCachePixels;
+        publishedCachePixels = buildingCachePixels;
+        buildingCachePixels = oldPublished;
+
+        publishedCenterX = buildCenterX;
+        publishedCenterZ = buildCenterZ;
+        publishedDimension = buildDimension;
+        publishedTerrainHash = buildTerrainHash;
+        publishedGeneration++;
+
+        nextBuildBlockRow = CACHE_BLOCKS;
+        buildData = null;
+        buildClaimLookup = Map.of();
+        buildRegions = List.of();
+        displayGeneration = Integer.MIN_VALUE;
+    }
+
+    private void refreshDisplay(int playerX, int playerZ, String rawShape) {
+        if (publishedCachePixels == null) {
+            return;
+        }
+
+        String shape = rawShape == null ? "CIRCLE" : rawShape.toUpperCase(Locale.ROOT);
+        if (displayTexture != null
+                && displayPlayerX == playerX
+                && displayPlayerZ == playerZ
+                && displayShape.equals(shape)
+                && displayGeneration == publishedGeneration) {
+            return;
+        }
+
+        int deltaX = playerX - publishedCenterX;
+        int deltaZ = playerZ - publishedCenterZ;
+        int maximumOffset = (CACHE_BLOCKS - VISIBLE_BLOCKS) / 2;
+        if (Math.abs(deltaX) > maximumOffset || Math.abs(deltaZ) > maximumOffset) {
+            // Keep the last complete image during a long teleport; the new cache
+            // will replace it atomically after the background build finishes.
+            return;
+        }
+
+        ensureDisplayTexture();
+        int[] source = publishedCachePixels;
+        NativeImage target = displayTexture.getPixels();
+        int sourceStartX = (CACHE_HALF_BLOCKS - VISIBLE_HALF_BLOCKS + deltaX) * PIXELS_PER_BLOCK;
+        int sourceStartZ = (CACHE_HALF_BLOCKS - VISIBLE_HALF_BLOCKS + deltaZ) * PIXELS_PER_BLOCK;
+        boolean circle = "CIRCLE".equals(shape);
+
+        for (int z = 0; z < DISPLAY_SIZE; z++) {
+            int offsetZ = z - DISPLAY_SIZE / 2;
+            for (int x = 0; x < DISPLAY_SIZE; x++) {
+                int offsetX = x - DISPLAY_SIZE / 2;
+                if (circle && outsideCircle(offsetX, offsetZ)) {
+                    target.setPixel(x, z, 0x00000000);
+                    continue;
+                }
+
+                int color = source[(sourceStartZ + z) * CACHE_SIZE + sourceStartX + x];
+                if (circle) {
+                    color = applyCircleBorder(color, offsetX, offsetZ);
+                }
+                target.setPixel(x, z, color);
+            }
+        }
+
+        displayTexture.upload();
+        displayPlayerX = playerX;
+        displayPlayerZ = playerZ;
+        displayShape = shape;
+        displayGeneration = publishedGeneration;
     }
 
     private int applyClaimOverlay(int base, int worldX, int worldZ) {
-        ClaimChunkStatus status = claimLookup.get(chunkKey(worldX >> 4, worldZ >> 4));
-        if (status == null || status == ClaimChunkStatus.WILDERNESS || status == ClaimChunkStatus.REGION) {
+        int chunkX = worldX >> 4;
+        int chunkZ = worldZ >> 4;
+        MinimapDataPayload.ClaimOverlay overlay = buildClaimLookup.get(chunkKey(chunkX, chunkZ));
+        if (overlay == null
+                || overlay.status() == ClaimChunkStatus.WILDERNESS
+                || overlay.status() == ClaimChunkStatus.REGION) {
             return base;
         }
 
-        int rgb = switch (status) {
-            case OWNED_BY_SELF -> data.ownClaimColor();
-            case OWNED_BY_TRUSTED -> lighten(data.ownClaimColor(), 36);
-            case OWNED_BY_OTHER -> data.otherClaimColor();
-            default -> data.otherClaimColor();
+        int rgb = switch (overlay.status()) {
+            case OWNED_BY_SELF -> buildData.ownClaimColor();
+            case OWNED_BY_TRUSTED -> lighten(buildData.ownClaimColor(), 36);
+            case OWNED_BY_OTHER -> buildData.otherClaimColor();
+            default -> buildData.otherClaimColor();
         };
+
         int localX = Math.floorMod(worldX, 16);
         int localZ = Math.floorMod(worldZ, 16);
-        boolean edge = localX == 0 || localX == 15 || localZ == 0 || localZ == 15;
-        return blend(base, withAlpha(rgb, edge ? 210 : 46));
+        boolean edge = isOuterClaimEdge(
+                overlay.claimId(),
+                claimIdAt(chunkX - 1, chunkZ),
+                claimIdAt(chunkX + 1, chunkZ),
+                claimIdAt(chunkX, chunkZ - 1),
+                claimIdAt(chunkX, chunkZ + 1),
+                localX,
+                localZ
+        );
+        return blend(base, withAlpha(rgb, edge ? 210 : 34));
+    }
+
+    private UUID claimIdAt(int chunkX, int chunkZ) {
+        MinimapDataPayload.ClaimOverlay neighbour = buildClaimLookup.get(chunkKey(chunkX, chunkZ));
+        return neighbour == null ? null : neighbour.claimId();
+    }
+
+    static boolean isOuterClaimEdge(
+            UUID current,
+            UUID west,
+            UUID east,
+            UUID north,
+            UUID south,
+            int localX,
+            int localZ
+    ) {
+        return ClaimOutlineMath.isOuterClaimEdge(
+                current, west, east, north, south, localX, localZ
+        );
     }
 
     private int applyRegionOverlay(int base, int worldX, int worldZ) {
         int color = base;
-        for (MinimapDataPayload.RegionOverlay region : regions) {
+        for (MinimapDataPayload.RegionOverlay region : buildRegions) {
             if (worldX < region.minX() || worldX > region.maxX()
                     || worldZ < region.minZ() || worldZ > region.maxZ()) {
                 continue;
             }
             boolean edge = worldX == region.minX() || worldX == region.maxX()
                     || worldZ == region.minZ() || worldZ == region.maxZ();
-            color = blend(color, withAlpha(data.regionColor(), edge ? 220 : 34));
+            color = blend(color, withAlpha(buildData.regionColor(), edge ? 200 : 28));
         }
         return color;
     }
 
-    private int applyShapeBorder(int color, int offsetX, int offsetZ) {
-        if (!"CIRCLE".equalsIgnoreCase(shape)) {
-            return color;
+    private void writeDetailedBlock(
+            int[] image,
+            ClientLevel level,
+            int blockX,
+            int blockZ,
+            int worldX,
+            int worldZ
+    ) {
+        int pixelX = blockX * PIXELS_PER_BLOCK;
+        int pixelZ = blockZ * PIXELS_PER_BLOCK;
+        for (int dz = 0; dz < PIXELS_PER_BLOCK; dz++) {
+            int row = (pixelZ + dz) * CACHE_SIZE;
+            for (int dx = 0; dx < PIXELS_PER_BLOCK; dx++) {
+                int color = AerialMapAtlas.sampleDetail(
+                        level,
+                        worldX,
+                        worldZ,
+                        dx,
+                        dz,
+                        PIXELS_PER_BLOCK
+                );
+                if (color == be.winnetrie.mod.simpleserverutilities.client.map.TerrainColorSampler.VOID_COLOR) {
+                    color = checkerColor(pixelX + dx, pixelZ + dz);
+                }
+                color = applyClaimOverlay(color, worldX, worldZ);
+                color = applyRegionOverlay(color, worldX, worldZ);
+                image[row + pixelX + dx] = color;
+            }
         }
-        int distanceSquared = offsetX * offsetX + offsetZ * offsetZ;
-        int inner = CIRCLE_RADIUS - 2;
-        if (distanceSquared >= inner * inner) {
+    }
+
+    private static int applyCircleBorder(int color, int offsetX, int offsetZ) {
+        int innerRadius = CIRCLE_RADIUS - 2;
+        if (offsetX * offsetX + offsetZ * offsetZ >= innerRadius * innerRadius) {
             return blend(color, 0xD9000000);
         }
         return color;
     }
 
-    private boolean isOutsideShape(int offsetX, int offsetZ) {
-        return "CIRCLE".equalsIgnoreCase(shape)
-                && offsetX * offsetX + offsetZ * offsetZ > CIRCLE_RADIUS * CIRCLE_RADIUS;
+    private static boolean outsideCircle(int offsetX, int offsetZ) {
+        return offsetX * offsetX + offsetZ * offsetZ > CIRCLE_RADIUS * CIRCLE_RADIUS;
     }
 
-    private static int sampleSurfaceColor(
-            ClientLevel level,
-            BlockPos.MutableBlockPos pos,
-            int worldX,
-            int worldZ
-    ) {
-        int chunkX = worldX >> 4;
-        int chunkZ = worldZ >> 4;
-        LevelChunk chunk = level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
-        if (chunk == null) {
-            return checkerColor(worldX, worldZ);
-        }
-
-        int localX = Math.floorMod(worldX, 16);
-        int localZ = Math.floorMod(worldZ, 16);
-        int surfaceY = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX, localZ);
-        int minY = level.getMinY();
-        int y = Math.min(surfaceY, level.getMaxY());
-        MapColor.Brightness brightness = surfaceBrightness(chunk, localX, localZ, surfaceY);
-
-        for (int attempts = 0; attempts < 16 && y >= minY; attempts++, y--) {
-            pos.set(worldX, y, worldZ);
-            BlockState state = chunk.getBlockState(pos);
-            MapColor mapColor = state.getMapColor(level, pos);
-            if (mapColor != MapColor.NONE) {
-                return mapColor.calculateARGBColor(brightness);
-            }
-        }
-        return VOID_COLOR;
-    }
-
-    private static MapColor.Brightness surfaceBrightness(LevelChunk chunk, int localX, int localZ, int current) {
-        int total = 0;
-        int count = 0;
-        if (localX > 0) {
-            total += chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX - 1, localZ);
-            count++;
-        }
-        if (localZ > 0) {
-            total += chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX, localZ - 1);
-            count++;
-        }
-        if (count == 0) {
-            return MapColor.Brightness.NORMAL;
-        }
-        double delta = current - total / (double) count;
-        if (delta >= 2.0D) {
-            return MapColor.Brightness.HIGH;
-        }
-        if (delta <= -2.0D) {
-            return MapColor.Brightness.LOW;
-        }
-        return MapColor.Brightness.NORMAL;
-    }
-
-    private void ensureTexture() {
-        if (texture == null) {
-            texture = new DynamicTexture("SSU minimap terrain", TEXTURE_SIZE, TEXTURE_SIZE, true);
+    private void ensureBuildingPixels() {
+        if (buildingCachePixels == null) {
+            buildingCachePixels = new int[CACHE_SIZE * CACHE_SIZE];
         }
     }
 
-    private void fillUnknown(NativeImage image) {
-        for (int z = 0; z < image.getHeight(); z++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                int offsetX = x - HALF;
-                int offsetZ = z - HALF;
-                image.setPixel(x, z, isOutsideShape(offsetX, offsetZ)
-                        ? 0x00000000
-                        : checkerColor(x, z));
+    private void ensureDisplayTexture() {
+        if (displayTexture == null) {
+            displayTexture = new DynamicTexture("SSU smooth minimap viewport", DISPLAY_SIZE, DISPLAY_SIZE, true);
+        }
+    }
+
+    private static void fillUnknown(int[] image) {
+        for (int z = 0; z < CACHE_SIZE; z++) {
+            int row = z * CACHE_SIZE;
+            for (int x = 0; x < CACHE_SIZE; x++) {
+                image[row + x] = checkerColor(x, z);
             }
         }
     }
 
     private static int checkerColor(int x, int z) {
-        return (((x >> 4) + (z >> 4)) & 1) == 0 ? UNKNOWN_DARK : UNKNOWN_LIGHT;
+        return (((x >> 5) + (z >> 5)) & 1) == 0 ? UNKNOWN_DARK : UNKNOWN_LIGHT;
     }
 
-    private static int overlayHash(MinimapDataPayload payload) {
+    private static int terrainHash(MinimapDataPayload payload) {
         int result = payload.dimension().hashCode();
-        result = 31 * result + payload.shape().toUpperCase(java.util.Locale.ROOT).hashCode();
         result = 31 * result + Boolean.hashCode(payload.showClaims());
         result = 31 * result + Boolean.hashCode(payload.showRegions());
         result = 31 * result + payload.ownClaimColor();
@@ -329,13 +434,29 @@ final class MinimapTerrainMap implements AutoCloseable {
 
     @Override
     public void close() {
+        closeTexture(displayTexture);
+        publishedCachePixels = null;
+        buildingCachePixels = null;
+        displayTexture = null;
+        publishedCenterX = Integer.MIN_VALUE;
+        publishedCenterZ = Integer.MIN_VALUE;
+        publishedDimension = "";
+        publishedTerrainHash = Integer.MIN_VALUE;
+        publishedGeneration = 0;
+        nextBuildBlockRow = CACHE_BLOCKS;
+        buildData = null;
+        buildClaimLookup = Map.of();
+        buildRegions = List.of();
+        displayPlayerX = Integer.MIN_VALUE;
+        displayPlayerZ = Integer.MIN_VALUE;
+        displayShape = "";
+        displayGeneration = Integer.MIN_VALUE;
+        forceRebuild = false;
+    }
+
+    private static void closeTexture(@Nullable DynamicTexture texture) {
         if (texture != null) {
             texture.close();
-            texture = null;
         }
-        nextRow = TEXTURE_SIZE;
-        claimLookup = Map.of();
-        regions = List.of();
-        data = null;
     }
 }

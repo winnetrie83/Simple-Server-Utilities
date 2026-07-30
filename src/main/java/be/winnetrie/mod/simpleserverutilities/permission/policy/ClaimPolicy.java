@@ -56,7 +56,7 @@ public class ClaimPolicy {
 
     public static boolean canTeleportClaim(ServerPlayer player, PermissionContext context) {
         return canUseClaims(player, context)
-                && PermissionService.getBoolean(player, PermissionKeys.CLAIMS_TELEPORT, true, context);
+                && TeleportPolicy.canTeleport(player, TeleportType.CLAIM, context);
     }
 
     public static boolean hasAdminBypass(ServerPlayer player) {

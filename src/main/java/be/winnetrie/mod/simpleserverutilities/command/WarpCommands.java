@@ -125,7 +125,7 @@ public class WarpCommands {
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
 
         if (!WarpPolicy.canTeleportWarp(player, context)) {
-            player.sendSystemMessage(Component.literal("You do not have permission to use warps here."));
+            player.sendSystemMessage(Component.literal(TeleportPolicy.denialMessage(TeleportType.WARP, context)));
             return 0;
         }
 
@@ -155,7 +155,11 @@ public class WarpCommands {
                 warp.getY(),
                 warp.getZ(),
                 warp.getYaw(),
-                warp.getPitch()
+                warp.getPitch(),
+                candidate -> WarpPolicy.canTeleportWarp(candidate,
+                        PermissionContext.at(candidate, candidate.blockPosition())),
+                candidate -> TeleportPolicy.denialMessage(TeleportType.WARP,
+                        PermissionContext.at(candidate, candidate.blockPosition()))
         );
     }
 

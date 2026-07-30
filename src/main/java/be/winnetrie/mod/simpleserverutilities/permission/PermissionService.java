@@ -115,7 +115,7 @@ public class PermissionService {
         return server.getPlayerList().isOp(new NameAndId(player.getGameProfile()));
     }
 
-    private static boolean getBuiltInDefault(String permission) {
+    public static boolean getBuiltInDefault(String permission) {
         return switch (permission) {
             case PermissionKeys.CLAIMS_USE,
                     PermissionKeys.CLAIMS_CREATE,
@@ -130,13 +130,21 @@ public class PermissionService {
                     PermissionKeys.HOMES_TELEPORT,
                     PermissionKeys.WARPS_USE,
                     PermissionKeys.WARPS_TELEPORT,
+                    PermissionKeys.SPAWN_USE,
+                    PermissionKeys.TELEPORT_ESCAPE,
+                    PermissionKeys.TELEPORT_REQUIRE_STILL,
+                    PermissionKeys.TELEPORT_CANCEL_ON_MOVE,
                     PermissionKeys.REGIONS_RENT,
                     PermissionKeys.ECONOMY_USE,
                     PermissionKeys.ECONOMY_BALANCE,
                     PermissionKeys.ECONOMY_PAY,
                     PermissionKeys.ECONOMY_HISTORY,
                     PermissionKeys.SETTINGS_USE,
-                    PermissionKeys.MINIMAP_USE -> true;
+                    PermissionKeys.MINIMAP_USE,
+                    PermissionKeys.MAIL_ACCESS,
+                    PermissionKeys.MAIL_SEND,
+                    PermissionKeys.MAIL_SEND_ITEMS,
+                    PermissionKeys.MAIL_SEND_MONEY -> true;
             default -> false;
         };
     }

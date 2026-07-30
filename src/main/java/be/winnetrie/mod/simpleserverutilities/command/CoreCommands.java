@@ -57,6 +57,7 @@ public final class CoreCommands {
                         + ", coalesced=" + storage.coalesced()
                         + ", failed=" + storage.failed()
                         + ", retryRequired=" + storage.retryRequired()
+                        + ", immutableTasks=" + storage.activeTasks()
         ));
         source.sendSystemMessage(Component.literal(" - Active jobs: " + SimpleServerUtilities.JOBS.size()));
         return 1;

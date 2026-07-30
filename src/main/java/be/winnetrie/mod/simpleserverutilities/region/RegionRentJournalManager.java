@@ -97,6 +97,29 @@ public final class RegionRentJournalManager {
         return count;
     }
 
+    public synchronized java.util.List<RegionRentOperationRecord> records() {
+        return records.values().stream()
+                .sorted(java.util.Comparator.comparingLong(RegionRentOperationRecord::getUpdatedAtEpochMilli).reversed())
+                .toList();
+    }
+
+    public synchronized boolean hasPendingForRegion(String regionName) {
+        if (regionName == null || regionName.isBlank()) {
+            return false;
+        }
+        for (RegionRentOperationRecord record : records.values()) {
+            if (!regionName.equalsIgnoreCase(record.getRegionName())) {
+                continue;
+            }
+            if (record.getStatus() != RegionRentOperationRecord.Status.COMPLETED
+                    && record.getStatus() != RegionRentOperationRecord.Status.ROLLED_BACK
+                    && record.getStatus() != RegionRentOperationRecord.Status.FAILED) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void write(RegionRentOperationRecord record) throws IOException {
         if (folder == null) {
             throw new IOException("Region-rent journal is not initialized.");

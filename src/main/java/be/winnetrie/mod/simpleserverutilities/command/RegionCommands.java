@@ -1,17 +1,21 @@
 package be.winnetrie.mod.simpleserverutilities.command;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionCatalog;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.RegionPolicy;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportOptions;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportPolicy;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportType;
 import be.winnetrie.mod.simpleserverutilities.economy.MoneyFormat;
 import be.winnetrie.mod.simpleserverutilities.region.RegionInteractionEvents;
+import be.winnetrie.mod.simpleserverutilities.region.RegionMutationGuard;
 import be.winnetrie.mod.simpleserverutilities.region.RegionRentalService;
 import be.winnetrie.mod.simpleserverutilities.region.RegionRentalService.RentalResult;
 import be.winnetrie.mod.simpleserverutilities.region.RegionSelection;
 import be.winnetrie.mod.simpleserverutilities.region.RegionSelectionManager;
 import be.winnetrie.mod.simpleserverutilities.region.RegionSnapshotManager;
 import be.winnetrie.mod.simpleserverutilities.region.RegionWorldEditManager;
-import be.winnetrie.mod.simpleserverutilities.teleport.TeleportDestination;
-import be.winnetrie.mod.simpleserverutilities.teleport.TeleportSafety;
 
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -32,7 +36,6 @@ import be.winnetrie.mod.simpleserverutilities.region.RegionOperationResult;
 import be.winnetrie.mod.simpleserverutilities.region.RegionRentData;
 
 
-import java.util.Set;
 import java.io.IOException;
 import java.util.Map;
 
@@ -101,19 +104,19 @@ public class RegionCommands {
                 .then(Commands.literal("rentals")
                         .executes(context -> listRentals(context.getSource())))
 
-                .then(Commands.literal("addowner")
+                .then(Commands.literal("addmanager")
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .then(Commands.argument("player", StringArgumentType.word())
-                                        .executes(context -> addOwner(
+                                        .executes(context -> addManager(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "name"),
                                                 StringArgumentType.getString(context, "player")
                                         )))))
 
-                .then(Commands.literal("removeowner")
+                .then(Commands.literal("removemanager")
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .then(Commands.argument("player", StringArgumentType.word())
-                                        .executes(context -> removeOwner(
+                                        .executes(context -> removeManager(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "name"),
                                                 StringArgumentType.getString(context, "player")
@@ -343,13 +346,6 @@ public class RegionCommands {
                                         )))))
 
                 .then(Commands.literal("rentconfig")
-                        .then(Commands.literal("ownershare")
-                                .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
-                                        .executes(context -> setRentConfig(
-                                                context.getSource(),
-                                                "ownershare",
-                                                IntegerArgumentType.getInteger(context, "percent")
-                                        ))))
                         .then(Commands.literal("playerrefund")
                                 .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100))
                                         .executes(context -> setRentConfig(
@@ -539,9 +535,20 @@ public class RegionCommands {
             player.sendSystemMessage(Component.literal("Region not found: " + name));
             return 0;
         }
-        if (existing.getRentData().isRented()) {
+        RegionMutationGuard.Check safety = RegionMutationGuard.delete(existing);
+        if (!safety.allowed()) {
+            player.sendSystemMessage(Component.literal(safety.message()));
+            return 0;
+        }
+
+        try {
+            SimpleServerUtilities.REGION_SNAPSHOTS.archiveSnapshot(existing.getName(), "region-deleted");
+        } catch (IOException e) {
+            SimpleServerUtilities.LOGGER.error(
+                    "Could not archive snapshot before deleting region '{}'.", existing.getName(), e
+            );
             player.sendSystemMessage(Component.literal(
-                    "This region is rented. Unrent it first so any configured refund can be processed safely."
+                    "Region was not deleted because its snapshot could not be archived safely."
             ));
             return 0;
         }
@@ -575,7 +582,7 @@ public class RegionCommands {
 
         source.sendSystemMessage(Component.literal("Region: " + region.getName()));
         source.sendSystemMessage(Component.literal("Bounds: " + region.getBoundsText()));
-        source.sendSystemMessage(Component.literal("Owners: " + region.getOwners().size()));
+        source.sendSystemMessage(Component.literal("Managers: " + region.getManagers().size()));
         source.sendSystemMessage(Component.literal("Members: " + region.getMembers().size()));
 
         if (region.getSpawnPos() != null) {
@@ -671,7 +678,7 @@ public class RegionCommands {
     }
 
 
-    private static int addOwner(CommandSourceStack source, String name, String playerName) {
+    private static int addManager(CommandSourceStack source, String name, String playerName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -692,14 +699,14 @@ public class RegionCommands {
             return 0;
         }
 
-        region.addOwner(targetUuid.get());
+        region.addManager(targetUuid.get());
         SimpleServerUtilities.REGIONS.save();
 
-        player.sendSystemMessage(Component.literal(playerName + " is now an owner of region '" + name + "'."));
+        player.sendSystemMessage(Component.literal(playerName + " is now a manager of region '" + name + "'."));
         return 1;
     }
 
-    private static int removeOwner(CommandSourceStack source, String name, String playerName) {
+    private static int removeManager(CommandSourceStack source, String name, String playerName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -720,10 +727,10 @@ public class RegionCommands {
             return 0;
         }
 
-        region.removeOwner(targetUuid.get());
+        region.removeManager(targetUuid.get());
         SimpleServerUtilities.REGIONS.save();
 
-        player.sendSystemMessage(Component.literal(playerName + " is no longer an owner of region '" + name + "'."));
+        player.sendSystemMessage(Component.literal(playerName + " is no longer a manager of region '" + name + "'."));
         return 1;
     }
 
@@ -1457,11 +1464,20 @@ public class RegionCommands {
             return 0;
         }
 
-        region.setPermissionOverride(key, value);
+        String normalizedKey = key.trim().toLowerCase(java.util.Locale.ROOT);
+        final String normalizedValue;
+        try {
+            normalizedValue = PermissionCatalog.normalizeValue(normalizedKey, value);
+        } catch (IllegalArgumentException exception) {
+            player.sendSystemMessage(Component.literal(exception.getMessage()));
+            return 0;
+        }
+        region.setPermissionOverride(normalizedKey, normalizedValue);
         SimpleServerUtilities.REGIONS.save();
+        SimpleServerUtilities.PERMISSIONS.invalidateResolutionCache();
 
         player.sendSystemMessage(Component.literal(
-                "Set region permission override " + key + " = " + value + " for '" + region.getName() + "'."
+                "Set region permission override " + normalizedKey + " = " + normalizedValue + " for '" + region.getName() + "'."
         ));
         return 1;
     }
@@ -1480,16 +1496,18 @@ public class RegionCommands {
             return 0;
         }
 
-        boolean existed = region.getPermissionOverrides().containsKey(key);
-        region.removePermissionOverride(key);
+        String normalizedKey = key.trim().toLowerCase(java.util.Locale.ROOT);
+        boolean existed = region.getPermissionOverrides().containsKey(normalizedKey);
+        region.removePermissionOverride(normalizedKey);
         SimpleServerUtilities.REGIONS.save();
+        SimpleServerUtilities.PERMISSIONS.invalidateResolutionCache();
 
         if (!existed) {
-            player.sendSystemMessage(Component.literal("Permission override was not set on region '" + region.getName() + "': " + key));
+            player.sendSystemMessage(Component.literal("Permission override was not set on region '" + region.getName() + "': " + normalizedKey));
             return 0;
         }
 
-        player.sendSystemMessage(Component.literal("Removed region permission override " + key + " from '" + region.getName() + "'."));
+        player.sendSystemMessage(Component.literal("Removed region permission override " + normalizedKey + " from '" + region.getName() + "'."));
         return 1;
     }
 
@@ -1533,39 +1551,54 @@ public class RegionCommands {
             return 0;
         }
 
-        ServerLevel level = player.level().getServer().getLevel(region.getDimension());
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
+        if (!RegionPolicy.canTeleportRegion(player, context)) {
+            player.sendSystemMessage(Component.literal(TeleportPolicy.denialMessage(TeleportType.REGION, context)));
+            return 0;
+        }
 
+        ServerLevel level = player.level().getServer().getLevel(region.getDimension());
         if (level == null) {
             player.sendSystemMessage(Component.literal("Region dimension is not loaded."));
             return 0;
         }
 
-        Optional<TeleportDestination> destination = TeleportSafety.findSafeDestination(
+        TeleportOptions options = TeleportPolicy.resolve(player, TeleportType.REGION, context);
+        BlockPos spawn = region.getSpawnPos();
+        return SimpleServerUtilities.TELEPORTS.requestTeleport(
+                player,
+                "regions",
+                "region '" + region.getName() + "'",
+                options,
                 level,
-                region.getSpawnPos().getX() + 0.5,
-                region.getSpawnPos().getY(),
-                region.getSpawnPos().getZ() + 0.5
-        );
-
-        if (destination.isEmpty()) {
-            player.sendSystemMessage(Component.literal("No safe teleport location was found near this region spawn."));
-            return 0;
-        }
-
-        TeleportDestination safe = destination.get();
-        player.teleportTo(
-                level,
-                safe.x(),
-                safe.y(),
-                safe.z(),
-                Set.of(),
+                spawn.getX() + 0.5,
+                spawn.getY(),
+                spawn.getZ() + 0.5,
                 region.getSpawnYaw(),
                 region.getSpawnPitch(),
-                true
+                candidate -> {
+                    Region current = SimpleServerUtilities.REGIONS.get(name);
+                    PermissionContext currentContext = PermissionContext.at(candidate, candidate.blockPosition());
+                    return current != null
+                            && current.getSpawnPos() != null
+                            && (current.hasAccess(candidate.getUUID()) || isOp(candidate))
+                            && RegionPolicy.canTeleportRegion(candidate, currentContext);
+                },
+                candidate -> {
+                    Region current = SimpleServerUtilities.REGIONS.get(name);
+                    if (current == null) {
+                        return "Teleport cancelled: region '" + name + "' no longer exists.";
+                    }
+                    if (current.getSpawnPos() == null) {
+                        return "Teleport cancelled: region '" + name + "' no longer has a spawn.";
+                    }
+                    if (!current.hasAccess(candidate.getUUID()) && !isOp(candidate)) {
+                        return "Teleport cancelled: you no longer have access to region '" + name + "'.";
+                    }
+                    return TeleportPolicy.denialMessage(TeleportType.REGION,
+                            PermissionContext.at(candidate, candidate.blockPosition()));
+                }
         );
-
-        player.sendSystemMessage(Component.literal("Teleported to region '" + name + "'."));
-        return 1;
     }
 
     private static int redefine(CommandSourceStack source, String name) {
@@ -1582,11 +1615,41 @@ public class RegionCommands {
             return 0;
         }
 
-        RegionOperationResult result = SimpleServerUtilities.REGIONS.redefine(name, selection.getDimension(), selection.getPoint1(), selection.getPoint2());
+        Region existing = SimpleServerUtilities.REGIONS.get(name);
+        if (existing == null) {
+            player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        RegionMutationGuard.Check safety = RegionMutationGuard.redefine(existing);
+        if (!safety.allowed()) {
+            player.sendSystemMessage(Component.literal(safety.message()));
+            return 0;
+        }
+
+        RegionOperationResult result = SimpleServerUtilities.REGIONS.redefine(
+                name, selection.getDimension(), selection.getPoint1(), selection.getPoint2()
+        );
 
         switch (result.getType()) {
             case SUCCESS -> {
-                player.sendSystemMessage(Component.literal("Region '" + name + "' redefined."));
+                try {
+                    int archived = SimpleServerUtilities.REGION_SNAPSHOTS.archiveSnapshot(
+                            name, "region-redefined"
+                    );
+                    player.sendSystemMessage(Component.literal(
+                            "Region '" + name + "' redefined."
+                                    + (archived > 0 ? " Its previous snapshot was archived." : "")
+                    ));
+                } catch (IOException e) {
+                    SimpleServerUtilities.LOGGER.error(
+                            "Region '{}' was redefined but its old snapshot could not be archived.", name, e
+                    );
+                    player.sendSystemMessage(Component.literal(
+                            "Region '" + name + "' was redefined, but the old snapshot could not be archived. "
+                                    + "Do not reset it until a new snapshot has been saved."
+                    ));
+                }
                 SELECTIONS.clear(player);
                 SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
                 SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownRegion(player);
@@ -1646,17 +1709,42 @@ public class RegionCommands {
             return 0;
         }
 
+        RegionMutationGuard.Check safety = RegionMutationGuard.saveSnapshot(region);
+        if (!safety.allowed()) {
+            player.sendSystemMessage(Component.literal(safety.message()));
+            return 0;
+        }
+
         try {
-            int savedBlocks = SimpleServerUtilities.REGION_SNAPSHOTS.save(level, region);
-
+            RegionSnapshotManager.RegionSnapshotCaptureJob job =
+                    SimpleServerUtilities.REGION_SNAPSHOTS.createCaptureJob(level, region);
+            UUID playerId = player.getUUID();
+            net.minecraft.server.MinecraftServer server = source.getServer();
+            UUID jobId = SimpleServerUtilities.JOBS.submit(job, result -> {
+                ServerPlayer online = server.getPlayerList().getPlayer(playerId);
+                if (online == null) {
+                    return;
+                }
+                if (result.status() == be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler.Status.COMPLETED) {
+                    online.sendSystemMessage(Component.literal(
+                            "Saved snapshot for region '" + region.getName() + "'. Stored "
+                                    + job.savedBlocks() + " non-air block(s)."
+                    ));
+                } else {
+                    online.sendSystemMessage(Component.literal(
+                            "Region snapshot capture "
+                                    + result.status().name().toLowerCase(java.util.Locale.ROOT)
+                                    + (result.error().isBlank() ? "." : ": " + result.error())
+                    ));
+                }
+            });
             player.sendSystemMessage(Component.literal(
-                    "Saved snapshot for region '" + region.getName() + "'. Stored " + savedBlocks + " non-air block(s)."
+                    "Scheduled snapshot capture job " + jobId + " for region '" + region.getName() + "'."
             ));
-
             return 1;
-        } catch (IOException e) {
-            SimpleServerUtilities.LOGGER.error("Failed to save region snapshot for '{}'.", region.getName(), e);
-            player.sendSystemMessage(Component.literal("Failed to save region snapshot. Check server log for details."));
+        } catch (IOException | IllegalStateException e) {
+            SimpleServerUtilities.LOGGER.error("Failed to schedule region snapshot for '{}'.", region.getName(), e);
+            player.sendSystemMessage(Component.literal("Failed to save region snapshot: " + e.getMessage()));
             return 0;
         }
     }
@@ -1672,6 +1760,12 @@ public class RegionCommands {
 
         if (region == null) {
             player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        RegionMutationGuard.Check safety = RegionMutationGuard.resetFromSnapshot(region);
+        if (!safety.allowed()) {
+            player.sendSystemMessage(Component.literal(safety.message()));
             return 0;
         }
 
@@ -1737,6 +1831,12 @@ public class RegionCommands {
 
         if (region == null) {
             player.sendSystemMessage(Component.literal("Region not found: " + name));
+            return 0;
+        }
+
+        RegionMutationGuard.Check safety = RegionMutationGuard.clearRegion(region);
+        if (!safety.allowed()) {
+            player.sendSystemMessage(Component.literal(safety.message()));
             return 0;
         }
 
@@ -1835,7 +1935,6 @@ public class RegionCommands {
 
         int permille = Math.max(0, Math.min(100, percent)) * 10;
         switch (key) {
-            case "ownershare" -> SimpleServerUtilities.REGIONS.rentEconomySettings().setOwnerSharePermille(permille);
             case "playerrefund" -> SimpleServerUtilities.REGIONS.rentEconomySettings().setPlayerCancelRefundPermille(permille);
             case "adminrefund" -> SimpleServerUtilities.REGIONS.rentEconomySettings().setAdminCancelRefundPermille(permille);
             default -> {
@@ -1873,14 +1972,14 @@ public class RegionCommands {
     private static boolean canViewRegion(ServerPlayer player, Region region) {
         return isOp(player)
                 || RegionPolicy.canEditRegion(player)
-                || region.isOwner(player.getUUID())
+                || region.isManager(player.getUUID())
                 || player.getUUID().equals(region.getRentData().getRenter());
     }
 
     private static boolean canManageOwnRegion(ServerPlayer player, Region region) {
         return isOp(player)
                 || RegionPolicy.canEditRegion(player)
-                || region.isOwner(player.getUUID())
+                || region.isManager(player.getUUID())
                 || player.getUUID().equals(region.getRentData().getRenter());
     }
 
@@ -1964,8 +2063,8 @@ public class RegionCommands {
         source.sendSystemMessage(Component.literal(" - /regions delete <name>"));
         source.sendSystemMessage(Component.literal(" - /regions info <name>"));
         source.sendSystemMessage(Component.literal(" - /regions list"));
-        source.sendSystemMessage(Component.literal(" - /regions addowner <name> <player>"));
-        source.sendSystemMessage(Component.literal(" - /regions removeowner <name> <player>"));
+        source.sendSystemMessage(Component.literal(" - /regions addmanager <name> <player>"));
+        source.sendSystemMessage(Component.literal(" - /regions removemanager <name> <player>"));
         source.sendSystemMessage(Component.literal(" - /regions addmember <name> <player>"));
         source.sendSystemMessage(Component.literal(" - /regions removemember <name> <player>"));
         source.sendSystemMessage(Component.literal(" - /regions rent <name>"));
@@ -1986,7 +2085,7 @@ public class RegionCommands {
         source.sendSystemMessage(Component.literal(" - /regions myrentals"));
         source.sendSystemMessage(Component.literal(" - /regions extend <name>"));
         source.sendSystemMessage(Component.literal(" - /regions setrentable <name> <true|false>"));
-        source.sendSystemMessage(Component.literal(" - /regions rentconfig ownershare|playerrefund|adminrefund <0-100>"));
+        source.sendSystemMessage(Component.literal(" - /regions rentconfig playerrefund|adminrefund <0-100>"));
         source.sendSystemMessage(Component.literal(" - /regions setrentprice <name> <amount>"));
         source.sendSystemMessage(Component.literal(" - /regions setrentperiod <name> <days>"));
         source.sendSystemMessage(Component.literal(" - /regions addtime <name> <days>"));

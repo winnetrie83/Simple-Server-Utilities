@@ -6,220 +6,348 @@ import java.util.List;
 
 import com.mojang.blaze3d.platform.NativeImage;
 
+import be.winnetrie.mod.simpleserverutilities.client.map.AerialMapAtlas;
+import be.winnetrie.mod.simpleserverutilities.client.map.TerrainColorSampler;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.material.MapColor;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Builds a lightweight top-down terrain texture from chunks that are already
- * available on the client. The server remains authoritative for claim data;
- * this class only turns locally received world data into a visual background.
+ * Double-buffered terrain renderer for the claim map.
+ *
+ * <p>The last complete map remains visible while another zoom level or map
+ * centre is prepared. It is spatially remapped to the requested world bounds,
+ * so zooming and panning never clear the complete canvas.</p>
  */
 final class ClaimTerrainMap implements AutoCloseable {
 
-    static final int SAMPLES_PER_CHUNK = 16;
+    private static final int BLOCKS_PER_CHUNK = 16;
+    private static final int PIXELS_PER_BLOCK = 1;
+    static final int PIXELS_PER_CHUNK = BLOCKS_PER_CHUNK * PIXELS_PER_BLOCK;
 
-    private static final int CHUNKS_PER_TICK = 8;
+    private static final int CHUNKS_PER_TICK = 12;
     private static final int UNKNOWN_DARK = 0xFF20252A;
     private static final int UNKNOWN_LIGHT = 0xFF292F35;
-    private static final int VOID_COLOR = 0xFF111419;
 
-    private @Nullable DynamicTexture texture;
-    private int textureWidth;
-    private int textureHeight;
-    private int centerChunkX = Integer.MIN_VALUE;
-    private int centerChunkZ = Integer.MIN_VALUE;
-    private int radius = -1;
-    private String dimension = "";
-    private List<ClaimMapDataPayload.Entry> pendingChunks = List.of();
+    private @Nullable DynamicTexture publishedTexture;
+    private int publishedWidth;
+    private int publishedHeight;
+    private int publishedCenterChunkX = Integer.MIN_VALUE;
+    private int publishedCenterChunkZ = Integer.MIN_VALUE;
+    private int publishedRadius = -1;
+    private String publishedDimension = "";
+
+    private @Nullable DynamicTexture buildingTexture;
+    private int buildingWidth;
+    private int buildingHeight;
+    private int buildingCenterChunkX = Integer.MIN_VALUE;
+    private int buildingCenterChunkZ = Integer.MIN_VALUE;
+    private int buildingRadius = -1;
+    private String buildingDimension = "";
+    private List<ChunkCoordinate> pendingChunks = List.of();
     private int nextPendingChunk;
-    private boolean dirty;
+    private boolean buildingDirty;
 
     void ensureView(ClaimMapDataPayload payload) {
         ClientLevel level = Minecraft.getInstance().level;
         String currentDimension = level == null ? "" : level.dimension().identifier().toString();
         int gridSize = payload.radius() * 2 + 1;
-        int requiredWidth = gridSize * SAMPLES_PER_CHUNK;
+        int requiredWidth = gridSize * PIXELS_PER_CHUNK;
         int requiredHeight = requiredWidth;
 
-        if (texture != null
-                && textureWidth == requiredWidth
-                && textureHeight == requiredHeight
-                && centerChunkX == payload.centerChunkX()
-                && centerChunkZ == payload.centerChunkZ()
-                && radius == payload.radius()
-                && dimension.equals(currentDimension)) {
+        boolean publishedMatches = matchesPublished(
+                payload, currentDimension, requiredWidth, requiredHeight
+        );
+        boolean buildingMatches = matchesBuilding(
+                payload, currentDimension, requiredWidth, requiredHeight
+        );
+        if (publishedMatches) {
+            if (buildingTexture != null && !buildingMatches) {
+                cancelBuild();
+            }
+            return;
+        }
+        if (buildingMatches) {
             return;
         }
 
-        closeTexture();
-        textureWidth = requiredWidth;
-        textureHeight = requiredHeight;
-        centerChunkX = payload.centerChunkX();
-        centerChunkZ = payload.centerChunkZ();
-        radius = payload.radius();
-        dimension = currentDimension;
-
-        texture = new DynamicTexture("SSU claim terrain map", textureWidth, textureHeight, true);
-        fillUnknown(texture.getPixels());
-        texture.upload();
-
-        List<ClaimMapDataPayload.Entry> ordered = new ArrayList<>(payload.chunks());
-        int originX = Minecraft.getInstance().player == null
-                ? centerChunkX
-                : Minecraft.getInstance().player.chunkPosition().x();
-        int originZ = Minecraft.getInstance().player == null
-                ? centerChunkZ
-                : Minecraft.getInstance().player.chunkPosition().z();
-        ordered.sort(Comparator.comparingInt(entry -> distanceSquared(entry.chunkX(), entry.chunkZ(), originX, originZ)));
-        pendingChunks = List.copyOf(ordered);
-        nextPendingChunk = 0;
-        dirty = false;
+        beginBuild(payload, currentDimension, requiredWidth, requiredHeight);
     }
 
     void tick(ClaimMapDataPayload payload) {
         ensureView(payload);
         ClientLevel level = Minecraft.getInstance().level;
-        if (level == null || texture == null || nextPendingChunk >= pendingChunks.size()) {
+        if (level == null || buildingTexture == null || nextPendingChunk >= pendingChunks.size()) {
             return;
         }
 
         int processed = 0;
         while (nextPendingChunk < pendingChunks.size() && processed < CHUNKS_PER_TICK) {
-            ClaimMapDataPayload.Entry entry = pendingChunks.get(nextPendingChunk++);
-            renderChunk(level, entry.chunkX(), entry.chunkZ());
+            ChunkCoordinate coordinate = pendingChunks.get(nextPendingChunk++);
+            renderChunk(level, coordinate.x(), coordinate.z());
             processed++;
         }
 
-        if (dirty) {
-            texture.upload();
-            dirty = false;
+        if (publishedTexture == null && buildingDirty) {
+            buildingTexture.upload();
+            buildingDirty = false;
+        }
+
+        if (nextPendingChunk >= pendingChunks.size()) {
+            if (buildingDirty) {
+                buildingTexture.upload();
+                buildingDirty = false;
+            }
+            publish();
         }
     }
 
-    void render(GuiGraphicsExtractor graphics, int left, int top, int size) {
-        if (texture == null) {
-            graphics.fill(left, top, left + size, top + size, UNKNOWN_DARK);
+    void render(
+            GuiGraphicsExtractor graphics,
+            int left,
+            int top,
+            int size,
+            ClaimMapDataPayload view
+    ) {
+        graphics.fill(left, top, left + size, top + size, UNKNOWN_DARK);
+
+        if (publishedTexture != null
+                && publishedRadius >= 0
+                && publishedDimension.equals(currentDimension())) {
+            renderMapped(
+                    graphics,
+                    publishedTexture,
+                    publishedCenterChunkX,
+                    publishedCenterChunkZ,
+                    publishedRadius,
+                    left,
+                    top,
+                    size,
+                    view
+            );
             return;
         }
+
+        if (buildingTexture != null
+                && buildingRadius == view.radius()
+                && buildingCenterChunkX == view.centerChunkX()
+                && buildingCenterChunkZ == view.centerChunkZ()
+                && buildingDimension.equals(currentDimension())) {
+            graphics.blit(
+                    buildingTexture.getTextureView(),
+                    buildingTexture.getSampler(),
+                    left,
+                    top,
+                    left + size,
+                    top + size,
+                    0.0F,
+                    1.0F,
+                    0.0F,
+                    1.0F
+            );
+        }
+    }
+
+    private void renderMapped(
+            GuiGraphicsExtractor graphics,
+            DynamicTexture source,
+            int sourceCenterChunkX,
+            int sourceCenterChunkZ,
+            int sourceRadius,
+            int left,
+            int top,
+            int size,
+            ClaimMapDataPayload target
+    ) {
+        int targetMinX = (target.centerChunkX() - target.radius()) << 4;
+        int targetMinZ = (target.centerChunkZ() - target.radius()) << 4;
+        int targetMaxX = (target.centerChunkX() + target.radius() + 1) << 4;
+        int targetMaxZ = (target.centerChunkZ() + target.radius() + 1) << 4;
+
+        int sourceMinX = (sourceCenterChunkX - sourceRadius) << 4;
+        int sourceMinZ = (sourceCenterChunkZ - sourceRadius) << 4;
+        int sourceMaxX = (sourceCenterChunkX + sourceRadius + 1) << 4;
+        int sourceMaxZ = (sourceCenterChunkZ + sourceRadius + 1) << 4;
+
+        int intersectionMinX = Math.max(targetMinX, sourceMinX);
+        int intersectionMinZ = Math.max(targetMinZ, sourceMinZ);
+        int intersectionMaxX = Math.min(targetMaxX, sourceMaxX);
+        int intersectionMaxZ = Math.min(targetMaxZ, sourceMaxZ);
+        if (intersectionMinX >= intersectionMaxX || intersectionMinZ >= intersectionMaxZ) {
+            return;
+        }
+
+        double targetWidth = targetMaxX - targetMinX;
+        double targetHeight = targetMaxZ - targetMinZ;
+        double sourceWidth = sourceMaxX - sourceMinX;
+        double sourceHeight = sourceMaxZ - sourceMinZ;
+
+        int destinationLeft = left + (int) Math.floor((intersectionMinX - targetMinX) * size / targetWidth);
+        int destinationTop = top + (int) Math.floor((intersectionMinZ - targetMinZ) * size / targetHeight);
+        int destinationRight = left + (int) Math.ceil((intersectionMaxX - targetMinX) * size / targetWidth);
+        int destinationBottom = top + (int) Math.ceil((intersectionMaxZ - targetMinZ) * size / targetHeight);
+
+        float u0 = (float) ((intersectionMinX - sourceMinX) / sourceWidth);
+        float v0 = (float) ((intersectionMinZ - sourceMinZ) / sourceHeight);
+        float u1 = (float) ((intersectionMaxX - sourceMinX) / sourceWidth);
+        float v1 = (float) ((intersectionMaxZ - sourceMinZ) / sourceHeight);
+
         graphics.blit(
-                texture.getTextureView(),
-                texture.getSampler(),
-                left,
-                top,
-                left + size,
-                top + size,
-                0.0F,
-                1.0F,
-                0.0F,
-                1.0F
+                source.getTextureView(),
+                source.getSampler(),
+                destinationLeft,
+                destinationTop,
+                destinationRight,
+                destinationBottom,
+                u0,
+                u1,
+                v0,
+                v1
         );
     }
 
-    private void renderChunk(ClientLevel level, int chunkX, int chunkZ) {
-        if (texture == null) {
-            return;
-        }
-
-        LevelChunk chunk = level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
-        if (chunk == null) {
-            return;
-        }
-
-        int[][] heights = new int[SAMPLES_PER_CHUNK][SAMPLES_PER_CHUNK];
-        for (int sampleZ = 0; sampleZ < SAMPLES_PER_CHUNK; sampleZ++) {
-            for (int sampleX = 0; sampleX < SAMPLES_PER_CHUNK; sampleX++) {
-                int localX = sampleCoordinate(sampleX);
-                int localZ = sampleCoordinate(sampleZ);
-                heights[sampleZ][sampleX] = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX, localZ);
-            }
-        }
-
-        NativeImage pixels = texture.getPixels();
-        int imageChunkX = chunkX - (centerChunkX - radius);
-        int imageChunkZ = chunkZ - (centerChunkZ - radius);
-        int pixelBaseX = imageChunkX * SAMPLES_PER_CHUNK;
-        int pixelBaseZ = imageChunkZ * SAMPLES_PER_CHUNK;
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-
-        for (int sampleZ = 0; sampleZ < SAMPLES_PER_CHUNK; sampleZ++) {
-            for (int sampleX = 0; sampleX < SAMPLES_PER_CHUNK; sampleX++) {
-                int localX = sampleCoordinate(sampleX);
-                int localZ = sampleCoordinate(sampleZ);
-                int worldX = chunkX * 16 + localX;
-                int worldZ = chunkZ * 16 + localZ;
-                int surfaceY = heights[sampleZ][sampleX];
-                int argb = sampleSurfaceColor(level, chunk, pos, worldX, surfaceY, worldZ,
-                        brightnessFor(heights, sampleX, sampleZ));
-                pixels.setPixel(pixelBaseX + sampleX, pixelBaseZ + sampleZ, argb);
-            }
-        }
-        dirty = true;
-    }
-
-    private static int sampleSurfaceColor(
-            ClientLevel level,
-            LevelChunk chunk,
-            BlockPos.MutableBlockPos pos,
-            int worldX,
-            int surfaceY,
-            int worldZ,
-            MapColor.Brightness brightness
+    private boolean matchesPublished(
+            ClaimMapDataPayload payload,
+            String dimension,
+            int requiredWidth,
+            int requiredHeight
     ) {
-        int minY = level.getMinY();
-        int y = Math.min(surfaceY, level.getMaxY());
-        for (int attempts = 0; attempts < 16 && y >= minY; attempts++, y--) {
-            pos.set(worldX, y, worldZ);
-            BlockState state = chunk.getBlockState(pos);
-            MapColor mapColor = state.getMapColor(level, pos);
-            if (mapColor != MapColor.NONE) {
-                return mapColor.calculateARGBColor(brightness);
+        return publishedTexture != null
+                && publishedWidth == requiredWidth
+                && publishedHeight == requiredHeight
+                && publishedCenterChunkX == payload.centerChunkX()
+                && publishedCenterChunkZ == payload.centerChunkZ()
+                && publishedRadius == payload.radius()
+                && publishedDimension.equals(dimension);
+    }
+
+    private boolean matchesBuilding(
+            ClaimMapDataPayload payload,
+            String dimension,
+            int requiredWidth,
+            int requiredHeight
+    ) {
+        return buildingTexture != null
+                && buildingWidth == requiredWidth
+                && buildingHeight == requiredHeight
+                && buildingCenterChunkX == payload.centerChunkX()
+                && buildingCenterChunkZ == payload.centerChunkZ()
+                && buildingRadius == payload.radius()
+                && buildingDimension.equals(dimension)
+                && nextPendingChunk < pendingChunks.size();
+    }
+
+    private void beginBuild(
+            ClaimMapDataPayload payload,
+            String dimension,
+            int requiredWidth,
+            int requiredHeight
+    ) {
+        closeTexture(buildingTexture);
+        buildingTexture = new DynamicTexture(
+                "SSU claim terrain map build",
+                requiredWidth,
+                requiredHeight,
+                true
+        );
+        buildingWidth = requiredWidth;
+        buildingHeight = requiredHeight;
+        buildingCenterChunkX = payload.centerChunkX();
+        buildingCenterChunkZ = payload.centerChunkZ();
+        buildingRadius = payload.radius();
+        buildingDimension = dimension;
+        fillUnknown(buildingTexture.getPixels());
+        buildingTexture.upload();
+
+        List<ChunkCoordinate> ordered = new ArrayList<>(
+                (payload.radius() * 2 + 1) * (payload.radius() * 2 + 1)
+        );
+        for (int chunkZ = payload.centerChunkZ() - payload.radius();
+                chunkZ <= payload.centerChunkZ() + payload.radius();
+                chunkZ++) {
+            for (int chunkX = payload.centerChunkX() - payload.radius();
+                    chunkX <= payload.centerChunkX() + payload.radius();
+                    chunkX++) {
+                ordered.add(new ChunkCoordinate(chunkX, chunkZ));
             }
         }
-        return VOID_COLOR;
+        int originX = Minecraft.getInstance().player == null
+                ? payload.centerChunkX()
+                : Minecraft.getInstance().player.chunkPosition().x();
+        int originZ = Minecraft.getInstance().player == null
+                ? payload.centerChunkZ()
+                : Minecraft.getInstance().player.chunkPosition().z();
+        ordered.sort(Comparator.comparingInt(entry -> distanceSquared(entry.x(), entry.z(), originX, originZ)));
+        pendingChunks = List.copyOf(ordered);
+        nextPendingChunk = 0;
+        buildingDirty = false;
     }
 
-    private static MapColor.Brightness brightnessFor(int[][] heights, int x, int z) {
-        int current = heights[z][x];
-        int comparisonTotal = 0;
-        int comparisonCount = 0;
-        if (x > 0) {
-            comparisonTotal += heights[z][x - 1];
-            comparisonCount++;
-        }
-        if (z > 0) {
-            comparisonTotal += heights[z - 1][x];
-            comparisonCount++;
-        }
-        if (comparisonCount == 0) {
-            return MapColor.Brightness.NORMAL;
+    private void renderChunk(ClientLevel level, int chunkX, int chunkZ) {
+        if (buildingTexture == null) {
+            return;
         }
 
-        double delta = current - (comparisonTotal / (double) comparisonCount);
-        if (delta >= 2.0D) {
-            return MapColor.Brightness.HIGH;
+        AerialMapAtlas.refreshLoadedChunk(level, chunkX, chunkZ);
+        NativeImage pixels = buildingTexture.getPixels();
+        int imageChunkX = chunkX - (buildingCenterChunkX - buildingRadius);
+        int imageChunkZ = chunkZ - (buildingCenterChunkZ - buildingRadius);
+        int pixelBaseX = imageChunkX * PIXELS_PER_CHUNK;
+        int pixelBaseZ = imageChunkZ * PIXELS_PER_CHUNK;
+        for (int localZ = 0; localZ < BLOCKS_PER_CHUNK; localZ++) {
+            for (int localX = 0; localX < BLOCKS_PER_CHUNK; localX++) {
+                int worldX = chunkX * BLOCKS_PER_CHUNK + localX;
+                int worldZ = chunkZ * BLOCKS_PER_CHUNK + localZ;
+                int pixelX = pixelBaseX + localX;
+                int pixelZ = pixelBaseZ + localZ;
+                int color = AerialMapAtlas.sample(level, worldX, worldZ);
+                pixels.setPixel(pixelX, pixelZ, color == TerrainColorSampler.VOID_COLOR
+                        ? checkerColor(pixelX, pixelZ)
+                        : color);
+            }
         }
-        if (delta <= -2.0D) {
-            return MapColor.Brightness.LOW;
-        }
-        return MapColor.Brightness.NORMAL;
+        buildingDirty = true;
     }
 
-    private static int sampleCoordinate(int sample) {
-        if (SAMPLES_PER_CHUNK >= 16) {
-            return Math.min(15, sample);
+    private void cancelBuild() {
+        closeTexture(buildingTexture);
+        buildingTexture = null;
+        buildingWidth = 0;
+        buildingHeight = 0;
+        buildingCenterChunkX = Integer.MIN_VALUE;
+        buildingCenterChunkZ = Integer.MIN_VALUE;
+        buildingRadius = -1;
+        buildingDimension = "";
+        pendingChunks = List.of();
+        nextPendingChunk = 0;
+        buildingDirty = false;
+    }
+
+    private void publish() {
+        if (buildingTexture == null) {
+            return;
         }
-        int step = 16 / SAMPLES_PER_CHUNK;
-        return sample * step + step / 2;
+        closeTexture(publishedTexture);
+        publishedTexture = buildingTexture;
+        publishedWidth = buildingWidth;
+        publishedHeight = buildingHeight;
+        publishedCenterChunkX = buildingCenterChunkX;
+        publishedCenterChunkZ = buildingCenterChunkZ;
+        publishedRadius = buildingRadius;
+        publishedDimension = buildingDimension;
+
+        buildingTexture = null;
+        buildingWidth = 0;
+        buildingHeight = 0;
+        buildingCenterChunkX = Integer.MIN_VALUE;
+        buildingCenterChunkZ = Integer.MIN_VALUE;
+        buildingRadius = -1;
+        buildingDimension = "";
+        pendingChunks = List.of();
+        nextPendingChunk = 0;
     }
 
     private static int distanceSquared(int x, int z, int originX, int originZ) {
@@ -228,26 +356,40 @@ final class ClaimTerrainMap implements AutoCloseable {
         return dx * dx + dz * dz;
     }
 
+    private static int checkerColor(int x, int y) {
+        int checker = ((x / PIXELS_PER_CHUNK) + (y / PIXELS_PER_CHUNK)) & 1;
+        return checker == 0 ? UNKNOWN_DARK : UNKNOWN_LIGHT;
+    }
+
     private static void fillUnknown(NativeImage image) {
         for (int y = 0; y < image.getHeight(); y++) {
             for (int x = 0; x < image.getWidth(); x++) {
-                int checker = ((x / SAMPLES_PER_CHUNK) + (y / SAMPLES_PER_CHUNK)) & 1;
-                image.setPixel(x, y, checker == 0 ? UNKNOWN_DARK : UNKNOWN_LIGHT);
+                image.setPixel(x, y, checkerColor(x, y));
             }
         }
     }
 
-    private void closeTexture() {
+    private static String currentDimension() {
+        ClientLevel level = Minecraft.getInstance().level;
+        return level == null ? "" : level.dimension().identifier().toString();
+    }
+
+    private static void closeTexture(@Nullable DynamicTexture texture) {
         if (texture != null) {
             texture.close();
-            texture = null;
         }
     }
 
     @Override
     public void close() {
-        closeTexture();
+        closeTexture(publishedTexture);
+        closeTexture(buildingTexture);
+        publishedTexture = null;
+        buildingTexture = null;
         pendingChunks = List.of();
         nextPendingChunk = 0;
+    }
+
+    private record ChunkCoordinate(int x, int z) {
     }
 }

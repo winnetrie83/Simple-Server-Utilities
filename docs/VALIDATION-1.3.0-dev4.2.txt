@@ -1,0 +1,95 @@
+SSU 1.3.0-dev4.2 validation report
+Date: 2026-07-29
+Baseline: SSU 1.3.0-dev4.1 source
+Target: Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+Network protocol: 12
+
+RESULT SUMMARY
+- Source-level and pure-Java regression checks: PASS
+- JSON and PNG asset validation: PASS
+- Patch/ZIP reproducibility checks: PASS
+- Full Gradle/NeoForge compile: NOT COMPLETED IN THIS ENVIRONMENT
+
+FULL BUILD LIMITATION
+The included Gradle wrapper attempted to download Gradle 9.2.1 but this
+execution environment could not resolve services.gradle.org:
+
+  java.net.UnknownHostException: services.gradle.org
+
+The installed JVM is OpenJDK 21.0.10 while the project toolchain requires
+Java 25. Therefore no claim is made that a distributable NeoForge JAR was
+compiled here. The source must be built locally with Java 25 using:
+
+  gradlew.bat clean test build
+
+CHECKS COMPLETED
+1. git diff --check
+   PASS: no whitespace/patch formatting errors.
+
+2. Java lexical delimiter scan
+   PASS: 161 Java source/test files scanned while ignoring comments, strings,
+   character literals and text blocks; no unbalanced braces, parentheses or
+   brackets were found.
+
+3. Pure-Java map helper harnesses
+   PASS: TerrainReliefMath
+     - flat local, broad, macro, block and edge factors are exactly 1.0;
+     - equal slopes are invariant under absolute elevation changes;
+     - north-west-facing macro shade: 1.087;
+     - opposing macro shade: 0.877;
+     - raised one-block corner rim: 1.0920249999999998;
+     - lower one-block corner rim: 0.8742250000000001.
+   PASS: AerialMapCacheCoordinates
+     - negative region coordinates and unsafe path components passed.
+   PASS: ClaimOutlineMath
+     - same-claim internal edge hidden;
+     - wilderness and different-claim outer edges shown.
+   PASS: MapPanMath
+     - positive/negative drag direction and chunk rounding passed.
+
+4. JSON and PNG validation
+   PASS: 13 JSON files parsed.
+   PASS: 13 PNG files have valid signatures and chunk CRCs.
+
+5. Cartographic renderer source invariants
+   PASS: renderer cache fingerprint is atlas-topographic-v3.
+   PASS: one representative tinted average colour is used per world block
+   instead of copying the texture's 4x4 detail pattern.
+   PASS: BushBlock and empty-collision plant/utility surfaces are skipped.
+   PASS: leaves remain visible, while leaves and canopy logs are excluded from
+   the height used for topographic relief.
+   PASS: water keeps depth shading without the previous checker ripple.
+   PASS: final colour grade uses 0.84 saturation and 0.97 brightness.
+   PASS: no absolute-elevation modulo contour remains in TerrainReliefMath.
+   PASS: local, six-block and twelve-block landform shading are combined with
+   real neighbouring-height terrace rims.
+   PASS: a 6-block relief margin is precomputed once per tile and can reuse
+   neighbouring cached height arrays; missing neighbours are queried with
+   getChunk(..., false), so the renderer does not force-load chunks.
+
+6. Version/protocol source assertions
+   PASS: mod_version is 1.3.0-dev4.2.
+   PASS: networking registrar version remains 12.
+   PASS: snapshot format and server save schemas are unchanged from dev4.1.
+
+7. Patch reproducibility
+   PASS: the dev4.1-to-dev4.2 patch applies cleanly to the supplied dev4.1
+   source tree and produces a tree identical to the dev4.2 source tree.
+
+8. Source ZIP integrity
+   PASS: unzip integrity test completed with no compressed-data errors.
+   PASS: packaged gradle.properties reports 1.3.0-dev4.2.
+   PASS: packaged ModNetworking registers protocol 12.
+   PASS: packaged AerialMapAtlas contains atlas-topographic-v3.
+
+RUNTIME TESTS STILL REQUIRED
+- Actual vegetation filtering for vanilla and modded flowers/crops/plants.
+- Visual comparison of plains, forests, hills, mountains and structures on all
+  three maps at multiple zoom levels.
+- Confirmation that whole hills remain readable without returning to the noisy
+  dev4.1 appearance.
+- Confirmation that leaves remain visible while tree crowns no longer create
+  artificial relief bumps.
+- One-time cache rebuild and later disk reload under atlas-topographic-v3.
+- Client tile-capture performance while newly visited terrain is rendered.
+- Regression checks for claim perimeter, right-click drag and region reset.

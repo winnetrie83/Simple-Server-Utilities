@@ -2,7 +2,6 @@ package be.winnetrie.mod.simpleserverutilities.command;
 
 import java.time.Instant;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
@@ -14,8 +13,9 @@ import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimOperationResult;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.ClaimPolicy;
-import be.winnetrie.mod.simpleserverutilities.teleport.TeleportDestination;
-import be.winnetrie.mod.simpleserverutilities.teleport.TeleportSafety;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportOptions;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportPolicy;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportType;
 
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -550,7 +550,7 @@ public class ClaimCommands {
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
 
         if (!ClaimPolicy.canTeleportClaim(player, context)) {
-            player.sendSystemMessage(Component.literal("You do not have permission to teleport to claims here."));
+            player.sendSystemMessage(Component.literal(TeleportPolicy.denialMessage(TeleportType.CLAIM, context)));
             return 0;
         }
 
@@ -561,11 +561,7 @@ public class ClaimCommands {
             return 0;
         }
 
-        return teleportToClaim(
-                player,
-                claim,
-                "Teleported to claim '" + claim.getDisplayName() + "'."
-        );
+        return teleportToClaim(player, claim, true);
     }
 
     private static int adminList(CommandSourceStack source, String playerName) {
@@ -633,11 +629,7 @@ public class ClaimCommands {
             return 0;
         }
 
-        return teleportToClaim(
-                executor,
-                claim,
-                "Teleported to " + playerName + "'s claim '" + claim.getDisplayName() + "'."
-        );
+        return teleportToClaim(executor, claim, false);
     }
 
     private static int adminDelete(CommandSourceStack source, String playerName, String claimName) {
@@ -664,7 +656,7 @@ public class ClaimCommands {
         return 1;
     }
 
-    private static int teleportToClaim(ServerPlayer player, PlayerClaim claim, String successMessage) {
+    private static int teleportToClaim(ServerPlayer player, PlayerClaim claim, boolean enforcePlayerPolicy) {
         ServerLevel level = getClaimLevel(player, claim);
 
         if (level == null) {
@@ -687,32 +679,42 @@ public class ClaimCommands {
             return 0;
         }
 
-        Optional<TeleportDestination> destination = TeleportSafety.findSafeDestination(
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
+        TeleportOptions options = enforcePlayerPolicy
+                ? TeleportPolicy.resolve(player, TeleportType.CLAIM, context)
+                : new TeleportOptions(0, 0, false);
+
+        if (enforcePlayerPolicy) {
+            return SimpleServerUtilities.TELEPORTS.requestTeleport(
+                    player,
+                    "claims",
+                    "claim '" + claim.getDisplayName() + "'",
+                    options,
+                    level,
+                    targetPos.getX() + 0.5,
+                    targetPos.getY(),
+                    targetPos.getZ() + 0.5,
+                    yaw,
+                    pitch,
+                    candidate -> ClaimPolicy.canTeleportClaim(candidate,
+                            PermissionContext.at(candidate, candidate.blockPosition())),
+                    candidate -> TeleportPolicy.denialMessage(TeleportType.CLAIM,
+                            PermissionContext.at(candidate, candidate.blockPosition()))
+            );
+        }
+
+        return SimpleServerUtilities.TELEPORTS.requestTeleport(
+                player,
+                "claims-admin",
+                "claim '" + claim.getDisplayName() + "'",
+                options,
                 level,
                 targetPos.getX() + 0.5,
                 targetPos.getY(),
-                targetPos.getZ() + 0.5
-        );
-
-        if (destination.isEmpty()) {
-            player.sendSystemMessage(Component.literal("No safe teleport location was found in this claim."));
-            return 0;
-        }
-
-        TeleportDestination safe = destination.get();
-        player.teleportTo(
-                level,
-                safe.x(),
-                safe.y(),
-                safe.z(),
-                Set.of(),
+                targetPos.getZ() + 0.5,
                 yaw,
-                pitch,
-                true
+                pitch
         );
-
-        player.sendSystemMessage(Component.literal(successMessage));
-        return 1;
     }
 
     private static ServerLevel getClaimLevel(ServerPlayer player, PlayerClaim claim) {

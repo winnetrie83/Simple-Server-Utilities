@@ -53,6 +53,25 @@ public final class ClaimMapService {
             return;
         }
 
+        if (payload.operation() == ClaimMapOperation.DELETE) {
+            if (!ClaimPolicy.canDeleteClaim(player)) {
+                sendMap(player, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), payload.claimName(),
+                        "You do not have permission to delete claims.", true);
+                return;
+            }
+            boolean deleted = SimpleServerUtilities.PLAYER_CLAIMS.deleteClaimGroup(
+                    player.getUUID(), payload.claimName(), ClaimPolicy.hasAdminBypass(player));
+            if (deleted) {
+                SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player);
+                sendMap(player, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), "",
+                        "Deleted claim '" + payload.claimName() + "'.", false);
+            } else {
+                sendMap(player, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), payload.claimName(),
+                        "Claim could not be deleted.", true);
+            }
+            return;
+        }
+
         List<ChunkPos> chunks = new ArrayList<>(payload.chunks().size());
         for (ClaimMapActionPayload.ChunkCoordinate chunk : payload.chunks()) {
             if (Math.abs(chunk.x() - payload.centerChunkX()) > payload.radius()
@@ -145,6 +164,7 @@ public final class ClaimMapService {
                 case CREATE -> "Created claim '" + claimName + "' with " + batchResult.affectedChunks() + " chunk(s).";
                 case ADD -> "Added " + batchResult.affectedChunks() + " chunk(s) to '" + claimName + "'.";
                 case REMOVE -> "Removed " + batchResult.affectedChunks() + " chunk(s) from '" + claimName + "'.";
+                case DELETE -> "Deleted claim '" + claimName + "'.";
             };
         }
 

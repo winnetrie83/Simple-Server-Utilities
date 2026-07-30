@@ -22,7 +22,7 @@ public class WarpPolicy {
 
     public static boolean canTeleportWarp(ServerPlayer player, PermissionContext context) {
         return canUseWarps(player, context)
-                && PermissionService.getBoolean(player, PermissionKeys.WARPS_TELEPORT, true, context);
+                && TeleportPolicy.canTeleport(player, TeleportType.WARP, context);
     }
 
     public static boolean canAdminWarps(ServerPlayer player) {

@@ -83,6 +83,40 @@ public final class PlayerSettingsCommands {
                                         .executes(context -> setRegionOverlay(
                                                 context.getSource(),
                                                 BoolArgumentType.getBool(context, "enabled")
+                                        )))))
+                .then(Commands.literal("worldmap")
+                        .executes(context -> show(context.getSource()))
+                        .then(Commands.literal("claims")
+                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                        .executes(context -> setWorldMapClaimOverlay(
+                                                context.getSource(),
+                                                BoolArgumentType.getBool(context, "enabled")
+                                        ))))
+                        .then(Commands.literal("regions")
+                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                        .executes(context -> setWorldMapRegionOverlay(
+                                                context.getSource(),
+                                                BoolArgumentType.getBool(context, "enabled")
+                                        )))))
+                .then(Commands.literal("mail")
+                        .executes(context -> show(context.getSource()))
+                        .then(Commands.literal("auto_delete_private")
+                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                        .executes(context -> setMailAutoDeletePlayer(
+                                                context.getSource(),
+                                                BoolArgumentType.getBool(context, "enabled")
+                                        ))))
+                        .then(Commands.literal("auto_delete_server")
+                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                        .executes(context -> setMailAutoDeleteSystem(
+                                                context.getSource(),
+                                                BoolArgumentType.getBool(context, "enabled")
+                                        ))))
+                        .then(Commands.literal("auto_delete_auction")
+                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                        .executes(context -> setMailAutoDeleteAuction(
+                                                context.getSource(),
+                                                BoolArgumentType.getBool(context, "enabled")
                                         )))));
     }
 
@@ -96,8 +130,16 @@ public final class PlayerSettingsCommands {
         player.sendSystemMessage(Component.literal(" Minimap shape: " + value.getMinimapShape().name().toLowerCase()));
         player.sendSystemMessage(Component.literal(" Minimap position: " + value.getMinimapPosition().name().toLowerCase()));
         player.sendSystemMessage(Component.literal(" North up: " + value.isMinimapNorthUp()));
-        player.sendSystemMessage(Component.literal(" Claim overlay: " + value.isMinimapShowClaims()));
-        player.sendSystemMessage(Component.literal(" Region overlay: " + value.isMinimapShowRegions()));
+        player.sendSystemMessage(Component.literal(" Minimap claim overlay: " + value.isMinimapShowClaims()));
+        player.sendSystemMessage(Component.literal(" Minimap region overlay: " + value.isMinimapShowRegions()));
+        player.sendSystemMessage(Component.literal(" World-map claim overlay: " + value.isWorldMapShowClaims()));
+        player.sendSystemMessage(Component.literal(" World-map region overlay: " + value.isWorldMapShowRegions()));
+        player.sendSystemMessage(Component.literal(" Auto-delete claimed private attachment mail: "
+                + value.isMailAutoDeletePlayerAttachments()));
+        player.sendSystemMessage(Component.literal(" Auto-delete claimed server attachment mail: "
+                + value.isMailAutoDeleteSystemAttachments()));
+        player.sendSystemMessage(Component.literal(" Auto-delete claimed auction attachment mail: "
+                + value.isMailAutoDeleteAuctionAttachments()));
         return 1;
     }
 
@@ -152,6 +194,29 @@ public final class PlayerSettingsCommands {
 
     private static int setRegionOverlay(CommandSourceStack source, boolean enabled) {
         return update(source, value -> value.setMinimapShowRegions(enabled), "Minimap region overlay: " + enabled);
+    }
+
+    private static int setWorldMapClaimOverlay(CommandSourceStack source, boolean enabled) {
+        return update(source, value -> value.setWorldMapShowClaims(enabled), "World-map claim overlay: " + enabled);
+    }
+
+    private static int setWorldMapRegionOverlay(CommandSourceStack source, boolean enabled) {
+        return update(source, value -> value.setWorldMapShowRegions(enabled), "World-map region overlay: " + enabled);
+    }
+
+    private static int setMailAutoDeletePlayer(CommandSourceStack source, boolean enabled) {
+        return update(source, value -> value.setMailAutoDeletePlayerAttachments(enabled),
+                "Auto-delete claimed private attachment mail: " + enabled);
+    }
+
+    private static int setMailAutoDeleteSystem(CommandSourceStack source, boolean enabled) {
+        return update(source, value -> value.setMailAutoDeleteSystemAttachments(enabled),
+                "Auto-delete claimed server attachment mail: " + enabled);
+    }
+
+    private static int setMailAutoDeleteAuction(CommandSourceStack source, boolean enabled) {
+        return update(source, value -> value.setMailAutoDeleteAuctionAttachments(enabled),
+                "Auto-delete claimed auction attachment mail: " + enabled);
     }
 
     private static int update(

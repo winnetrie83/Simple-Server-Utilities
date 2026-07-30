@@ -1,0 +1,28 @@
+SSU 1.4.0-dev1.3.1 validation report
+
+Scope
+- Build-configuration-only hotfix for compileTestJava.
+
+Confirmed cause
+- src/test had JUnit dependencies but ModDevGradle unit-test integration was not enabled.
+- Minecraft/NeoForge classes were therefore absent from the test compile classpath.
+- This explains both the direct MinecraftServer errors and the indirect CustomPacketPayload error.
+
+Changes
+- Enabled neoForge.unitTest.
+- Bound testedMod to mods.simpleserverutilities.
+- Added org.junit.platform:junit-platform-launcher to testRuntimeOnly.
+- Bumped source version to 1.4.0-dev1.3.1.
+
+Static validation
+- build.gradle block structure checked.
+- Exactly one unitTest block is present.
+- testedMod targets the declared simpleserverutilities mod.
+- JUnit Platform launcher is present.
+- All 29 existing @Test methods remain present.
+- No production Java, resources, network protocol or save schema changed.
+- Patch applies cleanly to the exact dev1.3 source tree.
+- ZIP integrity checked.
+
+Environment limitation
+- A full Gradle run was not possible in this environment because the Gradle 9.2.1 distribution could not be downloaded from services.gradle.org and only Java 21 is installed. Run gradlew.bat clean test build locally with Java 25.

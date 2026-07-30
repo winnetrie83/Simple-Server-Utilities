@@ -82,6 +82,19 @@ public final class StoragePaths {
         return economy(root).resolve("transactions");
     }
 
+
+    public static Path mail(Path root) {
+        return root.resolve("mail");
+    }
+
+    public static Path mailboxes(Path root) {
+        return mail(root).resolve("mailboxes");
+    }
+
+    public static Path serverSpawn(Path root) {
+        return root.resolve("spawn").resolve("server_spawn.json");
+    }
+
     public static Path regions(Path root) {
         return root.resolve("regions");
     }

@@ -58,7 +58,6 @@ public class RegionManager {
 
         regions.clear();
         rentingEnabled = true;
-        rentEconomySettings.setOwnerSharePermille(0);
         rentEconomySettings.setPlayerCancelRefundPermille(0);
         rentEconomySettings.setAdminCancelRefundPermille(1_000);
         regionRecordStore.reset();
@@ -127,10 +126,9 @@ public class RegionManager {
             Files.createDirectories(regionEntriesFolder);
 
             JsonObject settings = new JsonObject();
-            settings.addProperty("schemaVersion", 2);
+            settings.addProperty("schemaVersion", 3);
             settings.addProperty("rentingEnabled", rentingEnabled);
             rentEconomySettings.normalize();
-            settings.addProperty("rentOwnerSharePermille", rentEconomySettings.getOwnerSharePermille());
             settings.addProperty("playerCancelRefundPermille", rentEconomySettings.getPlayerCancelRefundPermille());
             settings.addProperty("adminCancelRefundPermille", rentEconomySettings.getAdminCancelRefundPermille());
             settingsRecordStore.queueJson(GSON, regionsFolder.resolve("_settings.json"), settings);
@@ -302,7 +300,7 @@ public class RegionManager {
         Region newRegion = new Region(oldRegion.getName(), dimension, point1, point2);
         newRegion.setPriority(oldRegion.getPriority());
 
-        newRegion.getOwners().addAll(oldRegion.getOwners());
+        newRegion.getManagers().addAll(oldRegion.getManagers());
         newRegion.getMembers().addAll(oldRegion.getMembers());
         newRegion.getPermissionOverrides().putAll(oldRegion.getPermissionOverrides());
 
@@ -331,7 +329,8 @@ public class RegionManager {
 
         copySettings(oldRegion, newRegion);
 
-        if (oldRegion.getSpawnPos() != null) {
+        if (oldRegion.getSpawnPos() != null
+                && newRegion.contains(newRegion.getDimension(), oldRegion.getSpawnPos())) {
             newRegion.setSpawn(oldRegion.getSpawnPos(), oldRegion.getSpawnYaw(), oldRegion.getSpawnPitch());
         }
 
@@ -348,7 +347,6 @@ public class RegionManager {
             try {
                 JsonObject settings = JsonParser.parseString(Files.readString(settingsFile)).getAsJsonObject();
                 rentingEnabled = getBoolean(settings, "rentingEnabled", true);
-                rentEconomySettings.setOwnerSharePermille(getInt(settings, "rentOwnerSharePermille", 0));
                 rentEconomySettings.setPlayerCancelRefundPermille(getInt(settings, "playerCancelRefundPermille", 0));
                 rentEconomySettings.setAdminCancelRefundPermille(getInt(settings, "adminCancelRefundPermille", 1_000));
             } catch (Exception e) {
@@ -375,7 +373,6 @@ public class RegionManager {
         try {
             JsonObject root = JsonParser.parseString(Files.readString(loadPath)).getAsJsonObject();
             rentingEnabled = getBoolean(root, "rentingEnabled", true);
-            rentEconomySettings.setOwnerSharePermille(getInt(root, "rentOwnerSharePermille", 0));
             rentEconomySettings.setPlayerCancelRefundPermille(getInt(root, "playerCancelRefundPermille", 0));
             rentEconomySettings.setAdminCancelRefundPermille(getInt(root, "adminCancelRefundPermille", 1_000));
 
@@ -416,7 +413,9 @@ public class RegionManager {
         Region region = new Region(name, dimension, point1, point2);
         region.setPriority(getInt(json, "priority", 0));
 
-        loadUuidSet(json, "owners", region.getOwners());
+        loadUuidSet(json, "managers", region.getManagers());
+        // One-time forward migration: pre-dev2.1 region owners were administrative managers.
+        loadUuidSet(json, "owners", region.getManagers());
         loadUuidSet(json, "members", region.getMembers());
 
         if (json.has("permissions")) {
@@ -501,7 +500,7 @@ public class RegionManager {
     private JsonObject regionToJson(Region region) {
         JsonObject json = new JsonObject();
 
-        json.addProperty("schemaVersion", 2);
+        json.addProperty("schemaVersion", 3);
         json.addProperty("name", region.getName());
         json.addProperty("dimension", region.getDimension().identifier().toString());
         json.addProperty("priority", region.getPriority());
@@ -513,7 +512,7 @@ public class RegionManager {
         json.addProperty("maxY", region.getMaxY());
         json.addProperty("maxZ", region.getMaxZ());
 
-        json.add("owners", saveUuidSet(region.getOwners()));
+        json.add("managers", saveUuidSet(region.getManagers()));
         json.add("members", saveUuidSet(region.getMembers()));
 
         if (!region.getWelcomeMessage().isBlank()) {

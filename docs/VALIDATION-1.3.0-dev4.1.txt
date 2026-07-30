@@ -1,0 +1,88 @@
+SSU 1.3.0-dev4.1 validation report
+Date: 2026-07-29
+Baseline: SSU 1.3.0-dev4 source
+Target: Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+Network protocol: 12
+
+RESULT SUMMARY
+- Source-level and pure-Java regression checks: PASS
+- JSON and PNG asset validation: PASS
+- Patch/ZIP reproducibility checks: PASS
+- Full Gradle/NeoForge compile: NOT COMPLETED IN THIS ENVIRONMENT
+
+FULL BUILD LIMITATION
+The included Gradle wrapper attempted to download Gradle 9.2.1 but this
+execution environment could not resolve services.gradle.org:
+
+  java.net.UnknownHostException: services.gradle.org
+
+The installed JVM is OpenJDK 21.0.10 while the project toolchain requires
+Java 25. Therefore no claim is made that a distributable NeoForge JAR was
+compiled here. The source must be built locally with Java 25 using:
+
+  gradlew.bat clean test build
+
+CHECKS COMPLETED
+1. git diff --check
+   PASS: no whitespace/patch formatting errors.
+
+2. Java lexical delimiter scan
+   PASS: 161 Java source/test files scanned while ignoring comments, strings,
+   character literals and text blocks; no unbalanced braces, parentheses or
+   brackets were found.
+
+3. Pure-Java map helper harnesses
+   PASS: TerrainReliefMath
+     - flat elevation factor: 0.979
+     - raised one-block factor: 1.1310000000000002
+     - lower one-block factor: 0.883
+     - raised/lower detail-rim direction assertions passed
+   PASS: ClaimOutlineMath
+     - same-claim internal edge hidden
+     - wilderness and different-claim outer edges shown
+   PASS: MapPanMath
+     - positive/negative drag direction and chunk rounding assertions passed
+
+4. JSON validation
+   PASS: 13 JSON files parsed.
+
+5. PNG validation
+   PASS: 13 PNG files have valid signatures and chunk CRCs.
+
+6. Snapshot source invariants
+   PASS: current snapshot format is version 3.
+   PASS: reset clear path uses UPDATE_SUPPRESS_DROPS.
+   PASS: inventory-bearing block entities are emptied before removal.
+   PASS: existing hanging entities are discarded instead of killed/broken.
+   PASS: v3 snapshot JSON writes and reads the entities collection.
+   PASS: block restoration and neighbour reconciliation are separate phases.
+
+7. Version/protocol source assertions
+   PASS: mod_version is 1.3.0-dev4.1.
+   PASS: networking registrar version is 12.
+
+8. Patch reproducibility
+   PASS: the dev4-to-dev4.1 patch applies cleanly to an archive of baseline
+   commit b0fd60f and produces a tree identical to the dev4.1 source tree.
+
+9. Source ZIP integrity
+   PASS: unzip integrity test completed with no compressed-data errors.
+   PASS: packaged gradle.properties reports 1.3.0-dev4.1.
+   PASS: packaged ModNetworking registers protocol 12.
+
+API REVIEW
+The newly used Minecraft 26.2 APIs and input-event signatures were reviewed
+against the 26.2 generated API documentation/migration material available
+during implementation. This review is not a substitute for the required
+Java 25 NeoForge compilation and Minecraft runtime test.
+
+RUNTIME TESTS STILL REQUIRED
+- No item/container/crop drops or duplication during a region reset.
+- Correct restoration of chest/furnace/hopper/barrel contents.
+- Correct restoration of item frames, glow item frames, items/rotation and
+  paintings from a newly created version-3 snapshot.
+- Compatibility behavior for old version-1/version-2 snapshots.
+- Only the outer connected-claim perimeter on the HUD minimap.
+- Right-click drag and release both inside and outside the map widget.
+- Stronger one-block relief and cache regeneration on all three maps.
+- Client/server protocol mismatch rejection between dev4 and dev4.1.

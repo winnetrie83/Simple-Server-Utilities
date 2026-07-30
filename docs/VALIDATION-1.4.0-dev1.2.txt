@@ -1,0 +1,59 @@
+SSU 1.4.0-dev1.2 validation report
+==================================
+
+Scope
+-----
+- Dropdown-driven player/rank permission editor
+- Paged, typed permission controls and explanatory tooltips
+- Server-side permission metadata/value validation
+- Mouse-following, realigned 3D dashboard portrait
+- Network protocol 14
+
+Executable checks completed
+---------------------------
+PASS  PermissionCatalog compiled and executed in a pure Java harness.
+PASS  All 74 PermissionKeys entries resolve to non-empty editor metadata.
+PASS  Boolean normalization accepts ON/OFF and true/false and rejects unsupported values.
+PASS  Integer normalization accepts valid whole numbers and rejects negative/out-of-range/decimal examples.
+PASS  Existing custom keys remain editable as bounded text values.
+PASS  New permission request/data payload classes compiled against a minimal Minecraft network API stub.
+PASS  Payload constructor harness verified mode normalization and page/request bounds.
+PASS  SsuDashboardScreen and PlayerSkinWidgetAccessor compiled together against a focused Minecraft/NeoForge client API stub set.
+PASS  SsuMenuService, PermissionCatalog and both new payloads compiled together against a focused server API stub set.
+PASS  All 13 JSON resources parse successfully.
+PASS  All 13 PNG resources have a valid PNG signature, chunk structure, IEND and CRCs.
+PASS  Lightweight Java lexical balance scan passed for all 178 Java source/test files.
+PASS  No invalid player.getServer(), actor.getServer() or viewer.getServer() calls remain in main Java sources.
+PASS  Network registration uses protocol 14 and includes both dedicated permission-editor payloads.
+PASS  Client payload dispatch is registered and routes data only to an open SsuDashboardScreen.
+PASS  The client mixin configuration contains PlayerSkinWidgetAccessor in the client-only list.
+PASS  git diff --check reports no whitespace errors.
+
+Portrait geometry check
+-----------------------
+The 54x78 portrait frame's central transparent opening is x=11..42 and y=17..64.
+The PlayerSkinWidget is now 32x48 and positioned exactly at that opening relative to the frame.
+The frame is rendered after the widget, so the stone border masks its edge cleanly.
+
+Full Gradle/NeoForge build status
+---------------------------------
+NOT RUN TO COMPLETION in this environment.
+The included Gradle wrapper attempted to download Gradle 9.2.1 but failed with:
+java.net.UnknownHostException: services.gradle.org
+
+The available runtime is Java 21 while this project targets Java 25. A final compile and Minecraft runtime test must therefore be performed locally with Java 25:
+
+gradlew.bat clean test build
+
+Runtime checks still required
+-----------------------------
+- Open Players & Permissions and test both dropdown modes.
+- Select online and remembered offline players.
+- Test target filtering, permission filtering, dropdown scrolling and permission pagination.
+- Toggle boolean permissions and set/reset numeric/custom values.
+- Verify inherited/default values after reset.
+- Assign a rank to a selected player.
+- Verify permission tooltips at different GUI scales.
+- Confirm that the 3D model remains inside the frame and follows the pointer.
+- Restart the server and confirm permission persistence.
+- Confirm protocol-13 and protocol-14 installations are not mixed.

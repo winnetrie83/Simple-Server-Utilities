@@ -1,0 +1,51 @@
+SSU 1.3.0-dev4 validation report
+================================
+
+Base source
+-----------
+SSU-1.3.0-dev3.4-source(1).zip
+
+Version and compatibility
+-------------------------
+- Mod version: 1.3.0-dev4
+- Target: Minecraft 26.2, NeoForge 26.2.0.7-beta, Java 25
+- Network protocol: 11 (unchanged)
+- Existing claim, region, permission, home, warp, economy and rent schemas: compatible
+- Legacy version 1 region snapshots: readable when no version 2 generation exists
+- New client-only persistent aerial cache: isolated from server world data
+
+Implemented checks
+------------------
+- Central guard covers delete, redefine, snapshot capture, manual clear and manual reset.
+- Active region jobs, active rentals, pending rent journals and unresolved destructive resets are handled explicitly.
+- Delete/redefine invalidates active primary, backup and legacy snapshot generations.
+- Region redefine retains a spawn only when it remains inside the new bounds.
+- Dashboard refresh updates the existing screen and preserves page, pagination and draft fields.
+- Snapshot capture is a bounded job; serialization runs on the single storage worker.
+- Snapshot v2 is gzip-compressed, palette-based, checksummed and atomically published.
+- Valid v2 backup recovery is supported; v2 corruption does not silently fall back to stale v1 data.
+- Block-entity SNBT capture/restore has a guarded compatibility fallback.
+- Destructive reset checkpoints distinguish running, interrupted, failed, cancelled, completed and recovered states.
+- Persistent aerial tiles are namespaced by server/world, resource-pack fingerprint and dimension.
+- Disk reads/writes are asynchronous; writes coalesce per tile and session barriers prevent stale publication.
+- Cache corruption is isolated, disk use is capped and normal shutdown attempts to drain writes.
+
+Executable regression checks
+----------------------------
+- Pure coordinate checks passed for negative snapshot coordinates and cache-region floor division.
+- Unsafe cache path components, including '..', are rejected.
+- Stubbed aerial-map storage runtime passed per-tile write coalescing, latest-value readback and palette invalidation/session-barrier checks.
+- Static source assertions confirmed stale-session read rejection, corrupt-cache artifact accounting and the normal-shutdown flush hook are present.
+- Stubbed batched-storage runtime passed immutable task execution, same-file write coalescing, flush and active-task accounting.
+- javac source parse scan found no Java syntax diagnostics; unresolved Minecraft/NeoForge symbols are expected without the target dependencies.
+- git diff whitespace/error check passed.
+
+Build limitation
+----------------
+A full Gradle/NeoForge compile could not be completed in this sandbox. It provides Java 21.0.10 while the project requires Java 25, and the Gradle wrapper cannot resolve services.gradle.org from the sandbox. Before server testing, run the checked-in wrapper with Java 25:
+
+    ./gradlew clean test build
+
+Runtime status
+--------------
+This build is source-complete and statically/regression validated, but it has not yet been confirmed inside Minecraft 26.2. Treat it as a test build until the manual test plan succeeds on a copied world.

@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.permission.policy;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import net.minecraft.server.level.ServerPlayer;
@@ -31,8 +32,12 @@ public class RegionPolicy {
     }
 
     public static boolean canTeleportRegion(ServerPlayer player) {
+        return canTeleportRegion(player, PermissionContext.global(player));
+    }
+
+    public static boolean canTeleportRegion(ServerPlayer player, PermissionContext context) {
         return Config.ENABLE_ADMIN_REGIONS.get()
-                && PermissionService.getBoolean(player, PermissionKeys.REGIONS_TELEPORT, false);
+                && TeleportPolicy.canTeleport(player, TeleportType.REGION, context);
     }
 
     public static boolean canRentRegion(ServerPlayer player) {

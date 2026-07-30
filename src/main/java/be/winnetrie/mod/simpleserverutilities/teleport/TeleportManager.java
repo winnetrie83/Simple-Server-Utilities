@@ -6,9 +6,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportOptions;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -30,6 +31,44 @@ public class TeleportManager {
             double z,
             float yaw,
             float pitch
+    ) {
+        return requestTeleport(player, cooldownKey, targetName, options, targetLevel,
+                x, y, z, yaw, pitch, ignored -> true, "Teleport is no longer allowed.");
+    }
+
+    public int requestTeleport(
+            ServerPlayer player,
+            String cooldownKey,
+            String targetName,
+            TeleportOptions options,
+            ServerLevel targetLevel,
+            double x,
+            double y,
+            double z,
+            float yaw,
+            float pitch,
+            Predicate<ServerPlayer> executionGuard,
+            String guardFailureMessage
+    ) {
+        return requestTeleport(
+                player, cooldownKey, targetName, options, targetLevel, x, y, z, yaw, pitch,
+                executionGuard, ignored -> guardFailureMessage
+        );
+    }
+
+    public int requestTeleport(
+            ServerPlayer player,
+            String cooldownKey,
+            String targetName,
+            TeleportOptions options,
+            ServerLevel targetLevel,
+            double x,
+            double y,
+            double z,
+            float yaw,
+            float pitch,
+            Predicate<ServerPlayer> executionGuard,
+            Function<ServerPlayer, String> guardFailureMessage
     ) {
         MinecraftServer server = player.level().getServer();
 
@@ -59,6 +98,17 @@ public class TeleportManager {
 
         if (pendingTeleports.containsKey(player.getUUID())) {
             player.sendSystemMessage(Component.literal("You already have a pending teleport."));
+            return 0;
+        }
+
+        Predicate<ServerPlayer> resolvedGuard = executionGuard == null ? ignored -> true : executionGuard;
+        Function<ServerPlayer, String> resolvedGuardFailure = candidate -> {
+            String message = guardFailureMessage == null ? null : guardFailureMessage.apply(candidate);
+            return message == null || message.isBlank()
+                    ? "Teleport is no longer allowed." : message;
+        };
+        if (!resolvedGuard.test(player)) {
+            player.sendSystemMessage(Component.literal(resolvedGuardFailure.apply(player)));
             return 0;
         }
 
@@ -98,17 +148,23 @@ public class TeleportManager {
                 yaw,
                 pitch,
                 options.cooldownSeconds(),
-                options.cancelOnMove(),
+                options.requireStill(),
                 executeAtTick,
                 player.level().dimension().identifier().toString(),
-                player.blockPosition()
+                player.getX(),
+                player.getY(),
+                player.getZ(),
+                resolvedGuard,
+                resolvedGuardFailure
         );
 
         pendingTeleports.put(player.getUUID(), pendingTeleport);
 
-        player.sendSystemMessage(Component.literal(
-                "Teleporting to " + targetName + " in " + options.delaySeconds() + " seconds. Stand still."
-        ));
+        String countdownMessage = "Teleporting to " + targetName + " in " + options.delaySeconds() + " seconds.";
+        if (options.requireStill()) {
+            countdownMessage += " Remain still or the teleport will be cancelled.";
+        }
+        player.sendSystemMessage(Component.literal(countdownMessage));
 
         return 1;
     }
@@ -133,13 +189,19 @@ public class TeleportManager {
                 continue;
             }
 
-            if (pendingTeleport.cancelOnMove() && hasMoved(player, pendingTeleport)) {
+            if (pendingTeleport.requireStill() && hasMoved(player, pendingTeleport)) {
                 iterator.remove();
                 player.sendSystemMessage(Component.literal("Teleport cancelled because you moved."));
                 continue;
             }
 
             if (currentTick < pendingTeleport.executeAtTick()) {
+                continue;
+            }
+
+            if (!pendingTeleport.executionGuard().test(player)) {
+                iterator.remove();
+                player.sendSystemMessage(Component.literal(pendingTeleport.guardFailureMessage().apply(player)));
                 continue;
             }
 
@@ -184,12 +246,16 @@ public class TeleportManager {
 
     private boolean hasMoved(ServerPlayer player, PendingTeleport pendingTeleport) {
         String currentDimension = player.level().dimension().identifier().toString();
-
         if (!currentDimension.equals(pendingTeleport.startDimension())) {
             return true;
         }
 
-        return !player.blockPosition().equals(pendingTeleport.startBlockPos());
+        return TeleportMovementGuard.hasMoved(
+                pendingTeleport.startDimension(),
+                pendingTeleport.startX(), pendingTeleport.startY(), pendingTeleport.startZ(),
+                currentDimension,
+                player.getX(), player.getY(), player.getZ()
+        );
     }
 
     private void doTeleport(
@@ -235,6 +301,12 @@ public class TeleportManager {
         return Math.max(1, (int) Math.ceil(ticks / 20.0D));
     }
 
+    /** Clears session-only pending teleports and cooldowns between server lifecycles. */
+    public void clear() {
+        pendingTeleports.clear();
+        cooldownUntilTick.clear();
+    }
+
     private record PendingTeleport(
             UUID playerId,
             String cooldownKey,
@@ -246,10 +318,14 @@ public class TeleportManager {
             float yaw,
             float pitch,
             int cooldownSeconds,
-            boolean cancelOnMove,
+            boolean requireStill,
             long executeAtTick,
             String startDimension,
-            BlockPos startBlockPos
+            double startX,
+            double startY,
+            double startZ,
+            Predicate<ServerPlayer> executionGuard,
+            Function<ServerPlayer, String> guardFailureMessage
     ) {
     }
 }

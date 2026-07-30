@@ -9,10 +9,13 @@ import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapOperation;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.WorldMapRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsRequestPayload;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
@@ -24,11 +27,14 @@ public final class ClaimMapScreen extends Screen {
     private ClaimMapOperation operation;
     private final Set<Long> selectedChunks = new LinkedHashSet<>();
     private ClaimMapWidget mapWidget;
-    private final ClaimTerrainMap terrainMap = new ClaimTerrainMap();
+    private ClaimTerrainMap terrainMap = new ClaimTerrainMap();
+    private boolean terrainMapClosed;
     private EditBox claimNameBox;
     private Button applyButton;
     private Button clearButton;
     private String draftClaimName = "";
+    private String pendingDeleteClaim = "";
+    private long nextSettingsRequestId = 1L;
 
     public ClaimMapScreen(ClaimMapDataPayload payload) {
         super(Component.literal("Interactive Claim Map"));
@@ -37,12 +43,22 @@ public final class ClaimMapScreen extends Screen {
     }
 
     public void acceptSnapshot(ClaimMapDataPayload updated) {
+        if (updated.centerChunkX() != payload.centerChunkX()
+                || updated.centerChunkZ() != payload.centerChunkZ()
+                || updated.radius() != payload.radius()) {
+            return;
+        }
+
         boolean completedCreate = operation == ClaimMapOperation.CREATE
                 && !updated.error()
                 && !updated.notice().isBlank()
                 && updated.ownedClaimGroups().stream().anyMatch(name -> name.equalsIgnoreCase(updated.selectedClaimGroup()));
         this.payload = updated;
         this.selectedChunks.clear();
+        if (updated.selectedClaimGroup().isBlank() && operation != ClaimMapOperation.CREATE) {
+            operation = ClaimMapOperation.CREATE;
+            pendingDeleteClaim = "";
+        }
         if (completedCreate) {
             operation = ClaimMapOperation.ADD;
             draftClaimName = "";
@@ -52,6 +68,10 @@ public final class ClaimMapScreen extends Screen {
 
     @Override
     protected void init() {
+        if (terrainMapClosed) {
+            terrainMap = new ClaimTerrainMap();
+            terrainMapClosed = false;
+        }
         int margin = 14;
         int panelWidth = Math.min(760, width - margin * 2);
         int panelLeft = (width - panelWidth) / 2;
@@ -140,10 +160,24 @@ public final class ClaimMapScreen extends Screen {
         clearButton = Button.builder(Component.literal("Clear"), ignored -> clearSelection())
                 .bounds(controlLeft + 138, y, 66, 20).build();
         addRenderableWidget(clearButton);
+
+        y += 28;
+        Button settings = Button.builder(Component.literal("Settings"), ignored -> openClaimSettings())
+                .bounds(controlLeft, y, 96, 20).build();
+        settings.active = !payload.selectedClaimGroup().isBlank();
+        addRenderableWidget(settings);
+        String deleteLabel = pendingDeleteClaim.equalsIgnoreCase(payload.selectedClaimGroup())
+                ? "Confirm delete" : "Delete claim";
+        Button delete = Button.builder(Component.literal(deleteLabel), ignored -> requestDeleteClaim())
+                .bounds(controlLeft + 102, y, 102, 20).build();
+        delete.active = !payload.selectedClaimGroup().isBlank();
+        addRenderableWidget(delete);
         updateActionButtons();
 
         addRenderableWidget(Button.builder(Component.literal("Back to SSU menu"), ignored -> backToMenu())
                 .bounds(panelLeft, height - 28, 130, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("World map"), ignored -> openWorldMap())
+                .bounds(panelLeft + 136, height - 28, 90, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Done"), ignored -> onClose())
                 .bounds(panelLeft + panelWidth - 70, height - 28, 70, 20).build());
     }
@@ -178,7 +212,7 @@ public final class ClaimMapScreen extends Screen {
                 : (payload.selectedClaimGroup().isBlank() ? "<none>" : payload.selectedClaimGroup());
         graphics.text(font, selectedClaim, controlLeft + 32, top + 88, 0xFFFFFFFF);
 
-        int infoY = top + (operation == ClaimMapOperation.CREATE ? 202 : 174);
+        int infoY = top + (operation == ClaimMapOperation.CREATE ? 230 : 202);
         graphics.text(font, "Selected: " + selectedChunks.size() + " / " + ClaimMapWidget.MAX_SELECTION_SIZE + " chunk(s)", controlLeft, infoY, 0xFFFFFFFF);
         graphics.text(font,
                 "Total chunks: " + payload.usedChunks() + " / " + payload.maxChunks(),
@@ -204,7 +238,7 @@ public final class ClaimMapScreen extends Screen {
             graphics.text(font, payload.notice(), panelLeft, height - 44,
                     payload.error() ? 0xFFFF6B6B : 0xFF6BFF88);
         } else {
-            graphics.text(font, "Left-click chunks to select. Right-drag to pan. Scroll to zoom.",
+            graphics.text(font, "Left-click chunks to select. Hold right mouse and drag the map. Scroll to zoom.",
                     panelLeft, height - 44, 0xFFBEBEBE);
         }
 
@@ -230,6 +264,7 @@ public final class ClaimMapScreen extends Screen {
 
     private void setOperation(ClaimMapOperation newOperation) {
         operation = newOperation;
+        pendingDeleteClaim = "";
         selectedChunks.clear();
         rebuildWidgets();
     }
@@ -242,6 +277,7 @@ public final class ClaimMapScreen extends Screen {
         int current = indexOfIgnoreCase(claims, payload.selectedClaimGroup());
         int next = Math.floorMod((current < 0 ? 0 : current) + direction, claims.size());
         operation = ClaimMapOperation.ADD;
+        pendingDeleteClaim = "";
         requestMap(payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), claims.get(next));
     }
 
@@ -267,6 +303,34 @@ public final class ClaimMapScreen extends Screen {
 
     private void requestMap(int centerX, int centerZ, int radius, String selectedClaim) {
         selectedChunks.clear();
+
+        /*
+         * Move the viewport immediately. Existing terrain and claim entries are
+         * kept as geographically anchored preview data until the authoritative
+         * server snapshot for the new view arrives.
+         */
+        payload = new ClaimMapDataPayload(
+                centerX,
+                centerZ,
+                radius,
+                selectedClaim,
+                payload.ownedClaimGroups(),
+                payload.usedChunks(),
+                payload.maxChunks(),
+                payload.usedClaimGroups(),
+                payload.maxClaimGroups(),
+                payload.selectedClaimChunks(),
+                payload.maxChunksPerClaim(),
+                payload.canCreateClaims(),
+                payload.ownClaimColor(),
+                payload.otherClaimColor(),
+                payload.regionColor(),
+                payload.selectionColor(),
+                "",
+                false,
+                payload.chunks()
+        );
+        rebuildWidgets();
         ClientPacketDistributor.sendToServer(new ClaimMapRequestPayload(centerX, centerZ, radius, selectedClaim));
     }
 
@@ -304,6 +368,7 @@ public final class ClaimMapScreen extends Screen {
             case CREATE -> "Create selected claim";
             case ADD -> "Add selected chunks";
             case REMOVE -> "Remove selected chunks";
+            case DELETE -> "Delete claim";
         };
     }
 
@@ -323,6 +388,34 @@ public final class ClaimMapScreen extends Screen {
         if (clearButton != null) {
             clearButton.active = !selectedChunks.isEmpty();
         }
+    }
+
+    private void openClaimSettings() {
+        if (payload.selectedClaimGroup().isBlank()) return;
+        ClientPacketDistributor.sendToServer(new SsuPropertySettingsRequestPayload(
+                "claim", payload.selectedClaimGroup(), nextSettingsRequestId++));
+    }
+
+    private void requestDeleteClaim() {
+        String claim = payload.selectedClaimGroup();
+        if (claim.isBlank()) return;
+        if (!pendingDeleteClaim.equalsIgnoreCase(claim)) {
+            pendingDeleteClaim = claim;
+            rebuildWidgets();
+            return;
+        }
+        pendingDeleteClaim = "";
+        selectedChunks.clear();
+        ClientPacketDistributor.sendToServer(new ClaimMapActionPayload(
+                ClaimMapOperation.DELETE, claim, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), List.of()));
+    }
+
+    private void openWorldMap() {
+        ClientPacketDistributor.sendToServer(new WorldMapRequestPayload(
+                payload.centerChunkX(),
+                payload.centerChunkZ(),
+                Math.max(3, Math.min(32, payload.radius()))
+        ));
     }
 
     private void backToMenu() {
@@ -349,7 +442,34 @@ public final class ClaimMapScreen extends Screen {
     @Override
     public void removed() {
         terrainMap.close();
+        terrainMapClosed = true;
         super.removed();
+    }
+
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (event.buttonInfo().button() == 1
+                && mapWidget != null
+                && mapWidget.beginRightDrag(event.x(), event.y())) {
+            return true;
+        }
+        return super.mouseClicked(event, doubleClick);
+    }
+
+    @Override
+    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+        if (mapWidget != null && mapWidget.isRightDragging()) {
+            return mapWidget.updateRightDrag(event.x(), event.y());
+        }
+        return super.mouseDragged(event, deltaX, deltaY);
+    }
+
+    @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        if (mapWidget != null && mapWidget.isRightDragging()) {
+            return mapWidget.finishRightDrag();
+        }
+        return super.mouseReleased(event);
     }
 
     @Override

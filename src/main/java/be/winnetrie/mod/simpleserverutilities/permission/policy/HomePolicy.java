@@ -36,7 +36,7 @@ public class HomePolicy {
 
     public static boolean canTeleportHome(ServerPlayer player, PermissionContext context) {
         return canUseHomes(player, context)
-                && PermissionService.getBoolean(player, PermissionKeys.HOMES_TELEPORT, true, context);
+                && TeleportPolicy.canTeleport(player, TeleportType.HOME, context);
     }
 
     public static boolean canDeleteHome(ServerPlayer player) {

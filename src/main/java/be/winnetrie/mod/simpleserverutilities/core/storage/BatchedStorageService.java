@@ -6,6 +6,8 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -23,10 +25,10 @@ import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 /**
  * Coalescing, single-writer storage queue.
  *
- * <p>Callers serialize immutable snapshots on the server thread and enqueue the
- * resulting text. Repeated writes to the same path are coalesced so only the
- * newest snapshot reaches disk. No Minecraft world state is ever accessed from
- * the storage worker.</p>
+ * <p>Callers may enqueue already-serialized immutable snapshots or submit
+ * immutable parsing/serialization tasks. Repeated writes to the same path are
+ * coalesced so only the newest snapshot reaches disk. No live Minecraft world
+ * state may ever be accessed from the storage worker.</p>
  */
 public final class BatchedStorageService {
 
@@ -37,6 +39,7 @@ public final class BatchedStorageService {
     private final AtomicLong completedWrites = new AtomicLong();
     private final AtomicLong failedWrites = new AtomicLong();
     private final AtomicLong coalescedWrites = new AtomicLong();
+    private final AtomicLong activeTasks = new AtomicLong();
     private final Set<Path> retryRequired = ConcurrentHashMap.newKeySet();
 
     private volatile ExecutorService executor;
@@ -64,6 +67,38 @@ public final class BatchedStorageService {
 
     public void queueDelete(Path file) {
         enqueue(file, new PendingOperation(OperationType.DELETE, "", 0));
+    }
+
+    /**
+     * Runs immutable serialization or parsing work on SSU's single storage
+     * worker. The task must never access live Minecraft world state.
+     */
+    public <T> CompletableFuture<T> submitTask(Callable<T> task) {
+        Objects.requireNonNull(task, "task");
+        start();
+        CompletableFuture<T> result = new CompletableFuture<>();
+        activeTasks.incrementAndGet();
+        ExecutorService current = executor;
+        if (current == null || current.isShutdown()) {
+            activeTasks.decrementAndGet();
+            result.completeExceptionally(new IllegalStateException("SSU storage worker is not available."));
+            return result;
+        }
+        try {
+            current.execute(() -> {
+                try {
+                    result.complete(task.call());
+                } catch (Throwable throwable) {
+                    result.completeExceptionally(throwable);
+                } finally {
+                    activeTasks.decrementAndGet();
+                }
+            });
+        } catch (RuntimeException e) {
+            activeTasks.decrementAndGet();
+            result.completeExceptionally(e);
+        }
+        return result;
     }
 
     private void enqueue(Path rawFile, PendingOperation operation) {
@@ -153,7 +188,8 @@ public final class BatchedStorageService {
                 });
                 long remainingNanos = Math.max(1L, deadline - System.nanoTime());
                 barrier.get(remainingNanos, TimeUnit.NANOSECONDS);
-                if (pending.isEmpty() && order.isEmpty() && !drainScheduled.get() && retryRequired.isEmpty()) {
+                if (pending.isEmpty() && order.isEmpty() && !drainScheduled.get()
+                        && retryRequired.isEmpty() && activeTasks.get() == 0L) {
                     return true;
                 }
             }
@@ -163,9 +199,11 @@ public final class BatchedStorageService {
         }
 
         SimpleServerUtilities.LOGGER.error(
-                "Timed out while flushing SSU storage queue. {} operation(s) remain; {} path(s) require retry.",
+                "Timed out while flushing SSU storage queue. {} operation(s) remain; {} path(s) require retry; "
+                        + "{} immutable task(s) are still active.",
                 pending.size(),
-                retryRequired.size()
+                retryRequired.size(),
+                activeTasks.get()
         );
         return false;
     }
@@ -204,7 +242,8 @@ public final class BatchedStorageService {
                 failedWrites.get(),
                 coalescedWrites.get(),
                 pending.size(),
-                retryRequired.size()
+                retryRequired.size(),
+                activeTasks.get()
         );
     }
 
@@ -214,7 +253,8 @@ public final class BatchedStorageService {
             long failed,
             long coalesced,
             int pending,
-            int retryRequired
+            int retryRequired,
+            long activeTasks
     ) {
     }
 

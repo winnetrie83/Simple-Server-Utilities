@@ -24,7 +24,7 @@ public class Region {
 
     private int priority = 0;
 
-    private final Set<UUID> owners = new HashSet<>();
+    private final Set<UUID> managers = new HashSet<>();
     private final Set<UUID> members = new HashSet<>();
 
     private final RegionSettings settings = new RegionSettings();
@@ -99,8 +99,8 @@ public class Region {
                 && pos.getZ() >= minZ && pos.getZ() <= maxZ;
     }
 
-    public boolean isOwner(UUID uuid) {
-        return owners.contains(uuid);
+    public boolean isManager(UUID uuid) {
+        return managers.contains(uuid);
     }
 
     public boolean isMember(UUID uuid) {
@@ -108,15 +108,15 @@ public class Region {
     }
 
     public boolean hasAccess(UUID uuid) {
-        return isOwner(uuid) || isMember(uuid);
+        return isManager(uuid) || isMember(uuid);
     }
 
-    public void addOwner(UUID uuid) {
-        owners.add(uuid);
+    public void addManager(UUID uuid) {
+        managers.add(uuid);
     }
 
-    public void removeOwner(UUID uuid) {
-        owners.remove(uuid);
+    public void removeManager(UUID uuid) {
+        managers.remove(uuid);
     }
 
     public void addMember(UUID uuid) {
@@ -127,8 +127,8 @@ public class Region {
         members.remove(uuid);
     }
 
-    public Set<UUID> getOwners() {
-        return owners;
+    public Set<UUID> getManagers() {
+        return managers;
     }
 
     public Set<UUID> getMembers() {
@@ -164,7 +164,7 @@ public class Region {
     }
 
     public String getPermissionOverride(String key) {
-        return permissionOverrides.get(key);
+        return key == null ? null : permissionOverrides.get(key.trim().toLowerCase(java.util.Locale.ROOT));
     }
 
     public void setPermissionOverride(String key, String value) {
@@ -172,16 +172,17 @@ public class Region {
             return;
         }
 
+        String normalizedKey = key.trim().toLowerCase(java.util.Locale.ROOT);
         if (value == null || value.isBlank()) {
-            permissionOverrides.remove(key);
+            permissionOverrides.remove(normalizedKey);
             return;
         }
 
-        permissionOverrides.put(key.trim(), value.trim());
+        permissionOverrides.put(normalizedKey, value.trim());
     }
 
     public void removePermissionOverride(String key) {
-        permissionOverrides.remove(key);
+        if (key != null) permissionOverrides.remove(key.trim().toLowerCase(java.util.Locale.ROOT));
     }
 
     public BlockPos getSpawnPos() {
@@ -192,6 +193,12 @@ public class Region {
         this.spawnPos = spawnPos.immutable();
         this.spawnYaw = spawnYaw;
         this.spawnPitch = spawnPitch;
+    }
+
+    public void clearSpawn() {
+        this.spawnPos = null;
+        this.spawnYaw = 0.0F;
+        this.spawnPitch = 0.0F;
     }
 
     public float getSpawnYaw() {
