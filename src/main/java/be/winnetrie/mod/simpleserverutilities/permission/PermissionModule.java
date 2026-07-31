@@ -2,6 +2,8 @@ package be.winnetrie.mod.simpleserverutilities.permission;
 
 import java.util.Set;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
+
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModule;
 import be.winnetrie.mod.simpleserverutilities.core.service.SsuServiceRegistry;
 import net.minecraft.server.MinecraftServer;
@@ -18,6 +20,11 @@ public final class PermissionModule implements SsuModule {
     @Override
     public String id() {
         return "permissions";
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return Config.ENABLE_PERMISSION_SYSTEM.get();
     }
 
     @Override
@@ -39,5 +46,6 @@ public final class PermissionModule implements SsuModule {
     @Override
     public void onServerStopping(MinecraftServer server) {
         manager.save();
+        manager.clear();
     }
 }

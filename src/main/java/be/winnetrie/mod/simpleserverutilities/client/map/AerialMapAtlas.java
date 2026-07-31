@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.client.map;
 
 import java.util.ArrayDeque;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Queue;
@@ -10,6 +11,8 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jspecify.annotations.Nullable;
@@ -27,11 +30,14 @@ public final class AerialMapAtlas {
 
     private static final int TILE_BLOCKS = 16;
     /** Bump whenever persisted pixels must be rebuilt by a new renderer. */
-    private static final String RENDERER_FINGERPRINT = "atlas-topographic-v4-";
+    private static final String RENDERER_FINGERPRINT = "atlas-topographic-v6-";
     private static final int DETAIL = TerrainColorSampler.DETAIL;
     private static final int BASE_TILE_PIXELS = TILE_BLOCKS * DETAIL;
-    private static final int MAX_TILES_PER_DIMENSION = 2048;
-    private static final int BACKGROUND_SCAN_RADIUS = 9;
+    private static final int MAX_TILES_PER_DIMENSION = 9216;
+    private static final int DEFAULT_LIVE_UPDATE_RADIUS_CHUNKS = 8;
+    private static final int MAX_LIVE_UPDATE_RADIUS_CHUNKS = 32;
+    private static final long TRANSIENT_TILE_KEEP_TICKS = 200L;
+    private static final long MEMORY_SWEEP_INTERVAL_TICKS = 40L;
     private static final int RELIEF_MARGIN = 8;
     private static final int RELIEF_GRID_SIZE = TILE_BLOCKS + RELIEF_MARGIN * 2;
     private static final int BACKGROUND_TILES_PER_TICK = 2;
@@ -45,6 +51,8 @@ public final class AerialMapAtlas {
     private static String scanDimension = "";
     private static int scanCenterChunkX = Integer.MIN_VALUE;
     private static int scanCenterChunkZ = Integer.MIN_VALUE;
+    private static int scanRadiusChunks = Integer.MIN_VALUE;
+    private static int liveUpdateRadiusChunks = DEFAULT_LIVE_UPDATE_RADIUS_CHUNKS;
     private static long atlasTick;
     private static int paletteGeneration = Integer.MIN_VALUE;
     private static String paletteFingerprint = "";
@@ -99,6 +107,7 @@ public final class AerialMapAtlas {
         if (!dimension.equals(scanDimension)
                 || centerX != scanCenterChunkX
                 || centerZ != scanCenterChunkZ
+                || scanRadiusChunks != liveUpdateRadiusChunks
                 || SCAN_QUEUE.isEmpty()) {
             rebuildScanQueue(dimension, centerX, centerZ);
         }
@@ -113,6 +122,10 @@ public final class AerialMapAtlas {
                 requestDiskTile(level, chunkX, chunkZ);
             }
             processed++;
+        }
+
+        if (atlasTick % MEMORY_SWEEP_INTERVAL_TICKS == 0L) {
+            evictColdTiles(level, centerX, centerZ);
         }
 
         if (atlasTick % 1_200L == 0L) {
@@ -193,9 +206,58 @@ public final class AerialMapAtlas {
         return sample(level, worldX, worldZ);
     }
 
+    /** Returns the cached mapped-surface Y without force-loading a chunk. */
+    public static int surfaceHeightAvailable(ClientLevel level, int worldX, int worldZ, int fallback) {
+        SurfaceTile tile = getOrCapture(level, worldX >> 4, worldZ >> 4);
+        if (tile == null) return fallback;
+        int index = Math.floorMod(worldZ, TILE_BLOCKS) * TILE_BLOCKS + Math.floorMod(worldX, TILE_BLOCKS);
+        return tile.surfaceHeights[index];
+    }
+
+    /** Returns cached block light at the mapped surface without loading a chunk. */
+    public static int blockLightAvailable(ClientLevel level, int worldX, int worldZ, int fallback) {
+        SurfaceTile tile = getOrCapture(level, worldX >> 4, worldZ >> 4);
+        if (tile == null) return Math.max(0, Math.min(15, fallback));
+        int index = Math.floorMod(worldZ, TILE_BLOCKS) * TILE_BLOCKS + Math.floorMod(worldX, TILE_BLOCKS);
+        return Byte.toUnsignedInt(tile.blockLights[index]);
+    }
+
+    /** Returns cached surface height, block id and biome id without force-loading a chunk. */
+    public static SurfaceInfo surfaceInfoAvailable(
+            ClientLevel level,
+            int worldX,
+            int worldZ,
+            int fallbackY
+    ) {
+        SurfaceTile tile = getOrCapture(level, worldX >> 4, worldZ >> 4);
+        if (tile == null) {
+            return new SurfaceInfo(fallbackY, "", "");
+        }
+        int index = Math.floorMod(worldZ, TILE_BLOCKS) * TILE_BLOCKS + Math.floorMod(worldX, TILE_BLOCKS);
+        return new SurfaceInfo(
+                tile.surfaceHeights[index],
+                tile.surfaceBlockIds[index],
+                tile.biomeIds[index]
+        );
+    }
+
     /** Refreshes a loaded chunk tile after a visible map explicitly needs it. */
     public static void refreshLoadedChunk(ClientLevel level, int chunkX, int chunkZ) {
-        captureIfLoaded(level, chunkX, chunkZ, true);
+        if (isWithinLiveUpdateRadius(level, chunkX, chunkZ)) {
+            captureIfLoaded(level, chunkX, chunkZ, true);
+        } else {
+            requestDiskTile(level, chunkX, chunkZ);
+        }
+    }
+
+    public static void setLiveUpdateRadiusChunks(int radiusChunks) {
+        int normalized = Math.max(1, Math.min(MAX_LIVE_UPDATE_RADIUS_CHUNKS, radiusChunks));
+        if (normalized == liveUpdateRadiusChunks) {
+            return;
+        }
+        liveUpdateRadiusChunks = normalized;
+        SCAN_QUEUE.clear();
+        scanRadiusChunks = Integer.MIN_VALUE;
     }
 
     public static void clear() {
@@ -209,6 +271,7 @@ public final class AerialMapAtlas {
         atlasTick = 0L;
         capturedTiles = 0L;
         captureNanos = 0L;
+        liveUpdateRadiusChunks = DEFAULT_LIVE_UPDATE_RADIUS_CHUNKS;
     }
 
     private static void clearTilesOnly() {
@@ -217,22 +280,35 @@ public final class AerialMapAtlas {
         scanDimension = "";
         scanCenterChunkX = Integer.MIN_VALUE;
         scanCenterChunkZ = Integer.MIN_VALUE;
+        scanRadiusChunks = Integer.MIN_VALUE;
     }
 
     private static @Nullable SurfaceTile getOrCapture(ClientLevel level, int chunkX, int chunkZ) {
         SurfaceTile tile = tile(level, chunkX, chunkZ);
-        if (tile == null || tile.paletteGeneration != paletteGeneration) {
-            tile = captureIfLoaded(level, chunkX, chunkZ, false);
+        if (tile != null && tile.paletteGeneration != paletteGeneration) {
+            tile = null;
+        }
+        if (tile == null) {
+            tile = isWithinLiveUpdateRadius(level, chunkX, chunkZ)
+                    ? captureIfLoaded(level, chunkX, chunkZ, false)
+                    : null;
             if (tile == null) {
                 requestDiskTile(level, chunkX, chunkZ);
             }
+        } else if (atlasTick - tile.capturedTick >= TILE_REFRESH_TICKS
+                && isWithinLiveUpdateRadius(level, chunkX, chunkZ)) {
+            tile = captureIfLoaded(level, chunkX, chunkZ, false);
         }
         return tile;
     }
 
     private static @Nullable SurfaceTile tile(ClientLevel level, int chunkX, int chunkZ) {
         DimensionAtlas atlas = DIMENSIONS.get(dimension(level));
-        return atlas == null ? null : atlas.tiles.get(key(chunkX, chunkZ));
+        SurfaceTile tile = atlas == null ? null : atlas.tiles.get(key(chunkX, chunkZ));
+        if (tile != null) {
+            tile.lastAccessTick = atlasTick;
+        }
+        return tile;
     }
 
     private static @Nullable SurfaceTile captureIfLoaded(
@@ -245,6 +321,9 @@ public final class AerialMapAtlas {
         DimensionAtlas atlas = DIMENSIONS.computeIfAbsent(dimension, ignored -> new DimensionAtlas());
         long key = key(chunkX, chunkZ);
         SurfaceTile existing = atlas.tiles.get(key);
+        if (existing != null) {
+            existing.lastAccessTick = atlasTick;
+        }
         if (existing != null
                 && existing.paletteGeneration == paletteGeneration
                 && !force
@@ -254,7 +333,7 @@ public final class AerialMapAtlas {
 
         LevelChunk chunk = level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
         if (chunk == null) {
-            return existing;
+            return existing != null && existing.paletteGeneration == paletteGeneration ? existing : null;
         }
 
         long captureStarted = System.nanoTime();
@@ -262,6 +341,11 @@ public final class AerialMapAtlas {
         short[] terrainHeights = new short[TILE_BLOCKS * TILE_BLOCKS];
         short[] surfaceHeights = new short[TILE_BLOCKS * TILE_BLOCKS];
         byte[] surfaceKinds = new byte[TILE_BLOCKS * TILE_BLOCKS];
+        byte[] blockLights = new byte[TILE_BLOCKS * TILE_BLOCKS];
+        String[] surfaceBlockIds = new String[TILE_BLOCKS * TILE_BLOCKS];
+        String[] biomeIds = new String[TILE_BLOCKS * TILE_BLOCKS];
+        Map<String, String> blockIdPool = new HashMap<>();
+        Map<String, String> biomeIdPool = new HashMap<>();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         TerrainColorSampler.Scratch scratch = new TerrainColorSampler.Scratch();
 
@@ -283,6 +367,18 @@ public final class AerialMapAtlas {
                 terrainHeights[blockIndex] = clampedShort(scratch.terrainHeight());
                 surfaceHeights[blockIndex] = clampedShort(scratch.mappedSurfaceHeight());
                 surfaceKinds[blockIndex] = scratch.mappedSurfaceKind();
+                int surfaceY = scratch.mappedSurfaceHeight();
+                pos.set(worldX, surfaceY, worldZ);
+                String blockId = registryId(chunk.getBlockState(pos).getBlock());
+                String biomeId = level.getBiome(pos).getRegisteredName();
+                surfaceBlockIds[blockIndex] = blockIdPool.computeIfAbsent(blockId, ignored -> blockId);
+                biomeIds[blockIndex] = biomeIdPool.computeIfAbsent(biomeId, ignored -> biomeId);
+                int blockLight = 0;
+                for (int offsetY = -1; offsetY <= 2; offsetY++) {
+                    pos.set(worldX, surfaceY + offsetY, worldZ);
+                    blockLight = Math.max(blockLight, level.getBrightness(LightLayer.BLOCK, pos));
+                }
+                blockLights[blockIndex] = (byte) Math.max(0, Math.min(15, blockLight));
             }
         }
 
@@ -330,9 +426,9 @@ public final class AerialMapAtlas {
                         heightAt(grids.terrain(), localX, localZ + 8)
                 );
                 double terrainLight = terraceLight * (1.0D
-                        + (localLight - 1.0D) * 0.34D
-                        + (broadLight - 1.0D) * 0.96D
-                        + (macroLight - 1.0D) * 1.22D);
+                        + (localLight - 1.0D) * 0.46D
+                        + (broadLight - 1.0D) * 1.12D
+                        + (macroLight - 1.0D) * 1.38D);
 
                 byte kind = kindAt(grids.kinds(), localX, localZ);
                 double light;
@@ -364,7 +460,7 @@ public final class AerialMapAtlas {
                             + (macroLight - 1.0D) * 0.58D;
                     light = Math.max(0.78D, Math.min(1.10D, light));
                 } else {
-                    light = Math.max(0.72D, Math.min(1.18D, terrainLight));
+                    light = Math.max(0.66D, Math.min(1.24D, terrainLight));
                 }
 
                 int sourceBase = (localZ * TILE_BLOCKS + localX) * TerrainColorSampler.DETAIL_PIXELS;
@@ -385,6 +481,9 @@ public final class AerialMapAtlas {
                 terrainHeights,
                 surfaceHeights,
                 surfaceKinds,
+                blockLights,
+                surfaceBlockIds,
+                biomeIds,
                 atlasTick,
                 paletteGeneration
         );
@@ -402,7 +501,10 @@ public final class AerialMapAtlas {
                 base,
                 terrainHeights,
                 surfaceHeights,
-                surfaceKinds
+                surfaceKinds,
+                blockLights,
+                surfaceBlockIds,
+                biomeIds
         );
         return captured;
     }
@@ -422,7 +524,10 @@ public final class AerialMapAtlas {
             if (loaded.basePixels().length != BASE_TILE_PIXELS * BASE_TILE_PIXELS
                     || loaded.terrainHeights().length != TILE_BLOCKS * TILE_BLOCKS
                     || loaded.surfaceHeights().length != TILE_BLOCKS * TILE_BLOCKS
-                    || loaded.surfaceKinds().length != TILE_BLOCKS * TILE_BLOCKS) {
+                    || loaded.surfaceKinds().length != TILE_BLOCKS * TILE_BLOCKS
+                    || loaded.blockLights().length != TILE_BLOCKS * TILE_BLOCKS
+                    || loaded.surfaceBlockIds().length != TILE_BLOCKS * TILE_BLOCKS
+                    || loaded.biomeIds().length != TILE_BLOCKS * TILE_BLOCKS) {
                 continue;
             }
             DimensionAtlas atlas = DIMENSIONS.computeIfAbsent(loaded.dimension(), ignored -> new DimensionAtlas());
@@ -437,6 +542,9 @@ public final class AerialMapAtlas {
                             loaded.terrainHeights(),
                             loaded.surfaceHeights(),
                             loaded.surfaceKinds(),
+                            loaded.blockLights(),
+                            loaded.surfaceBlockIds(),
+                            loaded.biomeIds(),
                             atlasTick,
                             paletteGeneration
                     )
@@ -622,6 +730,11 @@ public final class AerialMapAtlas {
         return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
+    private static String registryId(net.minecraft.world.level.block.Block block) {
+        var id = BuiltInRegistries.BLOCK.getKey(block);
+        return id == null ? "minecraft:air" : id.toString();
+    }
+
     private static long estimatedTileBytes() {
         long pixels = 0L;
         for (int size = BASE_TILE_PIXELS; size > 0; size >>= 1) {
@@ -631,8 +744,9 @@ public final class AerialMapAtlas {
             }
         }
         return pixels * Integer.BYTES
-                + (long) TILE_BLOCKS * TILE_BLOCKS * (Short.BYTES * 2L + Byte.BYTES)
-                + 256L;
+                + (long) TILE_BLOCKS * TILE_BLOCKS
+                * (Short.BYTES * 2L + Byte.BYTES * 2L + Long.BYTES * 2L)
+                + 4_096L;
     }
 
     private static float[] buildLinearTable() {
@@ -658,10 +772,11 @@ public final class AerialMapAtlas {
         scanDimension = dimension;
         scanCenterChunkX = centerX;
         scanCenterChunkZ = centerZ;
+        scanRadiusChunks = liveUpdateRadiusChunks;
         SCAN_QUEUE.clear();
 
         SCAN_QUEUE.add(key(centerX, centerZ));
-        for (int radius = 1; radius <= BACKGROUND_SCAN_RADIUS; radius++) {
+        for (int radius = 1; radius <= liveUpdateRadiusChunks; radius++) {
             for (int dx = -radius; dx <= radius; dx++) {
                 SCAN_QUEUE.add(key(centerX + dx, centerZ - radius));
                 SCAN_QUEUE.add(key(centerX + dx, centerZ + radius));
@@ -671,6 +786,54 @@ public final class AerialMapAtlas {
                 SCAN_QUEUE.add(key(centerX + radius, centerZ + dz));
             }
         }
+    }
+
+    private static void evictColdTiles(ClientLevel level, int centerChunkX, int centerChunkZ) {
+        String activeDimension = dimension(level);
+        long minimumRecentTick = atlasTick - TRANSIENT_TILE_KEEP_TICKS;
+        var dimensionIterator = DIMENSIONS.entrySet().iterator();
+        while (dimensionIterator.hasNext()) {
+            Map.Entry<String, DimensionAtlas> dimensionEntry = dimensionIterator.next();
+            boolean active = dimensionEntry.getKey().equals(activeDimension);
+            var tileIterator = dimensionEntry.getValue().tiles.entrySet().iterator();
+            while (tileIterator.hasNext()) {
+                Map.Entry<Long, SurfaceTile> tileEntry = tileIterator.next();
+                SurfaceTile tile = tileEntry.getValue();
+                boolean liveNeighbour = active && withinRadius(
+                        keyX(tileEntry.getKey()), keyZ(tileEntry.getKey()),
+                        centerChunkX, centerChunkZ, liveUpdateRadiusChunks
+                );
+                if (!liveNeighbour && tile.lastAccessTick < minimumRecentTick) {
+                    tileIterator.remove();
+                }
+            }
+            if (dimensionEntry.getValue().tiles.isEmpty()) {
+                dimensionIterator.remove();
+            }
+        }
+    }
+
+    private static boolean isWithinLiveUpdateRadius(ClientLevel level, int chunkX, int chunkZ) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level != level) {
+            return false;
+        }
+        return withinRadius(
+                chunkX, chunkZ,
+                minecraft.player.chunkPosition().x(), minecraft.player.chunkPosition().z(),
+                liveUpdateRadiusChunks
+        );
+    }
+
+    private static boolean withinRadius(
+            int chunkX,
+            int chunkZ,
+            int centerChunkX,
+            int centerChunkZ,
+            int radius
+    ) {
+        return Math.abs(chunkX - centerChunkX) <= radius
+                && Math.abs(chunkZ - centerChunkZ) <= radius;
     }
 
     private static void trim(LinkedHashMap<Long, SurfaceTile> tiles) {
@@ -703,6 +866,9 @@ public final class AerialMapAtlas {
 
     private static double fractional(double value) {
         return value - Math.floor(value);
+    }
+
+    public record SurfaceInfo(int surfaceY, String blockId, String biomeId) {
     }
 
     public record Statistics(
@@ -742,14 +908,21 @@ public final class AerialMapAtlas {
         private final short[] terrainHeights;
         private final short[] surfaceHeights;
         private final byte[] surfaceKinds;
+        private final byte[] blockLights;
+        private final String[] surfaceBlockIds;
+        private final String[] biomeIds;
         private final long capturedTick;
         private final int paletteGeneration;
+        private long lastAccessTick;
 
         private SurfaceTile(
                 int[][] mipmaps,
                 short[] terrainHeights,
                 short[] surfaceHeights,
                 byte[] surfaceKinds,
+                byte[] blockLights,
+                String[] surfaceBlockIds,
+                String[] biomeIds,
                 long capturedTick,
                 int paletteGeneration
         ) {
@@ -757,8 +930,12 @@ public final class AerialMapAtlas {
             this.terrainHeights = terrainHeights;
             this.surfaceHeights = surfaceHeights;
             this.surfaceKinds = surfaceKinds;
+            this.blockLights = blockLights;
+            this.surfaceBlockIds = surfaceBlockIds;
+            this.biomeIds = biomeIds;
             this.capturedTick = capturedTick;
             this.paletteGeneration = paletteGeneration;
+            this.lastAccessTick = capturedTick;
         }
 
         private int blockColor(int blockX, int blockZ) {

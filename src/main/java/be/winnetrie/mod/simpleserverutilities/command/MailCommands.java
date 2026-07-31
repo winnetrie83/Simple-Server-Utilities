@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.command;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -14,7 +15,7 @@ public final class MailCommands {
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("mail")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                .requires(source -> Config.ENABLE_MAIL.get() && source.getEntity() instanceof ServerPlayer)
                 .executes(context -> open(context.getSource()));
     }
 

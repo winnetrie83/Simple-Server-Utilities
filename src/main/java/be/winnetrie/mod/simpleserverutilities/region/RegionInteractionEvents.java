@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.economy.MoneyFormat;
 import be.winnetrie.mod.simpleserverutilities.command.RegionCommands;
@@ -30,8 +31,14 @@ public class RegionInteractionEvents {
     private RegionInteractionEvents() {
     }
 
+    public static void clearRuntimeState() {
+        LAST_REGION.clear();
+        nextEnterLeaveTick = 0L;
+    }
+
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
@@ -45,12 +52,11 @@ public class RegionInteractionEvents {
                 return;
             }
 
-            RegionCommands.getSelectionManager().setPoint2(player, event.getPos());
-            SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(
-                    player,
-                    RegionCommands.getSelectionManager().getSelection(player)
-            );
-            player.sendSystemMessage(Component.literal("Region point 2 set to " + formatPos(event.getPos()) + "."));
+            if (!RegionEditorService.open(player)) {
+                player.sendSystemMessage(Component.literal(
+                        "Set both region points with left-click first, then right-click to configure the region."
+                ), true);
+            }
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.SUCCESS);
             return;
@@ -83,7 +89,27 @@ public class RegionInteractionEvents {
     }
 
     @SubscribeEvent
+    public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
+        if (!(event.getEntity() instanceof ServerPlayer player)
+                || event.getHand() != InteractionHand.MAIN_HAND
+                || !SimpleServerUtilities.REGION_SELECTION_TOOLS.isBoundTool(player, player.getMainHandItem())
+                || !RegionPolicy.canUseSelectionTool(player)) {
+            return;
+        }
+        if (!RegionEditorService.open(player)) {
+            player.sendSystemMessage(Component.literal(
+                    "Set both region points with left-click first, then right-click to configure the region."
+            ), true);
+        }
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.SUCCESS);
+    }
+
+    @SubscribeEvent
     public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
+        if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
+        if (event.getAction() != PlayerInteractEvent.LeftClickBlock.Action.START) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
@@ -96,17 +122,29 @@ public class RegionInteractionEvents {
             return;
         }
 
-        RegionCommands.getSelectionManager().setPoint1(player, event.getPos());
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(
-                player,
-                RegionCommands.getSelectionManager().getSelection(player)
-        );
-        player.sendSystemMessage(Component.literal("Region point 1 set to " + formatPos(event.getPos()) + "."));
+        RegionSelectionManager manager = RegionCommands.getSelectionManager();
+        RegionSelection selection = manager.getSelection(player);
+        if (selection.getPoint1() == null || selection.isComplete()) {
+            if (selection.isComplete()) {
+                manager.clear(player);
+            }
+            manager.setPoint1(player, event.getPos());
+            player.sendSystemMessage(Component.literal(
+                    "Region point 1 set to " + formatPos(event.getPos()) + ". Left-click point 2 next."
+            ), true);
+        } else {
+            manager.setPoint2(player, event.getPos());
+            player.sendSystemMessage(Component.literal(
+                    "Region point 2 set to " + formatPos(event.getPos()) + ". Right-click to configure."
+            ), true);
+        }
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, manager.getSelection(player));
         event.setCanceled(true);
     }
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
         MinecraftServer server = event.getServer();
         long tick = server.getTickCount();
 

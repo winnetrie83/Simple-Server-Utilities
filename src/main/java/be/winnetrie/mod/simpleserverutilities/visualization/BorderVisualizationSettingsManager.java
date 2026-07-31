@@ -136,6 +136,19 @@ public final class BorderVisualizationSettingsManager {
         revision++;
     }
 
+
+    public void setClaimRenderDistanceBlocks(int blocks) {
+        settings.setClaimRenderDistanceBlocks(blocks);
+        queueSettingsSave();
+        revision++;
+    }
+
+    public void setRegionRenderDistanceBlocks(int blocks) {
+        settings.setRegionRenderDistanceBlocks(blocks);
+        queueSettingsSave();
+        revision++;
+    }
+
     public long revision() {
         return revision;
     }

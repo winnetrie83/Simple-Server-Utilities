@@ -127,6 +127,10 @@ public final class SsuDashboardScreen extends Screen {
     private int playerProfilePermissionPage;
     private String draftAccountAmount = "";
     private String pendingUnrentRegion = "";
+    private String pendingDeleteHologram = "";
+    private String pendingResetStatistic = "";
+    private String pendingDeleteStatistic = "";
+    private final java.util.ArrayList<SettingsTooltip> settingsTooltips = new java.util.ArrayList<>();
     private SettingsCategory settingsCategory = SettingsCategory.GENERAL;
 
     public SsuDashboardScreen(SsuMenuSnapshotPayload snapshot) {
@@ -221,11 +225,21 @@ public final class SsuDashboardScreen extends Screen {
             // The transparent opening in portrait_framework.png is x=11..42, y=17..64.
             skin.setPosition(l.sidebarX() + 34, l.panelY() + 71);
             addRenderableWidget(skin);
+
+            Rect profile = profileBounds(l);
+            Button profileButton = Button.builder(Component.literal("Profile"), ignored -> openPage(Page.PROFILE))
+                    .bounds(profile.x(), profile.y(), profile.width(), profile.height()).build();
+            profileButton.active = page != Page.PROFILE;
+            addRenderableWidget(profileButton);
         }
 
         switch (page) {
             case HOME -> addHomeButtons(l);
             case ADMIN -> addAdminButtons(l);
+            case MODULE_SETTINGS -> addModuleSettingsButtons(l);
+            case ADMIN_TOOLS -> addAdminToolButtons(l);
+            case HOLOGRAMS -> addHologramButtons(l);
+            case STATISTICS -> addStatisticButtons(l);
             case CLAIMS -> addClaimButtons(l);
             case TRAVEL -> addTravelButtons(l);
             case ECONOMY -> addEconomyButtons(l);
@@ -246,27 +260,29 @@ public final class SsuDashboardScreen extends Screen {
         skin = null; searchBox = null; payPlayerBox = null; payAmountBox = null;
         playerRefundBox = null; adminRefundBox = null;
         permissionTargetSearchBox = null; permissionSearchBox = null; playerProfileSearchBox = null; permissionValueInputs.clear();
-        accountAmountBox = null;
+        accountAmountBox = null; settingsTooltips.clear();
     }
 
     private void addHomeButtons(Layout l) {
-        if (!useTexturedTiles(l)) addModuleGrid(l, homeModules());
+        if (!useTexturedTiles(l)) addModuleGrid(l, homeModules(l));
     }
 
     private void addAdminButtons(Layout l) {
         if (!useTexturedTiles(l)) addModuleGrid(l, adminModules());
     }
 
-    private List<Module> homeModules() {
-        return List.of(
-                new Module("Claims", "Your connected land claims and map tools.", ICON_CLAIM, Page.CLAIMS, true),
+    private List<Module> homeModules(Layout l) {
+        java.util.ArrayList<Module> modules = new java.util.ArrayList<>(List.of(
+                new Module("Claims", "Your connected land claims and map tools.", ICON_CLAIM, Page.CLAIMS, snapshot.moduleSettings().claims()),
                 new Module("Travel", "Homes and available server warps.", ICON_PORTAL, Page.TRAVEL, true),
                 new Module("Wallet", "Balance, payments and transaction history.", ICON_MARKET, Page.ECONOMY, snapshot.economy().enabled()),
-                new Module("Mail", "Inbox, sent mail, items and money attachments.", ICON_MARKET, Page.MAIL, true),
-                new Module("Regions", "Server regions, borders and rentals.", ICON_CLAIM, Page.REGIONS,
-                        snapshot.core().regionCount() > 0 || snapshot.administrator()),
-                new Module("Profile", "Your rank, property and personal settings.", ICON_PLAYERS, Page.PROFILE, true)
-        );
+                new Module("Mail", "Inbox, sent mail, items and money attachments.", ICON_MARKET, Page.MAIL, snapshot.moduleSettings().mail())
+        ));
+        // Compact layouts have no portrait sidebar, so Profile remains available as a normal tile there.
+        if (!l.sidebarVisible()) {
+            modules.add(new Module("Profile", "Your rank, property and personal settings.", ICON_PLAYERS, Page.PROFILE, true));
+        }
+        return List.copyOf(modules);
     }
 
     private List<Module> adminModules() {
@@ -278,8 +294,177 @@ public final class SsuDashboardScreen extends Screen {
                 new Module("Rent journal", "Inspect rent reconciliation records.", ICON_PORTAL, Page.RENT_OPERATIONS, snapshot.economy().canAdmin()),
                 new Module("Active jobs", "View progress and cancel server jobs.", ICON_SETTINGS, Page.JOBS, snapshot.adminAccess().core()),
                 new Module("Core status", "Storage, indexes and migrated modules.", ICON_SETTINGS, Page.CORE, snapshot.adminAccess().core()),
-                new Module("Regions", "Open region and rental administration.", ICON_SHIELD, Page.REGIONS, true)
+                new Module("Module settings", "Enable modules and configure world render distances.", ICON_SETTINGS, Page.MODULE_SETTINGS, snapshot.administrator()),
+                new Module("Admin tools", "Get purpose-built world editing and setup tools.", ICON_SETTINGS, Page.ADMIN_TOOLS, snapshot.administrator()),
+                new Module("Holograms", "Edit, teleport to and delete floating text from anywhere.", ICON_SETTINGS, Page.HOLOGRAMS,
+                        snapshot.administrator() && snapshot.moduleSettings().holograms()),
+                new Module("Statistics", "Create event counters and publish personal values or leaderboards.", ICON_PLAYERS, Page.STATISTICS,
+                        snapshot.administrator() && snapshot.moduleSettings().statistics()),
+                new Module("Regions", "Open region and rental administration.", ICON_SHIELD, Page.REGIONS, snapshot.moduleSettings().regions())
         );
+    }
+
+    private List<AdminTool> adminTools() {
+        return List.of(
+                new AdminTool("Region Tool", "Left-click position 1, then left-click position 2. Right-click opens the initial region settings GUI.", "region"),
+                new AdminTool("Hologram Tool", "Right-click to create one block ahead. Right-click an existing hologram with the tool to edit or delete it.", "hologram")
+        );
+    }
+
+    private void addAdminToolButtons(Layout l) {
+        List<AdminTool> tools = adminTools();
+        for (int i = 0; i < tools.size(); i++) {
+            AdminTool tool = tools.get(i);
+            int y = l.contentTop() + 42 + i * 54;
+            Button getTool = Button.builder(Component.literal("Get Tool"), ignored ->
+                            action("admin_tool_get", tool.id(), "", ""))
+                    .bounds(l.contentRight() - 84, y + 8, 84, 20).build();
+            getTool.active = !(("region".equals(tool.id()) && !snapshot.moduleSettings().regions())
+                    || ("hologram".equals(tool.id()) && !snapshot.moduleSettings().holograms()));
+            addRenderableWidget(getTool);
+        }
+        Button manageHolograms = Button.builder(Component.literal("Manage holograms"), ignored -> openPage(Page.HOLOGRAMS))
+                .bounds(l.contentX(), l.contentTop() + 160, 132, 20).build();
+        manageHolograms.active = snapshot.moduleSettings().holograms();
+        addRenderableWidget(manageHolograms);
+        addRenderableWidget(Button.builder(Component.literal("Module settings"), ignored -> openPage(Page.MODULE_SETTINGS))
+                .bounds(l.contentRight() - 132, l.contentTop() + 160, 132, 20).build());
+    }
+
+    private void addModuleSettingsButtons(Layout l) {
+        var settings = snapshot.moduleSettings();
+        List<ModuleSwitch> switches = List.of(
+                new ModuleSwitch("Player Claims", "claims", settings.claims()),
+                new ModuleSwitch("Homes", "homes", settings.homes()),
+                new ModuleSwitch("Warps", "warps", settings.warps()),
+                new ModuleSwitch("Server Regions", "regions", settings.regions()),
+                new ModuleSwitch("Treecapitator", "treecapitator", settings.treecapitator()),
+                new ModuleSwitch("Veinminer", "veinminer", settings.veinminer()),
+                new ModuleSwitch("Crop Harvesting", "crop_harvesting", settings.cropHarvesting()),
+                new ModuleSwitch("Floating Text / Media", "holograms", settings.holograms()),
+                new ModuleSwitch("Block Information", "block_information", settings.blockInformation()),
+                new ModuleSwitch("Player Statistics", "statistics", settings.statistics()),
+                new ModuleSwitch("Mail", "mail", settings.mail()),
+                new ModuleSwitch("Permissions", "permissions", settings.permissions()),
+                new ModuleSwitch("Remote Images", "remote_hologram_images", settings.remoteHologramImages())
+        );
+        int columns = l.contentWidth() >= 470 ? 3 : 2;
+        int gap = 6;
+        int buttonWidth = (l.contentWidth() - gap * (columns - 1)) / columns;
+        int top = l.contentTop() + 24;
+        for (int i = 0; i < switches.size(); i++) {
+            ModuleSwitch value = switches.get(i);
+            int x = l.contentX() + (i % columns) * (buttonWidth + gap);
+            int y = top + (i / columns) * 25;
+            addRenderableWidget(Button.builder(Component.literal(value.label() + ": " + onOff(value.enabled())), ignored ->
+                            action("module_toggle", value.key(), "", Boolean.toString(!value.enabled())))
+                    .bounds(x, y, buttonWidth, 20).build());
+        }
+
+        int distanceTop = top + ((switches.size() + columns - 1) / columns) * 25 + 10;
+        addDistanceButtons(l, distanceTop, "holograms", settings.hologramRenderDistance(), 8);
+        addDistanceButtons(l, distanceTop + 27, "claim_borders", settings.claimBorderRenderDistance(), 16);
+        addDistanceButtons(l, distanceTop + 54, "region_borders", settings.regionBorderRenderDistance(), 16);
+    }
+
+    private void addDistanceButtons(Layout l, int y, String key, int current, int minimum) {
+        int right = l.contentRight();
+        addRenderableWidget(Button.builder(Component.literal("-16"), ignored ->
+                        action("render_distance", key, "", Integer.toString(Math.max(minimum, current - 16))))
+                .bounds(right - 90, y, 42, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("+16"), ignored ->
+                        action("render_distance", key, "", Integer.toString(Math.min(512, current + 16))))
+                .bounds(right - 44, y, 44, 20).build());
+    }
+
+    private void addHologramButtons(Layout l) {
+        addListSearch(l);
+        List<SsuMenuPageDataPayload.LocationEntry> values = pageData.locations();
+        for (int i = 0; i < values.size(); i++) {
+            var entry = values.get(i);
+            int y = rowY(l, i);
+            int right = l.contentRight();
+            addRenderableWidget(Button.builder(Component.literal("Edit"), ignored ->
+                            action("hologram_edit", entry.name(), "", ""))
+                    .bounds(right - 190, y, 48, 20).build());
+            addRenderableWidget(Button.builder(Component.literal("Teleport"), ignored ->
+                            action("hologram_teleport", entry.name(), "", ""))
+                    .bounds(right - 138, y, 72, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(hologramDeleteLabel(entry.name())), ignored ->
+                            requestHologramDelete(entry.name()))
+                    .bounds(right - 62, y, 62, 20).build());
+        }
+        addPagination(l, 0);
+    }
+
+    private String hologramDeleteLabel(String id) {
+        return pendingDeleteHologram.equalsIgnoreCase(id) ? "Confirm" : "Delete";
+    }
+
+    private void requestHologramDelete(String id) {
+        if (pendingDeleteHologram.equalsIgnoreCase(id)) {
+            pendingDeleteHologram = "";
+            action("hologram_delete", id, "", "");
+            return;
+        }
+        pendingDeleteHologram = id;
+        setNotice("Click Confirm again to permanently delete hologram '" + id + "'.", true);
+    }
+
+    private void addStatisticButtons(Layout l) {
+        addListSearch(l);
+        addRenderableWidget(Button.builder(Component.literal("Create"), ignored ->
+                        action("statistic_edit", "", "", ""))
+                .bounds(l.contentX(), l.footerY(), 68, 20).build());
+        List<SsuMenuPageDataPayload.StatisticEntry> values = pageData.statistics();
+        for (int i = 0; i < values.size(); i++) {
+            var entry = values.get(i);
+            int y = rowY(l, i);
+            int right = l.contentRight();
+            addRenderableWidget(Button.builder(Component.literal("Edit"), ignored ->
+                            action("statistic_edit", entry.id(), "", ""))
+                    .bounds(right - 260, y, 42, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(entry.enabled() ? "Pause" : "Resume"), ignored ->
+                            action("statistic_toggle", entry.id(), "", Boolean.toString(!entry.enabled())))
+                    .bounds(right - 214, y, 58, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(statisticResetLabel(entry.id())), ignored ->
+                            requestStatisticReset(entry.id()))
+                    .bounds(right - 152, y, 58, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(statisticDeleteLabel(entry.id())), ignored ->
+                            requestStatisticDelete(entry.id()))
+                    .bounds(right - 90, y, 58, 20).build());
+        }
+        addPagination(l, 76);
+    }
+
+    private String statisticResetLabel(String id) {
+        return pendingResetStatistic.equalsIgnoreCase(id) ? "Confirm" : "Reset";
+    }
+
+    private String statisticDeleteLabel(String id) {
+        return pendingDeleteStatistic.equalsIgnoreCase(id) ? "Confirm" : "Delete";
+    }
+
+    private void requestStatisticReset(String id) {
+        if (pendingResetStatistic.equalsIgnoreCase(id)) {
+            pendingResetStatistic = "";
+            action("statistic_reset", id, "", "");
+            return;
+        }
+        pendingResetStatistic = id;
+        pendingDeleteStatistic = "";
+        setNotice("Click Confirm again to reset statistic '" + id + "' for every player.", true);
+    }
+
+    private void requestStatisticDelete(String id) {
+        if (pendingDeleteStatistic.equalsIgnoreCase(id)) {
+            pendingDeleteStatistic = "";
+            action("statistic_delete", id, "", "");
+            return;
+        }
+        pendingDeleteStatistic = id;
+        pendingResetStatistic = "";
+        setNotice("Click Confirm again to permanently delete statistic '" + id + "' and its values.", true);
     }
 
     private void addModuleGrid(Layout l, List<Module> modules) {
@@ -398,9 +583,11 @@ public final class SsuDashboardScreen extends Screen {
                     .bounds(right - 300, y, 56, 20).build());
             addRenderableWidget(Button.builder(Component.literal("Settings"), ignored -> openPropertySettings("region", entry.name()))
                     .bounds(right - 240, y, 66, 20).build());
-            addRenderableWidget(Button.builder(Component.literal(entry.visible() ? "Hide" : "Show"), ignored ->
-                    action("region_visibility", entry.name(), "", Boolean.toString(!entry.visible())))
-                    .bounds(right - 170, y, 54, 20).build());
+            if (snapshot.administrator()) {
+                addRenderableWidget(Button.builder(Component.literal(entry.visible() ? "Disable" : "Show"), ignored ->
+                        action("region_visibility", entry.name(), "", Boolean.toString(!entry.visible())))
+                        .bounds(right - 170, y, 54, 20).build());
+            }
             String label = entry.rentedByPlayer() ? (entry.periodText().equals("permanent") ? "Unrent" : "Extend")
                     : entry.rentable() && !entry.rented() ? "Rent" : "";
             if (!label.isBlank()) {
@@ -415,14 +602,16 @@ public final class SsuDashboardScreen extends Screen {
                 }
             }
         }
-        addRenderableWidget(Button.builder(Component.literal("Hide all"), ignored -> action("regions_hide", "", "", ""))
-                .bounds(l.contentX(), l.footerY(), 72, 20).build());
-        addPagination(l, 78);
+        if (snapshot.administrator()) {
+            addRenderableWidget(Button.builder(Component.literal("Disable all"), ignored -> action("regions_hide", "", "", ""))
+                    .bounds(l.contentX(), l.footerY(), 72, 20).build());
+        }
+        addPagination(l, snapshot.administrator() ? 78 : 0);
     }
 
     private void addSettingsButtons(Layout l) {
         int categoryX = l.contentX();
-        int categoryY = l.contentTop() + 4;
+        int categoryY = l.contentTop() + 24;
         int categoryWidth = Math.min(96, Math.max(78, l.contentWidth() / 4));
         for (SettingsCategory category : SettingsCategory.values()) {
             Button button = Button.builder(Component.literal(category.label), ignored -> {
@@ -436,7 +625,7 @@ public final class SsuDashboardScreen extends Screen {
 
         var s = snapshot.uiSettings();
         int x = categoryX + categoryWidth + 8;
-        int y = l.contentTop() + 8;
+        int y = l.contentTop() + 28;
         int available = Math.max(120, l.contentRight() - x);
         int gap = 6;
         int w = available >= 310 ? (available - gap) / 2 : available;
@@ -444,8 +633,23 @@ public final class SsuDashboardScreen extends Screen {
         boolean twoColumns = available >= 310;
 
         switch (settingsCategory) {
-            case GENERAL -> addSetting(x, y, w, "Dashboard hints: " + onOff(s.dashboardHints()),
-                    "hints", !s.dashboardHints());
+            case GENERAL -> {
+                addSetting(x, y, w, "Dashboard hints: " + onOff(s.dashboardHints()),
+                        "hints", !s.dashboardHints());
+                Button blockInfo = Button.builder(Component.literal("Block information: " + onOff(s.blockInformationEnabled())), ignored ->
+                                action("setting", "block_information_enabled", "", Boolean.toString(!s.blockInformationEnabled())))
+                        .bounds(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w, 20).build();
+                blockInfo.active = snapshot.moduleSettings().blockInformation();
+                addRenderableWidget(blockInfo);
+                if (s.blockInformationDebugAllowed()) {
+                    int debugY = y + (twoColumns ? 27 : 54);
+                    Button debug = Button.builder(Component.literal("Block info debug: " + onOff(s.blockInformationDebugEnabled())), ignored ->
+                                    action("setting", "block_information_debug", "", Boolean.toString(!s.blockInformationDebugEnabled())))
+                            .bounds(x, debugY, w, 20).build();
+                    debug.active = snapshot.moduleSettings().blockInformation() && s.blockInformationEnabled();
+                    addRenderableWidget(debug);
+                }
+            }
             case MINIMAP -> {
                 addSetting(x, y, w, "Minimap: " + onOff(s.minimapEnabled()), "minimap_enabled", !s.minimapEnabled());
                 addSetting(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w,
@@ -467,6 +671,9 @@ public final class SsuDashboardScreen extends Screen {
                 row += twoColumns ? 27 : 54;
                 addSetting(x, y + row, w, "Region overlay: " + onOff(s.minimapShowRegions()),
                         "minimap_regions", !s.minimapShowRegions());
+                addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
+                        "Marker overlay: " + onOff(s.minimapShowMarkers()),
+                        "minimap_markers", !s.minimapShowMarkers());
             }
             case WORLD_MAP -> {
                 addSetting(x, y, w, "Claim overlay: " + onOff(s.worldMapShowClaims()),
@@ -474,6 +681,48 @@ public final class SsuDashboardScreen extends Screen {
                 addSetting(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w,
                         "Region overlay: " + onOff(s.worldMapShowRegions()),
                         "worldmap_regions", !s.worldMapShowRegions());
+                int row = twoColumns ? 27 : 54;
+                addSetting(x, y + row, w, "Map marker layer: " + onOff(s.worldMapShowMarkers()),
+                        "worldmap_markers", !s.worldMapShowMarkers());
+                addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
+                        "World marker icons: " + onOff(s.worldMarkersVisible()),
+                        "world_markers", !s.worldMarkersVisible());
+                row += twoColumns ? 27 : 54;
+                addSetting(x, y + row, w, "Marker beams: " + onOff(s.markerBeamsVisible()),
+                        "marker_beams", !s.markerBeamsVisible());
+                int nextDistance = s.markerBeamDistance() >= 512 ? 32 : Math.min(512, s.markerBeamDistance() + 32);
+                addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
+                        "Beam distance: " + s.markerBeamDistance(),
+                        "marker_beam_distance", nextDistance);
+                row += twoColumns ? 27 : 54;
+                addSetting(x, y + row, w,
+                        "Live terrain: " + s.mapLiveUpdateRadiusChunks() + " chunks",
+                        "map_live_update_radius", nextMapLiveUpdateRadius(s.mapLiveUpdateRadiusChunks()));
+            }
+            case UTILITY_MINING -> {
+                addSetting(x, y, w, "Treecapitator: " + onOff(s.treecapitatorEnabled()),
+                        "treecapitator_enabled", !s.treecapitatorEnabled());
+                addSetting(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w,
+                        "Activation: " + activationLabel(s.treecapitatorActivation()),
+                        "treecapitator_activation", nextActivation(s.treecapitatorActivation()));
+                int row = twoColumns ? 27 : 54;
+                addSetting(x, y + row, w, "Tree outline: " + colorHex(s.treecapitatorOutlineColor()),
+                        "treecapitator_color", colorHex(nextMiningColor(s.treecapitatorOutlineColor())));
+                addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
+                        "Tree glow: " + s.treecapitatorOutlineBrightness() + "%",
+                        "treecapitator_brightness", nextBrightness(s.treecapitatorOutlineBrightness()));
+                row += twoColumns ? 27 : 54;
+                addSetting(x, y + row, w, "Veinminer: " + onOff(s.veinminerEnabled()),
+                        "veinminer_enabled", !s.veinminerEnabled());
+                addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
+                        "Activation: " + activationLabel(s.veinminerActivation()),
+                        "veinminer_activation", nextActivation(s.veinminerActivation()));
+                row += twoColumns ? 27 : 54;
+                addSetting(x, y + row, w, "Vein outline: " + colorHex(s.veinminerOutlineColor()),
+                        "veinminer_color", colorHex(nextMiningColor(s.veinminerOutlineColor())));
+                addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
+                        "Vein glow: " + s.veinminerOutlineBrightness() + "%",
+                        "veinminer_brightness", nextBrightness(s.veinminerOutlineBrightness()));
             }
             case BORDERS -> {
                 Button claims = Button.builder(Component.literal("Claim borders: " + onOff(snapshot.claimBordersVisible())), ignored ->
@@ -486,21 +735,26 @@ public final class SsuDashboardScreen extends Screen {
                         .bounds(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w, 20).build();
                 regions.active = snapshot.canViewRegionBorders();
                 addRenderableWidget(regions);
-                Button clearPins = Button.builder(Component.literal("Clear selected region borders"), ignored ->
-                                action("border_regions_clear_pins", "", "", ""))
-                        .bounds(x, y + (twoColumns ? 27 : 54), w, 20).build();
-                clearPins.active = snapshot.canViewRegionBorders();
-                addRenderableWidget(clearPins);
             }
             case MAIL -> {
-                addSetting(x, y, w, "Private attachment mail: " + onOff(s.mailAutoDeletePlayerAttachments()),
-                        "mail_auto_delete_player", !s.mailAutoDeletePlayerAttachments());
-                addSetting(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w,
-                        "Server attachment mail: " + onOff(s.mailAutoDeleteSystemAttachments()),
-                        "mail_auto_delete_system", !s.mailAutoDeleteSystemAttachments());
-                addSetting(x, y + (twoColumns ? 27 : 54), w,
-                        "Auction attachment mail: " + onOff(s.mailAutoDeleteAuctionAttachments()),
-                        "mail_auto_delete_auction", !s.mailAutoDeleteAuctionAttachments());
+                addSettingWithTooltip(x, y, w,
+                        "Claimed player mail: " + keepDelete(s.mailAutoDeletePlayerAttachments()),
+                        "mail_auto_delete_player", !s.mailAutoDeletePlayerAttachments(),
+                        "Mail with attachments sent by another player.",
+                        "DELETE removes it after all items and money are claimed.",
+                        "KEEP leaves it in your inbox until normal deletion or expiry.");
+                addSettingWithTooltip(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w,
+                        "Claimed server mail: " + keepDelete(s.mailAutoDeleteSystemAttachments()),
+                        "mail_auto_delete_system", !s.mailAutoDeleteSystemAttachments(),
+                        "Mail with attachments from server or recovery systems.",
+                        "DELETE removes it after all items and money are claimed.",
+                        "KEEP leaves it in your inbox until normal deletion or expiry.");
+                addSettingWithTooltip(x, y + (twoColumns ? 27 : 54), w,
+                        "Claimed auction mail: " + keepDelete(s.mailAutoDeleteAuctionAttachments()),
+                        "mail_auto_delete_auction", !s.mailAutoDeleteAuctionAttachments(),
+                        "Mail with attachments created by auction deliveries.",
+                        "DELETE removes it after all items and money are claimed.",
+                        "KEEP leaves it in your inbox until normal deletion or expiry.");
             }
         }
     }
@@ -508,6 +762,12 @@ public final class SsuDashboardScreen extends Screen {
     private void addSetting(int x, int y, int w, String label, String key, Object value) {
         addRenderableWidget(Button.builder(Component.literal(label), ignored -> action("setting", key, "", String.valueOf(value)))
                 .bounds(x, y, w, 20).build());
+    }
+
+    private void addSettingWithTooltip(int x, int y, int w, String label, String key, Object value, String... lines) {
+        addSetting(x, y, w, label, key, value);
+        settingsTooltips.add(new SettingsTooltip(new Rect(x, y, w, 20),
+                java.util.Arrays.stream(lines).<Component>map(Component::literal).toList()));
     }
 
     private void addPermissionButtons(Layout l) {
@@ -860,6 +1120,15 @@ public final class SsuDashboardScreen extends Screen {
         ClientPacketDistributor.sendToServer(new SsuMenuActionPayload(action, target, secondary, value, id));
     }
 
+    public void refreshCurrentPage() {
+        if (page.hasRemoteData()) requestPage(false);
+        else rebuildWidgets();
+    }
+
+    public void refreshRemotePage() {
+        if (page.hasRemoteData()) requestPage(false);
+    }
+
     private void requestPage(boolean reset) {
         if (page == Page.PERMISSIONS) {
             requestPermissionEditor(reset);
@@ -916,7 +1185,7 @@ public final class SsuDashboardScreen extends Screen {
             return;
         }
         if (target == page) return;
-        previousPage = page; page = target; pageIndex = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = "";
+        previousPage = page; page = target; pageIndex = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingResetStatistic = ""; pendingDeleteStatistic = "";
         loading = false;
         if (target != Page.PERMISSIONS) permissionLoading = false;
         if (target != Page.PLAYER_INFO) playerProfileLoading = false;
@@ -928,7 +1197,7 @@ public final class SsuDashboardScreen extends Screen {
     private void goBack() {
         if (page == Page.HOME) { onClose(); return; }
         page = previousPage == page ? Page.HOME : previousPage; previousPage = Page.HOME;
-        pageIndex = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = "";
+        pageIndex = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingResetStatistic = ""; pendingDeleteStatistic = "";
         loading = false;
         if (page != Page.PERMISSIONS) permissionLoading = false;
         if (page != Page.PLAYER_INFO) playerProfileLoading = false;
@@ -1093,7 +1362,7 @@ public final class SsuDashboardScreen extends Screen {
             openPage(Page.ADMIN);
             return true;
         }
-        if ((l.sidebarVisible() || page != Page.HOME) && backBounds(l).contains(event.x(), event.y())) {
+        if (page != Page.HOME && backBounds(l).contains(event.x(), event.y())) {
             playClick();
             goBack();
             return true;
@@ -1120,10 +1389,8 @@ public final class SsuDashboardScreen extends Screen {
         updatePortraitRotation(l, mouseX, mouseY);
         g.fill(0,0,width,height,0xA5000000); g.fill(l.panelX(),l.panelY(),l.panelRight(),l.panelBottom(),PANEL);
         g.outline(l.panelX(),l.panelY(),l.panelWidth(),l.panelHeight(),PANEL_BORDER);
-        if (l.sidebarVisible()) g.text(font,"Simple Server Utilities",l.panelX()+11,l.panelY()+11,ACCENT,true);
-        int headerX = l.sidebarVisible() ? l.contentX() : l.panelX() + (page == Page.HOME ? 12 : 72);
-        g.text(font,page.label(),headerX,l.panelY()+11,TEXT,true);
-        g.text(font,page.subtitle(),headerX,l.panelY()+26,MUTED,false);
+        if (l.sidebarVisible()) g.text(font,"Simple Server Utilities",l.panelX()+11,l.panelY()+13,ACCENT,true);
+        drawPageTitle(g, l);
         drawSidebar(g,l); drawPage(g,l,mouseX,mouseY);
         if (!notice.isBlank()) g.text(font,trim(notice,90),l.contentX(),l.panelBottom()-43,noticeError?ERROR:GOOD,false);
         if (loading || (page == Page.PERMISSIONS && permissionLoading)
@@ -1139,9 +1406,10 @@ public final class SsuDashboardScreen extends Screen {
         drawUtilityButton(g, settingsBounds(l), ICON_SETTINGS, page == Page.SETTINGS,
                 mouseX, mouseY, snapshot.settingsAvailable());
         drawUtilityButton(g, adminBounds(l), ICON_SHIELD,
-                page == Page.ADMIN || page == Page.PERMISSIONS || page == Page.PLAYER_INFO,
+                page == Page.ADMIN || page == Page.MODULE_SETTINGS || page == Page.ADMIN_TOOLS
+                        || page == Page.HOLOGRAMS || page == Page.PERMISSIONS || page == Page.PLAYER_INFO,
                 mouseX, mouseY, snapshot.administrator());
-        if (l.sidebarVisible() || page != Page.HOME) drawBackButton(g, l, mouseX, mouseY);
+        if (page != Page.HOME) drawBackButton(g, l, mouseX, mouseY);
         if (page == Page.PERMISSIONS) {
             drawPermissionDropdowns(g, l, mouseX, mouseY);
             drawPermissionTooltip(g, l, mouseX, mouseY);
@@ -1149,8 +1417,31 @@ public final class SsuDashboardScreen extends Screen {
         if (page == Page.PLAYER_INFO) {
             drawPlayerProfileDropdown(g, l, mouseX, mouseY);
         }
+        if (page == Page.SETTINGS) drawSettingsTooltip(g, mouseX, mouseY);
     }
 
+    private void drawPageTitle(GuiGraphicsExtractor g, Layout l) {
+        String title = page.label();
+        int left = l.sidebarVisible() ? l.contentX() : l.panelX() + 12;
+        int right = Math.min(closeBounds(l).x() - 8, l.contentRight());
+        int available = Math.max(1, right - left);
+        int titleWidth = Math.max(1, font.width(title));
+        float scale = Math.min(1.35F, available / (float) titleWidth);
+        int centerX = left + available / 2;
+        g.pose().pushMatrix();
+        g.pose().translate(centerX, l.panelY() + 10);
+        g.pose().scale(scale, scale);
+        g.text(font, title, -titleWidth / 2, 0, TEXT, true);
+        g.pose().popMatrix();
+    }
+
+    private void drawSettingsTooltip(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+        for (SettingsTooltip tooltip : settingsTooltips) {
+            if (!tooltip.bounds().contains(mouseX, mouseY)) continue;
+            g.setComponentTooltipForNextFrame(font, tooltip.lines(), mouseX, mouseY);
+            return;
+        }
+    }
 
     private void updatePortraitRotation(Layout l, int mouseX, int mouseY) {
         if (skin == null || !l.sidebarVisible()) return;
@@ -1325,9 +1616,6 @@ public final class SsuDashboardScreen extends Screen {
             g.blit(RenderPipelines.GUI_TEXTURED, BUTTON_BACK_GLOW_TEXTURE,
                     bounds.x(), bounds.y(), 0, 0, 54, 20, 54, 20);
         }
-        if (l.sidebarVisible()) {
-            g.text(font, page == Page.HOME ? "Close" : "Back", bounds.x() + 60, bounds.y() + 6, MUTED, false);
-        }
     }
 
     private Rect closeBounds(Layout l) { return new Rect(l.panelRight() - 40, l.panelY() + 7, 28, 28); }
@@ -1337,33 +1625,37 @@ public final class SsuDashboardScreen extends Screen {
     }
     private Rect backBounds(Layout l) {
         return l.sidebarVisible()
-                ? new Rect(l.panelX() + 12, l.panelBottom() - 29, 54, 20)
+                ? new Rect(l.sidebarX() + (100 - 54) / 2, l.panelBottom() - 29, 54, 20)
                 : new Rect(l.panelX() + 10, l.panelY() + 7, 54, 20);
+    }
+
+    private Rect profileBounds(Layout l) {
+        int y = l.panelY() + (snapshot.economy().enabled() ? 187 : 170);
+        return new Rect(l.sidebarX() + 8, y, 84, 20);
     }
 
     private void drawSidebar(GuiGraphicsExtractor g, Layout l) {
         if (!l.sidebarVisible()) return;
         g.fill(l.sidebarX(),l.panelY()+42,l.sidebarX()+100,l.panelBottom()-36,CARD);
         g.outline(l.sidebarX(),l.panelY()+42,100,l.panelBottom()-78,PANEL_BORDER);
-        int y=l.panelY()+138;
+        int y=l.panelY()+140;
         center(g,snapshot.playerName(),l.sidebarX()+50,y,TEXT);
-        center(g,"Rank: "+(snapshot.primaryRank().isBlank()?"default":snapshot.primaryRank()),l.sidebarX()+50,y+14,MUTED);
-        center(g,snapshot.economy().formattedBalance(),l.sidebarX()+50,y+31,snapshot.economy().enabled()?GOOD:MUTED);
-        g.text(font,"Claims: "+snapshot.core().claimCount(),l.sidebarX()+8,y+54,MUTED,false);
-        g.text(font,"Homes: "+snapshot.core().homeCount(),l.sidebarX()+8,y+68,MUTED,false);
-        g.text(font,"Rentals: "+snapshot.core().activeRentalCount(),l.sidebarX()+8,y+82,MUTED,false);
+        center(g,"Rank: "+(snapshot.primaryRank().isBlank()?"default":snapshot.primaryRank()),l.sidebarX()+50,y+15,MUTED);
+        if (snapshot.economy().enabled()) {
+            center(g,snapshot.economy().formattedBalance(),l.sidebarX()+50,y+32,GOOD);
+        }
     }
 
     private void drawPage(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
         switch(page) {
-            case HOME -> drawModuleTiles(g, l, mouseX, mouseY,
-                    "Choose a player module",
-                    snapshot.core().claimCount()+" claim(s), "+snapshot.core().activeRentalCount()+" active rental(s)");
-            case ADMIN -> drawModuleTiles(g, l, mouseX, mouseY,
-                    "Paged administration tools",
-                    "All changes use typed, server-validated actions.");
+            case HOME -> drawModuleTiles(g, l, mouseX, mouseY);
+            case ADMIN -> drawModuleTiles(g, l, mouseX, mouseY);
+            case MODULE_SETTINGS -> drawModuleSettings(g, l);
+            case ADMIN_TOOLS -> drawAdminTools(g, l, mouseX, mouseY);
+            case HOLOGRAMS -> drawHolograms(g, l);
+            case STATISTICS -> drawStatistics(g, l);
             case CLAIMS -> drawClaims(g,l); case TRAVEL -> drawTravel(g,l); case ECONOMY -> drawEconomy(g,l);
-            case REGIONS -> drawRegions(g,l); case SETTINGS -> g.text(font,"Personal settings are persisted by the server.",l.contentX(),l.contentTop(),MUTED,false);
+            case REGIONS -> drawRegions(g,l); case SETTINGS -> drawSettingsIntro(g, l);
             case PERMISSIONS -> drawPermissions(g,l,mouseX,mouseY); case PLAYER_INFO -> drawPlayerInfo(g,l);
             case ACCOUNTS -> drawAccounts(g,l); case JOBS -> drawJobs(g,l);
             case RENT_OPERATIONS -> drawRentOps(g,l); case CORE -> drawCore(g,l); case PROFILE -> drawProfile(g,l);
@@ -1371,9 +1663,7 @@ public final class SsuDashboardScreen extends Screen {
         }
     }
 
-    private void drawModuleTiles(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY, String heading, String subheading) {
-        g.text(font, heading, l.contentX(), l.contentTop(), MUTED, false);
-        g.text(font, subheading, l.contentX(), l.contentTop() + 15, MUTED, false);
+    private void drawModuleTiles(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
         if (!useTexturedTiles(l)) return;
         for (ModuleTile tile : moduleTiles(l)) {
             Rect b = tile.bounds();
@@ -1390,7 +1680,8 @@ public final class SsuDashboardScreen extends Screen {
             center(g, tile.module().label(), b.x() + TILE_SIZE / 2, b.y() + TILE_SIZE + 4,
                     tile.module().enabled() ? TEXT : MUTED);
             if (hovered && snapshot.uiSettings().dashboardHints()) {
-                g.text(font, trim(tile.module().hint(), 72), l.contentX(), l.footerY() - 16, MUTED, false);
+                g.setComponentTooltipForNextFrame(font,
+                        List.of(Component.literal(tile.module().hint())), mouseX, mouseY);
             }
         }
     }
@@ -1401,11 +1692,13 @@ public final class SsuDashboardScreen extends Screen {
 
     private List<ModuleTile> moduleTiles(Layout l) {
         if (page != Page.HOME && page != Page.ADMIN) return List.of();
-        List<Module> modules = page == Page.HOME ? homeModules() : adminModules();
-        int columns = l.contentWidth() >= 500 ? 4 : 3;
+        List<Module> modules = page == Page.HOME ? homeModules(l) : adminModules();
+        int columns = page == Page.ADMIN && modules.size() > 9
+                ? 4
+                : l.contentWidth() >= 500 ? 4 : 3;
         int gapX = Math.max(10, (l.contentWidth() - columns * TILE_SIZE) / Math.max(1, columns - 1));
         int startX = l.contentX() + Math.max(0, (l.contentWidth() - (columns * TILE_SIZE + gapX * (columns - 1))) / 2);
-        int startY = l.contentTop() + 38;
+        int startY = l.contentTop() + 10;
         int rowStep = TILE_SIZE + TILE_LABEL_HEIGHT + 10;
         java.util.ArrayList<ModuleTile> result = new java.util.ArrayList<>(modules.size());
         for (int i = 0; i < modules.size(); i++) {
@@ -1416,12 +1709,85 @@ public final class SsuDashboardScreen extends Screen {
         return List.copyOf(result);
     }
 
+    private void drawSettingsIntro(GuiGraphicsExtractor g, Layout l) {
+        g.text(font, "Choose a category, then click a setting to change it.",
+                l.contentX(), l.contentTop() + 4, TEXT, false);
+    }
+
+    private void drawModuleSettings(GuiGraphicsExtractor g, Layout l) {
+        var settings = snapshot.moduleSettings();
+        g.text(font, "Disabled modules release their runtime data and make their tools inert.",
+                l.contentX(), l.contentTop(), MUTED, false);
+        int columns = l.contentWidth() >= 470 ? 3 : 2;
+        int top = l.contentTop() + 24;
+        int rows = (13 + columns - 1) / columns;
+        int distanceTop = top + rows * 25 + 10;
+        g.text(font, "Hologram render/load distance: " + settings.hologramRenderDistance() + " blocks",
+                l.contentX(), distanceTop + 6, TEXT, false);
+        g.text(font, "Claim border render distance: " + settings.claimBorderRenderDistance() + " blocks",
+                l.contentX(), distanceTop + 33, TEXT, false);
+        g.text(font, "Region border render distance: " + settings.regionBorderRenderDistance() + " blocks",
+                l.contentX(), distanceTop + 60, TEXT, false);
+    }
+
+    private void drawAdminTools(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
+        g.text(font, "Select a specialised admin tool. Tool use is still permission checked by the server.",
+                l.contentX(), l.contentTop(), MUTED, false);
+        List<AdminTool> tools = adminTools();
+        for (int i = 0; i < tools.size(); i++) {
+            AdminTool tool = tools.get(i);
+            int y = l.contentTop() + 42 + i * 54;
+            Rect row = new Rect(l.contentX(), y, l.contentWidth(), 42);
+            boolean hovered = row.contains(mouseX, mouseY);
+            g.fill(row.x(), row.y(), row.x() + row.width(), row.y() + row.height(), hovered ? 0xD02A3743 : CARD);
+            g.outline(row.x(), row.y(), row.width(), row.height(), hovered ? ACCENT : PANEL_BORDER);
+            g.text(font, tool.label(), row.x() + 8, row.y() + 7, TEXT, true);
+            g.text(font, trim(tool.hint(), 62), row.x() + 8, row.y() + 23, MUTED, false);
+            if (hovered) {
+                g.setComponentTooltipForNextFrame(font, List.of(Component.literal(tool.hint())), mouseX, mouseY);
+            }
+        }
+        g.text(font, "Module switches and render distances are managed on the Module Settings page.",
+                l.contentX(), l.contentTop() + 146, MUTED, false);
+    }
+
+    private void drawHolograms(GuiGraphicsExtractor g, Layout l) {
+        if (pageData.locations().isEmpty()) empty(g, l, "No holograms on this page.");
+        int availableTextWidth = Math.max(42, l.contentWidth() - 198);
+        int labelCharacters = Math.max(6, availableTextWidth / 6);
+        for (int i = 0; i < pageData.locations().size(); i++) {
+            var entry = pageData.locations().get(i);
+            int y = rowTextY(l, i);
+            String label = entry.name() + " [" + entry.kind() + "]";
+            if (availableTextWidth >= 230) {
+                label += " | " + shortDim(entry.dimension()) + " @ " + pos(entry.x(), entry.y(), entry.z());
+            }
+            g.text(font, trim(label, labelCharacters), l.contentX(), y, TEXT, false);
+        }
+    }
+
+    private void drawStatistics(GuiGraphicsExtractor g, Layout l) {
+        if (pageData.statistics().isEmpty()) empty(g, l, "No custom statistics on this page.");
+        int textWidth = Math.max(100, l.contentWidth() - 272);
+        int chars = Math.max(12, textWidth / 6);
+        for (int i = 0; i < pageData.statistics().size(); i++) {
+            var entry = pageData.statistics().get(i);
+            int y = rowTextY(l, i);
+            String primary = entry.displayName() + " [" + entry.id() + "]";
+            g.text(font, trim(primary, chars), l.contentX(), y, entry.enabled() ? TEXT : MUTED, false);
+            String target = "*".equals(entry.target()) ? "all" : entry.target();
+            g.text(font, trim(entry.eventType().toLowerCase(Locale.ROOT).replace('_', ' ') + " • " + target
+                    + " • " + entry.playerCount() + " players • total " + entry.formattedTotal(), chars + 14),
+                    l.contentX(), y + 11, MUTED, false);
+        }
+    }
+
     private void drawClaims(GuiGraphicsExtractor g,Layout l){if(pageData.claims().isEmpty())empty(g,l,"No claims on this page.");
         for(int i=0;i<pageData.claims().size();i++){var e=pageData.claims().get(i);int y=rowTextY(l,i);
             g.text(font,e.name(),l.contentX(),y,TEXT,false);g.text(font,e.chunkCount()+" chunks | "+shortDim(e.dimension()),l.contentX()+100,y,MUTED,false);}
         if(selectedRow>=0&&selectedRow<pageData.claims().size()){var e=pageData.claims().get(selectedRow);
             detail(g,l,"Claim details",List.of("ID: "+e.id(),"Trusted: "+(e.trustedPlayers().isBlank()?e.trustedCount():e.trustedPlayers()),
-                    "Spawn: "+(e.hasSpawn()?e.spawn():"none"),"Flags: "+e.flags()));}}
+                    "Flags: "+e.flags()));}}
     private void drawTravel(GuiGraphicsExtractor g,Layout l){if(pageData.locations().isEmpty())empty(g,l,"No server spawn, homes or warps on this page.");
         for(int i=0;i<pageData.locations().size();i++){var e=pageData.locations().get(i);int y=rowTextY(l,i);
             g.text(font,cap(e.kind())+": "+e.name(),l.contentX(),y,TEXT,false);g.text(font,shortDim(e.dimension())+" | "+pos(e.x(),e.y(),e.z()),l.contentX()+130,y,MUTED,false);}}
@@ -1542,11 +1908,27 @@ public final class SsuDashboardScreen extends Screen {
     private int rowTextY(Layout l,int i){return rowY(l,i)+6;} private int rowTextY(Layout l,int i,int offset){return rowY(l,i,offset)+6;}
     private Layout layout(){int pw=Math.max(360,Math.min(680,width-8));int ph=Math.max(250,Math.min(390,height-8));int px=(width-pw)/2;int py=(height-ph)/2;
         boolean side=pw>=540;int sx=px+10;int cx=side?sx+112:px+12;int cw=px+pw-12-cx;return new Layout(px,py,pw,ph,sx,cx,cw,side);}
+    private static String activationLabel(String value) { return "KEYBIND".equals(value) ? "Keybind" : "Crouch"; }
+    private static String nextActivation(String value) { return "KEYBIND".equals(value) ? "SNEAK" : "KEYBIND"; }
+    private static int nextBrightness(int value) { return value >= 100 ? 25 : Math.min(100, value + 15); }
+    private static int nextMapLiveUpdateRadius(int value) {
+        int[] values = {1, 2, 4, 6, 8, 12, 16, 24, 32};
+        for (int candidate : values) if (candidate > value) return candidate;
+        return values[0];
+    }
+    private static String colorHex(int color) { return String.format(java.util.Locale.ROOT, "#%06X", color & 0xFFFFFF); }
+    private static int nextMiningColor(int current) {
+        int[] colors = {0x55FF77, 0x55AAFF, 0xFFD84D, 0xFF66DD, 0xFFFFFF, 0xFF704D};
+        int rgb = current & 0xFFFFFF;
+        for (int i = 0; i < colors.length; i++) if (colors[i] == rgb) return colors[(i + 1) % colors.length];
+        return colors[0];
+    }
+
     private void center(GuiGraphicsExtractor g,String s,int x,int y,int color){String v=blank(s);g.text(font,v,x-font.width(v)/2,y,color,false);}
     private static Identifier texture(String file) {
         return Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "textures/gui/dashboard/" + file);
     }
-    private static String onOff(boolean v){return v?"ON":"OFF";} private static String yesNo(boolean v){return v?"Yes":"No";}
+    private static String onOff(boolean v){return v?"ON":"OFF";} private static String keepDelete(boolean v){return v?"DELETE":"KEEP";} private static String yesNo(boolean v){return v?"Yes":"No";}
     private static String blank(String v){return v==null||v.isBlank()?"-":v;} private static String cap(String v){return v==null||v.isBlank()?"":Character.toUpperCase(v.charAt(0))+v.substring(1);}
     private static String shortDim(String v){int i=v.indexOf(':');return i>=0?v.substring(i+1):v;}
     private static String pos(double x,double y,double z){return (int)Math.floor(x)+", "+(int)Math.floor(y)+", "+(int)Math.floor(z);}
@@ -1555,7 +1937,7 @@ public final class SsuDashboardScreen extends Screen {
     @Override public boolean isPauseScreen(){return false;}
 
     private enum SettingsCategory {
-        GENERAL("General"), MINIMAP("Minimap"), WORLD_MAP("World map"), BORDERS("Borders"), MAIL("Mail");
+        GENERAL("General"), MINIMAP("Minimap"), WORLD_MAP("World map"), UTILITY_MINING("Mining"), BORDERS("Borders"), MAIL("Mail");
         private final String label;
         SettingsCategory(String label) { this.label = label; }
     }
@@ -1565,8 +1947,11 @@ public final class SsuDashboardScreen extends Screen {
         MAIL("Mail","Inbox, attachments and sent mail",""),
         CLAIMS("Claims & Land","Owned claims and claim tools","claims"), TRAVEL("Travel","Server spawn, homes and warps","travel"),
         ECONOMY("Wallet & Transactions","Payments and paged transaction history","transactions"),
-        REGIONS("Regions & Rentals","Rentals, region details and visibility","regions"), SETTINGS("Settings","Categorised personal settings for every SSU module",""),
-        ADMIN("Admin Center","Paged administrative tools",""), PLAYER_INFO("Player Info & Profile","Admin player browser and effective permissions",""),
+        REGIONS("Regions & Rentals","Rentals, region details and visibility","regions"), SETTINGS("Settings","Personal settings",""),
+        ADMIN("Admin Center","Paged administrative tools",""), MODULE_SETTINGS("Module Settings","Global module switches and render distances",""),
+        ADMIN_TOOLS("Admin Tools","Purpose-built setup and editing tools",""),
+        HOLOGRAMS("Holograms","Remote floating-text and hologram administration","holograms"),
+        STATISTICS("Player Statistics","Custom counters, storage and Floating Text sources","statistics"), PLAYER_INFO("Player Info & Profile","Admin player browser and effective permissions",""),
         PERMISSIONS("Permissions","Rank, player and dimension overrides","permissions"),
         ACCOUNTS("Economy Accounts","Searchable account browser","accounts"),
         JOBS("Active Jobs","Scheduler progress and cancellation","jobs"),
@@ -1575,7 +1960,10 @@ public final class SsuDashboardScreen extends Screen {
         String label(){return label;}String subtitle(){return subtitle;}String remoteId(){return remote;}boolean hasRemoteData(){return !remote.isBlank();}
     }
     private record Module(String label, String hint, Identifier icon, Page page, boolean enabled){}
+    private record AdminTool(String label, String hint, String id){}
+    private record ModuleSwitch(String label, String key, boolean enabled){}
     private record ModuleTile(Rect bounds, Module module){}
+    private record SettingsTooltip(Rect bounds, List<Component> lines){}
     private record Rect(int x, int y, int width, int height) {
         boolean contains(double px, double py) { return px >= x && px < x + width && py >= y && py < y + height; }
     }

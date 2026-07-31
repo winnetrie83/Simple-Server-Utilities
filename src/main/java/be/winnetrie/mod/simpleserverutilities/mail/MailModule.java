@@ -2,6 +2,8 @@ package be.winnetrie.mod.simpleserverutilities.mail;
 
 import java.util.Set;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
+
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModule;
 import be.winnetrie.mod.simpleserverutilities.core.service.SsuServiceRegistry;
 import net.minecraft.server.MinecraftServer;
@@ -14,6 +16,11 @@ public final class MailModule implements SsuModule {
     }
 
     @Override public String id() { return "mail"; }
+
+    @Override
+    public boolean isEnabled() {
+        return Config.ENABLE_MAIL.get();
+    }
 
     @Override public Set<String> dependencies() {
         return Set.of("storage", "transactions", "economy", "permissions");

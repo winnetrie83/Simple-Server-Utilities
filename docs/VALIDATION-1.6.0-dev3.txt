@@ -1,0 +1,46 @@
+SSU 1.6.0-dev3 validation report
+Date: 2026-07-30
+
+Baseline
+- Parent source: SSU 1.6.0-dev2
+- Mod version: 1.6.0-dev3
+- Network protocol: 25
+- Target: Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+
+Static source validation
+- Java files: 255
+- Java lines: 44814
+- JSON resources parsed successfully: 13
+- Package declarations match their source paths.
+- Public top-level type names match their filenames.
+- No duplicate project fully-qualified class names were found.
+- All project-local imports resolve to an existing top-level or nested project type.
+- Java delimiter, string, character, text-block and comment balance checks passed.
+- A dependency-free javac parse pass reported no syntax-like diagnostics; normal missing Minecraft/NeoForge dependency diagnostics were expected.
+- No obsolete LocalPlayer.displayClientMessage call remains.
+- The unintended JUnit src/test tree is absent.
+
+Targeted implementation checks (21/21)
+- Version is 1.6.0-dev3 and protocol is 25.
+- HologramEditorRequestPayload is bounded and registered client-to-server.
+- A normal tool right-click stores a server-owned point one world unit along the eye/view ray.
+- Right-click targeting sends only the synchronized hologram ID and cancels the normal use pipeline.
+- The server rechecks the exact named Hologram Tool in the main hand for local edit requests.
+- The editor supports create, complete edit-state preloading, safe ID changes and double-confirmed local deletion.
+- Editing preserves the stored dimension, position and enabled state.
+- HologramManager performs synchronized ID-safe replacement and immediate client resynchronization.
+- Admin Center exposes a searchable paged Holograms page.
+- Remote Edit opens the complete editor without requiring proximity or the held tool.
+- Remote Teleport resolves the stored dimension and uses the existing safe-destination search.
+- Remote Delete requires client confirmation and is permission checked on the server.
+- Treecapitator requires the main-hand stack to match ItemTags.AXES.
+- Veinminer requires the main-hand stack to match ItemTags.PICKAXES.
+- Required-tool checks run during resolution and throughout extra-block/natural-leaf processing.
+- The region and hologram result screens use LocalPlayer.sendSystemMessage(Component).
+- All changed payload constructor and registration references are internally consistent.
+
+Build limitation in this environment
+- ./gradlew clean compileJava was attempted.
+- The wrapper could not download Gradle 9.2.1 because outbound DNS is unavailable in this container (UnknownHostException for services.gradle.org).
+- The container provides Java 21, while the project requires Java 25.
+- Therefore this report does not claim a completed Minecraft/NeoForge compile or in-game test. Run gradlew.bat clean build with Java 25 on the development machine before installing the test JAR.

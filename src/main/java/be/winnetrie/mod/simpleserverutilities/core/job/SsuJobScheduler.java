@@ -71,6 +71,26 @@ public final class SsuJobScheduler {
         return true;
     }
 
+
+    public int cancelByOwnerModule(String rawModuleId) {
+        String moduleId = rawModuleId == null ? "" : rawModuleId.trim().toLowerCase(java.util.Locale.ROOT);
+        if (moduleId.isEmpty()) return 0;
+        java.util.List<UUID> ids;
+        synchronized (this) {
+            ids = jobs.values().stream()
+                    .filter(job -> moduleId.equals(normalizeModuleId(job.job().ownerModule())))
+                    .map(ScheduledJob::id)
+                    .toList();
+        }
+        int cancelled = 0;
+        for (UUID id : ids) if (cancel(id)) cancelled++;
+        return cancelled;
+    }
+
+    private static String normalizeModuleId(String rawModuleId) {
+        return rawModuleId == null ? "" : rawModuleId.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
     public void tick(MinecraftServer server) {
         long deadline = System.nanoTime() + tickTimeBudgetNanos;
         int remainingOperations = tickOperationBudget;

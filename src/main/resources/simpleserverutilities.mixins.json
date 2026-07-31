@@ -16,6 +16,9 @@
     "requireAnnotations": true
   },
   "client": [
-    "PlayerSkinWidgetAccessor"
+    "PlayerSkinWidgetAccessor",
+    "MultiLineEditBoxAccessor",
+    "MultilineTextFieldAccessor",
+    "MultiLineEditBoxRichTextMixin"
   ]
 }

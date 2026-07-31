@@ -7,6 +7,7 @@ import java.util.List;
 import com.mojang.blaze3d.platform.NativeImage;
 
 import be.winnetrie.mod.simpleserverutilities.client.map.AerialMapAtlas;
+import be.winnetrie.mod.simpleserverutilities.client.map.MapLighting;
 import be.winnetrie.mod.simpleserverutilities.client.map.TerrainColorSampler;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
 import net.minecraft.client.Minecraft;
@@ -39,6 +40,7 @@ final class ClaimTerrainMap implements AutoCloseable {
     private int publishedCenterChunkZ = Integer.MIN_VALUE;
     private int publishedRadius = -1;
     private String publishedDimension = "";
+    private int publishedNightBucket = -1;
 
     private @Nullable DynamicTexture buildingTexture;
     private int buildingWidth;
@@ -47,6 +49,7 @@ final class ClaimTerrainMap implements AutoCloseable {
     private int buildingCenterChunkZ = Integer.MIN_VALUE;
     private int buildingRadius = -1;
     private String buildingDimension = "";
+    private int buildingNightBucket = -1;
     private List<ChunkCoordinate> pendingChunks = List.of();
     private int nextPendingChunk;
     private boolean buildingDirty;
@@ -57,12 +60,13 @@ final class ClaimTerrainMap implements AutoCloseable {
         int gridSize = payload.radius() * 2 + 1;
         int requiredWidth = gridSize * PIXELS_PER_CHUNK;
         int requiredHeight = requiredWidth;
+        int nightBucket = level == null ? 0 : MapLighting.nightBucket(level);
 
         boolean publishedMatches = matchesPublished(
-                payload, currentDimension, requiredWidth, requiredHeight
+                payload, currentDimension, requiredWidth, requiredHeight, nightBucket
         );
         boolean buildingMatches = matchesBuilding(
-                payload, currentDimension, requiredWidth, requiredHeight
+                payload, currentDimension, requiredWidth, requiredHeight, nightBucket
         );
         if (publishedMatches) {
             if (buildingTexture != null && !buildingMatches) {
@@ -74,7 +78,7 @@ final class ClaimTerrainMap implements AutoCloseable {
             return;
         }
 
-        beginBuild(payload, currentDimension, requiredWidth, requiredHeight);
+        beginBuild(payload, currentDimension, requiredWidth, requiredHeight, nightBucket);
     }
 
     void tick(ClaimMapDataPayload payload) {
@@ -213,7 +217,8 @@ final class ClaimTerrainMap implements AutoCloseable {
             ClaimMapDataPayload payload,
             String dimension,
             int requiredWidth,
-            int requiredHeight
+            int requiredHeight,
+            int nightBucket
     ) {
         return publishedTexture != null
                 && publishedWidth == requiredWidth
@@ -221,14 +226,16 @@ final class ClaimTerrainMap implements AutoCloseable {
                 && publishedCenterChunkX == payload.centerChunkX()
                 && publishedCenterChunkZ == payload.centerChunkZ()
                 && publishedRadius == payload.radius()
-                && publishedDimension.equals(dimension);
+                && publishedDimension.equals(dimension)
+                && publishedNightBucket == nightBucket;
     }
 
     private boolean matchesBuilding(
             ClaimMapDataPayload payload,
             String dimension,
             int requiredWidth,
-            int requiredHeight
+            int requiredHeight,
+            int nightBucket
     ) {
         return buildingTexture != null
                 && buildingWidth == requiredWidth
@@ -237,6 +244,7 @@ final class ClaimTerrainMap implements AutoCloseable {
                 && buildingCenterChunkZ == payload.centerChunkZ()
                 && buildingRadius == payload.radius()
                 && buildingDimension.equals(dimension)
+                && buildingNightBucket == nightBucket
                 && nextPendingChunk < pendingChunks.size();
     }
 
@@ -244,7 +252,8 @@ final class ClaimTerrainMap implements AutoCloseable {
             ClaimMapDataPayload payload,
             String dimension,
             int requiredWidth,
-            int requiredHeight
+            int requiredHeight,
+            int nightBucket
     ) {
         closeTexture(buildingTexture);
         buildingTexture = new DynamicTexture(
@@ -259,6 +268,7 @@ final class ClaimTerrainMap implements AutoCloseable {
         buildingCenterChunkZ = payload.centerChunkZ();
         buildingRadius = payload.radius();
         buildingDimension = dimension;
+        buildingNightBucket = nightBucket;
         fillUnknown(buildingTexture.getPixels());
         buildingTexture.upload();
 
@@ -304,9 +314,10 @@ final class ClaimTerrainMap implements AutoCloseable {
                 int pixelX = pixelBaseX + localX;
                 int pixelZ = pixelBaseZ + localZ;
                 int color = AerialMapAtlas.sample(level, worldX, worldZ);
-                pixels.setPixel(pixelX, pixelZ, color == TerrainColorSampler.VOID_COLOR
+                color = color == TerrainColorSampler.VOID_COLOR
                         ? checkerColor(pixelX, pixelZ)
-                        : color);
+                        : MapLighting.apply(level, worldX, worldZ, color);
+                pixels.setPixel(pixelX, pixelZ, color);
             }
         }
         buildingDirty = true;
@@ -321,6 +332,7 @@ final class ClaimTerrainMap implements AutoCloseable {
         buildingCenterChunkZ = Integer.MIN_VALUE;
         buildingRadius = -1;
         buildingDimension = "";
+        buildingNightBucket = -1;
         pendingChunks = List.of();
         nextPendingChunk = 0;
         buildingDirty = false;
@@ -338,6 +350,7 @@ final class ClaimTerrainMap implements AutoCloseable {
         publishedCenterChunkZ = buildingCenterChunkZ;
         publishedRadius = buildingRadius;
         publishedDimension = buildingDimension;
+        publishedNightBucket = buildingNightBucket;
 
         buildingTexture = null;
         buildingWidth = 0;
@@ -346,6 +359,7 @@ final class ClaimTerrainMap implements AutoCloseable {
         buildingCenterChunkZ = Integer.MIN_VALUE;
         buildingRadius = -1;
         buildingDimension = "";
+        buildingNightBucket = -1;
         pendingChunks = List.of();
         nextPendingChunk = 0;
     }

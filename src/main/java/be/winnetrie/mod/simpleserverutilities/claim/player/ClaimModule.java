@@ -2,6 +2,8 @@ package be.winnetrie.mod.simpleserverutilities.claim.player;
 
 import java.util.Set;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
+
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModule;
 import be.winnetrie.mod.simpleserverutilities.core.service.SsuServiceRegistry;
 import net.minecraft.server.MinecraftServer;
@@ -21,6 +23,11 @@ public final class ClaimModule implements SsuModule {
     }
 
     @Override
+    public boolean isEnabled() {
+        return Config.ENABLE_PLAYER_CLAIMS.get();
+    }
+
+    @Override
     public Set<String> dependencies() {
         return Set.of("storage");
     }
@@ -32,11 +39,14 @@ public final class ClaimModule implements SsuModule {
 
     @Override
     public void onServerStarting(MinecraftServer server) {
+        ClaimPresenceEvents.clearRuntimeState();
         manager.load(server);
     }
 
     @Override
     public void onServerStopping(MinecraftServer server) {
         manager.save();
+        manager.clear();
+        ClaimPresenceEvents.clearRuntimeState();
     }
 }

@@ -1,5 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.region;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -16,6 +17,11 @@ public class RegionRentEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        if (!Config.ENABLE_ADMIN_REGIONS.get()) {
+            nextCheckTick = 0L;
+            return;
+        }
+
         MinecraftServer server = event.getServer();
         long currentTick = server.getTickCount();
 

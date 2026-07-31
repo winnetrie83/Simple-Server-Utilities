@@ -66,6 +66,11 @@ public final class RegionRentJournalManager {
         }
     }
 
+    public synchronized void clear() {
+        records.clear();
+        folder = null;
+    }
+
     public synchronized RegionRentOperationRecord prepare(RegionRentOperationRecord record) throws IOException {
         records.put(record.getOperationId(), record);
         write(record);

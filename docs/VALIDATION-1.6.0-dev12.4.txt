@@ -1,0 +1,28 @@
+SSU 1.6.0-dev12.4 validation report
+Date: 2026-07-31
+
+Baseline
+- Parent source: SSU 1.6.0-dev12.3
+- Mod version: 1.6.0-dev12.4
+- Target: Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+- Network protocol: 35 (unchanged)
+- Player UI preferences: schema 6 (unchanged)
+- Map markers: schema 1 (unchanged)
+- Aerial map cache: format 4 in map-cache-v3 (unchanged)
+
+Implemented changes
+- The camera-facing world marker icon is now a filled disc rather than a hollow line ring.
+- The outer radius changes from 0.58 blocks to 0.29 blocks, halving the icon diameter.
+- A slightly smaller coloured foreground disc sits in front of a thin dark backing disc for contrast and avoids z-fighting through a small camera-facing depth offset.
+- The vertical build-height beam and every marker setting/payload remain unchanged.
+
+Static validation
+- All Java source files passed lexical/delimiter balance scanning.
+- All JSON resources parsed successfully.
+- Source assertions confirmed version 1.6.0-dev12.4, protocol 35, filled GizmoStyle rectangles, radius 0.29 and removal of the former circular line-loop rendering.
+- MapMarkerRenderer compiled with javac 21 against minimal Minecraft/SSU signature stubs matching the methods used by the actual source.
+- Source ZIP integrity and packaged version assertions passed.
+
+Build limitation
+- A complete Gradle/NeoForge build was not run in this container because Gradle 9.2.1 is not cached, outbound download is unavailable and the installed JVM is Java 21 rather than Java 25.
+- Build locally with Java 25 using `gradlew.bat clean build` before installing the test jar.

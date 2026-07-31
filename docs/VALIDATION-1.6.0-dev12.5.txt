@@ -1,0 +1,63 @@
+SSU 1.6.0-dev12.5 validation report
+====================================
+
+Baseline
+--------
+Parent source: SSU 1.6.0-dev12.4
+Mod version: 1.6.0-dev12.5
+Minecraft: 26.2
+NeoForge: 26.2.0.7-beta
+Required Java: 25
+Network protocol: 35 (unchanged)
+Player UI preference schema: 6 (unchanged)
+Map marker schema: 1 (unchanged)
+Aerial map client-cache format: 5
+Aerial map client-cache directory: map-cache-v4
+Server-persistent data schemas: unchanged
+
+Implemented scope
+-----------------
+1. In-world marker aim label
+   - Camera/crosshair targeting selects only the closest marker within a bounded angular tolerance.
+   - Looking at a marker disc draws one compact always-on-top billboard label.
+   - Label contains the saved marker name and live player distance.
+   - Label is tied to the existing in-world marker-icon toggle/range; marker beams remain independently controlled.
+
+2. World Map cursor metadata
+   - LOCATION panel and bottom status line show X/Y/Z, surface biome and surface block.
+   - Metadata is captured with the terrain tile and remains available outside loaded client chunks.
+   - Block/biome registry IDs are converted to compact readable names in the UI.
+
+3. Aerial cache migration
+   - Tile cache format increased from 4 to 5.
+   - New cache root map-cache-v4 avoids interpreting old tiles as the new binary layout.
+   - Surface block IDs and biome IDs are persisted per sampled map pixel.
+
+Static/source validation
+------------------------
+PASS - 296 Java source files passed lexical/comment/string and delimiter-balance checks.
+PASS - 14 JSON files parsed successfully.
+PASS - 11 targeted source assertions covering version, protocol, cache version/path, marker label,
+       surface metadata capture and World Map biome/block presentation.
+PASS - Clean diff is limited to version/docs and the five intended Java implementation files.
+
+Targeted signature compilation
+------------------------------
+PASS - MapMarkerRenderer compiled against the actual Minecraft 26.2 merged signatures with minimal NeoForge/SSU stubs.
+PASS - AerialMapStorage compiled against the actual Minecraft 26.2 merged signatures with minimal stubs.
+PASS - AerialMapAtlas compiled against the actual Minecraft 26.2 merged signatures with minimal stubs.
+PASS - WorldMapWidget compiled against the actual Minecraft 26.2 merged signatures with minimal stubs.
+PASS - WorldMapScreen compiled against the actual Minecraft 26.2 merged signatures with minimal stubs.
+PASS - Aerial cache format-5 block/biome metadata write/read roundtrip harness completed successfully.
+
+Packaging/build limitation
+--------------------------
+A full Gradle/NeoForge build was not executed in the work container. The container provides Java 21,
+while this project requires Java 25, and the Gradle 9.2.1 distribution is not cached and cannot be
+downloaded from this environment. Build locally with Java 25 using:
+
+    gradlew.bat clean build
+
+Runtime status
+--------------
+Statically and signature-validated test source. Not yet built or confirmed in Minecraft by the user.

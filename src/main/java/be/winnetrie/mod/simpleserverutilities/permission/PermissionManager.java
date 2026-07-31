@@ -425,6 +425,21 @@ public class PermissionManager {
         return existed;
     }
 
+    public void clear() {
+        data = new PermissionData();
+        settings = new PermissionSettings();
+        invalidateResolutionCache();
+        rankRecordStore.reset();
+        playerRecordStore.reset();
+        dimensionRecordStore.reset();
+        claimContextRecordStore.reset();
+        settingsRecordStore.reset();
+        rootFolder = null;
+        permissionsFolder = null;
+        settingsFile = null;
+        legacySaveFile = null;
+    }
+
     public PermissionData getData() {
         return data;
     }
@@ -1055,6 +1070,22 @@ public class PermissionManager {
         changed |= setDefaultPermission(rank, PermissionKeys.MAIL_DAILY_SEND_LIMIT, 20);
         changed |= setDefaultPermission(rank, PermissionKeys.MAIL_SEND_COOLDOWN, 5);
         changed |= setDefaultPermission(rank, PermissionKeys.MAIL_ADMIN, false);
+
+        changed |= setDefaultPermission(rank, PermissionKeys.CROPS_HARVESTING_USE, true);
+
+        changed |= setDefaultPermission(rank, PermissionKeys.TREECAPITATOR_USE, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.TREECAPITATOR_MAX_BLOCKS, Config.TREECAPITATOR_DEFAULT_MAX_BLOCKS.get());
+        changed |= setDefaultPermission(rank, PermissionKeys.TREECAPITATOR_BLOCKS, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_USE, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_MAX_BLOCKS, Config.VEINMINER_DEFAULT_MAX_BLOCKS.get());
+        changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_ORE_COAL, true);
+        changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_ORE_IRON, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_ORE_COPPER, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_ORE_GOLD, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_ORE_REDSTONE, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_ORE_EMERALD, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_ORE_LAPIS, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_ORE_DIAMOND, false);
 
         return changed;
     }

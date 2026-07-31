@@ -21,6 +21,7 @@ public record MinimapDataPayload(
         boolean northUp,
         boolean showClaims,
         boolean showRegions,
+        int liveUpdateRadiusChunks,
         String dimension,
         int centerChunkX,
         int centerChunkZ,
@@ -45,6 +46,7 @@ public record MinimapDataPayload(
         size = Math.max(64, Math.min(256, size));
         shape = "RECTANGLE".equalsIgnoreCase(shape) ? "RECTANGLE" : "CIRCLE";
         position = normalizePosition(position);
+        liveUpdateRadiusChunks = Math.max(1, Math.min(32, liveUpdateRadiusChunks));
         dimension = limit(dimension, 128);
         claims = claims == null ? List.of() : List.copyOf(claims);
         regions = regions == null ? List.of() : List.copyOf(regions);
@@ -61,6 +63,7 @@ public record MinimapDataPayload(
         buffer.writeBoolean(payload.northUp());
         buffer.writeBoolean(payload.showClaims());
         buffer.writeBoolean(payload.showRegions());
+        buffer.writeVarInt(payload.liveUpdateRadiusChunks());
         buffer.writeUtf(payload.dimension(), 128);
         buffer.writeVarInt(payload.centerChunkX());
         buffer.writeVarInt(payload.centerChunkZ());
@@ -95,6 +98,7 @@ public record MinimapDataPayload(
         boolean northUp = buffer.readBoolean();
         boolean showClaims = buffer.readBoolean();
         boolean showRegions = buffer.readBoolean();
+        int liveUpdateRadiusChunks = buffer.readVarInt();
         String dimension = buffer.readUtf(128);
         int centerChunkX = buffer.readVarInt();
         int centerChunkZ = buffer.readVarInt();
@@ -127,6 +131,7 @@ public record MinimapDataPayload(
 
         return new MinimapDataPayload(
                 allowed, enabled, size, shape, position, northUp, showClaims, showRegions,
+                liveUpdateRadiusChunks,
                 dimension, centerChunkX, centerChunkZ, ownClaimColor, otherClaimColor, regionColor,
                 claims, regions
         );

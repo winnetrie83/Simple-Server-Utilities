@@ -1,0 +1,49 @@
+SSU 1.6.0-dev6 validation report
+=================================
+
+Versioning
+----------
+- Mod version: 1.6.0-dev6
+- Network protocol: 28
+- Hologram storage schema: 4
+- Player UI preferences schema remains unchanged.
+
+Implemented checks
+------------------
+- One Gizmos.rect background is emitted per hologram entry, before all TextGizmo lines.
+- Background size is based on the maximum rendered line width and the complete multiline height.
+- Background depth offset scales with hologram scale and is moved away from the camera.
+- Hologram renderer uses Minecraft 26.2 GameRenderer.mainCamera().
+- Text is automatically wrapped after 40 visible characters; legacy formatting pairs do not count.
+- Active legacy formatting is carried onto each independently rendered TextGizmo line.
+- Editor exposes compact B/I/U/S, selected-text colour and clear-style controls.
+- Editor selected-text palette maps in order to Minecraft colour codes 0-f.
+- Editor cursor and selection endpoints are restored through client-only mixin accessors.
+- X/Y/Z coordinates are transmitted, bounded and stored while retaining the hologram dimension.
+- Submit, open and sync text buffers account for inline formatting overhead.
+- Existing schema-3 global text styles migrate to schema-4 inline formatting.
+- UtilityMiningResolver contains the required Block import.
+- No old GameRenderer.getMainCamera or LocalPlayer.displayClientMessage calls remain.
+- No src/test tree is present.
+
+Executable harnesses
+--------------------
+- HologramRichText compiled with the available javac.
+- 40-character wrapping harness passed.
+- Formatting carry-over across automatic line boundaries passed.
+- HologramDefinition schema-3 to schema-4 migration harness passed.
+- All resource JSON files parsed successfully.
+- Dependency-free all-source javac parsing reported no Java syntax diagnostics; unresolved Minecraft/NeoForge symbols are expected without the mod classpath.
+
+Source inventory
+----------------
+- 259 Java files
+- 45,986 Java lines
+- 2 resource JSON files
+
+Build limitation
+----------------
+A complete Gradle/NeoForge compile could not run in the assistant environment. The included
+Gradle 9.2.1 wrapper attempted to download its distribution, but DNS access to
+services.gradle.org is unavailable. The environment also does not provide the required
+Java 25 toolchain. Run `gradlew.bat clean build` locally with Java 25 before in-game testing.

@@ -3,6 +3,7 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 import com.mojang.blaze3d.platform.NativeImage;
 
 import be.winnetrie.mod.simpleserverutilities.client.map.AerialMapAtlas;
+import be.winnetrie.mod.simpleserverutilities.client.map.MapLighting;
 import be.winnetrie.mod.simpleserverutilities.client.map.TerrainColorSampler;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapDataPayload;
 import net.minecraft.client.Minecraft;
@@ -33,25 +34,30 @@ final class WorldMapTerrainMap implements AutoCloseable {
     private int publishedCenterChunkZ = Integer.MIN_VALUE;
     private int publishedRadius = -1;
     private String publishedDimension = "";
+    private int buildNightBucket = -1;
+    private int publishedNightBucket = -1;
     private boolean forceRebuild = true;
 
     void ensureView(WorldMapDataPayload payload, int requestedPixels) {
         ClientLevel level = Minecraft.getInstance().level;
         String dimension = level == null ? "" : level.dimension().identifier().toString();
         int requiredSize = Math.max(MIN_TEXTURE_SIZE, Math.min(MAX_TEXTURE_SIZE, requestedPixels));
+        int nightBucket = level == null ? 0 : MapLighting.nightBucket(level);
 
         boolean publishedMatches = publishedTexture != null
                 && textureSize == requiredSize
                 && publishedCenterChunkX == payload.centerChunkX()
                 && publishedCenterChunkZ == payload.centerChunkZ()
                 && publishedRadius == payload.radius()
-                && publishedDimension.equals(dimension);
+                && publishedDimension.equals(dimension)
+                && publishedNightBucket == nightBucket;
         boolean buildingMatches = buildingTexture != null
                 && textureSize == requiredSize
                 && buildCenterChunkX == payload.centerChunkX()
                 && buildCenterChunkZ == payload.centerChunkZ()
                 && buildRadius == payload.radius()
                 && buildDimension.equals(dimension)
+                && buildNightBucket == nightBucket
                 && buildRow < textureSize;
 
         if (!forceRebuild && publishedMatches) {
@@ -66,7 +72,7 @@ final class WorldMapTerrainMap implements AutoCloseable {
             return;
         }
 
-        beginBuild(payload, dimension, requiredSize);
+        beginBuild(payload, dimension, requiredSize, nightBucket);
     }
 
     void tick(WorldMapDataPayload payload, int requestedPixels) {
@@ -156,7 +162,8 @@ final class WorldMapTerrainMap implements AutoCloseable {
     ) {
         double worldX = minimumBlockX + ((pixelX + offsetX) * totalBlocks) / textureSize;
         double worldZ = minimumBlockZ + ((pixelZ + offsetZ) * totalBlocks) / textureSize;
-        return AerialMapAtlas.sampleAtScale(level, worldX, worldZ, blocksPerPixel);
+        int color = AerialMapAtlas.sampleAtScale(level, worldX, worldZ, blocksPerPixel);
+        return MapLighting.apply(level, (int) Math.floor(worldX), (int) Math.floor(worldZ), color);
     }
 
     private static int gammaAverage(int first, int second, int third, int fourth) {
@@ -276,7 +283,7 @@ final class WorldMapTerrainMap implements AutoCloseable {
         forceRebuild = true;
     }
 
-    private void beginBuild(WorldMapDataPayload payload, String dimension, int requiredSize) {
+    private void beginBuild(WorldMapDataPayload payload, String dimension, int requiredSize, int nightBucket) {
         if (textureSize != requiredSize) {
             closeTexture(publishedTexture);
             closeTexture(buildingTexture);
@@ -292,6 +299,7 @@ final class WorldMapTerrainMap implements AutoCloseable {
         buildCenterChunkZ = payload.centerChunkZ();
         buildRadius = payload.radius();
         buildDimension = dimension;
+        buildNightBucket = nightBucket;
         buildRow = 0;
         forceRebuild = false;
     }
@@ -304,6 +312,7 @@ final class WorldMapTerrainMap implements AutoCloseable {
         publishedCenterChunkZ = buildCenterChunkZ;
         publishedRadius = buildRadius;
         publishedDimension = buildDimension;
+        publishedNightBucket = buildNightBucket;
         buildRow = textureSize;
     }
 
@@ -326,6 +335,8 @@ final class WorldMapTerrainMap implements AutoCloseable {
         publishedTexture = null;
         buildingTexture = null;
         textureSize = 0;
+        buildNightBucket = -1;
+        publishedNightBucket = -1;
         forceRebuild = true;
     }
 

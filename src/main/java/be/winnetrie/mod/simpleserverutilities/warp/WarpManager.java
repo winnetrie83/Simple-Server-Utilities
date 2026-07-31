@@ -78,6 +78,12 @@ public class WarpManager {
         warpRecordStore.queueJson(GSON, saveFile, data);
     }
 
+    public void clear() {
+        warps.clear();
+        warpRecordStore.reset();
+        saveFile = null;
+    }
+
     public boolean setWarp(ServerPlayer player, String rawName) {
         String name = sanitizeName(rawName);
         String normalizedName = normalizeName(name);

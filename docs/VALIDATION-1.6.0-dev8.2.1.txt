@@ -1,0 +1,17 @@
+SSU 1.6.0-dev8.2.1 source validation
+
+Hotfix scope
+- Corrected the effectively-final Java error in PropertySettingsScreen.addPlayerAction.
+- `storedValue` is never reassigned and is therefore safe to capture in the options stream predicate.
+- `selectedValue` remains mutable only for choosing the fallback dropdown value and is not captured by that predicate.
+
+Compatibility
+- mod_version: 1.6.0-dev8.2.1
+- network protocol: 30 (unchanged)
+- hologram schema: 4 (unchanged)
+- player UI preferences schema: 3 (unchanged)
+- border visualization settings schema: 2 (unchanged)
+
+Environment note
+- Full NeoForge/Gradle compilation was not available in the work container because the project requires Java 25 while the container provides Java 21.
+- Build locally with Java 25 using: gradlew.bat clean build

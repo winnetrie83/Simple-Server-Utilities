@@ -302,11 +302,11 @@ public final class MailManager {
             }
         }
         String subject = rawSubject == null || rawSubject.isBlank() ? "(No subject)" : rawSubject.trim();
-        String body = rawBody == null ? "" : rawBody.trim();
-        if (subject.length() > 96 || body.length() > 1024) {
-            return MailOperationResult.failure("text_too_long", "Mail subject or message is too long.");
+        String body = MailRichText.normalize(rawBody);
+        if (subject.length() > 96) {
+            return MailOperationResult.failure("text_too_long", "Mail subject is too long.");
         }
-        if (items.isEmpty() && moneyMinor == 0L && body.isBlank()) {
+        if (items.isEmpty() && moneyMinor == 0L && MailRichText.plainText(body).isBlank()) {
             return MailOperationResult.failure("empty", "A mail needs a message, item, or money attachment.");
         }
 

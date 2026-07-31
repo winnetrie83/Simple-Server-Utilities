@@ -1,0 +1,62 @@
+SSU 1.6.0-dev5.1 validation report
+Date: 2026-07-30
+
+Baseline
+- Parent source: SSU 1.6.0-dev5
+- Mod version: 1.6.0-dev5.1
+- Network protocol: 27 (unchanged)
+- Hologram storage schema: 3 (unchanged)
+- Target: Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+
+Changed production files
+- UtilityMiningResolver.java
+- HologramRenderer.java
+- gradle.properties
+
+Documentation changes
+- CHANGELOG.md
+- README.md
+- docs/TESTING-1.6.0-dev5.1.md
+- docs/VALIDATION-1.6.0-dev5.1.txt
+
+Static source validation
+- Java files: 256
+- Java lines: 45,765
+- JSON files parsed successfully: 13
+- Package declarations match their source paths.
+- Public top-level type names match their filenames.
+- All project-local imports resolve to an existing project type.
+- Java delimiter, string, character, text-block and comment balance checks passed.
+- A dependency-free javac diagnostic pass reported no syntax-like diagnostics; unresolved Minecraft/NeoForge/Gson/SLF4J dependencies were expected.
+- HologramRenderer passed an isolated stub-compilation harness, including the Minecraft 26.2 main-camera forward/left/up vector calls and Gizmos rectangle emission.
+- A standalone wood-family normalization harness passed 12 checks covering normal, stripped, wood, stem, hyphae, bamboo, species separation and namespace separation.
+- The unintended JUnit src/test tree is absent.
+
+Targeted implementation checks (29/29)
+- Version is 1.6.0-dev5.1 and protocol remains 27.
+- Treecapitator resolves a normalized target wood family instead of one exact block instance.
+- Full-tree validation and upward-only selection both use the same normalized family.
+- Normal and stripped log/wood variants normalize together.
+- Stem and hyphae variants normalize together.
+- Bamboo block and stripped bamboo block normalize together.
+- Registry namespaces remain part of the family key, preventing cross-mod species merging.
+- Runtime block revalidation accepts only the original normalized family.
+- Per-block permissions, protection and required-tool checks remain active for every actual variant.
+- Natural-tree validation no longer requires the connected remnant to still touch the ground.
+- A remaining vertical trunk section is still required.
+- The existing natural-canopy requirement remains active.
+- Different wood families remain hard traversal boundaries.
+- The floating-text background uses Minecraft's main camera rather than a line-to-camera position vector.
+- Camera forward, left and up vectors are all used as the billboard basis.
+- The former independently aimed background basis is absent.
+- Background depth bias is reduced to 0.0015 world units.
+- The bias is applied away from the camera along the camera forward vector.
+- Background horizontal and vertical axes come directly from the camera quaternion basis.
+- Text and background still share the same see-through/always-on-top policy.
+- No payload, protocol or storage-schema changes were introduced.
+
+Build limitation in this environment
+- ./gradlew compileJava --offline was attempted.
+- The wrapper attempted to download Gradle 9.2.1 and failed because outbound DNS is unavailable in this container (UnknownHostException for services.gradle.org).
+- The container provides Java 21, while the project requires Java 25.
+- Therefore this report does not claim a completed Minecraft/NeoForge build or in-game test. Run gradlew.bat clean build with Java 25 before installing the test JAR.

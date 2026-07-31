@@ -5,9 +5,12 @@ import java.util.Map;
 
 public final class BorderVisualizationSettings {
 
-    private int schemaVersion = 1;
+    private int schemaVersion = 2;
     private Map<BorderCategory, Integer> colors = new EnumMap<>(BorderCategory.class);
+    /** Legacy schema-1 value, retained for transparent migration only. */
     private int viewDistanceChunks = 16;
+    private int claimRenderDistanceBlocks = 128;
+    private int regionRenderDistanceBlocks = 128;
     private int claimVerticalRange = 64;
 
     public BorderVisualizationSettings() {
@@ -15,13 +18,18 @@ public final class BorderVisualizationSettings {
     }
 
     public void ensureDefaults() {
-        if (colors == null) {
-            colors = new EnumMap<>(BorderCategory.class);
-        }
+        if (colors == null) colors = new EnumMap<>(BorderCategory.class);
         for (BorderCategory category : BorderCategory.values()) {
             colors.putIfAbsent(category, category.defaultRgb());
         }
-        viewDistanceChunks = Math.max(2, Math.min(32, viewDistanceChunks));
+        if (schemaVersion < 2) {
+            int migrated = Math.max(32, Math.min(512, viewDistanceChunks * 16));
+            claimRenderDistanceBlocks = migrated;
+            regionRenderDistanceBlocks = migrated;
+            schemaVersion = 2;
+        }
+        claimRenderDistanceBlocks = clampDistance(claimRenderDistanceBlocks);
+        regionRenderDistanceBlocks = clampDistance(regionRenderDistanceBlocks);
         claimVerticalRange = Math.max(8, Math.min(256, claimVerticalRange));
     }
 
@@ -45,17 +53,33 @@ public final class BorderVisualizationSettings {
         ensureDefaults();
     }
 
-    public int getStrokeArgb(BorderCategory category) {
-        return 0xFF000000 | getRgb(category);
-    }
+    public int getStrokeArgb(BorderCategory category) { return 0xFF000000 | getRgb(category); }
+    public int getFillArgb(BorderCategory category) { return 0x28000000 | getRgb(category); }
 
-    public int getFillArgb(BorderCategory category) {
-        return 0x28000000 | getRgb(category);
-    }
-
-    public int getViewDistanceChunks() {
+    public int getClaimRenderDistanceBlocks() {
         ensureDefaults();
-        return viewDistanceChunks;
+        return claimRenderDistanceBlocks;
+    }
+
+    public void setClaimRenderDistanceBlocks(int blocks) {
+        claimRenderDistanceBlocks = clampDistance(blocks);
+        schemaVersion = 2;
+    }
+
+    public int getRegionRenderDistanceBlocks() {
+        ensureDefaults();
+        return regionRenderDistanceBlocks;
+    }
+
+    public void setRegionRenderDistanceBlocks(int blocks) {
+        regionRenderDistanceBlocks = clampDistance(blocks);
+        schemaVersion = 2;
+    }
+
+    /** Compatibility helper for older callers. */
+    @Deprecated
+    public int getViewDistanceChunks() {
+        return Math.max(2, Math.max(getClaimRenderDistanceBlocks(), getRegionRenderDistanceBlocks()) / 16);
     }
 
     public int getClaimVerticalRange() {
@@ -63,7 +87,9 @@ public final class BorderVisualizationSettings {
         return claimVerticalRange;
     }
 
-    public int getSchemaVersion() {
-        return schemaVersion;
+    public int getSchemaVersion() { return schemaVersion; }
+
+    private static int clampDistance(int blocks) {
+        return Math.max(16, Math.min(512, blocks));
     }
 }

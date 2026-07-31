@@ -15,6 +15,8 @@ public record SsuMenuSnapshotPayload(
         boolean settingsAvailable,
         UiSettingsSummary uiSettings,
         boolean administrator,
+        boolean cropsHarvestingEnabled,
+        ModuleSettingsSummary moduleSettings,
         AdminAccessSummary adminAccess,
         boolean claimBordersVisible,
         boolean regionBordersVisible,
@@ -43,6 +45,7 @@ public record SsuMenuSnapshotPayload(
         playerName = playerName == null ? "" : playerName;
         primaryRank = primaryRank == null ? "" : primaryRank;
         uiSettings = uiSettings == null ? UiSettingsSummary.defaults() : uiSettings;
+        moduleSettings = moduleSettings == null ? ModuleSettingsSummary.defaults() : moduleSettings;
         adminAccess = adminAccess == null ? AdminAccessSummary.none() : adminAccess;
         core = core == null ? CoreSummary.empty() : core;
         economy = economy == null ? EconomySummary.empty() : economy;
@@ -62,6 +65,8 @@ public record SsuMenuSnapshotPayload(
         buffer.writeBoolean(payload.settingsAvailable);
         writeUiSettings(buffer, payload.uiSettings);
         buffer.writeBoolean(payload.administrator);
+        buffer.writeBoolean(payload.cropsHarvestingEnabled);
+        writeModuleSettings(buffer, payload.moduleSettings);
         writeAdminAccess(buffer, payload.adminAccess);
         buffer.writeBoolean(payload.claimBordersVisible);
         buffer.writeBoolean(payload.regionBordersVisible);
@@ -85,6 +90,8 @@ public record SsuMenuSnapshotPayload(
                 buffer.readBoolean(),
                 readUiSettings(buffer),
                 buffer.readBoolean(),
+                buffer.readBoolean(),
+                readModuleSettings(buffer),
                 readAdminAccess(buffer),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
@@ -101,6 +108,34 @@ public record SsuMenuSnapshotPayload(
         );
     }
 
+
+    private static void writeModuleSettings(RegistryFriendlyByteBuf buffer, ModuleSettingsSummary settings) {
+        buffer.writeBoolean(settings.claims());
+        buffer.writeBoolean(settings.homes());
+        buffer.writeBoolean(settings.warps());
+        buffer.writeBoolean(settings.regions());
+        buffer.writeBoolean(settings.treecapitator());
+        buffer.writeBoolean(settings.veinminer());
+        buffer.writeBoolean(settings.cropHarvesting());
+        buffer.writeBoolean(settings.holograms());
+        buffer.writeBoolean(settings.blockInformation());
+        buffer.writeBoolean(settings.statistics());
+        buffer.writeBoolean(settings.mail());
+        buffer.writeBoolean(settings.permissions());
+        buffer.writeBoolean(settings.remoteHologramImages());
+        buffer.writeVarInt(settings.hologramRenderDistance());
+        buffer.writeVarInt(settings.claimBorderRenderDistance());
+        buffer.writeVarInt(settings.regionBorderRenderDistance());
+    }
+
+    private static ModuleSettingsSummary readModuleSettings(RegistryFriendlyByteBuf buffer) {
+        return new ModuleSettingsSummary(
+                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
+                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
+                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
+                buffer.readBoolean(), buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt()
+        );
+    }
 
     private static void writeAdminAccess(RegistryFriendlyByteBuf buffer, AdminAccessSummary access) {
         buffer.writeBoolean(access.permissions());
@@ -124,9 +159,26 @@ public record SsuMenuSnapshotPayload(
         buffer.writeBoolean(settings.minimapShowRegions());
         buffer.writeBoolean(settings.worldMapShowClaims());
         buffer.writeBoolean(settings.worldMapShowRegions());
+        buffer.writeBoolean(settings.worldMapShowMarkers());
+        buffer.writeBoolean(settings.minimapShowMarkers());
+        buffer.writeBoolean(settings.worldMarkersVisible());
+        buffer.writeBoolean(settings.markerBeamsVisible());
+        buffer.writeVarInt(settings.markerBeamDistance());
+        buffer.writeVarInt(settings.mapLiveUpdateRadiusChunks());
+        buffer.writeBoolean(settings.blockInformationEnabled());
+        buffer.writeBoolean(settings.blockInformationDebugAllowed());
+        buffer.writeBoolean(settings.blockInformationDebugEnabled());
         buffer.writeBoolean(settings.mailAutoDeletePlayerAttachments());
         buffer.writeBoolean(settings.mailAutoDeleteSystemAttachments());
         buffer.writeBoolean(settings.mailAutoDeleteAuctionAttachments());
+        buffer.writeBoolean(settings.treecapitatorEnabled());
+        buffer.writeUtf(settings.treecapitatorActivation(), 16);
+        buffer.writeInt(settings.treecapitatorOutlineColor());
+        buffer.writeVarInt(settings.treecapitatorOutlineBrightness());
+        buffer.writeBoolean(settings.veinminerEnabled());
+        buffer.writeUtf(settings.veinminerActivation(), 16);
+        buffer.writeInt(settings.veinminerOutlineColor());
+        buffer.writeVarInt(settings.veinminerOutlineBrightness());
     }
 
     private static UiSettingsSummary readUiSettings(RegistryFriendlyByteBuf buffer) {
@@ -143,7 +195,24 @@ public record SsuMenuSnapshotPayload(
                 buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
-                buffer.readBoolean()
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readVarInt(),
+                buffer.readVarInt(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readUtf(16),
+                buffer.readInt(),
+                buffer.readVarInt(),
+                buffer.readBoolean(),
+                buffer.readUtf(16),
+                buffer.readInt(),
+                buffer.readVarInt()
         );
     }
 
@@ -348,6 +417,36 @@ public record SsuMenuSnapshotPayload(
         return TYPE;
     }
 
+    public record ModuleSettingsSummary(
+            boolean claims,
+            boolean homes,
+            boolean warps,
+            boolean regions,
+            boolean treecapitator,
+            boolean veinminer,
+            boolean cropHarvesting,
+            boolean holograms,
+            boolean blockInformation,
+            boolean statistics,
+            boolean mail,
+            boolean permissions,
+            boolean remoteHologramImages,
+            int hologramRenderDistance,
+            int claimBorderRenderDistance,
+            int regionBorderRenderDistance
+    ) {
+        public ModuleSettingsSummary {
+            hologramRenderDistance = Math.max(8, Math.min(512, hologramRenderDistance));
+            claimBorderRenderDistance = Math.max(16, Math.min(512, claimBorderRenderDistance));
+            regionBorderRenderDistance = Math.max(16, Math.min(512, regionBorderRenderDistance));
+        }
+
+        public static ModuleSettingsSummary defaults() {
+            return new ModuleSettingsSummary(true, true, true, true, true, true, true, true, true, true,
+                    true, true, true, 64, 128, 128);
+        }
+    }
+
     public record AdminAccessSummary(boolean permissions, boolean core, boolean rentPolicy, boolean spawn) {
         public static AdminAccessSummary none() {
             return new AdminAccessSummary(false, false, false, false);
@@ -365,18 +464,50 @@ public record SsuMenuSnapshotPayload(
             boolean minimapShowRegions,
             boolean worldMapShowClaims,
             boolean worldMapShowRegions,
+            boolean worldMapShowMarkers,
+            boolean minimapShowMarkers,
+            boolean worldMarkersVisible,
+            boolean markerBeamsVisible,
+            int markerBeamDistance,
+            int mapLiveUpdateRadiusChunks,
+            boolean blockInformationEnabled,
+            boolean blockInformationDebugAllowed,
+            boolean blockInformationDebugEnabled,
             boolean mailAutoDeletePlayerAttachments,
             boolean mailAutoDeleteSystemAttachments,
-            boolean mailAutoDeleteAuctionAttachments
+            boolean mailAutoDeleteAuctionAttachments,
+            boolean treecapitatorEnabled,
+            String treecapitatorActivation,
+            int treecapitatorOutlineColor,
+            int treecapitatorOutlineBrightness,
+            boolean veinminerEnabled,
+            String veinminerActivation,
+            int veinminerOutlineColor,
+            int veinminerOutlineBrightness
     ) {
         public UiSettingsSummary {
             minimapSize = Math.max(64, Math.min(256, minimapSize));
             minimapShape = minimapShape == null ? "CIRCLE" : minimapShape;
             minimapPosition = minimapPosition == null ? "TOP_RIGHT" : minimapPosition;
+            markerBeamDistance = Math.max(16, Math.min(512, markerBeamDistance));
+            mapLiveUpdateRadiusChunks = Math.max(1, Math.min(32, mapLiveUpdateRadiusChunks));
+            treecapitatorActivation = treecapitatorActivation == null ? "SNEAK" : treecapitatorActivation;
+            veinminerActivation = veinminerActivation == null ? "SNEAK" : veinminerActivation;
+            treecapitatorOutlineBrightness = Math.max(10, Math.min(100, treecapitatorOutlineBrightness));
+            veinminerOutlineBrightness = Math.max(10, Math.min(100, veinminerOutlineBrightness));
         }
 
         public static UiSettingsSummary defaults() {
-            return new UiSettingsSummary(true, false, 96, "CIRCLE", "TOP_RIGHT", true, true, true, true, true, false, false, false);
+            return new UiSettingsSummary(
+                    true, false, 96, "CIRCLE", "TOP_RIGHT",
+                    true, true, true, true, true,
+                    true, true, true, true, 128,
+                    8,
+                    true, false, false,
+                    false, false, false,
+                    false, "SNEAK", 0xFF55FF77, 85,
+                    false, "SNEAK", 0xFF55AAFF, 85
+            );
         }
     }
 

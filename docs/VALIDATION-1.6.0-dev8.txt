@@ -1,0 +1,22 @@
+SSU 1.6.0-dev8 source validation
+================================
+
+Static/source checks performed in the packaging environment:
+- Git whitespace/error scan (`git diff --check`): PASS
+- Java source delimiter/parser-oriented scan: PASS
+- Full source javac parser pass without the Minecraft/NeoForge classpath: no syntax/parser diagnostics; expected missing-dependency diagnostics only
+- Dynamic module lifecycle pure-Java harness: PASS
+- Job owner cancellation pure-Java harness: PASS
+- Border settings migration/default/clamp pure-Java harness: PASS
+- Border renderer stub compilation and 2D/3D radius-clipping harness: PASS
+- Disabled-module event-path audit (permissions, region rent, mail and utility mining): PASS
+
+Full Gradle compilation could not run in this environment:
+- Project requirement: Java 25 and Gradle 9.2.1
+- Available runtime: Java 21
+- Gradle wrapper distribution was not cached
+- Network access to services.gradle.org was unavailable, so the wrapper stopped before project configuration/Java compilation
+
+Required local verification:
+`gradlew.bat clean build`
+Then follow TESTING-1.6.0-dev8.md in Minecraft with matching dev8 client/server builds.

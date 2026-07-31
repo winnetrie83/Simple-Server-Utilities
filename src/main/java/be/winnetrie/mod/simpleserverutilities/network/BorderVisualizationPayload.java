@@ -16,6 +16,7 @@ public record BorderVisualizationPayload(
         boolean visible,
         String dimension,
         int claimVerticalRange,
+        int renderDistance,
         List<Entry> entries
 ) implements CustomPacketPayload {
 
@@ -33,6 +34,7 @@ public record BorderVisualizationPayload(
     public BorderVisualizationPayload {
         dimension = dimension == null ? "" : dimension;
         claimVerticalRange = Math.max(8, Math.min(256, claimVerticalRange));
+        renderDistance = Math.max(8, Math.min(512, renderDistance));
         entries = entries == null ? List.of() : List.copyOf(entries);
         if (entries.size() > MAX_ENTRIES) {
             throw new IllegalArgumentException("Too many border visualization entries: " + entries.size());
@@ -40,7 +42,7 @@ public record BorderVisualizationPayload(
     }
 
     public static BorderVisualizationPayload clear(BorderLayer layer) {
-        return new BorderVisualizationPayload(layer, false, "", 64, List.of());
+        return new BorderVisualizationPayload(layer, false, "", 64, 64, List.of());
     }
 
     private static void encode(RegistryFriendlyByteBuf buffer, BorderVisualizationPayload payload) {
@@ -48,6 +50,7 @@ public record BorderVisualizationPayload(
         buffer.writeBoolean(payload.visible);
         buffer.writeUtf(payload.dimension);
         buffer.writeVarInt(payload.claimVerticalRange);
+        buffer.writeVarInt(payload.renderDistance);
         buffer.writeVarInt(payload.entries.size());
 
         for (Entry entry : payload.entries) {
@@ -83,6 +86,7 @@ public record BorderVisualizationPayload(
         boolean visible = buffer.readBoolean();
         String dimension = buffer.readUtf();
         int claimVerticalRange = buffer.readVarInt();
+        int renderDistance = buffer.readVarInt();
         int entryCount = readBoundedSize(buffer, MAX_ENTRIES, "entries");
         List<Entry> entries = new ArrayList<>(entryCount);
 
@@ -121,7 +125,7 @@ public record BorderVisualizationPayload(
             entries.add(new Entry(category, label, strokeColor, fillColor, strokeWidth, strokeBoxes, boxes, edges));
         }
 
-        return new BorderVisualizationPayload(layer, visible, dimension, claimVerticalRange, entries);
+        return new BorderVisualizationPayload(layer, visible, dimension, claimVerticalRange, renderDistance, entries);
     }
 
     private static int readBoundedSize(RegistryFriendlyByteBuf buffer, int maximum, String name) {

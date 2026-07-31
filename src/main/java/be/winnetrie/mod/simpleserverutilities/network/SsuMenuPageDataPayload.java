@@ -25,7 +25,8 @@ public record SsuMenuPageDataPayload(
         List<AccountEntry> accounts,
         List<JobEntry> jobs,
         List<RentOperationEntry> rentOperations,
-        List<PermissionEntry> permissions
+        List<PermissionEntry> permissions,
+        List<StatisticEntry> statistics
 ) implements CustomPacketPayload {
 
     private static final int MAX_ENTRIES = SsuMenuPageRequestPayload.MAX_PAGE_SIZE;
@@ -50,13 +51,14 @@ public record SsuMenuPageDataPayload(
         jobs = copy(jobs, "jobs");
         rentOperations = copy(rentOperations, "rent operations");
         permissions = copy(permissions, "permissions");
+        statistics = copy(statistics, "statistics");
     }
 
     public static SsuMenuPageDataPayload empty(
             String page, int pageIndex, int pageSize, long requestId, String notice, boolean error
     ) {
         return new SsuMenuPageDataPayload(page, pageIndex, pageSize, 0, requestId, notice, error,
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     private static void encode(RegistryFriendlyByteBuf b, SsuMenuPageDataPayload p) {
@@ -75,13 +77,14 @@ public record SsuMenuPageDataPayload(
         writeJobs(b, p.jobs);
         writeRentOperations(b, p.rentOperations);
         writePermissions(b, p.permissions);
+        writeStatistics(b, p.statistics);
     }
 
     private static SsuMenuPageDataPayload decode(RegistryFriendlyByteBuf b) {
         return new SsuMenuPageDataPayload(
                 b.readUtf(32), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readVarLong(),
                 b.readUtf(512), b.readBoolean(), readClaims(b), readLocations(b), readRegions(b),
-                readTransactions(b), readAccounts(b), readJobs(b), readRentOperations(b), readPermissions(b)
+                readTransactions(b), readAccounts(b), readJobs(b), readRentOperations(b), readPermissions(b), readStatistics(b)
         );
     }
 
@@ -184,6 +187,23 @@ public record SsuMenuPageDataPayload(
         List<PermissionEntry> r=new ArrayList<>(n);for(int i=0;i<n;i++)r.add(new PermissionEntry(b.readUtf(64),
                 b.readUtf(16),b.readUtf(128),b.readUtf(128),b.readUtf(128)));return r;}
 
+    private static void writeStatistics(RegistryFriendlyByteBuf b, List<StatisticEntry> values) {
+        b.writeVarInt(values.size());
+        for (StatisticEntry v : values) {
+            b.writeUtf(v.id, 64); b.writeUtf(v.displayName, 64); b.writeUtf(v.eventType, 32);
+            b.writeUtf(v.target, 128); b.writeUtf(v.unit, 24); b.writeBoolean(v.enabled);
+            b.writeVarInt(v.playerCount); b.writeVarLong(v.totalValue); b.writeUtf(v.formattedTotal, 128);
+            b.writeVarLong(v.updatedAt);
+        }
+    }
+    private static List<StatisticEntry> readStatistics(RegistryFriendlyByteBuf b) {
+        int n = size(b, "statistics"); List<StatisticEntry> r = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) r.add(new StatisticEntry(b.readUtf(64), b.readUtf(64), b.readUtf(32),
+                b.readUtf(128), b.readUtf(24), b.readBoolean(), b.readVarInt(), b.readVarLong(),
+                b.readUtf(128), b.readVarLong()));
+        return r;
+    }
+
     private static int size(RegistryFriendlyByteBuf b,String name){int n=b.readVarInt();if(n<0||n>MAX_ENTRIES)
         throw new IllegalArgumentException("Invalid SSU menu "+name+" page size: "+n);return n;}
     private static <T> List<T> copy(List<T> values,String name){List<T> result=values==null?List.of():List.copyOf(values);
@@ -222,4 +242,13 @@ public record SsuMenuPageDataPayload(
             grossAmount=bounded(grossAmount,128);refundAmount=bounded(refundAmount,128);error=bounded(error,256);updatedAt=Math.max(0L,updatedAt);}}
     public record PermissionEntry(String owner,String kind,String key,String value,String source){
         public PermissionEntry{owner=bounded(owner,64);kind=bounded(kind,16);key=bounded(key,128);value=bounded(value,128);source=bounded(source,128);}}
+    public record StatisticEntry(String id, String displayName, String eventType, String target, String unit,
+            boolean enabled, int playerCount, long totalValue, String formattedTotal, long updatedAt) {
+        public StatisticEntry {
+            id = bounded(id, 64); displayName = bounded(displayName, 64); eventType = bounded(eventType, 32);
+            target = bounded(target, 128); unit = bounded(unit, 24); playerCount = Math.max(0, playerCount);
+            totalValue = Math.max(0L, totalValue); formattedTotal = bounded(formattedTotal, 128);
+            updatedAt = Math.max(0L, updatedAt);
+        }
+    }
 }

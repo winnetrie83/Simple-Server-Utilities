@@ -11,6 +11,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportOptions;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportPolicy;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportType;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.WarpPolicy;
+import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.warp.Warp;
 import net.minecraft.commands.CommandSourceStack;
@@ -30,7 +31,7 @@ public class WarpCommands {
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("warps")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                .requires(source -> Config.ENABLE_WARPS.get() && source.getEntity() instanceof ServerPlayer)
 
                 // /warps
                 .executes(context -> listWarps(context.getSource()))

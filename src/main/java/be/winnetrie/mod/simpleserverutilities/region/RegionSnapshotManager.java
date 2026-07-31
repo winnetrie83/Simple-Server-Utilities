@@ -101,6 +101,13 @@ public final class RegionSnapshotManager {
         recoverInterruptedCheckpoints();
     }
 
+    public void clear() {
+        snapshotFolder = null;
+        archiveFolder = null;
+        jobFolder = null;
+        unresolvedResetRegions.clear();
+    }
+
     public boolean hasSnapshot(String regionName) {
         if (snapshotFolder == null) {
             return false;
@@ -1002,6 +1009,11 @@ public final class RegionSnapshotManager {
         }
 
         @Override
+        public String ownerModule() {
+            return "regions";
+        }
+
+        @Override
         public Set<String> resourceLocks() {
             return Set.of(SsuJobLocks.region(region.getDimension(), region.getName()));
         }
@@ -1293,6 +1305,11 @@ public final class RegionSnapshotManager {
                     completedOperations,
                     totalOperations
             );
+        }
+
+        @Override
+        public String ownerModule() {
+            return "regions";
         }
 
         @Override

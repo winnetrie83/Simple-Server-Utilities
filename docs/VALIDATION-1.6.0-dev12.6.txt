@@ -1,0 +1,49 @@
+SSU 1.6.0-dev12.6 validation report
+====================================
+
+Baseline
+--------
+Parent source: SSU 1.6.0-dev12.5
+Mod version: 1.6.0-dev12.6
+Minecraft: 26.2
+NeoForge: 26.2.0.7-beta
+Required Java: 25
+Network protocol: 35 (unchanged)
+Player UI preference schema: 6 (unchanged)
+Map marker schema: 1 (unchanged)
+Aerial map client-cache format: 5 / map-cache-v4 (unchanged)
+Server-persistent data schemas: unchanged
+
+Implemented scope
+-----------------
+1. Stable apparent marker size
+   - The filled camera-facing marker disc scales proportionally with distance after a 16-block reference distance.
+   - Scaling is clamped to the existing 512-block in-world marker range.
+   - Near markers retain the previous compact world size.
+
+2. Stable readable aimed label
+   - Text scale, background dimensions and camera-relative vertical offset use the same bounded visual scale.
+   - The label therefore retains approximately constant screen size alongside the marker disc.
+
+3. Long-range aim selection
+   - Replaced the former capped world-space tolerance with a fixed angular tolerance.
+   - This keeps crosshair selection aligned with the compensated marker size at long distance.
+
+Validation
+----------
+PASS - Targeted javac 21 compilation of MapMarkerRenderer completed with minimal Minecraft/SSU signature stubs.
+PASS - Full Java lexical/string/comment and delimiter-balance scan completed.
+PASS - All JSON resources parsed successfully.
+PASS - Source assertions confirm version 1.6.0-dev12.6, unchanged protocol 35, 16-block reference distance, bounded distance scaling and scaled label geometry/text.
+
+Packaging/build limitation
+--------------------------
+A full Gradle/NeoForge build was not executed in the work container. The project requires Java 25,
+while the container provides Java 21, and the Gradle 9.2.1 distribution is not cached for offline use.
+Build locally with Java 25 using:
+
+    gradlew.bat clean build
+
+Runtime status
+--------------
+Statically and targeted-compile validated test source. Not yet built or confirmed in Minecraft by the user.

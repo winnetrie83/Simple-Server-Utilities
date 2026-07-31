@@ -3,7 +3,9 @@ package be.winnetrie.mod.simpleserverutilities.command;
 import com.mojang.brigadier.CommandDispatcher;
 import java.time.Duration;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.blockinfo.BlockInformationService;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import net.minecraft.commands.CommandSourceStack;
@@ -26,7 +28,9 @@ public class SSUCommands {
                 .then(EconomyCommands.buildAdmin())
                 .then(UnifiedPermissionCommands.buildRank())
                 .then(UnifiedPermissionCommands.buildPermission())
-                .then(PlayerSettingsCommands.build()));
+                .then(PlayerSettingsCommands.build())
+                .then(UtilityMiningCommands.build())
+                .then(HologramCommands.build()));
 
         dispatcher.register(ClaimCommands.build());
         dispatcher.register(RegionCommands.build());
@@ -78,23 +82,60 @@ public class SSUCommands {
     }
 
     private static void reloadAll(MinecraftServer server) {
+        boolean statisticsWasActive = SimpleServerUtilities.CORE.modules().isActive("statistics");
+        if (statisticsWasActive) SimpleServerUtilities.STATISTICS.saveAll();
         SimpleServerUtilities.STORAGE.flush(Duration.ofSeconds(5));
 
         // Match the Core 2.0 dependency order while keeping the storage worker alive.
+        // Apply changed module switches before touching module-owned data. This
+        // guarantees that /ssu reload cannot resurrect a disabled subsystem.
+        SimpleServerUtilities.CORE.modules().refreshEnabledState(server);
+
         SimpleServerUtilities.TRANSACTIONS.clear();
         SimpleServerUtilities.ECONOMY.load(server);
-        SimpleServerUtilities.PLAYER_CLAIMS.load(server);
-        SimpleServerUtilities.PERMISSIONS.load(server);
-        SimpleServerUtilities.PERMISSIONS.migrateLegacyClaimLimitOverrides();
-        SimpleServerUtilities.MAIL.load(server);
-        SimpleServerUtilities.HOMES.load(server);
-        SimpleServerUtilities.WARPS.load(server);
+        if (Config.ENABLE_PLAYER_CLAIMS.get()) {
+            SimpleServerUtilities.PLAYER_CLAIMS.load(server);
+        }
+        if (Config.ENABLE_PERMISSION_SYSTEM.get()) {
+            SimpleServerUtilities.PERMISSIONS.load(server);
+            SimpleServerUtilities.PERMISSIONS.migrateLegacyClaimLimitOverrides();
+        }
+        if (Config.ENABLE_MAIL.get()) {
+            SimpleServerUtilities.MAIL.load(server);
+        }
+        if (Config.ENABLE_HOMES.get()) {
+            SimpleServerUtilities.HOMES.load(server);
+        }
+        if (Config.ENABLE_WARPS.get()) {
+            SimpleServerUtilities.WARPS.load(server);
+        }
         SimpleServerUtilities.SERVER_SPAWN.load(server);
         SimpleServerUtilities.UI_PREFERENCES.load(server);
-        SimpleServerUtilities.REGIONS.load(server);
-        SimpleServerUtilities.REGION_SNAPSHOTS.load(server);
-        SimpleServerUtilities.REGION_RENT_JOURNAL.loadAndRecover(server);
+        if (statisticsWasActive && SimpleServerUtilities.CORE.modules().isActive("statistics")) {
+            SimpleServerUtilities.STATISTICS.load(server);
+        }
+        BlockInformationService.syncAll(server);
+        if (Config.ENABLE_TREECAPITATOR.get()) {
+            SimpleServerUtilities.TREE_PLACEMENTS.load(server);
+        } else {
+            SimpleServerUtilities.TREE_PLACEMENTS.save();
+            SimpleServerUtilities.STORAGE.flush(Duration.ofSeconds(5));
+            SimpleServerUtilities.TREE_PLACEMENTS.clear();
+        }
+        SimpleServerUtilities.UTILITY_MINING.clearClients(server);
+        SimpleServerUtilities.UTILITY_MINING.clear();
+        if (Config.ENABLE_ADMIN_REGIONS.get()) {
+            SimpleServerUtilities.REGIONS.load(server);
+            SimpleServerUtilities.REGION_SNAPSHOTS.load(server);
+            SimpleServerUtilities.REGION_RENT_JOURNAL.loadAndRecover(server);
+        }
         SimpleServerUtilities.BORDER_SETTINGS.load(server);
         SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(server);
+        if (Config.ENABLE_HOLOGRAMS.get()) {
+            SimpleServerUtilities.HOLOGRAMS.load(server);
+            SimpleServerUtilities.HOLOGRAMS.syncAll();
+        } else {
+            SimpleServerUtilities.HOLOGRAMS.clearClients(server);
+        }
     }
 }

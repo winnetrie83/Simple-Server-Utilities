@@ -73,15 +73,13 @@ public final class BorderCommands {
         if (player == null) {
             return 0;
         }
-        if (!PermissionService.getBoolean(player, PermissionKeys.BORDER_CLAIMS_VIEW, true)) {
-            player.sendSystemMessage(Component.literal("You do not have permission to view claim borders."));
+        if (!be.winnetrie.mod.simpleserverutilities.Config.ENABLE_PLAYER_CLAIMS.get()
+                || !PermissionService.getBooleanWithoutOperatorBypass(player, PermissionKeys.BORDER_CLAIMS_VIEW, true)) {
+            player.sendSystemMessage(Component.literal("Claim borders are not allowed by the server."));
             return 0;
         }
 
         SimpleServerUtilities.BORDER_SETTINGS.setClaimsVisible(player.getUUID(), visible);
-        if (!visible) {
-            SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player);
-        }
         SimpleServerUtilities.BORDER_VISUALIZATIONS.syncOverview(player, true);
         player.sendSystemMessage(Component.literal("Claim borders turned " + onOff(visible) + "."));
         return 1;
@@ -92,8 +90,9 @@ public final class BorderCommands {
         if (player == null) {
             return 0;
         }
-        if (!PermissionService.getBoolean(player, PermissionKeys.BORDER_REGIONS_VIEW, true)) {
-            player.sendSystemMessage(Component.literal("You do not have permission to view region borders."));
+        if (!be.winnetrie.mod.simpleserverutilities.Config.ENABLE_ADMIN_REGIONS.get()
+                || !PermissionService.getBooleanWithoutOperatorBypass(player, PermissionKeys.BORDER_REGIONS_VIEW, true)) {
+            player.sendSystemMessage(Component.literal("Region borders are not allowed by the server."));
             return 0;
         }
 

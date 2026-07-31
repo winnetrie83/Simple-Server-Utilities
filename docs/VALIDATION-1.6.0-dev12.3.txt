@@ -1,0 +1,29 @@
+SSU 1.6.0-dev12.3 validation report
+Date: 2026-07-31
+
+Baseline
+- Parent source: SSU 1.6.0-dev12.2
+- Mod version: 1.6.0-dev12.3
+- Target: Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+- Network protocol: 35 (unchanged)
+- Player UI preferences: schema 6 (unchanged)
+- Map markers: schema 1 (unchanged)
+- Aerial map cache: format 4 in map-cache-v3 (unchanged)
+
+Implemented changes
+- The former horizontal ground ring is replaced by a camera-facing circular billboard basis derived from the current camera-to-marker vector.
+- The marker icon is centred at the saved marker block centre while the beam remains an independent full-height vertical line.
+- The marker editor exposes all sixteen Minecraft legacy colours in two rows of eight.
+- Colour controls render full colour swatches with selection/hover outlines and named plus hexadecimal tooltips.
+- The World Map marker context actions are enclosed in a larger padded double-outline frame that remains clamped inside the map viewport.
+
+Static validation
+- All Java source files passed lexical/delimiter balance scanning.
+- All JSON resources parsed successfully.
+- Source assertions confirmed version 1.6.0-dev12.3, protocol 35, sixteen unique legacy colours, two-row/eight-column layout, camera-facing Vec3 basis use and the enlarged context frame.
+- MapMarkerEditorScreen and MapMarkerRenderer compiled with javac 21 against a major-version-adjusted copy of the actual Minecraft 26.2 merged jar plus minimal NeoForge/SSU stubs.
+- Source ZIP integrity and packaged version assertions passed.
+
+Build limitation
+- A complete Gradle/NeoForge build was not run in this container because Gradle 9.2.1 is not cached, outbound download is unavailable and the installed JVM is Java 21 rather than Java 25.
+- Build locally with Java 25 using `gradlew.bat clean build` before installing the test jar.

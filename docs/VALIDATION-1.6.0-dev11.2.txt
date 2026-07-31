@@ -1,0 +1,62 @@
+SSU 1.6.0-dev11.2 validation report
+===================================
+
+Baseline
+--------
+- Parent source: SSU 1.6.0-dev11.1
+- Mod version: 1.6.0-dev11.2
+- Minecraft: 26.2
+- NeoForge: 26.2.0.7-beta
+- Java target: 25
+- Network protocol: 34 (was 33)
+- Player UI preference schema: 5 (unchanged)
+- All persistent storage schemas unchanged.
+
+Implemented Container Information extension
+-------------------------------------------
+- Added strict permission ssu.block_information.inventory.
+- Added integer permission ssu.block_information.inventory.max_items with
+  fallback/default 1 and validated range 0-54.
+- Added optional ssu.block_information.inventory.full override up to the hard
+  54-stack cap.
+- Added a server-authoritative looked-at-target content payload and client HUD
+  item-icon grid with stack counts, Empty state and truncation indicator.
+- Added flower pots, own ender chest, ordinary/double chests, vanilla Container
+  block entities, lecterns, campfires, item frames, armor stands, Container
+  entities and NeoForge block/entity item capability fallbacks.
+- Added server reach, loaded chunk, SSU protection, double-chest half, lock and
+  unopened random-loot validation.
+- Player entities are excluded explicitly.
+- Preview ItemStacks are sanitized to item type/count; all per-stack components
+  are removed before network encoding to avoid leaking nested/private metadata
+  and to keep packets bounded.
+- Content is refreshed every five ticks and only changed snapshots are sent.
+
+Validation
+----------
+- Java lexical string/comment and balanced delimiter scan passed for all 283
+  Java source files.
+- BlockInformationClientState compiled with javac 21 against major-version-
+  downgraded copies of the actual Minecraft 26.2 patched signatures plus
+  minimal NeoForge signature stubs.
+- BlockInformationService compiled against the same Minecraft signatures plus
+  minimal SSU/NeoForge service and capability stubs, validating chest, pot,
+  lectern, campfire, item-frame, armor-stand, reach and capability API calls.
+- BlockInformationContentPayload and BlockInformationStatePayload compiled
+  against the actual Minecraft 26.2 buffer, ItemStack and payload signatures.
+- PermissionKeys and PermissionCatalog compiled; a runnable harness confirmed the
+  integer permission type, 0-54 range, value 1 acceptance and value 55 rejection.
+  The service source uses fallback/default 1.
+- Focused source assertions passed for version 1.6.0-dev11.2, protocol 34,
+  strict no-operator inventory/full gates, numeric fallback 1, hard cap 54,
+  server raycast, protection/lock/loot checks, player exclusion, payload
+  component sanitization, changed-snapshot caching and client target matching.
+- diff --check reported no whitespace errors.
+
+Build limitation
+----------------
+A complete Gradle/NeoForge build could not run in this container because the
+Gradle 9.2.1 distribution is not cached, external downloads are unavailable and
+the installed runtime is Java 21 while SSU targets Java 25. Build locally with:
+
+    gradlew.bat clean build

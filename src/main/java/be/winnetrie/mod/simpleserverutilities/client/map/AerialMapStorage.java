@@ -42,7 +42,7 @@ import net.minecraft.client.Minecraft;
 final class AerialMapStorage {
 
     private static final int MAGIC = 0x53535541; // SSUA
-    private static final int VERSION = 3;
+    private static final int VERSION = 5;
     private static final long DEFAULT_MAX_DISK_BYTES = 512L * 1024L * 1024L;
     private static final int PRUNE_EVERY_WRITES = 256;
 
@@ -155,7 +155,10 @@ final class AerialMapStorage {
             int[] basePixels,
             short[] terrainHeights,
             short[] surfaceHeights,
-            byte[] surfaceKinds
+            byte[] surfaceKinds,
+            byte[] blockLights,
+            String[] surfaceBlockIds,
+            String[] biomeIds
     ) {
         TileRequest request = new TileRequest(
                 SESSION.get(), serverKey, dimension, paletteFingerprint, chunkX, chunkZ
@@ -169,6 +172,9 @@ final class AerialMapStorage {
                 terrainHeights.clone(),
                 surfaceHeights.clone(),
                 surfaceKinds.clone(),
+                blockLights.clone(),
+                surfaceBlockIds.clone(),
+                biomeIds.clone(),
                 cacheRoot
         ));
         scheduleWrite(path);
@@ -201,7 +207,10 @@ final class AerialMapStorage {
                             pending.basePixels(),
                             pending.terrainHeights(),
                             pending.surfaceHeights(),
-                            pending.surfaceKinds()
+                            pending.surfaceKinds(),
+                            pending.blockLights(),
+                            pending.surfaceBlockIds(),
+                            pending.biomeIds()
                     );
                     long newSize = Files.size(path);
                     DISK_BYTES.updateAndGet(current -> Math.max(0L, current + newSize - previousSize));
@@ -339,13 +348,25 @@ final class AerialMapStorage {
             }
             byte[] surfaceKinds = new byte[kindCount];
             input.readFully(surfaceKinds);
+            int lightCount = input.readInt();
+            if (lightCount < 0 || lightCount > 4_096) {
+                throw new IOException("Invalid aerial tile block-light count " + lightCount + ".");
+            }
+            byte[] blockLights = new byte[lightCount];
+            input.readFully(blockLights);
+            String[] surfaceBlockIds = readStringArray(input, "surface block");
+            String[] biomeIds = readStringArray(input, "biome");
             if (terrainHeights.length != surfaceHeights.length
-                    || terrainHeights.length != surfaceKinds.length) {
+                    || terrainHeights.length != surfaceKinds.length
+                    || terrainHeights.length != blockLights.length
+                    || terrainHeights.length != surfaceBlockIds.length
+                    || terrainHeights.length != biomeIds.length) {
                 throw new IOException("Aerial tile metadata arrays do not have matching lengths.");
             }
             return new LoadedTile(
                     request.session(), request.serverKey(), request.dimension(), request.paletteFingerprint(),
-                    chunkX, chunkZ, pixels, terrainHeights, surfaceHeights, surfaceKinds, capturedAt
+                    chunkX, chunkZ, pixels, terrainHeights, surfaceHeights, surfaceKinds, blockLights,
+                    surfaceBlockIds, biomeIds, capturedAt
             );
         }
     }
@@ -362,13 +383,32 @@ final class AerialMapStorage {
         return values;
     }
 
+    private static String[] readStringArray(DataInputStream input, String label) throws IOException {
+        int count = input.readInt();
+        if (count < 0 || count > 4_096) {
+            throw new IOException("Invalid aerial tile " + label + " count " + count + ".");
+        }
+        String[] values = new String[count];
+        for (int index = 0; index < values.length; index++) {
+            String value = input.readUTF();
+            if (value.length() > 256) {
+                throw new IOException("Aerial tile " + label + " id is too long.");
+            }
+            values[index] = value;
+        }
+        return values;
+    }
+
     private static void writeAtomic(
             Path path,
             TileRequest request,
             int[] basePixels,
             short[] terrainHeights,
             short[] surfaceHeights,
-            byte[] surfaceKinds
+            byte[] surfaceKinds,
+            byte[] blockLights,
+            String[] surfaceBlockIds,
+            String[] biomeIds
     ) throws IOException {
         Files.createDirectories(path.getParent());
         Path temp = path.resolveSibling(path.getFileName() + ".tmp");
@@ -389,6 +429,10 @@ final class AerialMapStorage {
                 writeShortArray(output, surfaceHeights);
                 output.writeInt(surfaceKinds.length);
                 output.write(surfaceKinds);
+                output.writeInt(blockLights.length);
+                output.write(blockLights);
+                writeStringArray(output, surfaceBlockIds);
+                writeStringArray(output, biomeIds);
             }
             try {
                 Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
@@ -407,6 +451,13 @@ final class AerialMapStorage {
         }
     }
 
+    private static void writeStringArray(DataOutputStream output, String[] values) throws IOException {
+        output.writeInt(values.length);
+        for (String value : values) {
+            output.writeUTF(value == null ? "" : value);
+        }
+    }
+
     private static Path tilePath(Minecraft minecraft, TileRequest request) {
         int regionX = AerialMapCacheCoordinates.regionCoordinate(request.chunkX());
         int regionZ = AerialMapCacheCoordinates.regionCoordinate(request.chunkZ());
@@ -421,7 +472,7 @@ final class AerialMapStorage {
     private static Path cacheRoot(Minecraft minecraft) {
         return minecraft.gameDirectory.toPath()
                 .resolve("simpleserverutilities")
-                .resolve("map-cache-v2");
+                .resolve("map-cache-v4");
     }
 
     private static void prune(Path root) {
@@ -643,6 +694,9 @@ final class AerialMapStorage {
             short[] terrainHeights,
             short[] surfaceHeights,
             byte[] surfaceKinds,
+            byte[] blockLights,
+            String[] surfaceBlockIds,
+            String[] biomeIds,
             long capturedAt
     ) {
     }
@@ -678,6 +732,9 @@ final class AerialMapStorage {
             short[] terrainHeights,
             short[] surfaceHeights,
             byte[] surfaceKinds,
+            byte[] blockLights,
+            String[] surfaceBlockIds,
+            String[] biomeIds,
             Path cacheRoot
     ) {
     }

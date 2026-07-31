@@ -64,7 +64,7 @@ public final class MailSentRecord {
     public void normalize() {
         if (recipientName == null) recipientName = "";
         if (subject == null) subject = "";
-        if (body == null) body = "";
+        body = MailRichText.normalize(body);
         itemStackCount = Math.max(0, Math.min(9, itemStackCount));
         moneyMinor = Math.max(0L, moneyMinor);
         sentAtEpochMilli = Math.max(0L, sentAtEpochMilli);

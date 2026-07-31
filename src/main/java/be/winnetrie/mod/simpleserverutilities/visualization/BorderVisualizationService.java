@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
@@ -59,6 +60,8 @@ public class BorderVisualizationService {
         ChunkPos chunk = player.chunkPosition();
         long settingsRevision = SimpleServerUtilities.BORDER_SETTINGS.revision();
         PlayerSyncState previous = syncStates.get(player.getUUID());
+        boolean showClaims = canShowClaimBorders(player, preferences);
+        boolean showRegions = canShowRegionBorders(player, preferences);
 
         boolean changed = force
                 || previous == null
@@ -67,30 +70,36 @@ public class BorderVisualizationService {
                 || !previous.dimension().equals(dimension)
                 || previous.claimsRevision() != claimsRevision
                 || previous.regionsRevision() != regionsRevision
-                || previous.settingsRevision() != settingsRevision;
+                || previous.settingsRevision() != settingsRevision
+                || previous.claimsVisible() != showClaims
+                || previous.regionsVisible() != showRegions;
 
         if (!changed) {
             return;
         }
 
-        boolean showClaims = preferences.isClaimBordersVisible()
-                && PermissionService.getBoolean(player, PermissionKeys.BORDER_CLAIMS_VIEW, true);
-        boolean showRegions = preferences.isRegionBordersVisible()
-                && PermissionService.getBoolean(player, PermissionKeys.BORDER_REGIONS_VIEW, true);
-
         if (showClaims) {
             sendClaimOverview(player);
-        } else if (previous == null || previous.claimsVisible()) {
-            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.CLAIM));
+            sendFocusedClaim(player);
+        } else {
+            if (previous == null || previous.claimsVisible()) {
+                PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.CLAIM));
+            }
+            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.CLAIM_FOCUS));
         }
 
         if (showRegions) {
             sendRegionOverview(player);
-        } else if (previous == null || previous.regionsVisible()) {
-            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.REGION));
+            // Dev10.2 retires the former per-player pin layer. Clear it on every
+            // effective sync so stale clients cannot keep an old focused copy.
+            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.REGION_FOCUS));
+        } else {
+            if (previous == null || previous.regionsVisible()) {
+                PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.REGION));
+            }
+            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.REGION_FOCUS));
+            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.SELECTION));
         }
-
-        sendPinnedRegions(player);
 
         syncStates.put(player.getUUID(), new PlayerSyncState(
                 dimension,
@@ -105,70 +114,72 @@ public class BorderVisualizationService {
     }
 
     public void showClaim(ServerPlayer player, PlayerClaim claim) {
+        if (!Config.ENABLE_PLAYER_CLAIMS.get() || !claimInRenderRange(player, claim)) {
+            focusedClaims.remove(player.getUUID());
+            syncOverview(player, true);
+            return;
+        }
         focusedClaims.put(player.getUUID(), claim.getId());
-        BorderCategory category = claim.isOwner(player.getUUID())
-                ? BorderCategory.OWN_CLAIM
-                : BorderCategory.OTHER_CLAIM;
-        PacketDistributor.sendToPlayer(player, claimPayload(
-                BorderLayer.CLAIM_FOCUS,
-                claim.getDimension(),
-                List.of(claimEntry(claim, claim.getChunks(), category))
-        ));
+        syncOverview(player, true);
     }
 
     public void hideClaim(ServerPlayer player) {
         focusedClaims.remove(player.getUUID());
-        PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.CLAIM_FOCUS));
+        syncOverview(player, true);
     }
 
     public void refreshShownClaim(ServerPlayer player) {
         markClaimsChanged();
         UUID claimId = focusedClaims.get(player.getUUID());
-        if (claimId == null) {
-            syncOverview(player, true);
-            return;
-        }
-
-        PlayerClaim claim = findClaim(claimId);
-        if (claim == null) {
-            hideClaim(player);
-        } else {
-            showClaim(player, claim);
+        if (claimId != null && findClaim(claimId) == null) {
+            focusedClaims.remove(player.getUUID());
         }
         syncOverview(player, true);
     }
 
     public void showRegion(ServerPlayer player, Region region) {
-        SimpleServerUtilities.BORDER_SETTINGS.pinRegion(player.getUUID(), region.getName());
-        sendPinnedRegions(player);
+        if (region == null) {
+            return;
+        }
+        SimpleServerUtilities.REGIONS.setBorderVisible(region.getName(), true);
+        refreshAll(player.level().getServer());
     }
 
     public void hideRegion(ServerPlayer player, String regionName) {
-        SimpleServerUtilities.BORDER_SETTINGS.unpinRegion(player.getUUID(), regionName);
-        sendPinnedRegions(player);
+        SimpleServerUtilities.REGIONS.setBorderVisible(regionName, false);
+        refreshAll(player.level().getServer());
     }
 
     public void hideRegion(ServerPlayer player) {
-        SimpleServerUtilities.BORDER_SETTINGS.clearPinnedRegions(player.getUUID());
-        PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.REGION_FOCUS));
+        SimpleServerUtilities.REGIONS.setAllBordersVisible(false);
+        refreshAll(player.level().getServer());
     }
 
     public boolean isRegionShown(ServerPlayer player, String regionName) {
-        return SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID()).isRegionPinned(regionName);
+        Region region = SimpleServerUtilities.REGIONS.get(regionName);
+        return region != null && region.isBorderVisible();
     }
 
     public Set<String> shownRegions(ServerPlayer player) {
-        return SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID()).getPinnedRegions();
+        Set<String> visible = new HashSet<>();
+        for (Region region : SimpleServerUtilities.REGIONS.getAll()) {
+            if (region.isBorderVisible()) {
+                visible.add(region.getName());
+            }
+        }
+        return Set.copyOf(visible);
     }
 
     public void refreshShownRegion(ServerPlayer player) {
         markRegionsChanged();
-        sendPinnedRegions(player);
         syncOverview(player, true);
     }
 
     public void showSelection(ServerPlayer player, RegionSelection selection) {
-        if (!RegionPolicy.canVisualizeRegions(player) || !selection.isComplete()) {
+        PlayerBorderPreferences preferences = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID());
+        if (!canShowRegionBorders(player, preferences)
+                || !RegionPolicy.canVisualizeRegions(player)
+                || !selection.isComplete()) {
             hideSelection(player);
             return;
         }
@@ -198,6 +209,7 @@ public class BorderVisualizationService {
                 true,
                 selection.getDimension().identifier().toString(),
                 settings.getClaimVerticalRange(),
+                settings.getRegionRenderDistanceBlocks(),
                 List.of(entry)
         ));
     }
@@ -217,19 +229,11 @@ public class BorderVisualizationService {
 
     public void refreshAll(MinecraftServer server) {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            syncOverview(player, true);
-
             UUID claimId = focusedClaims.get(player.getUUID());
-            if (claimId != null) {
-                PlayerClaim claim = findClaim(claimId);
-                if (claim == null) {
-                    hideClaim(player);
-                } else {
-                    showClaim(player, claim);
-                }
+            if (claimId != null && findClaim(claimId) == null) {
+                focusedClaims.remove(player.getUUID());
             }
-
-            sendPinnedRegions(player);
+            syncOverview(player, true);
 
             RegionSelection selection = activeSelections.get(player.getUUID());
             if (selection != null) {
@@ -252,14 +256,17 @@ public class BorderVisualizationService {
 
     private void sendClaimOverview(ServerPlayer player) {
         BorderVisualizationSettings settings = SimpleServerUtilities.BORDER_SETTINGS.settings();
-        int radius = settings.getViewDistanceChunks();
+        int radius = (settings.getClaimRenderDistanceBlocks() + 15) / 16;
         int centerX = player.chunkPosition().x();
         int centerZ = player.chunkPosition().z();
         String dimension = player.level().dimension().identifier().toString();
         List<BorderVisualizationPayload.Entry> entries = new ArrayList<>();
 
+        UUID focusedClaimId = focusedClaims.get(player.getUUID());
         for (PlayerClaim claim : SimpleServerUtilities.PLAYER_CLAIMS.getClaims()) {
-            if (!dimension.equals(claim.getDimension()) || !hasChunkInRange(claim, centerX, centerZ, radius)) {
+            if ((focusedClaimId != null && focusedClaimId.equals(claim.getId()))
+                    || !dimension.equals(claim.getDimension())
+                    || !hasChunkInRange(claim, centerX, centerZ, radius)) {
                 continue;
             }
 
@@ -275,9 +282,63 @@ public class BorderVisualizationService {
         PacketDistributor.sendToPlayer(player, claimPayload(BorderLayer.CLAIM, dimension, entries));
     }
 
+    private void sendFocusedClaim(ServerPlayer player) {
+        UUID claimId = focusedClaims.get(player.getUUID());
+        if (claimId == null) {
+            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.CLAIM_FOCUS));
+            return;
+        }
+
+        PlayerClaim claim = findClaim(claimId);
+        if (claim == null) {
+            focusedClaims.remove(player.getUUID());
+            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.CLAIM_FOCUS));
+            return;
+        }
+        if (!claimInRenderRange(player, claim)) {
+            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.CLAIM_FOCUS));
+            return;
+        }
+
+        BorderCategory category = claim.isOwner(player.getUUID())
+                ? BorderCategory.OWN_CLAIM
+                : BorderCategory.OTHER_CLAIM;
+        PacketDistributor.sendToPlayer(player, claimPayload(
+                BorderLayer.CLAIM_FOCUS,
+                claim.getDimension(),
+                List.of(claimEntry(claim, claim.getChunks(), category))
+        ));
+    }
+
+    private static boolean canShowClaimBorders(
+            ServerPlayer player,
+            PlayerBorderPreferences preferences
+    ) {
+        return serverAllowsClaimBorders(player) && preferences.isClaimBordersVisible();
+    }
+
+    private static boolean canShowRegionBorders(
+            ServerPlayer player,
+            PlayerBorderPreferences preferences
+    ) {
+        return serverAllowsRegionBorders(player) && preferences.isRegionBordersVisible();
+    }
+
+    private static boolean serverAllowsClaimBorders(ServerPlayer player) {
+        return Config.ENABLE_PLAYER_CLAIMS.get()
+                && PermissionService.getBooleanWithoutOperatorBypass(
+                        player, PermissionKeys.BORDER_CLAIMS_VIEW, true);
+    }
+
+    private static boolean serverAllowsRegionBorders(ServerPlayer player) {
+        return Config.ENABLE_ADMIN_REGIONS.get()
+                && PermissionService.getBooleanWithoutOperatorBypass(
+                        player, PermissionKeys.BORDER_REGIONS_VIEW, true);
+    }
+
     private void sendRegionOverview(ServerPlayer player) {
         BorderVisualizationSettings settings = SimpleServerUtilities.BORDER_SETTINGS.settings();
-        double range = settings.getViewDistanceChunks() * 16.0;
+        double range = settings.getRegionRenderDistanceBlocks();
         double rangeSquared = range * range;
         double x = player.getX();
         double z = player.getZ();
@@ -291,7 +352,7 @@ public class BorderVisualizationService {
 
         for (Region region : SimpleServerUtilities.REGIONS.getIntersecting2D(
                 player.level().dimension(), minX, minZ, maxX, maxZ)) {
-            if (distanceSquared2D(region, x, z) > rangeSquared) {
+            if (!region.isBorderVisible() || distanceSquared2D(region, x, z) > rangeSquared) {
                 continue;
             }
             entries.add(regionEntry(region, BorderCategory.SERVER_REGION));
@@ -301,38 +362,6 @@ public class BorderVisualizationService {
         }
 
         PacketDistributor.sendToPlayer(player, regionPayload(BorderLayer.REGION, dimension, entries));
-    }
-
-    private void sendPinnedRegions(ServerPlayer player) {
-        PlayerBorderPreferences preferences = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID());
-        String dimension = player.level().dimension().identifier().toString();
-        List<BorderVisualizationPayload.Entry> entries = new ArrayList<>();
-        List<String> missing = new ArrayList<>();
-
-        for (String regionName : preferences.getPinnedRegions()) {
-            Region region = SimpleServerUtilities.REGIONS.get(regionName);
-            if (region == null) {
-                missing.add(regionName);
-                continue;
-            }
-            if (!dimension.equals(region.getDimension().identifier().toString())) {
-                continue;
-            }
-            entries.add(regionEntry(region, BorderCategory.SERVER_REGION));
-            if (entries.size() >= MAX_OVERVIEW_ENTRIES) {
-                break;
-            }
-        }
-
-        for (String missingName : missing) {
-            SimpleServerUtilities.BORDER_SETTINGS.unpinRegion(player.getUUID(), missingName);
-        }
-
-        if (entries.isEmpty()) {
-            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.REGION_FOCUS));
-        } else {
-            PacketDistributor.sendToPlayer(player, regionPayload(BorderLayer.REGION_FOCUS, dimension, entries));
-        }
     }
 
     private BorderVisualizationPayload claimPayload(
@@ -345,6 +374,7 @@ public class BorderVisualizationService {
                 true,
                 dimension,
                 SimpleServerUtilities.BORDER_SETTINGS.settings().getClaimVerticalRange(),
+                SimpleServerUtilities.BORDER_SETTINGS.settings().getClaimRenderDistanceBlocks(),
                 entries
         );
     }
@@ -359,6 +389,7 @@ public class BorderVisualizationService {
                 true,
                 dimension,
                 SimpleServerUtilities.BORDER_SETTINGS.settings().getClaimVerticalRange(),
+                SimpleServerUtilities.BORDER_SETTINGS.settings().getRegionRenderDistanceBlocks(),
                 entries
         );
     }
@@ -424,6 +455,13 @@ public class BorderVisualizationService {
             }
         }
         return false;
+    }
+
+    private static boolean claimInRenderRange(ServerPlayer player, PlayerClaim claim) {
+        if (player == null || claim == null
+                || !player.level().dimension().identifier().toString().equals(claim.getDimension())) return false;
+        int radius = (SimpleServerUtilities.BORDER_SETTINGS.settings().getClaimRenderDistanceBlocks() + 15) / 16;
+        return hasChunkInRange(claim, player.chunkPosition().x(), player.chunkPosition().z(), radius);
     }
 
     private static double distanceSquared2D(Region region, double x, double z) {

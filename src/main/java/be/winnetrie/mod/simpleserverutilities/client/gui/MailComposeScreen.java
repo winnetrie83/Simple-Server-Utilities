@@ -6,7 +6,13 @@ import java.util.List;
 
 import com.mojang.blaze3d.platform.InputConstants;
 
+import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText;
+import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument;
+import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument.Format;
 import be.winnetrie.mod.simpleserverutilities.mail.MailComposeMenu;
+import be.winnetrie.mod.simpleserverutilities.mail.MailRichText;
+import be.winnetrie.mod.simpleserverutilities.mixin.MultiLineEditBoxAccessor;
+import be.winnetrie.mod.simpleserverutilities.mixin.MultilineTextFieldAccessor;
 import be.winnetrie.mod.simpleserverutilities.network.MailActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailComposeResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailComposeSubmitPayload;
@@ -16,6 +22,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.MultiLineEditBox;
+import net.minecraft.client.gui.components.MultilineTextField;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -42,15 +49,39 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
     private static final int MESSAGE_X = 16;
     private static final int MESSAGE_Y = 76;
     private static final int MESSAGE_WIDTH = 368;
-    private static final int MESSAGE_HEIGHT = 132;
+    private static final int MESSAGE_HEIGHT = 108;
     private static final int BALANCE_X = 268;
     private static final int BALANCE_Y = 231;
+
+    private static final List<ColorPreset> MINECRAFT_COLORS = List.of(
+            new ColorPreset("Black", 0x000000),
+            new ColorPreset("Dark Blue", 0x0000AA),
+            new ColorPreset("Dark Green", 0x00AA00),
+            new ColorPreset("Dark Aqua", 0x00AAAA),
+            new ColorPreset("Dark Red", 0xAA0000),
+            new ColorPreset("Dark Purple", 0xAA00AA),
+            new ColorPreset("Gold", 0xFFAA00),
+            new ColorPreset("Gray", 0xAAAAAA),
+            new ColorPreset("Dark Gray", 0x555555),
+            new ColorPreset("Blue", 0x5555FF),
+            new ColorPreset("Green", 0x55FF55),
+            new ColorPreset("Aqua", 0x55FFFF),
+            new ColorPreset("Red", 0xFF5555),
+            new ColorPreset("Light Purple", 0xFF55FF),
+            new ColorPreset("Yellow", 0xFFFF55),
+            new ColorPreset("White", 0xFFFFFF)
+    );
 
     private EditBox recipient;
     private EditBox subject;
     private MultiLineEditBox body;
     private EditBox money;
     private Button playersButton;
+    private HologramRichTextDocument richDocument;
+    private boolean updatingBody;
+    private int rememberedSelectionStart = -1;
+    private int rememberedSelectionEnd = -1;
+    private PaletteTarget paletteTarget = PaletteTarget.NONE;
 
     private String notice = "";
     private boolean noticeError;
@@ -89,8 +120,28 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
                 .setShowBackground(true)
                 .setShowDecorations(true)
                 .build(font, MESSAGE_WIDTH, MESSAGE_HEIGHT, Component.literal("Message"));
-        body.setCharacterLimit(1024);
+        body.setCharacterLimit(MailRichText.MAX_VISIBLE_CHARACTERS);
+        body.setLineLimit(MailRichText.MAX_LINES);
+        richDocument = new HologramRichTextDocument("", MailRichText::normalize,
+                MailRichText.MAX_STORED_CHARACTERS);
+        body.setValueListener(this::onBodyChanged);
         addRenderableWidget(body);
+
+        addRenderableWidget(Button.builder(Component.literal("B"), ignored -> applySelectionFormat('l'))
+                .bounds(leftPos + 16, topPos + 188, 24, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("I"), ignored -> applySelectionFormat('o'))
+                .bounds(leftPos + 44, topPos + 188, 24, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("U"), ignored -> applySelectionFormat('n'))
+                .bounds(leftPos + 72, topPos + 188, 24, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("S"), ignored -> applySelectionFormat('m'))
+                .bounds(leftPos + 100, topPos + 188, 24, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Color ▾"), ignored -> openPalette())
+                .bounds(leftPos + 132, topPos + 188, 82, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Clear style"), ignored -> clearSelectionFormatting())
+                .bounds(leftPos + 220, topPos + 188, 94, 20).build());
+
+        RichTextEditBoxRenderer.register(body, () -> richDocument, () -> TEXT,
+                Component.literal("Message"));
 
         playersButton = Button.builder(Component.literal("Players ▼"), ignored -> togglePlayers())
                 .bounds(leftPos + 290, topPos + 24, 94, 20)
@@ -120,6 +171,7 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
     }
 
     private void togglePlayers() {
+        paletteTarget = PaletteTarget.NONE;
         playersExpanded = !playersExpanded;
         updatePlayersButtonLabel();
         if (playersExpanded) {
@@ -134,6 +186,7 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
     }
 
     private void recipientChanged(String value) {
+        paletteTarget = PaletteTarget.NONE;
         suggestionQuery = value == null ? "" : value.trim();
         dropdownScroll = 0;
         suggestions = List.of();
@@ -188,10 +241,107 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
                 menu.containerId,
                 recipient.getValue(),
                 subject.getValue(),
-                body.getValue(),
+                richDocument == null ? "" : richDocument.encode(),
                 money.getValue(),
                 id
         ));
+    }
+
+    private void onBodyChanged(String value) {
+        if (updatingBody || richDocument == null) return;
+        rememberedSelectionStart = -1;
+        rememberedSelectionEnd = -1;
+        String safe = value == null ? "" : value.replace(HologramRichText.FORMAT, '?');
+        richDocument.updatePlainText(safe);
+        if (safe.equals(value)) return;
+        updatingBody = true;
+        body.setValue(safe);
+        updatingBody = false;
+    }
+
+    private void applySelectionFormat(char formatCode) {
+        Format format = switch (formatCode) {
+            case 'l' -> Format.BOLD;
+            case 'o' -> Format.ITALIC;
+            case 'n' -> Format.UNDERLINED;
+            case 'm' -> Format.STRIKETHROUGH;
+            default -> null;
+        };
+        if (format == null) return;
+        int[] range = selectedRange();
+        if (range == null) return;
+        richDocument.toggle(range[0], range[1], format);
+        formattingApplied(range);
+    }
+
+    private void applySelectionColor(int paletteIndex) {
+        int[] range = selectedRange();
+        if (range == null) return;
+        richDocument.setColor(range[0], range[1], paletteIndex);
+        formattingApplied(range);
+    }
+
+    private void clearSelectionFormatting() {
+        int[] range = selectedRange();
+        if (range == null) return;
+        richDocument.clear(range[0], range[1]);
+        formattingApplied(range);
+    }
+
+    private void openPalette() {
+        if (selectedRange() == null) return;
+        playersExpanded = false;
+        updatePlayersButtonLabel();
+        paletteTarget = paletteTarget == PaletteTarget.SELECTION_TEXT
+                ? PaletteTarget.NONE : PaletteTarget.SELECTION_TEXT;
+    }
+
+    private int[] selectedRange() {
+        rememberCurrentSelection();
+        int length = richDocument == null ? 0 : richDocument.plainText().length();
+        if (rememberedSelectionStart < 0 || rememberedSelectionEnd <= rememberedSelectionStart
+                || rememberedSelectionEnd > length) {
+            notice = "Select part of the message first, then choose a style or color.";
+            noticeError = true;
+            setFocused(body);
+            return null;
+        }
+        return new int[] {rememberedSelectionStart, rememberedSelectionEnd};
+    }
+
+    private void rememberCurrentSelection() {
+        if (body == null || richDocument == null) return;
+        MultilineTextFieldAccessor access = cursorAccess(textField());
+        int cursor = Math.max(0, Math.min(richDocument.plainText().length(), access.ssu$getCursor()));
+        int anchor = Math.max(0, Math.min(richDocument.plainText().length(), access.ssu$getSelectCursor()));
+        if (cursor != anchor) {
+            rememberedSelectionStart = Math.min(cursor, anchor);
+            rememberedSelectionEnd = Math.max(cursor, anchor);
+        }
+    }
+
+    private void restoreSelection(int[] range) {
+        if (range == null || body == null) return;
+        setFocused(body);
+        MultilineTextFieldAccessor access = cursorAccess(textField());
+        access.ssu$setSelectCursor(range[0]);
+        access.ssu$setCursor(range[1]);
+        rememberedSelectionStart = range[0];
+        rememberedSelectionEnd = range[1];
+    }
+
+    private void formattingApplied(int[] range) {
+        restoreSelection(range);
+        notice = "Formatting applied to the selected message text.";
+        noticeError = false;
+    }
+
+    private MultilineTextField textField() {
+        return ((MultiLineEditBoxAccessor) (Object) body).ssu$getTextField();
+    }
+
+    private static MultilineTextFieldAccessor cursorAccess(MultilineTextField field) {
+        return (MultilineTextFieldAccessor) (Object) field;
     }
 
     private void backToMailbox() {
@@ -217,6 +367,11 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (paletteTarget != PaletteTarget.NONE) {
+            if (event.buttonInfo().button() == 0) handlePaletteClick(event.x(), event.y());
+            else paletteTarget = PaletteTarget.NONE;
+            return true;
+        }
         if (playersExpanded) {
             for (SuggestionBounds bound : suggestionBounds) {
                 if (bound.contains(event.x(), event.y())) {
@@ -267,6 +422,8 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
         drawAttachments(g);
         drawInventoryAndHotbar(g);
 
+        g.text(font, "Select message text, then apply B / I / U / S or one of the 16 colors",
+                leftPos + 16, topPos + 212, MUTED, false);
         g.text(font, "Balance: " + menu.formattedBalance(),
                 leftPos + BALANCE_X, topPos + BALANCE_Y, MUTED, false);
 
@@ -279,10 +436,10 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
     /** Draw the player picker after every normal widget, so it is always in front. */
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+        rememberCurrentSelection();
         super.extractRenderState(g, mouseX, mouseY, partialTick);
-        if (playersExpanded) {
-            drawPlayerDropdown(g, mouseX, mouseY);
-        }
+        if (playersExpanded) drawPlayerDropdown(g, mouseX, mouseY);
+        if (paletteTarget != PaletteTarget.NONE) drawPalette(g);
     }
 
     private void drawAttachments(GuiGraphicsExtractor g) {
@@ -388,6 +545,63 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
         }
     }
 
+    private void handlePaletteClick(double mouseX, double mouseY) {
+        int x = paletteX();
+        int y = paletteY();
+        int cellWidth = 88;
+        int cellHeight = 24;
+        int gap = 4;
+        for (int index = 0; index < MINECRAFT_COLORS.size(); index++) {
+            int column = index % 4;
+            int row = index / 4;
+            int left = x + column * (cellWidth + gap);
+            int top = y + row * (cellHeight + gap);
+            if (inside(mouseX, mouseY, left, top, cellWidth, cellHeight)) {
+                applySelectionColor(index);
+                paletteTarget = PaletteTarget.NONE;
+                return;
+            }
+        }
+        paletteTarget = PaletteTarget.NONE;
+    }
+
+    private void drawPalette(GuiGraphicsExtractor g) {
+        int x = paletteX();
+        int y = paletteY();
+        int width = 364;
+        g.fill(x - 6, y - 22, x + width + 6, y + 112, 0xFC10161D);
+        g.outline(x - 6, y - 22, width + 12, 134, BORDER);
+        g.text(font, "Apply Minecraft color to selected message text", x, y - 16, TEXT, true);
+
+        int cellWidth = 88;
+        int cellHeight = 24;
+        int gap = 4;
+        for (int index = 0; index < MINECRAFT_COLORS.size(); index++) {
+            ColorPreset preset = MINECRAFT_COLORS.get(index);
+            int column = index % 4;
+            int row = index / 4;
+            int left = x + column * (cellWidth + gap);
+            int top = y + row * (cellHeight + gap);
+            g.fill(left, top, left + cellWidth, top + cellHeight, 0xFF000000 | preset.rgb());
+            g.outline(left, top, cellWidth, cellHeight, 0xFFB6C0C8);
+            g.text(font, preset.name(), left + 5, top + 8, contrastColor(preset.rgb()), true);
+        }
+    }
+
+    private int paletteX() { return leftPos + 16; }
+    private int paletteY() { return topPos + 92; }
+
+    private static boolean inside(double mouseX, double mouseY, int x, int y, int width, int height) {
+        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+    }
+
+    private static int contrastColor(int rgb) {
+        int red = (rgb >>> 16) & 0xFF;
+        int green = (rgb >>> 8) & 0xFF;
+        int blue = rgb & 0xFF;
+        return red * 299 + green * 587 + blue * 114 >= 140_000 ? 0xFF101010 : 0xFFFFFFFF;
+    }
+
     private Rect dropdownBounds() {
         return new Rect(leftPos + 234, topPos + 46, 150, 158);
     }
@@ -400,6 +614,12 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
         g.outline(x + 5, y + 8, 8, 7, 0xFF8E969C);
         g.fill(x + 6, y + 9, x + 12, y + 14, 0xA05C646A);
         g.outline(x + 7, y + 4, 4, 6, 0xFF8E969C);
+    }
+
+    @Override
+    public void removed() {
+        RichTextEditBoxRenderer.unregister(body);
+        super.removed();
     }
 
     @Override
@@ -416,6 +636,11 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
 
     private static String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private enum PaletteTarget { NONE, SELECTION_TEXT }
+
+    private record ColorPreset(String name, int rgb) {
     }
 
     private record SuggestionBounds(String name, int x, int y, int width, int height) {

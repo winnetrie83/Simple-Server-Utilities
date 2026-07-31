@@ -10,6 +10,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.policy.HomePolicy;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportOptions;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportPolicy;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportType;
+import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.home.PlayerHome;
 import net.minecraft.commands.CommandSourceStack;
@@ -29,7 +30,7 @@ public class HomeCommands {
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("homes")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                .requires(source -> Config.ENABLE_HOMES.get() && source.getEntity() instanceof ServerPlayer)
 
                 // /homes
                 .executes(context -> listHomes(context.getSource()))

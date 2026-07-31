@@ -24,6 +24,7 @@ public final class BorderVisualizationClientState {
                 payload.layer(),
                 payload.dimension(),
                 payload.claimVerticalRange(),
+                payload.renderDistance(),
                 payload.entries()
         ));
     }
@@ -40,6 +41,7 @@ public final class BorderVisualizationClientState {
             BorderLayer layer,
             String dimension,
             int claimVerticalRange,
+            int renderDistance,
             List<BorderVisualizationPayload.Entry> entries
     ) {
         public LayerState {

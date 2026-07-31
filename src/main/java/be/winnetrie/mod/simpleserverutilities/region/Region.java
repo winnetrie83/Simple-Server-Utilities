@@ -23,6 +23,7 @@ public class Region {
     private final int maxZ;
 
     private int priority = 0;
+    private boolean borderVisible = false;
 
     private final Set<UUID> managers = new HashSet<>();
     private final Set<UUID> members = new HashSet<>();
@@ -220,6 +221,18 @@ public class Region {
 
     public void setPriority(int priority) {
         this.priority = priority;
+    }
+
+    /**
+     * Server-owned switch for this region's border eligibility. The player
+     * preference is applied separately and can only hide an eligible border.
+     */
+    public boolean isBorderVisible() {
+        return borderVisible;
+    }
+
+    public void setBorderVisible(boolean borderVisible) {
+        this.borderVisible = borderVisible;
     }
 
     public long getVolume() {

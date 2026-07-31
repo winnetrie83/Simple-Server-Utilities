@@ -2,6 +2,9 @@ package be.winnetrie.mod.simpleserverutilities.region;
 
 import java.util.Set;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModule;
 import be.winnetrie.mod.simpleserverutilities.core.service.SsuServiceRegistry;
 import net.minecraft.server.MinecraftServer;
@@ -36,6 +39,11 @@ public final class RegionModule implements SsuModule {
     }
 
     @Override
+    public boolean isEnabled() {
+        return Config.ENABLE_ADMIN_REGIONS.get();
+    }
+
+    @Override
     public Set<String> dependencies() {
         return Set.of("economy", "permissions", "storage", "jobs");
     }
@@ -56,7 +64,17 @@ public final class RegionModule implements SsuModule {
     }
 
     @Override
+    public void beforeServerStopping(MinecraftServer server) {
+        SimpleServerUtilities.JOBS.cancelByOwnerModule(id());
+    }
+
+    @Override
     public void onServerStopping(MinecraftServer server) {
         manager.save();
+        manager.clear();
+        snapshots.clear();
+        rentJournal.clear();
+        selectionTools.clear();
+        RegionInteractionEvents.clearRuntimeState();
     }
 }

@@ -1,0 +1,17 @@
+SSU 1.6.0-dev6.2 validation report
+
+- Based on 1.6.0-dev6.1; protocol 28 and hologram schema 4 unchanged.
+- Removed the premature player-placed-log rejection from Treecapitator origin resolution, connected-log discovery and validated chain execution.
+- Retained player-placed leaf exclusion in natural-canopy validation.
+- Verified namespace-qualified family normalization for normal/stripped log, wood/stripped wood, stem and hyphae variants.
+- Verified different species remain distinct.
+- Dependency-free structural checks completed; full NeoForge build still requires the project Java 25 environment.
+
+Executed checks:
+- 12/12 targeted source-path assertions passed.
+- 10/10 wood-family normalization cases passed, including vanilla and modded normal/stripped log/wood plus stem/hyphae.
+- Species and namespace separation passed.
+- 13 JSON files parsed successfully.
+- 262 Java source files present.
+- Changed-file delimiter checks passed.
+- Dependency-free javac diagnostics reported no syntax-like errors (missing Minecraft/NeoForge symbols are expected outside the Gradle classpath).

@@ -104,6 +104,14 @@ public class PlayerHomeManager {
         }
     }
 
+    public void clear() {
+        homesByOwner.clear();
+        homeRecordStore.reset();
+        rootFolder = null;
+        playersFolder = null;
+        legacySaveFile = null;
+    }
+
     public boolean setHome(ServerPlayer player, String rawName) {
         String name = sanitizeName(rawName);
         UUID owner = player.getUUID();

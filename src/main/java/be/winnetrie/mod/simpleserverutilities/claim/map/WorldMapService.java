@@ -5,6 +5,7 @@ import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapDataPayload;
+import be.winnetrie.mod.simpleserverutilities.mapmarker.MapMarkerService;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
@@ -69,6 +70,7 @@ public final class WorldMapService {
                 claims,
                 regions
         ));
+        MapMarkerService.sync(player);
     }
 
     private static List<WorldMapDataPayload.ClaimOverlay> collectClaims(

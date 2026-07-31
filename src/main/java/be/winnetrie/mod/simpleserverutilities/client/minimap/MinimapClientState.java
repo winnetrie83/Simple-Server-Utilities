@@ -1,5 +1,8 @@
 package be.winnetrie.mod.simpleserverutilities.client.minimap;
 
+import be.winnetrie.mod.simpleserverutilities.client.map.AerialMapAtlas;
+import be.winnetrie.mod.simpleserverutilities.client.mapmarker.MapMarkerClientState;
+import be.winnetrie.mod.simpleserverutilities.network.MapMarkerSyncPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinimapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinimapRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuSnapshotPayload;
@@ -29,6 +32,7 @@ public final class MinimapClientState {
         // Terrain.tick compares the effective overlay hash itself. Repeated,
         // identical server snapshots must not invalidate the visible texture.
         data = payload;
+        AerialMapAtlas.setLiveUpdateRadiusChunks(payload.liveUpdateRadiusChunks());
         requestCountdown = payload.enabled() ? ENABLED_REFRESH_TICKS : DISABLED_REFRESH_TICKS;
     }
 
@@ -42,6 +46,7 @@ public final class MinimapClientState {
                 settings.minimapNorthUp(),
                 settings.minimapShowClaims(),
                 settings.minimapShowRegions(),
+                settings.mapLiveUpdateRadiusChunks(),
                 data.dimension(),
                 data.centerChunkX(),
                 data.centerChunkZ(),
@@ -130,6 +135,7 @@ public final class MinimapClientState {
             TERRAIN.render(graphics, drawX, drawY, drawSize);
             graphics.pose().popMatrix();
         }
+        drawMarkers(graphics, minecraft, x, y, size, circle);
         graphics.disableScissor();
 
         drawPlayerMarker(graphics, x + size / 2, y + size / 2,
@@ -145,6 +151,49 @@ public final class MinimapClientState {
         graphics.fill(x + size / 2 - textWidth / 2 - 3, labelY - 2,
                 x + size / 2 + textWidth / 2 + 3, labelY + 10, 0xA0000000);
         graphics.centeredText(minecraft.font, coordinates, x + size / 2, labelY, 0xFFF2F2F2);
+    }
+
+
+    private static void drawMarkers(
+            GuiGraphicsExtractor graphics,
+            Minecraft minecraft,
+            int left,
+            int top,
+            int size,
+            boolean circle
+    ) {
+        if (!MapMarkerClientState.showOnMinimap() || minecraft.player == null || minecraft.level == null) return;
+        String dimension = minecraft.level.dimension().identifier().toString();
+        double playerX = minecraft.player.getX();
+        double playerZ = minecraft.player.getZ();
+        double scale = size / (double) MinimapTerrainMap.VISIBLE_BLOCKS;
+        double angle = data.northUp() ? 0.0D : Math.toRadians(-(180.0F + minecraft.player.getYRot()));
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+        double centerX = left + size / 2.0D;
+        double centerY = top + size / 2.0D;
+        double radius = size / 2.0D - 4.0D;
+        for (MapMarkerSyncPayload.Entry marker : MapMarkerClientState.markers()) {
+            if (!dimension.equals(marker.dimension())) continue;
+            double dx = (marker.x() + 0.5D - playerX) * scale;
+            double dz = (marker.z() + 0.5D - playerZ) * scale;
+            double rotatedX = dx * cos - dz * sin;
+            double rotatedY = dx * sin + dz * cos;
+            if (Math.abs(rotatedX) > size / 2.0D || Math.abs(rotatedY) > size / 2.0D) continue;
+            if (circle && rotatedX * rotatedX + rotatedY * rotatedY > radius * radius) continue;
+            int x = (int) Math.round(centerX + rotatedX);
+            int y = (int) Math.round(centerY + rotatedY);
+            drawMarkerIcon(graphics, x, y, marker.colorArgb());
+        }
+    }
+
+    private static void drawMarkerIcon(GuiGraphicsExtractor graphics, int x, int y, int color) {
+        graphics.fill(x - 1, y - 3, x + 2, y + 4, 0xE6111111);
+        graphics.fill(x - 3, y - 1, x + 4, y + 2, 0xE6111111);
+        graphics.fill(x - 2, y - 2, x + 3, y + 3, 0xE6111111);
+        graphics.fill(x - 1, y - 2, x + 2, y + 3, color);
+        graphics.fill(x - 2, y - 1, x + 3, y + 2, color);
+        graphics.fill(x, y, x + 1, y + 1, 0xFFFFFFFF);
     }
 
     public static void clear() {
@@ -177,7 +226,7 @@ public final class MinimapClientState {
 
     private static MinimapDataPayload defaults() {
         return new MinimapDataPayload(
-                true, false, 96, "CIRCLE", "TOP_RIGHT", true, true, true,
+                true, false, 96, "CIRCLE", "TOP_RIGHT", true, true, true, 8,
                 "", 0, 0, 0xFF4BCB63, 0xFFE05B5B, 0xFFFFB347,
                 java.util.List.of(), java.util.List.of()
         );

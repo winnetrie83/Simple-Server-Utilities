@@ -117,6 +117,19 @@ public class PlayerClaimManager {
         }
     }
 
+    public void clear() {
+        claims.clear();
+        chunkIndex.clear();
+        limits.clear();
+        claimRecordStore.reset();
+        limitRecordStore.reset();
+        indexRecordStore.reset();
+        rootFolder = null;
+        claimsFolder = null;
+        limitsFolder = null;
+        legacySaveFile = null;
+    }
+
     public boolean createClaimGroup(Level level, String name, UUID owner) {
         return createClaimGroupResult(level, name, owner).isSuccess();
     }

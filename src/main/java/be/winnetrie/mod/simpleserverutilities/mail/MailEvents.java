@@ -1,5 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.mail;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -14,6 +15,10 @@ public final class MailEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        if (!Config.ENABLE_MAIL.get()) {
+            nextMaintenanceTick = 0L;
+            return;
+        }
         long tick = event.getServer().getTickCount();
         if (tick + MAINTENANCE_INTERVAL_TICKS < nextMaintenanceTick) {
             nextMaintenanceTick = 0L;
@@ -25,7 +30,7 @@ public final class MailEvents {
 
     @SubscribeEvent
     public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) {
+        if (Config.ENABLE_MAIL.get() && event.getEntity() instanceof ServerPlayer player) {
             SimpleServerUtilities.MAIL.ensurePlayer(player);
         }
     }

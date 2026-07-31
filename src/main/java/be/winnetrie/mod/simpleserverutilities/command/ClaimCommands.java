@@ -1,9 +1,11 @@
 package be.winnetrie.mod.simpleserverutilities.command;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.Optional;
 import java.util.UUID;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapData;
@@ -40,7 +42,7 @@ public class ClaimCommands {
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("claims")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                .requires(source -> Config.ENABLE_PLAYER_CLAIMS.get() && source.getEntity() instanceof ServerPlayer)
 
                 .then(Commands.literal("help")
                         .executes(context -> help(context.getSource())))
@@ -198,12 +200,6 @@ public class ClaimCommands {
                                                         StringArgumentType.getString(context, "name")
                                                 )))))
 
-                        .then(Commands.literal("setspawn")
-                                .then(Commands.argument("name", StringArgumentType.word())
-                                        .executes(context -> setClaimSpawn(
-                                                context.getSource(),
-                                                StringArgumentType.getString(context, "name")
-                                        ))))
 
                         .then(Commands.literal("delete")
                                 .then(Commands.argument("player", StringArgumentType.word())
@@ -509,42 +505,6 @@ public class ClaimCommands {
         return 1;
     }
 
-    private static int setClaimSpawn(CommandSourceStack source, String claimName) {
-        ServerPlayer player = (ServerPlayer) source.getEntity();
-
-        PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
-
-        if (claim == null) {
-            player.sendSystemMessage(Component.literal("Claim not found: " + claimName));
-            return 0;
-        }
-
-        if (!canEditClaim(player, claim)) {
-            player.sendSystemMessage(Component.literal("Only the claim owner can set the claim spawn."));
-            return 0;
-        }
-
-        String currentDimension = player.level().dimension().identifier().toString();
-
-        if (!claim.getDimension().equals(currentDimension)) {
-            player.sendSystemMessage(Component.literal("You must be in the same dimension as this claim."));
-            return 0;
-        }
-
-        ChunkPos chunkPos = player.chunkPosition();
-
-        if (!claim.hasChunk(chunkPos.x(), chunkPos.z())) {
-            player.sendSystemMessage(Component.literal("You must stand inside the claim to set its spawn."));
-            return 0;
-        }
-
-        claim.setSpawn(player.blockPosition(), player.getYRot(), player.getXRot());
-        SimpleServerUtilities.PLAYER_CLAIMS.save();
-
-        player.sendSystemMessage(Component.literal("Spawn set for claim '" + claim.getDisplayName() + "'."));
-        return 1;
-    }
-
     private static int teleportToOwnClaim(CommandSourceStack source, String claimName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
@@ -664,15 +624,9 @@ public class ClaimCommands {
             return 0;
         }
 
-        BlockPos targetPos = claim.getSpawnPos();
-        float yaw = claim.getSpawnYaw();
-        float pitch = claim.getSpawnPitch();
-
-        if (targetPos == null) {
-            targetPos = findClaimTeleportPos(level, claim);
-            yaw = player.getYRot();
-            pitch = player.getXRot();
-        }
+        BlockPos targetPos = findClaimTeleportPos(level, claim);
+        float yaw = player.getYRot();
+        float pitch = player.getXRot();
 
         if (targetPos == null) {
             player.sendSystemMessage(Component.literal("This claim has no chunks to teleport to."));
@@ -733,7 +687,10 @@ public class ClaimCommands {
             return null;
         }
 
-        ClaimChunk firstChunk = claim.getChunks().iterator().next();
+        ClaimChunk firstChunk = claim.getChunks().stream()
+                .min(Comparator.comparingInt(ClaimChunk::getX).thenComparingInt(ClaimChunk::getZ))
+                .orElse(null);
+        if (firstChunk == null) return null;
 
         int blockX = firstChunk.getX() * 16 + 8;
         int blockZ = firstChunk.getZ() * 16 + 8;
@@ -752,14 +709,6 @@ public class ClaimCommands {
         player.sendSystemMessage(Component.literal("Owner UUID: " + claim.getOwner()));
         player.sendSystemMessage(Component.literal("Dimension: " + claim.getDimension()));
         player.sendSystemMessage(Component.literal("Chunks in this claim: " + claim.getChunkCount()));
-
-        if (claim.hasSpawn()) {
-            BlockPos spawn = claim.getSpawnPos();
-            player.sendSystemMessage(Component.literal("Spawn: " + spawn.getX() + ", " + spawn.getY() + ", " + spawn.getZ()));
-        }
-        else {
-            player.sendSystemMessage(Component.literal("Spawn: not set"));
-        }
 
         player.sendSystemMessage(Component.literal("Owner total chunks: " + usedChunks + " / " + maxChunks));
         player.sendSystemMessage(Component.literal("Trusted players: " + claim.getTrustedPlayers().size()));
@@ -830,7 +779,6 @@ public class ClaimCommands {
         source.sendSystemMessage(Component.literal(" - /claims show <name>"));
         source.sendSystemMessage(Component.literal(" - /claims hide"));
         source.sendSystemMessage(Component.literal(" - /claims tp <name>"));
-        source.sendSystemMessage(Component.literal(" - /claims setspawn <name>"));
 
         source.sendSystemMessage(Component.literal("Admin commands:"));
         source.sendSystemMessage(Component.literal(" - /claims admin list <player>"));

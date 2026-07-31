@@ -14,8 +14,6 @@ import net.minecraft.world.phys.Vec3;
 
 public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRenderer {
 
-    private static final double REGION_RENDER_DISTANCE_SQUARED = 512.0 * 512.0;
-    private static final double CLAIM_RENDER_DISTANCE_SQUARED = 192.0 * 192.0;
     private static final double EPSILON = 0.002;
     private static final double CLAIM_RIBBON_HALF_THICKNESS = 0.055;
     private static final double CLAIM_RIBBON_LOW_OFFSET = -8.75;
@@ -50,12 +48,14 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
             boolean claimLayer = layer.layer() == BorderLayer.CLAIM
                     || layer.layer() == BorderLayer.CLAIM_FOCUS;
 
+            double renderDistance = layer.renderDistance();
+            double renderDistanceSquared = renderDistance * renderDistance;
             for (BorderVisualizationPayload.Entry entry : layer.entries()) {
                 if (claimLayer) {
-                    renderClaimRibbon(entry, camX, camY, camZ, frustum);
+                    renderClaimRibbon(entry, camX, camY, camZ, frustum, renderDistance);
                 } else {
-                    renderRegionBoxes(entry, camX, camY, camZ, frustum);
-                    renderStaticEdges(entry, camX, camY, camZ);
+                    renderRegionBoxes(entry, camX, camY, camZ, frustum, renderDistance, renderDistanceSquared);
+                    renderStaticEdges(entry, camX, camY, camZ, renderDistance);
                 }
             }
         }
@@ -66,29 +66,24 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
             double camX,
             double camY,
             double camZ,
-            Frustum frustum
+            Frustum frustum,
+            double renderDistance
     ) {
         double lowY = Math.floor(camY) + CLAIM_RIBBON_LOW_OFFSET;
         double highY = Math.floor(camY) + CLAIM_RIBBON_HIGH_OFFSET;
 
         for (BorderVisualizationPayload.Edge edge : entry.edges()) {
-            if (distanceSquaredToSegment2D(
-                    camX,
-                    camZ,
-                    edge.x1(),
-                    edge.z1(),
-                    edge.x2(),
-                    edge.z2()
-            ) > CLAIM_RENDER_DISTANCE_SQUARED) {
-                continue;
-            }
+            HorizontalSegment visible = clipHorizontalSegment(
+                    edge.x1(), edge.z1(), edge.x2(), edge.z2(), camX, camZ, renderDistance
+            );
+            if (visible == null) continue;
 
-            double minX = Math.min(edge.x1(), edge.x2());
-            double maxX = Math.max(edge.x1(), edge.x2());
-            double minZ = Math.min(edge.z1(), edge.z2());
-            double maxZ = Math.max(edge.z1(), edge.z2());
+            double minX = Math.min(visible.x1(), visible.x2());
+            double maxX = Math.max(visible.x1(), visible.x2());
+            double minZ = Math.min(visible.z1(), visible.z2());
+            double maxZ = Math.max(visible.z1(), visible.z2());
 
-            if (edge.x1() == edge.x2()) {
+            if (visible.x1() == visible.x2()) {
                 minX -= CLAIM_RIBBON_HALF_THICKNESS;
                 maxX += CLAIM_RIBBON_HALF_THICKNESS;
             } else {
@@ -105,10 +100,10 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
                 Gizmos.cuboid(ribbon, GizmoStyle.fill(entry.fillColor()));
             }
 
-            Vec3 lowStart = new Vec3(edge.x1(), lowY, edge.z1());
-            Vec3 lowEnd = new Vec3(edge.x2(), lowY, edge.z2());
-            Vec3 highStart = new Vec3(edge.x1(), highY, edge.z1());
-            Vec3 highEnd = new Vec3(edge.x2(), highY, edge.z2());
+            Vec3 lowStart = new Vec3(visible.x1(), lowY, visible.z1());
+            Vec3 lowEnd = new Vec3(visible.x2(), lowY, visible.z2());
+            Vec3 highStart = new Vec3(visible.x1(), highY, visible.z1());
+            Vec3 highEnd = new Vec3(visible.x2(), highY, visible.z2());
 
             line(lowStart, lowEnd, entry, false);
             line(highStart, highEnd, entry, false);
@@ -122,8 +117,11 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
             double camX,
             double camY,
             double camZ,
-            Frustum frustum
+            Frustum frustum,
+            double renderDistance,
+            double renderDistanceSquared
     ) {
+        Vec3 camera = new Vec3(camX, camY, camZ);
         for (BorderVisualizationPayload.Box box : entry.boxes()) {
             AABB bounds = new AABB(
                     box.minX() - EPSILON,
@@ -134,18 +132,21 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
                     box.maxZ() + 1.0 + EPSILON
             );
 
-            if (distanceSquaredToAabb(bounds, camX, camY, camZ) > REGION_RENDER_DISTANCE_SQUARED
+            if (distanceSquaredToAabb(bounds, camX, camY, camZ) > renderDistanceSquared
                     || !frustum.isVisible(bounds)) {
                 continue;
             }
 
-            if (entry.fillColor() != 0) {
+            // A whole translucent cuboid can reveal faces hundreds of blocks away when the
+            // player stands inside a large region. Keep the fill only when the complete box
+            // fits inside the configured radius; individual border edges are clipped below.
+            if (entry.fillColor() != 0
+                    && farthestDistanceSquaredToAabb(bounds, camX, camY, camZ) <= renderDistanceSquared) {
                 Gizmos.cuboid(bounds, GizmoStyle.fill(entry.fillColor()));
             }
 
             if (entry.strokeBoxes()) {
-                Gizmos.cuboid(bounds, GizmoStyle.stroke(entry.strokeColor(), entry.strokeWidth()))
-                        .setAlwaysOnTop();
+                renderClippedBoxEdges(bounds, camera, renderDistance, entry, frustum);
             }
         }
     }
@@ -154,7 +155,8 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
             BorderVisualizationPayload.Entry entry,
             double camX,
             double camY,
-            double camZ
+            double camZ,
+            double renderDistance
     ) {
         if (entry.edges().isEmpty()) {
             return;
@@ -164,27 +166,138 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
         double highY = lowY + 4.0;
 
         for (BorderVisualizationPayload.Edge edge : entry.edges()) {
-            if (distanceSquaredToSegment2D(
-                    camX,
-                    camZ,
-                    edge.x1(),
-                    edge.z1(),
-                    edge.x2(),
-                    edge.z2()
-            ) > REGION_RENDER_DISTANCE_SQUARED) {
-                continue;
-            }
+            HorizontalSegment visible = clipHorizontalSegment(
+                    edge.x1(), edge.z1(), edge.x2(), edge.z2(), camX, camZ, renderDistance
+            );
+            if (visible == null) continue;
 
-            Vec3 lowStart = new Vec3(edge.x1(), lowY, edge.z1());
-            Vec3 lowEnd = new Vec3(edge.x2(), lowY, edge.z2());
-            Vec3 highStart = new Vec3(edge.x1(), highY, edge.z1());
-            Vec3 highEnd = new Vec3(edge.x2(), highY, edge.z2());
+            Vec3 lowStart = new Vec3(visible.x1(), lowY, visible.z1());
+            Vec3 lowEnd = new Vec3(visible.x2(), lowY, visible.z2());
+            Vec3 highStart = new Vec3(visible.x1(), highY, visible.z1());
+            Vec3 highEnd = new Vec3(visible.x2(), highY, visible.z2());
 
             line(lowStart, lowEnd, entry, true);
             line(highStart, highEnd, entry, true);
             line(lowStart, highStart, entry, true);
             line(lowEnd, highEnd, entry, true);
         }
+    }
+
+    private static void renderClippedBoxEdges(
+            AABB bounds,
+            Vec3 camera,
+            double renderDistance,
+            BorderVisualizationPayload.Entry entry,
+            Frustum frustum
+    ) {
+        Vec3 p000 = new Vec3(bounds.minX, bounds.minY, bounds.minZ);
+        Vec3 p001 = new Vec3(bounds.minX, bounds.minY, bounds.maxZ);
+        Vec3 p010 = new Vec3(bounds.minX, bounds.maxY, bounds.minZ);
+        Vec3 p011 = new Vec3(bounds.minX, bounds.maxY, bounds.maxZ);
+        Vec3 p100 = new Vec3(bounds.maxX, bounds.minY, bounds.minZ);
+        Vec3 p101 = new Vec3(bounds.maxX, bounds.minY, bounds.maxZ);
+        Vec3 p110 = new Vec3(bounds.maxX, bounds.maxY, bounds.minZ);
+        Vec3 p111 = new Vec3(bounds.maxX, bounds.maxY, bounds.maxZ);
+
+        renderClippedLine(p000, p001, camera, renderDistance, entry, frustum);
+        renderClippedLine(p000, p010, camera, renderDistance, entry, frustum);
+        renderClippedLine(p000, p100, camera, renderDistance, entry, frustum);
+        renderClippedLine(p001, p011, camera, renderDistance, entry, frustum);
+        renderClippedLine(p001, p101, camera, renderDistance, entry, frustum);
+        renderClippedLine(p010, p011, camera, renderDistance, entry, frustum);
+        renderClippedLine(p010, p110, camera, renderDistance, entry, frustum);
+        renderClippedLine(p100, p101, camera, renderDistance, entry, frustum);
+        renderClippedLine(p100, p110, camera, renderDistance, entry, frustum);
+        renderClippedLine(p011, p111, camera, renderDistance, entry, frustum);
+        renderClippedLine(p101, p111, camera, renderDistance, entry, frustum);
+        renderClippedLine(p110, p111, camera, renderDistance, entry, frustum);
+    }
+
+    private static void renderClippedLine(
+            Vec3 start,
+            Vec3 end,
+            Vec3 camera,
+            double radius,
+            BorderVisualizationPayload.Entry entry,
+            Frustum frustum
+    ) {
+        LineSegment visible = clipSegmentToSphere(start, end, camera, radius);
+        if (visible == null || !frustum.isVisible(segmentBounds(visible.start(), visible.end()))) return;
+        line(visible.start(), visible.end(), entry, true);
+    }
+
+    private static AABB segmentBounds(Vec3 start, Vec3 end) {
+        double padding = 0.05;
+        return new AABB(
+                Math.min(start.x, end.x) - padding,
+                Math.min(start.y, end.y) - padding,
+                Math.min(start.z, end.z) - padding,
+                Math.max(start.x, end.x) + padding,
+                Math.max(start.y, end.y) + padding,
+                Math.max(start.z, end.z) + padding
+        );
+    }
+
+    private static LineSegment clipSegmentToSphere(Vec3 start, Vec3 end, Vec3 center, double radius) {
+        Vec3 direction = end.subtract(start);
+        Vec3 offset = start.subtract(center);
+        double a = direction.dot(direction);
+        if (a <= 1.0E-12) return offset.lengthSqr() <= radius * radius ? new LineSegment(start, end) : null;
+        double b = 2.0 * offset.dot(direction);
+        double c = offset.dot(offset) - radius * radius;
+        double discriminant = b * b - 4.0 * a * c;
+        if (discriminant < 0.0) return c <= 0.0 ? new LineSegment(start, end) : null;
+        double root = Math.sqrt(discriminant);
+        double t1 = (-b - root) / (2.0 * a);
+        double t2 = (-b + root) / (2.0 * a);
+        double from = Math.max(0.0, Math.min(t1, t2));
+        double to = Math.min(1.0, Math.max(t1, t2));
+        if (c <= 0.0) from = 0.0;
+        if (end.subtract(center).lengthSqr() <= radius * radius) to = 1.0;
+        if (from > to || to < 0.0 || from > 1.0) return null;
+        return new LineSegment(start.add(direction.scale(from)), start.add(direction.scale(to)));
+    }
+
+    private static HorizontalSegment clipHorizontalSegment(
+            double startX,
+            double startZ,
+            double endX,
+            double endZ,
+            double centerX,
+            double centerZ,
+            double radius
+    ) {
+        double directionX = endX - startX;
+        double directionZ = endZ - startZ;
+        double offsetX = startX - centerX;
+        double offsetZ = startZ - centerZ;
+        double a = directionX * directionX + directionZ * directionZ;
+        double radiusSquared = radius * radius;
+        if (a <= 1.0E-12) {
+            return offsetX * offsetX + offsetZ * offsetZ <= radiusSquared
+                    ? new HorizontalSegment(startX, startZ, endX, endZ)
+                    : null;
+        }
+        double b = 2.0 * (offsetX * directionX + offsetZ * directionZ);
+        double c = offsetX * offsetX + offsetZ * offsetZ - radiusSquared;
+        double discriminant = b * b - 4.0 * a * c;
+        if (discriminant < 0.0) return c <= 0.0 ? new HorizontalSegment(startX, startZ, endX, endZ) : null;
+        double root = Math.sqrt(discriminant);
+        double t1 = (-b - root) / (2.0 * a);
+        double t2 = (-b + root) / (2.0 * a);
+        double from = Math.max(0.0, Math.min(t1, t2));
+        double to = Math.min(1.0, Math.max(t1, t2));
+        if (c <= 0.0) from = 0.0;
+        double endOffsetX = endX - centerX;
+        double endOffsetZ = endZ - centerZ;
+        if (endOffsetX * endOffsetX + endOffsetZ * endOffsetZ <= radiusSquared) to = 1.0;
+        if (from > to || to < 0.0 || from > 1.0) return null;
+        return new HorizontalSegment(
+                startX + directionX * from,
+                startZ + directionZ * from,
+                startX + directionX * to,
+                startZ + directionZ * to
+        );
     }
 
     private static void line(
@@ -206,6 +319,13 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
         return dx * dx + dy * dy + dz * dz;
     }
 
+    private static double farthestDistanceSquaredToAabb(AABB bounds, double x, double y, double z) {
+        double dx = Math.max(Math.abs(x - bounds.minX), Math.abs(x - bounds.maxX));
+        double dy = Math.max(Math.abs(y - bounds.minY), Math.abs(y - bounds.maxY));
+        double dz = Math.max(Math.abs(z - bounds.minZ), Math.abs(z - bounds.maxZ));
+        return dx * dx + dy * dy + dz * dz;
+    }
+
     private static double axisDistance(double value, double minimum, double maximum) {
         if (value < minimum) {
             return minimum - value;
@@ -216,32 +336,9 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
         return 0.0;
     }
 
-    private static double distanceSquaredToSegment2D(
-            double pointX,
-            double pointZ,
-            double startX,
-            double startZ,
-            double endX,
-            double endZ
-    ) {
-        double segmentX = endX - startX;
-        double segmentZ = endZ - startZ;
-        double segmentLengthSquared = segmentX * segmentX + segmentZ * segmentZ;
+    private record HorizontalSegment(double x1, double z1, double x2, double z2) {
+    }
 
-        if (segmentLengthSquared == 0.0) {
-            double dx = pointX - startX;
-            double dz = pointZ - startZ;
-            return dx * dx + dz * dz;
-        }
-
-        double t = ((pointX - startX) * segmentX + (pointZ - startZ) * segmentZ)
-                / segmentLengthSquared;
-        t = Math.max(0.0, Math.min(1.0, t));
-
-        double closestX = startX + t * segmentX;
-        double closestZ = startZ + t * segmentZ;
-        double dx = pointX - closestX;
-        double dz = pointZ - closestZ;
-        return dx * dx + dz * dz;
+    private record LineSegment(Vec3 start, Vec3 end) {
     }
 }

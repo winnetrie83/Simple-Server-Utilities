@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
 
+import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument;
+import be.winnetrie.mod.simpleserverutilities.mail.MailRichText;
 import be.winnetrie.mod.simpleserverutilities.network.MailActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailRequestPayload;
@@ -230,7 +232,18 @@ public final class MailScreen extends Screen {
         g.text(font, ("sent".equals(data.mode()) ? "To " : "From ") + entry.otherParty()
                 + " • " + formatDate(entry.createdAt()), x, y + 14, MUTED, false);
         int bodyY = y + 34;
-        List<FormattedCharSequence> bodyLines = font.split(Component.literal(entry.body().isBlank() ? "(No message)" : entry.body()),
+        String encodedBody = entry.body();
+        String visibleBody = MailRichText.plainText(encodedBody);
+        Component bodyComponent;
+        if (visibleBody.isBlank()) {
+            bodyComponent = Component.literal("(No message)");
+        } else {
+            HologramRichTextDocument document = new HologramRichTextDocument(
+                    encodedBody, MailRichText::normalize, MailRichText.MAX_STORED_CHARACTERS);
+            bodyComponent = RichTextEditBoxRenderer.component(
+                    document, 0, document.plainText().length(), TEXT);
+        }
+        List<FormattedCharSequence> bodyLines = font.split(bodyComponent,
                 Math.max(120, l.detailRight() - x - 12));
         int maxBodyLines = Math.max(2, (l.detailBottom() - bodyY - 108) / 10);
         for (int i = 0; i < Math.min(bodyLines.size(), maxBodyLines); i++) {

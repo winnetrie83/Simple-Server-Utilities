@@ -1,0 +1,19 @@
+SSU 1.6.0-dev12.8 validation report
+
+Base: SSU 1.6.0-dev12.7
+Mod version: 1.6.0-dev12.8
+Network protocol: 35 (unchanged)
+Persistent schemas: unchanged
+
+Focused source changes:
+- MapMarkerRenderer LABEL_SCALE 0.36F -> 0.72F.
+- Background now uses asymmetric top/bottom extents (0.30 / 0.48) instead of symmetric half-height 0.27.
+- Horizontal text-width factor doubled to 0.02430; fixed padding reduced to 0.10.
+
+Validation performed:
+- Java lexical/delimiter scan over all source files.
+- JSON parse validation over all JSON resources.
+- Focused source assertions for version, scale and asymmetric background geometry.
+- No networking, storage, marker-data or cache changes.
+
+Full Gradle/NeoForge build was not run in this container because the project requires Java 25 and Gradle 9.2.1 is not locally cached. Build locally with `gradlew.bat clean build`.

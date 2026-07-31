@@ -2,6 +2,9 @@ package be.winnetrie.mod.simpleserverutilities.permission;
 
 import java.util.Set;
 import java.util.List;
+import java.util.Locale;
+
+import net.minecraft.resources.Identifier;
 
 
 public final class PermissionKeys {
@@ -98,6 +101,51 @@ public final class PermissionKeys {
     public static final String MAIL_SEND_COOLDOWN = "ssu.mail.send_cooldown";
     public static final String MAIL_ADMIN = "ssu.mail.admin";
 
+    public static final String HOLOGRAMS_ADMIN = "ssu.holograms.admin";
+    public static final String BLOCK_INFORMATION_USE = "ssu.block_information.use";
+    public static final String BLOCK_INFORMATION_DEBUG = "ssu.block_information.debug";
+    public static final String BLOCK_INFORMATION_INVENTORY = "ssu.block_information.inventory";
+    public static final String BLOCK_INFORMATION_INVENTORY_FULL = "ssu.block_information.inventory.full";
+    public static final String BLOCK_INFORMATION_INVENTORY_MAX_ITEMS = "ssu.block_information.inventory.max_items";
+    public static final String STATISTICS_ADMIN = "ssu.statistics.admin";
+
+    public static final String CROPS_HARVESTING_USE = "ssu.crops_harvesting.use";
+
+    public static final String UTILITY_MINING_ADMIN = "ssu.utility_mining.admin";
+
+    public static final String TREECAPITATOR_USE = "ssu.treecapitator.use";
+    public static final String TREECAPITATOR_MAX_BLOCKS = "ssu.treecapitator.max_blocks";
+    public static final String TREECAPITATOR_BLOCKS = "ssu.treecapitator.blocks";
+
+    public static final String VEINMINER_USE = "ssu.veinminer.use";
+    public static final String VEINMINER_MAX_BLOCKS = "ssu.veinminer.max_blocks";
+    public static final String VEINMINER_ORE_COAL = "ssu.veinminer.ore.coal";
+    public static final String VEINMINER_ORE_IRON = "ssu.veinminer.ore.iron";
+    public static final String VEINMINER_ORE_COPPER = "ssu.veinminer.ore.copper";
+    public static final String VEINMINER_ORE_GOLD = "ssu.veinminer.ore.gold";
+    public static final String VEINMINER_ORE_REDSTONE = "ssu.veinminer.ore.redstone";
+    public static final String VEINMINER_ORE_EMERALD = "ssu.veinminer.ore.emerald";
+    public static final String VEINMINER_ORE_LAPIS = "ssu.veinminer.ore.lapis";
+    public static final String VEINMINER_ORE_DIAMOND = "ssu.veinminer.ore.diamond";
+
+    public static String treecapitatorBlock(Identifier id) {
+        return "ssu.treecapitator.block." + identifierSuffix(id);
+    }
+
+    public static String veinminerBlock(Identifier id) {
+        return "ssu.veinminer.block." + identifierSuffix(id);
+    }
+
+    private static String identifierSuffix(Identifier id) {
+        if (id == null) {
+            return "unknown";
+        }
+        return (id.getNamespace() + "." + id.getPath())
+                .toLowerCase(Locale.ROOT)
+                .replace('/', '.')
+                .replace(':', '.');
+    }
+
 
     private static final Set<String> KNOWN_KEYS = Set.of(
             CLAIMS_USE,
@@ -187,6 +235,30 @@ public final class PermissionKeys {
             MAIL_SEND_COOLDOWN,
             MAIL_ADMIN,
 
+            HOLOGRAMS_ADMIN,
+            BLOCK_INFORMATION_USE,
+            BLOCK_INFORMATION_DEBUG,
+            BLOCK_INFORMATION_INVENTORY,
+            BLOCK_INFORMATION_INVENTORY_FULL,
+            BLOCK_INFORMATION_INVENTORY_MAX_ITEMS,
+            STATISTICS_ADMIN,
+            CROPS_HARVESTING_USE,
+
+            UTILITY_MINING_ADMIN,
+            TREECAPITATOR_USE,
+            TREECAPITATOR_MAX_BLOCKS,
+            TREECAPITATOR_BLOCKS,
+            VEINMINER_USE,
+            VEINMINER_MAX_BLOCKS,
+            VEINMINER_ORE_COAL,
+            VEINMINER_ORE_IRON,
+            VEINMINER_ORE_COPPER,
+            VEINMINER_ORE_GOLD,
+            VEINMINER_ORE_REDSTONE,
+            VEINMINER_ORE_EMERALD,
+            VEINMINER_ORE_LAPIS,
+            VEINMINER_ORE_DIAMOND,
+
             "ssu.*",
             "ssu.claims.*",
             "ssu.homes.*",
@@ -202,6 +274,16 @@ public final class PermissionKeys {
             "ssu.economy.*",
             "ssu.teleport.*",
             "ssu.mail.*",
+            "ssu.holograms.*",
+            "ssu.block_information.*",
+            "ssu.statistics.*",
+            "ssu.crops_harvesting.*",
+            "ssu.utility_mining.*",
+            "ssu.treecapitator.*",
+            "ssu.treecapitator.block.*",
+            "ssu.veinminer.*",
+            "ssu.veinminer.ore.*",
+            "ssu.veinminer.block.*",
             "*"
     );
 
@@ -212,6 +294,12 @@ public final class PermissionKeys {
     }
 
     public static boolean isKnownKey(String key) {
-        return key != null && KNOWN_KEYS.contains(key);
+        if (key == null) {
+            return false;
+        }
+        String normalized = key.trim().toLowerCase(Locale.ROOT);
+        return KNOWN_KEYS.contains(normalized)
+                || normalized.startsWith("ssu.treecapitator.block.")
+                || normalized.startsWith("ssu.veinminer.block.");
     }
 }

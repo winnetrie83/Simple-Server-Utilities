@@ -1,5 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.command;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionCatalog;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
@@ -56,7 +57,7 @@ public class RegionCommands {
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("regions")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                .requires(source -> Config.ENABLE_ADMIN_REGIONS.get() && source.getEntity() instanceof ServerPlayer)
 
                 .then(Commands.literal("help")
                         .executes(context -> help(context.getSource())))
@@ -1333,8 +1334,7 @@ public class RegionCommands {
     private static int showRegionBoundary(CommandSourceStack source, String name) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!RegionPolicy.canVisualizeRegions(player)) {
-            player.sendSystemMessage(Component.literal("You do not have permission to visualize region boundaries."));
+        if (!canEditRegions(player)) {
             return 0;
         }
 
@@ -1347,8 +1347,7 @@ public class RegionCommands {
 
         RegionInteractionEvents.showBoundary(player, region.getName());
         player.sendSystemMessage(Component.literal(
-                "Showing boundary for region '" + region.getName()
-                        + "'. Use /regions hide " + region.getName() + " to hide only this region."
+                "Region border enabled for players: '" + region.getName() + "'."
         ));
         return 1;
     }
@@ -1356,8 +1355,7 @@ public class RegionCommands {
     private static int hideRegionBoundary(CommandSourceStack source, String name) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
-        if (!RegionPolicy.canVisualizeRegions(player)) {
-            player.sendSystemMessage(Component.literal("You do not have permission to visualize region boundaries."));
+        if (!canEditRegions(player)) {
             return 0;
         }
 
@@ -1368,14 +1366,17 @@ public class RegionCommands {
         }
 
         RegionInteractionEvents.hideBoundary(player, region.getName());
-        player.sendSystemMessage(Component.literal("Boundary hidden for region '" + region.getName() + "'."));
+        player.sendSystemMessage(Component.literal("Region border disabled for players: '" + region.getName() + "'."));
         return 1;
     }
 
     private static int hideAllRegionBoundaries(CommandSourceStack source) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!canEditRegions(player)) {
+            return 0;
+        }
         RegionInteractionEvents.hideAllBoundaries(player);
-        player.sendSystemMessage(Component.literal("All individually selected region boundaries hidden."));
+        player.sendSystemMessage(Component.literal("All server-region borders disabled for players."));
         return 1;
     }
 

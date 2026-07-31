@@ -243,6 +243,11 @@ public final class RegionWorldEditManager {
         }
 
         @Override
+        public String ownerModule() {
+            return "regions";
+        }
+
+        @Override
         public Set<String> resourceLocks() {
             return resourceLocks;
         }
@@ -341,6 +346,11 @@ public final class RegionWorldEditManager {
             if (x > maxX) {
                 complete = true;
             }
+        }
+
+        @Override
+        public String ownerModule() {
+            return "regions";
         }
 
         @Override

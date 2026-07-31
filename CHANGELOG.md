@@ -1,3 +1,434 @@
+## 1.6.0-dev12.10
+
+### Added
+
+- Added a personal **Live terrain** radius setting under Settings → World map. It cycles through 1, 2, 4, 6, 8, 12, 16, 24 and 32 chunks and defaults to 8 chunks.
+- The validated live-update radius is included in both the menu settings snapshot and recurring minimap state, so it is restored after reconnecting without requiring the dashboard to be opened first.
+
+### Changed
+
+- Confirmed and retained the existing asynchronous, server-isolated client disk cache for explored aerial-map tiles under `map-cache-v4` (cache format 5).
+- Only loaded chunks inside the player's configured live-update radius are recaptured. Cached terrain outside that radius remains available from disk but is not continuously refreshed.
+- Off-radius and inactive-dimension atlas tiles are evicted from client RAM after ten seconds without use. Tiles temporarily loaded for a distant World Map view remain in memory while actively viewed, then return to disk-only storage after the view is closed.
+- Raised the hard transient atlas ceiling to support a complete large World Map viewport without LRU thrashing; proximity and idle eviction remain the normal memory boundary.
+- Strengthened local, broad and macro topographic shading and expanded the ground-light range so hills, terraces and valleys read more clearly. The renderer fingerprint is now `atlas-topographic-v6`, causing explored tiles to be rebuilt once with the improved relief while keeping the same cache format and folder.
+
+### Fixed
+
+- Reworked the World Map marker context frame so its dark gutter and double outline are rendered after the map widget. The map can no longer paint over the frame around Add/Edit/Delete/Close.
+
+### Compatibility
+
+- Network protocol is now 36 because the validated map-update radius is synchronized to clients.
+- Player UI preferences migrate from schema 6 to schema 7 with an 8-chunk default.
+- Map markers remain schema 1 and the aerial cache remains format 5 under `map-cache-v4`.
+- No server world, claim, region, marker or other gameplay-data migration is required. Client and server must use the exact same dev12.10 build.
+
+## 1.6.0-dev12.9
+
+### Fixed
+
+- Shifted the complete left map toolbar panel three pixels to the right on both the World Map and Claim Map.
+- The panel background now moves together with its controls, restoring equal three-pixel padding on both sides of every 28-pixel toolbar button.
+- Kept the outer map shell, map viewport, top bar, information panels and right-side Close controls unchanged.
+
+### Compatibility
+
+- Network protocol remains 35. Player preferences remain schema 6, map markers remain schema 1 and the aerial map cache remains format 5 under `map-cache-v4`.
+- No server data, marker data, payload or client-cache migration is required. Client and server should use the exact same dev12.9 build.
+
+## 1.6.0-dev12.8
+
+### Changed
+
+- Doubled the aimed in-world marker name/distance text again.
+- Tightened the translucent label background around the enlarged text, especially above the glyphs, while retaining enough lower space for descenders.
+
+### Compatibility
+
+- Network protocol remains 35 and all persistent schemas remain unchanged.
+
+## 1.6.0-dev12.7
+
+### Changed
+
+- Halved the in-world marker-disc diameter again while preserving the filled billboard style, colour and dark contrast rim.
+- Increased the aimed marker name/distance label to 2.25 times its former text and panel size so it remains clearly readable at long range.
+- Moved the World Map and Claim Map Back controls into the bottom of their left tool columns.
+- Moved the Close controls to the top-right corner of both map shells.
+- Shifted every left-column map control three pixels to the right for improved alignment.
+
+### Compatibility
+
+- Network protocol remains 35. Player preferences remain schema 6, map markers remain schema 1 and the aerial map cache remains format 5 under `map-cache-v4`.
+- No server data, marker data, payload or client-cache migration is required. Client and server should use the exact same dev12.7 build.
+
+## 1.6.0-dev12.6
+
+### Changed
+
+- Added bounded distance compensation to in-world marker discs and aimed labels so their apparent screen size remains stable beyond sixteen blocks.
+- Replaced distance-capped world-space aim tolerance with a fixed angular tolerance for reliable long-range marker labels.
+
+### Compatibility
+
+- Network protocol remains 35 and all persistent schemas remain unchanged.
+
+## 1.6.0-dev12.5
+
+### Added
+
+- Looking directly at an in-world marker now reveals a compact camera-facing label containing the marker name and live distance. Only the best marker under the crosshair is labelled, avoiding world clutter.
+- World Map cursor information now includes the mapped surface biome and block alongside X/Y/Z in both the right information panel and compact bottom status bar.
+- Surface block and biome registry ids are persisted per explored atlas column so the information remains available for cached terrain outside currently loaded chunks.
+
+### Changed
+
+- Upgraded the client-only aerial map cache from format 4 to format 5 and moved it to `map-cache-v4` for the new biome/block metadata. Existing terrain is rebuilt automatically as it is explored or loaded from chunks.
+
+### Compatibility
+
+- Network protocol remains 35. Player preferences remain schema 6 and map markers remain schema 1.
+- No server/world data migration is required. The only migration is the disposable client aerial cache. Client and server should use the exact same dev12.5 build.
+
+## 1.6.0-dev12.4
+
+### Changed
+
+- Replaced the large hollow in-world marker ring with a solid camera-facing coloured disc.
+- Halved the marker icon diameter from approximately 1.16 blocks to 0.58 blocks while preserving a thin dark contrast rim.
+- Kept the independent full-height marker beam, map markers, minimap markers and all visibility/range settings unchanged.
+
+### Compatibility
+
+- Network protocol remains 35. Player preferences remain schema 6, map markers remain schema 1 and the aerial map cache remains format 4.
+- No server data, marker data, payload or client cache migration is required. Client and server should use the exact same dev12.4 build.
+
+## 1.6.0-dev12.3
+
+### Changed
+
+- Replaced the horizontal in-world marker ring with a camera-facing circular marker icon centred on the saved marker coordinate. The vertical beam remains independent and still spans the active dimension height.
+- Expanded the marker editor from twelve mixed presets to the complete sixteen Minecraft legacy colours.
+- Marker colour buttons now render their actual colour across the button face, with a bright selection outline and named/hex hover tooltips.
+- Added a larger double-outline frame around the complete World Map marker context menu so Add/Edit/Delete and Close visually belong to one compact panel.
+
+### Compatibility
+
+- Network protocol remains 35. Player preferences remain schema 6, map markers remain schema 1 and the aerial map cache remains format 4.
+- No server data, marker data, payload or client cache migration is required. Client and server should still use the exact same dev12.3 build.
+
+## 1.6.0-dev12.2
+
+### Fixed
+
+- Fixed the World Map marker context-menu buttons not responding to left clicks.
+- Marker context actions are now resolved by the parent screen before the underlying map widget receives the event.
+- **Add marker**, **Edit**, **Delete/Confirm** and **Close** now use explicit modal hitboxes that match the rendered button bounds.
+- Clicking outside the marker menu closes it and consumes the click, preventing accidental click-through to the map or toolbar.
+
+### Compatibility
+
+- Network protocol remains 35. Player preferences remain schema 6, map markers remain schema 1 and the aerial map cache remains format 4.
+- No server data, marker data, payload or client cache migration is required. Client and server should still use the exact same dev12.2 build.
+
+## 1.6.0-dev12.1
+
+### Fixed
+
+- Restored World Map right-click marker actions by opening the marker context menu directly on the right-button press instead of waiting for the former right-drag release path.
+- World Map and Claim Map panning now use the held middle mouse button. This keeps right-click exclusively available for marker create/edit/delete actions on the World Map.
+- Added screen-level middle-drag forwarding so dragging remains active even when Minecraft transfers focus between the map widget and its parent screen during the gesture.
+- Raised the bottom Back/Close controls on both full-screen maps by 5 pixels.
+- Removed the duplicate World Map/Claim Map switch button from the bottom control row; the existing left toolbar switch remains.
+- Renamed the World Map marker-manager tooltip to `Manage markers` and the terrain rebuild tooltip to `refresh`.
+- Updated both map status hints to describe middle-button panning.
+
+### Compatibility
+
+- Network protocol remains 35. Player preferences remain schema 6, map markers remain schema 1 and the aerial map cache remains format 4.
+- No server data, marker data or client cache migration is required. Client and server should still use the exact same dev12.1 build.
+
+## 1.6.0-dev12
+
+### Added
+
+- Added persistent personal map markers with name, colour, dimension and editable X/Y/Z coordinates. Markers are stored per player in isolated schema-1 JSON records below `simpleserverutilities/map_markers/players` and are limited to 256 per player.
+- Added a World Map right-click workflow. Right-clicking terrain opens a compact context menu to create a marker; right-clicking an existing marker opens Edit/Delete actions with delete confirmation.
+- Marker creation derives the initial Y coordinate as the first free block directly above the clicked mapped surface. The server verifies the height from `WORLD_SURFACE` whenever the clicked chunk is loaded and otherwise retains the cached mapped height supplied by the client.
+- Added a paged remote marker manager for editing or deleting markers without travelling to their position.
+- Added coloured marker symbols to the World Map and minimap, plus a coloured in-world circle at the saved coordinate.
+- Added optional distance-limited vertical marker beams spanning the active dimension's complete build height. Personal beam range defaults to 128 blocks, is adjustable from 16 through 512 blocks and is clamped server-side.
+- Added independent personal settings for World Map markers, minimap markers, in-world marker circles and marker beams.
+- Added shared map day/night treatment. World Map, Claim Map and minimap now darken with the client world's sky-darkness while cached block light keeps surface light sources visible at night.
+- Added block-light data to the persistent client aerial atlas cache and upgraded its on-disk format to version 4 under `map-cache-v3`.
+
+### Changed
+
+- Redesigned the World Map as a near-full-height professional map workspace with compact icon controls, hover tooltips, a dedicated layer/location/selection panel, a compact status bar and direct marker management.
+- Redesigned the Claim Map with the same visual shell, compact tooltips and a clearer right-side claim/action panel while preserving the existing server-authoritative claim workflows.
+- Strengthened local, terrace, hill and broad-scale topographic contrast so height transitions are more legible without changing terrain colours or map coordinates.
+- Minimap rendering now includes personal markers and uses the same day/night and illuminated-surface treatment as the larger maps.
+- Player UI preference schema increases from 5 to 6 for marker visibility and beam settings. Existing players migrate with all marker views enabled and a 128-block beam distance.
+- Network protocol increases from 34 to 35 for marker actions/synchronization and the expanded UI-settings snapshot. Client and server must use the exact same dev12 build.
+
+### Compatibility
+
+- Existing claims, regions, permissions, mail, economy, hologram, statistics and Block Information data remain compatible.
+- Region records remain schema 4, holograms schema 4, mailboxes schema 3, statistics schema 1 and border preferences schema 2.
+- The aerial atlas cache is client-only and is rebuilt automatically in the new version-4 cache format; no world-save migration is required.
+
+## 1.6.0-dev11.4
+
+- Separates the compact Block Information indicator from the recommended-tool hint.
+- The green/red vertical bar now answers only whether the looked-at block can be harvested correctly with the currently held item: green when drops are obtainable (or no correct tool is required), red when a correct tool is required but not held, and red for unbreakable blocks.
+- The tool icon remains an independent minimum required/recommended tool hint: optional efficiency recommendations such as a wooden shovel for dirt no longer turn the bar red when the player uses an empty hand.
+- Required minimum tiers remain unchanged, for example diamond pickaxe for obsidian; recommended categories still use their lowest-tier icon to communicate that any tier is suitable.
+- Debug output continues to distinguish `Required` from `Recommended`.
+- Network protocol remains 34 and all stored-data schemas remain unchanged.
+
+## 1.6.0-dev11.2
+
+- Extends Block Information with server-authoritative content previews for accessible containers and inventory-bearing objects.
+- Adds strict permission `ssu.block_information.inventory`; operators do not bypass it without an explicit rank/player/wildcard grant.
+- Adds integer permission `ssu.block_information.inventory.max_items` with a default of `1` and a hard range of `0` through `54` shown non-empty item stacks.
+- Adds optional `ssu.block_information.inventory.full`, which overrides the numeric preview limit up to the hard 54-stack cap.
+- Shows preview stacks as real Minecraft item icons with stack counts below the compact block/entity title; empty supported targets show `Empty` and additional hidden stacks are indicated with an ellipsis.
+- Supports flower pots, the viewing player's own ender chest, ordinary and double chests, vanilla `Container` block entities, lecterns, campfires, item frames, armor stands, container entities and compatible modded block/entity item capabilities.
+- Resolves the looked-at target again on the server, enforces reach, loaded-chunk state, SSU claim/region interaction protection and container locks, and never exposes another player's inventory.
+- Refuses to inspect unopened random-loot containers so the preview cannot generate or reveal loot before legitimate access.
+- Sanitizes preview stacks to item type and count only; nested container contents, books, maps and other per-stack metadata are not transferred.
+- Refreshes previews four times per second but sends a packet only when the effective target or bounded contents change.
+- Raises network protocol from 33 to 34; client and server must use the exact same dev11.2 build. Stored data schemas remain unchanged.
+
+## 1.6.0-dev11.1
+
+- Compacts the ordinary Block Information HUD to the translated block/entity name plus an optional real Minecraft item icon for the minimum required harvesting tool.
+- Retains the green/red vertical tool-validity indicator.
+- Moves registry ID, hardness, required-tool text and blockstate properties into a separate personal debug mode.
+- Adds strict permission `ssu.block_information.debug`; operators do not bypass this gate unless their rank/player/wildcard permissions explicitly grant it.
+- Adds entity names to the compact overlay and entity registry IDs to debug mode.
+- Raises Player UI Preferences schema from 4 to 5; debug mode migrates OFF.
+- Raises network protocol from 32 to 33; client and server must use the exact same dev11.1 build.
+
+## 1.6.0-dev11
+
+- Added the server-controlled **Block Information** module. Players can enable or disable it under Personal Settings, while the module switch and strict `ssu.block_information.use` permission remain the hard server gates.
+- Added a lightweight top-centre block overlay showing the translated block name, full registry identifier, readable namespace/mod name, hardness, correct-tool status and bounded sorted block-state properties. All block inspection is local client state; the server only synchronizes the effective permission/toggle state and sends no per-look packets.
+- Added persistent administrator-defined **Custom Player Statistics** for blocks broken, blocks placed, entities killed, player deaths, damage dealt, damage taken and online play time. Registry-aware event types support either `*` or one exact block/entity identifier.
+- Added a paged Statistics administration page with search plus create, edit, pause, resume, reset and double-confirmed delete actions. The dedicated editor validates IDs, display names, event types, filters and units on both client and server.
+- Added indexed event routing: enabled statistic definitions are grouped by event type and exact/wildcard target so gameplay events do not scan every definition. Damage is stored in exact hundredths; ordinary counters and play time use whole units.
+- Added isolated statistic storage below `simpleserverutilities/statistics`: schema-1 `definitions.json` and per-player schema-1 value records. Dirty player records are queued in batches every five seconds, on logout, on module disable/reload and during shutdown through the existing single-writer storage service.
+- Added corruption handling and bounded operation: malformed definition/player files are archived, definition IDs are unique and limited to 128, leaderboard output is bounded, additions saturate at `Long.MAX_VALUE`, and renamed/deleted/reset statistics migrate or remove their player values safely.
+- Integrated custom statistics into Floating Text. Rich text/link titles accept `{{stat:<id>}}` and `{{rank:<id>}}`; scoreboard holograms accept objective `ssu:<id>` and support both personal SELF values and formatted TOP leaderboards using the hologram's existing row count and independent refresh interval.
+- Added `ssu.statistics.admin`, the Statistics module switch and Block Information/Statistics descriptions to the permission and module editors.
+- Increased player UI preference schema from `3` to `4` for the personal Block Information choice. Existing players migrate with the personal choice enabled, while server module and permission gates remain authoritative.
+- Increased network protocol from `31` to `32` for the new dashboard fields, statistics records and editor/block-information payloads. Client and server must use the same dev11 build. Region schema remains `4`, hologram schema remains `4`, mailbox schema remains `3` and border preferences remain schema `2`.
+
+## 1.6.0-dev10.2
+
+- Corrected the Regions-page visibility model. Its per-region `Show`/`Disable` control is now a persistent server-owned setting instead of a personal pin belonging only to the administrator who clicked it.
+- Added `borderVisible` to region records. Existing and newly created regions default to hidden until an administrator explicitly enables their border. Region storage schema is now `4`.
+- Region overview payloads now contain only regions whose server-owned border setting is enabled. The player's personal Region borders switch and the strict `ssu.borders.regions.view` capability gate are still applied afterwards.
+- Retired the separate per-player `REGION_FOCUS` rendering path for Regions-page actions and clear that legacy layer during synchronization, removing both duplicate rendering and the case where Disable merely returned a region to the automatic overview.
+- The Regions page now reports the server-owned state, uses `Show`/`Disable`, and `Disable all` switches every server region off. `/regions show`, `/regions hide <name>` and `/regions hide` now manage the same server-owned state and require region-edit administration.
+- Region redefinition preserves the visibility setting and changes are saved and synchronized to all online players immediately.
+- Network protocol remains `31`; client/server payload layouts are unchanged. Border player-preference schema remains `2`; region record schema increases from `3` to `4`.
+
+## 1.6.0-dev10.1
+
+- Fixed the server region-border capability gate so an explicit `ssu.borders.regions.view = false` also applies to operators; operator bypass can no longer force region borders visible while the server has denied them.
+- Applied the same hard-gate semantics to claim borders for consistency: the server permission is the maximum capability, while each player's personal border toggle remains the final visibility choice.
+- Border synchronization now compares the freshly resolved effective capability with the previous client state every refresh cycle, so module or permission changes clear stale overlays even when no settings revision was raised.
+- Region overview, pinned/focused region borders and the temporary region-selection layer are all cleared when the effective region-border gate is off.
+- Region `Show` actions now fail explicitly when the server disallows region borders instead of appearing successful while no legal overlay should be sent.
+- Network protocol remains `31`; payloads and stored-data schemas are unchanged from dev10.
+
+## 1.6.0-dev10
+
+- Fixed duplicate in-world claim and region borders when an automatically visible overview entry was also selected as a focused claim or pinned region. Focused/pinned entries are now excluded from the overview layer and rendered exactly once.
+- Made personal border switches the final visibility decision. Claim and region overview, focused claims and individually selected regions are sent only when the relevant server module is enabled, the server permission allows viewing and that player has enabled the corresponding border setting.
+- Updated dashboard border capability flags so disabled server modules also disable the matching personal border control. Permission and rank changes now refresh online border visibility immediately.
+- Centered the textured Back button inside the portrait sidebar.
+- Moved Profile out of the wide dashboard tile grid and placed a dedicated Profile button directly below the portrait details and balance. Compact layouts without a portrait sidebar retain the Profile tile.
+- Network protocol remains `31`; no payload or stored-data schema changed. Existing border preferences, selected regions and other world/player data remain compatible.
+
+## 1.6.0-dev9
+
+- Added selection-based rich text to Mail Compose with the 16 Minecraft colours plus bold, italic, underline, strikethrough and clear-style controls. Inbox and Sent render the stored formatting while legacy plain-text mail remains compatible.
+- Removed the obsolete editable global text-colour control from the hologram editor while retaining old stored base colours as a compatibility fallback.
+- Renamed scoreboard `Lines` and `Ticks` to `Score rows` and `Refresh sec`, and fixed scheduling so each scoreboard hologram follows its own refresh interval.
+- Increased network protocol from `30` to `31` for the rich-mail payload changes. Mailbox schema remains `3`; hologram schema remains `4`.
+
+## 1.6.0-dev8.2.1
+
+- Fixed the Java compilation error in `PropertySettingsScreen.addPlayerAction`: the stored dropdown value is now captured through an unchanged local variable before the selected fallback value may be reassigned.
+- No gameplay, payload or stored-data behaviour changed. Network protocol remains `30`; client and server should use the same dev8.2.1 build.
+
+## 1.6.0-dev8.2
+
+- Removed claim-specific spawn configuration from the claim settings GUI and `/claims` command tree. Claim teleports now always resolve a deterministic claimed chunk and use the server heightmap for an automatic surface destination.
+- Retired the stored claim-spawn fields. Legacy `spawnX`, `spawnY`, `spawnZ`, `spawnYaw` and `spawnPitch` values are ignored when older claim JSON is loaded and disappear when that claim record is saved again; region and global server spawns are unchanged.
+- Replaced free-text claim Trust/Untrust fields with server-provided player dropdowns. Trust lists online and previously known players who do not already have access; Untrust lists only players currently trusted in that claim. Actions submit UUIDs and are revalidated server-side.
+- Added claim-presence tracking every 10 server ticks. A claim welcome message is now shown when a player actually enters a different claim, without repeating while moving between chunks belonging to the same claim.
+- Increased network protocol from `29` to `30` because property-setting entries can now carry bounded value/label option lists. Client and server must use the same dev8.2 build.
+- Existing claim ownership, chunks, trust, flags, regions, homes, warps, economy, mail, holograms and player preferences remain compatible. Hologram schema remains `4`, player UI preferences remain schema `3`, and border visualization settings remain schema `2`.
+
+## 1.6.0-dev8.1
+
+- Polished the dashboard and Settings UI: clearer mail-retention labels and hover help, simplified explanatory text, larger centered page titles and removal of redundant grey labels.
+- Removed the normal-player Regions dashboard tile while retaining administrative region management.
+- Simplified the left profile panel and removed the green Close arrow from the root dashboard; subpages retain a compact Back control.
+- Network protocol and stored-data schemas remained unchanged from dev8.
+
+## 1.6.0-dev8
+
+- Added **Admin Center → Module settings** as the operational control surface for Player Claims, Homes, Warps, Server Regions, Treecapitator, Veinminer, Crop Harvesting, Floating Text / Media, Mail, Permissions and remote hologram images. Existing NeoForge config values remain the persistence/backwards-compatibility layer.
+- Added runtime module activation. A disabled lifecycle-owned module is not initialized or loaded at server startup; disabling it at runtime first cancels owned work, saves pending state, releases its in-memory managers and makes its commands/tools inert. Re-enabling loads the unchanged stored data without requiring a restart.
+- Hardened `/ssu reload` so it cannot reload disabled module data. Claims, homes, warps, regions, mail and hologram command roots now also evaluate their module switch dynamically.
+- Added a configurable global hologram render/load distance of 8–512 blocks, default 64. The server now synchronizes only holograms in the same dimension and within the effective player range; each hologram may still request a shorter range.
+- Replaced the former periodic full hologram broadcast with one-second per-player proximity snapshots. Unchanged snapshots are not resent, scoreboard lines keep their own update interval and image sources leaving the active snapshot are released from the client cache.
+- Remote image definitions already stored on disk are now omitted from synchronization when remote images are disabled.
+- Added separate configurable claim-border and region-border render distances of 16–512 blocks, both defaulting to 128. The old chunk-distance setting migrates once into both block values; border settings schema is now 2.
+- Sent the authoritative border distance to clients and removed the hidden fixed claim/region renderer limits. Pinned region borders and focused claim borders now obey the configured range; long claim edges and large region-box edges are clipped at the player radius so a far face cannot remain visible merely because the player is inside the same large region. Region selections are cleared when the region module is disabled.
+- Added module ownership to long-running region snapshot/reset/world-edit jobs so disabling Regions cancels those jobs before region runtime state is released. Permission-profile login creation, region-rent ticking, mail login maintenance and Treecapitator placement provenance now also stop touching their module data while the corresponding module is disabled.
+- Increased network protocol from `28` to `29` because dashboard and border payloads changed. Hologram storage remains schema `4`, player UI preferences remain schema `3`, and existing world/module data remains compatible. Client and server must use the same dev8 build.
+
+## 1.6.0-dev7
+
+- Implemented actual client-side image holograms instead of the former text placeholder. PNG, JPG/JPEG and animated GIF sources are decoded, cached and rendered as camera-facing billboards.
+- Added asynchronous two-thread image loading so HTTP requests and image decoding do not block the render thread. Synced image holograms are preloaded and inactive cache entries expire automatically.
+- Added animated GIF frame composition, frame delays and disposal handling with a 180-frame safety limit.
+- Added local resource support such as `simpleserverutilities:textures/holograms/example.png` and remote direct HTTP(S) image sources, including extensionless endpoints when their returned bytes decode as PNG, JPG or GIF.
+- Added remote-source protections: 8 MiB download cap, connect/read timeouts, at most three redirects, credential rejection and rejection of loopback, link-local, site-local, multicast and carrier-grade NAT targets on every redirect.
+- Added decoded-size limits of 4096x4096 / 16,777,216 pixels, a maximum 64x64 render sample, a bounded 64-source client cache and an animated-image complexity cap. Equal colour runs are merged into larger billboard rectangles to control Gizmo cost.
+- Added in-world loading and concise error placeholders, image-aware right-click hitboxes, F3+T/resource-reload cache clearing and correct see-through behaviour.
+- Tightened editor and command validation to the supported PNG/GIF/JPG/JPEG formats. New common configs enable remote hologram images by default; an existing config that still contains `allowRemoteHologramImages=false` must be changed manually.
+- Network protocol remains `28` and hologram storage schema remains `4`; the image fields already existed in the dev6 payload and save format. Use the same dev7 build on client and server.
+
+## 1.6.0-dev6.2
+
+- Fixed the remaining Treecapitator wood-family bug: player-placement provenance no longer rejects matching trunk blocks before family resolution.
+- Natural canopy validation remains authoritative, while normal logs, stripped logs, wood, stripped wood, stems and hyphae of the same namespace-qualified species are now actually selected and broken together.
+- A stripped natural trunk segment or a matching bark-on-all-sides wood segment can be used as the targeted origin.
+- Player-placed leaves remain excluded from natural canopy validation, so ordinary constructed log piles still do not qualify as trees.
+- Network protocol remains 28 and hologram schema remains 4.
+
+## 1.6.0-dev6.1
+
+- Replaced the broken visible legacy-format-code editing path with a dedicated rich-text document model. The editor now stores only plain visible text in `MultiLineEditBox`; colors and B/I/U/S are retained separately per selected character and encoded only when saving.
+- Added a client-only styled content pass for the hologram text box. Applying a color, bold, italic, underline or strikethrough to a selection is visible immediately in the editor without exposing `§` control codes.
+- Retained the selected range while toolbar buttons and the color palette take focus, allowing several effects to be applied consecutively to the same selection.
+- Reworked world rendering into independently positioned rich-text segments. The 16 colors render per segment; bold uses a compact overdraw pass; underline and strikethrough use camera-plane decoration quads; stored/editable text remains unchanged.
+- Updated hologram hit testing to use the styled rendered width and the same camera-up multiline plane as the renderer.
+- Strengthened Treecapitator remnant discovery: one missing vertical trunk block is bridged in either direction, a canopy-backed one-log crown is no longer rejected, and conventionally named modded log/wood/stem/hyphae variants are accepted even when a mod omitted them from the logs tag.
+- Normal, stripped and bark-on-all-sides variants still normalize to the same namespace-qualified wood family, while different species and mod namespaces remain separated.
+- Network protocol remains `28` and hologram storage schema remains `4`; dev6.1 is payload- and data-compatible with dev6, but using the same build on client and server remains recommended.
+
+## 1.6.0-dev6
+
+- Replaced one-background-per-line hologram rendering with one fitted camera-facing background around the complete multiline text block.
+- Recalibrated background width against the rendered font, including bold glyphs, and added a scale-aware rear depth offset so text remains in front at both short and long distances.
+- Added an authoritative 40-visible-character limit per line. Formatting codes do not consume the limit; the editor moves overflow to the next line automatically and the server repeats the same normalization.
+- Replaced whole-hologram Bold/Italic/Underline/Strikethrough editor toggles with compact selection tools. Selected text can independently receive bold, italic, underline, strikethrough or any of the 16 standard Minecraft colours, and Clear style removes formatting only from the selected range.
+- Formatting is stored inline and carried across automatically wrapped TextGizmo lines. Existing schema-3 whole-text style flags migrate once to equivalent inline formatting.
+- Added editable X, Y and Z fields to local and remote hologram editing. The server validates finite Minecraft-bound coordinates while retaining the hologram's current dimension.
+- Increased hologram storage schema from 3 to 4 and network protocol from 27 to 28; client and server must both use dev6.
+- Included the Minecraft 26.2 `GameRenderer.mainCamera()` correction and the missing `Block` import in `UtilityMiningResolver`.
+- Existing non-hologram storage remains unchanged.
+
+## 1.6.0-dev5.1
+
+- Fixed Treecapitator rejecting a natural tree remnant after a lower or middle trunk log had already been removed. Natural-tree validation now relies on the remaining vertical trunk section plus its natural canopy instead of requiring the connected remnant to still touch solid ground.
+- Grouped normal logs, stripped logs, bark-on-all-sides wood, stripped wood, stems and hyphae by wood family. Treecapitator can now continue through those variants of the same species while still refusing a neighbouring different wood type.
+- Updated runtime revalidation so mixed valid variants of the selected wood family remain eligible throughout the automatic break chain and still receive their own per-block permission/protection/tool checks.
+- Reworked floating-text backgrounds to use the main camera's exact forward/left/up quaternion basis, matching Minecraft's `TextGizmo` billboard rotation instead of independently aiming the quad at the camera position.
+- Reduced the background depth bias to a minimal anti-z-fighting offset, keeping the text and background visually on one moving billboard layer.
+- Network protocol remains `27`; payloads and stored hologram schema remain unchanged from dev5.
+
+## 1.6.0-dev5
+
+- Fixed Treecapitator natural-leaf cleanup when mining begins above the bottom log. Completion is measured against the selected upward trunk section, while lower logs intentionally remain.
+- Added persistent ARGB backgrounds for floating text, links and scoreboard holograms. Existing holograms migrate to schema 3 with a transparent default background.
+- Added separate 16-colour Minecraft preset palettes for text and background colours, while retaining direct RGB/ARGB hexadecimal input and a transparent-background action.
+- Added a camera-facing background quad behind each visible hologram line with the same scale, view range and see-through policy as its text.
+- Increased the network protocol from `26` to `27`; client and server must both use dev5 or dev5.1.
+
+## 1.6.0-dev4
+
+- Recalibrated floating-text scale so the former visual size at scale `8` is now the useful baseline scale `1`; the editor and commands expose the new `1` through `8` range.
+- Migrated hologram definitions and the hologram container to schema 2. Existing schema-1 scales are converted once and queued for persistence so old floating text does not become eight times larger after updating.
+- Replaced the broad spherical hologram selector with a narrow camera-facing rectangle per rendered text line. Nearby holograms are now selected only when the view ray intersects their visible line area, with the nearest matching plane winning.
+- Treecapitator now builds both its preview and break selection from the exact targeted log upward. Logs below the target are excluded, and only the same exact log block/species as the target is accepted.
+- Separated natural-canopy validation from conservative leaf ownership. A touching tree of another species no longer disables the selected tree, while shared leaves near another trunk are left intact during automatic cleanup.
+- Added one normal durability attempt for every automatically mined Treecapitator log and Veinminer ore. The real main-hand tool is damaged through `hurtAndBreak`, so Unbreaking and normal tool-break handling remain involved; automatically removed leaves remain durability-free.
+- Added server-authoritative **Crops Harvesting**. Right-clicking a mature supported crop gives its normal block loot and resets its growth property to the first planted stage instead of removing the crop.
+- Added broad crop compatibility for vanilla crop classes, `minecraft:crops`, `c:crops`, legacy `forge:crops`, conventional `age`/`growth`/`stage`/`maturity` properties and configurable custom/disabled block identifiers. Mature double-height age-based crops are reset without a second loot roll; berry bushes and melon/pumpkin stems keep their native behaviour.
+- Added progression permission `ssu.crops_harvesting.use`, enabled for the migrated default rank, plus wildcard `ssu.crops_harvesting.*`.
+- Added a global **Crop harvesting: ON/OFF** control to Admin Center → Admin Tools and the matching server config value `enableCropsHarvesting`.
+- Increased the network protocol from `25` to `26` because the dashboard snapshot now carries the global crop-harvesting state; client and server must both use 1.6.0-dev4.
+- Existing claims, regions, economy, mail, permissions, player preferences and utility-mining tracking remain compatible. Holograms migrate in place from schema 1 to schema 2.
+
+## 1.6.0-dev3
+
+- Reworked the Hologram Tool around direct right-click use. Right-clicking normally opens a fresh editor and stores a server-authoritative placement point exactly one block along the player's view direction.
+- Added in-world hologram selection: right-clicking visible floating text, links, scoreboard holograms or image placeholders with the Hologram Tool opens that existing definition for editing instead of creating a duplicate. The server rechecks the exact named main-hand tool and hologram-admin permission before opening local edits.
+- Expanded the hologram editor to preload every persisted setting, support ID changes, save existing definitions and provide a double-confirmed local **Delete hologram** action.
+- Added a dedicated **Holograms** page directly in the Admin Center, plus a shortcut from Admin Tools. The searchable, paged list supports remote **Edit**, safe **Teleport** and double-confirmed **Delete** actions for every stored hologram.
+- Remote hologram teleports reuse SSU's existing safe-destination resolver, load the target chunk and refuse the teleport when no collision-free two-block standing position can be found nearby.
+- Improved in-world selection width so long floating-text lines can be clicked across their visible text instead of only near their centre point.
+- Treecapitator now requires an item in the main hand that belongs to Minecraft's axe item tag. Veinminer likewise requires the main-hand item to belong to the pickaxe item tag.
+- Rechecks the required tool before resolving a preview, before starting a multi-block break chain and before every extra log, ore or natural-leaf break, so switching tools or breaking the final durability point stops the chain safely.
+- Incorporated the Minecraft 26.2 client-message API correction in both hologram and region editor result screens by using `LocalPlayer.sendSystemMessage(Component)`.
+- Removed the unintended `src/test` JUnit source set from the distributable source archive, keeping `gradlew.bat clean build` aligned with the project's dependency-free build configuration.
+- Increased the network protocol from `24` to `25`; client and server must both use 1.6.0-dev3.
+- Existing claims, regions, economy, mail, permissions, player preferences, utility-mining tracking and hologram schema-1 storage remain compatible.
+
+## 1.6.0-dev2
+
+- Fixed floating text being rendered twice by removing the second offset grey `TextGizmo`. Holograms now use one centered colour pass only.
+- Retired the misleading hologram shadow control for this renderer. Minecraft 26.2 `TextGizmo.Style` exposes colour, scale and alignment but no native single-pass shadow option; the stored compatibility field is normalized off.
+- Added an **Admin Tools** page to the permission-aware Admin Center. Each tool has a purpose tooltip and a server-validated **Get Tool** action.
+- Added the **Hologram Tool**. Left-clicking a block records a temporary face-relative placement point; right-clicking opens a custom editor for floating text, website links, image definitions and scoreboard holograms, including colour, scale, formatting, visibility range and type-specific settings.
+- Added the **Region Tool** to the same Admin Tools page. Two left-clicks select positions 1 and 2; right-click opens an initial region creation GUI with name, priority, protection flags and rental/reset settings.
+- Added server-authoritative hologram and region editor payloads. Submitted coordinates are never trusted: both editors use the server's current temporary anchor or region selection and recheck module state and permissions.
+- Treecapitator previews and outlines now contain logs only. Leaves are no longer included in the selected-block outline or the permission-limited mining chain.
+- Added `treecapitatorBreakNaturalLeaves`, enabled by default, plus `/ssu utilitymining tree break_leaves <true|false>`. When enabled, naturally connected leaves are removed instantly only after the complete detected trunk has been felled.
+- Added persistent tracking of player-placed logs and leaves below `simpleserverutilities/utility_mining/player_placed_tree_blocks.json`. Tracked blocks are excluded from Treecapitator origins, trunk discovery and natural-leaf cleanup.
+- Natural-tree validation now requires a supported vertical trunk and a non-persistent, non-decaying canopy near its top. Leaf ownership is bounded by the configured search range and rejects a canopy when another unselected trunk is at least as close.
+- Existing hand-built structures from before this version cannot be identified historically with certainty; structural, canopy and vanilla leaf-state checks reject ordinary builds, while all new player placements are tracked exactly.
+- Increased the network protocol from `23` to `24`; client and server must both use 1.6.0-dev2.
+- Existing claims, regions, economy, mail, permissions, player preferences and hologram storage remain compatible. The new player-placed-tree tracking file is isolated.
+
+## 1.6.0-dev1.1
+
+- Source compilation hotfix for Minecraft/NeoForge 26.2.
+- Corrected `net.minecraft.util.Util` import for clickable hologram links.
+- Removed the `CustomPacketPayload.type()`/record-component name collision by using `miningType`.
+- Added `UtilityMiningTarget.isEmpty()`.
+- Replaced unavailable 26.2 ore-tag constants with explicit vanilla ore families while retaining `c:ores` and custom-block support.
+- Made Treecapitator ordering comparators use explicitly typed `BlockPos` lambdas.
+- Network protocol remains `23`; payload wire format and stored data are unchanged.
+
+## 1.6.0-dev1
+
+- Added separate Core 2.0 modules for Utility Mining and persistent Holograms.
+- Added Treecapitator and Veinminer as server-authoritative multi-block mining systems. The server resolves every selected block, rechecks protection immediately before breaking and uses the normal player game mode so ordinary drops, tool use and other block-break hooks remain involved.
+- Added player-selectable Sneak or Keybind activation for both systems. Treecapitator defaults to Left Alt and Veinminer to V in Minecraft Controls; activation mode, personal enable state, outline colour and outline brightness are available in Player Settings and fallback `/ssu settings` commands.
+- Added a merged outer structure outline that removes internal shared block-grid edges and renders a configurable glow/core pass around the complete selected tree or ore vein.
+- Added global Treecapitator/Veinminer toggles, default block limits, Treecapitator leaf range, custom log/ore lists and explicit disabled-block lists. Vanilla and modded log-tagged blocks are included by default; vanilla ore tags and the common `c:ores` tag are supported.
+- Added `ssu.treecapitator.use`, `ssu.treecapitator.max_blocks`, `ssu.treecapitator.blocks`, exact `ssu.treecapitator.block.<namespace>.<path>` permissions, `ssu.veinminer.use`, `ssu.veinminer.max_blocks`, per-vanilla-ore permissions and exact `ssu.veinminer.block.<namespace>.<path>` permissions.
+- Default-rank migration enables Treecapitator and coal Veinminer, while iron, copper, gold, redstone, emerald, lapis and diamond remain explicitly locked for later rank, personal-permission or quest upgrades.
+- Added `/ssu utilitymining` administration for runtime status, module toggles, limits, leaf range and custom/disabled block-list maintenance. Administration requires `ssu.utility_mining.admin` unless run from the server console or by an operator.
+- Added persistent dimension-aware floating text, clickable website-link and scoreboard holograms stored below `simpleserverutilities/holograms/holograms.json`.
+- Added hologram colour, scale, bold, italic, underline, strikethrough, shadow, see-through, enabled state, view distance, move, edit, delete and refresh controls through `/ssu hologram`; administration requires `ssu.holograms.admin`.
+- Added TOP and SELF scoreboard holograms backed by ordinary Minecraft scoreboard objectives, with configurable maximum lines and refresh interval.
+- Added image-hologram definitions with validated internal resource identifiers, optional validated HTTP(S) sources, width/height metadata and safe persistence. Remote image sources remain disabled by default. The actual textured billboard renderer is intentionally not enabled in this first slice; image entries currently render a visible source placeholder until the dedicated 26.2 custom-geometry/texture pipeline is completed.
+- Added a 512-definition hologram safety limit and only synchronizes holograms for the player's current dimension.
+- Migrated player UI preferences from schema 2 to schema 3 without changing existing settings.
+- Increased the network protocol from `22` to `23`; client and server must both use 1.6.0-dev1.
+- Existing claim, region, home, warp, spawn, economy, rent, permission and mailbox storage remains compatible.
+
 ## 1.5.0-dev2.1
 
 - Rebuilt Mail Compose around a true `MultiLineEditBox`; the caret starts at the top-left, Enter inserts new lines, long messages scroll, and the full body area is writable.

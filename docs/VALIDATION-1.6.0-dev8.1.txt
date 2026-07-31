@@ -1,0 +1,18 @@
+SSU 1.6.0-dev8.1 validation
+============================
+
+Scope
+-----
+STP items 1-9: dashboard and Settings polish only.
+
+Static validation performed
+---------------------------
+- Source diff reviewed against the uploaded 1.6.0-dev8 baseline.
+- Java parser/syntax pass performed on the changed dashboard source.
+- Braces, conflict markers and trailing-whitespace checks performed.
+- Version, changelog and gameplay-test checklist updated to 1.6.0-dev8.1.
+- No network payload, protocol, configuration key or storage-schema changes introduced.
+
+Environment limitation
+----------------------
+A full Gradle/NeoForge build was not run in this workspace because the supplied project targets Java 25 and Gradle 9.2.1, while the execution environment only has Java 21 and cannot resolve external Gradle/toolchain downloads. The source must still be built and tested in Minecraft with Java 25.

@@ -6,6 +6,9 @@ import com.mojang.logging.LogUtils;
 
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaimManager;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimModule;
+import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimPresenceEvents;
+import be.winnetrie.mod.simpleserverutilities.blockinfo.BlockInformationEvents;
+import be.winnetrie.mod.simpleserverutilities.blockinfo.BlockInformationModule;
 import be.winnetrie.mod.simpleserverutilities.core.SsuCore;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobEvents;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler;
@@ -16,9 +19,15 @@ import be.winnetrie.mod.simpleserverutilities.core.storage.BatchedStorageService
 import be.winnetrie.mod.simpleserverutilities.core.storage.StorageModule;
 import be.winnetrie.mod.simpleserverutilities.core.transaction.SsuTransactionManager;
 import be.winnetrie.mod.simpleserverutilities.core.transaction.TransactionModule;
+import be.winnetrie.mod.simpleserverutilities.cropharvesting.CropsHarvestingEvents;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyManager;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyModule;
 import be.winnetrie.mod.simpleserverutilities.command.SSUCommands;
+import be.winnetrie.mod.simpleserverutilities.hologram.HologramEvents;
+import be.winnetrie.mod.simpleserverutilities.hologram.HologramManager;
+import be.winnetrie.mod.simpleserverutilities.hologram.HologramModule;
+import be.winnetrie.mod.simpleserverutilities.hologram.HologramToolManager;
+import be.winnetrie.mod.simpleserverutilities.hologram.HologramToolEvents;
 import be.winnetrie.mod.simpleserverutilities.home.PlayerHomeManager;
 import be.winnetrie.mod.simpleserverutilities.home.HomeModule;
 import be.winnetrie.mod.simpleserverutilities.menu.SsuMenuService;
@@ -26,6 +35,9 @@ import be.winnetrie.mod.simpleserverutilities.mail.MailEvents;
 import be.winnetrie.mod.simpleserverutilities.mail.MailManager;
 import be.winnetrie.mod.simpleserverutilities.mail.MailModule;
 import be.winnetrie.mod.simpleserverutilities.mail.ModMailMenus;
+import be.winnetrie.mod.simpleserverutilities.mapmarker.MapMarkerEvents;
+import be.winnetrie.mod.simpleserverutilities.mapmarker.MapMarkerManager;
+import be.winnetrie.mod.simpleserverutilities.mapmarker.MapMarkerModule;
 import be.winnetrie.mod.simpleserverutilities.menu.MenuModule;
 import be.winnetrie.mod.simpleserverutilities.network.ModNetworking;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionManager;
@@ -59,6 +71,9 @@ import be.winnetrie.mod.simpleserverutilities.settings.PlayerUiPreferencesManage
 import be.winnetrie.mod.simpleserverutilities.settings.UiPreferencesModule;
 import be.winnetrie.mod.simpleserverutilities.spawn.ServerSpawnManager;
 import be.winnetrie.mod.simpleserverutilities.spawn.SpawnModule;
+import be.winnetrie.mod.simpleserverutilities.statistics.PlayerStatisticsManager;
+import be.winnetrie.mod.simpleserverutilities.statistics.StatisticsEvents;
+import be.winnetrie.mod.simpleserverutilities.statistics.StatisticsModule;
 import be.winnetrie.mod.simpleserverutilities.teleport.TeleportEvents;
 import be.winnetrie.mod.simpleserverutilities.teleport.TeleportModule;
 import be.winnetrie.mod.simpleserverutilities.teleport.TeleportManager;
@@ -68,6 +83,10 @@ import be.winnetrie.mod.simpleserverutilities.visualization.BorderVisualizationS
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderVisualizationSettingsManager;
 import be.winnetrie.mod.simpleserverutilities.warp.WarpManager;
 import be.winnetrie.mod.simpleserverutilities.warp.WarpModule;
+import be.winnetrie.mod.simpleserverutilities.utilitymining.UtilityMiningEvents;
+import be.winnetrie.mod.simpleserverutilities.utilitymining.UtilityMiningManager;
+import be.winnetrie.mod.simpleserverutilities.utilitymining.UtilityMiningModule;
+import be.winnetrie.mod.simpleserverutilities.utilitymining.PlacedTreeBlockTracker;
 
 @Mod(SimpleServerUtilities.MODID)
 public class SimpleServerUtilities {
@@ -96,6 +115,12 @@ public class SimpleServerUtilities {
     public static final BorderVisualizationService BORDER_VISUALIZATIONS = new BorderVisualizationService();
     public static final SsuMenuService MENUS = new SsuMenuService();
     public static final PlayerUiPreferencesManager UI_PREFERENCES = new PlayerUiPreferencesManager();
+    public static final UtilityMiningManager UTILITY_MINING = new UtilityMiningManager();
+    public static final PlacedTreeBlockTracker TREE_PLACEMENTS = new PlacedTreeBlockTracker();
+    public static final HologramManager HOLOGRAMS = new HologramManager();
+    public static final HologramToolManager HOLOGRAM_TOOLS = new HologramToolManager();
+    public static final PlayerStatisticsManager STATISTICS = new PlayerStatisticsManager();
+    public static final MapMarkerManager MAP_MARKERS = new MapMarkerManager();
 
     public SimpleServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
         ModMailMenus.MENU_TYPES.register(modEventBus);
@@ -115,6 +140,11 @@ public class SimpleServerUtilities {
         CORE.modules().register(new SpawnModule(SERVER_SPAWN));
         CORE.modules().register(new VisualizationModule(BORDER_SETTINGS, BORDER_VISUALIZATIONS));
         CORE.modules().register(new MenuModule(MENUS));
+        CORE.modules().register(new UtilityMiningModule(UTILITY_MINING, TREE_PLACEMENTS));
+        CORE.modules().register(new HologramModule(HOLOGRAMS, HOLOGRAM_TOOLS));
+        CORE.modules().register(new StatisticsModule(STATISTICS));
+        CORE.modules().register(new MapMarkerModule(MAP_MARKERS));
+        CORE.modules().register(new BlockInformationModule());
         CORE.initialize();
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(ModNetworking::register);
@@ -122,6 +152,7 @@ public class SimpleServerUtilities {
         NeoForge.EVENT_BUS.register(this);
 
         NeoForge.EVENT_BUS.register(ClaimProtectionEvents.class);
+        NeoForge.EVENT_BUS.register(ClaimPresenceEvents.class);
         NeoForge.EVENT_BUS.register(PistonProtectionEvents.class);
         NeoForge.EVENT_BUS.register(RedstoneProtectionEvents.class);
         NeoForge.EVENT_BUS.register(ExplosionProtectionEvents.class);
@@ -135,6 +166,13 @@ public class SimpleServerUtilities {
         NeoForge.EVENT_BUS.register(RegionInteractionEvents.class);
         NeoForge.EVENT_BUS.register(PermissionPlayerEvents.class);
         NeoForge.EVENT_BUS.register(MailEvents.class);
+        NeoForge.EVENT_BUS.register(CropsHarvestingEvents.class);
+        NeoForge.EVENT_BUS.register(UtilityMiningEvents.class);
+        NeoForge.EVENT_BUS.register(HologramEvents.class);
+        NeoForge.EVENT_BUS.register(HologramToolEvents.class);
+        NeoForge.EVENT_BUS.register(StatisticsEvents.class);
+        NeoForge.EVENT_BUS.register(BlockInformationEvents.class);
+        NeoForge.EVENT_BUS.register(MapMarkerEvents.class);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
         modContainer.registerConfig(ModConfig.Type.CLIENT, Config.CLIENT_SPEC);

@@ -26,6 +26,11 @@ public interface SsuJob {
         return Set.of();
     }
 
+    /** Optional runtime module owner used for safe dynamic module shutdown. */
+    default String ownerModule() {
+        return "";
+    }
+
     default void cancel() {
     }
 }

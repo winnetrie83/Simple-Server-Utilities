@@ -50,6 +50,14 @@ public final class StoragePaths {
         return root.resolve("player_settings");
     }
 
+    public static Path mapMarkers(Path root) {
+        return root.resolve("map_markers");
+    }
+
+    public static Path mapMarkerPlayers(Path root) {
+        return mapMarkers(root).resolve("players");
+    }
+
     public static Path homes(Path root) {
         return root.resolve("homes");
     }
@@ -82,6 +90,18 @@ public final class StoragePaths {
         return economy(root).resolve("transactions");
     }
 
+
+    public static Path holograms(Path root) {
+        return root.resolve("holograms");
+    }
+
+    public static Path statistics(Path root) {
+        return root.resolve("statistics");
+    }
+
+    public static Path utilityMining(Path root) {
+        return root.resolve("utility_mining");
+    }
 
     public static Path mail(Path root) {
         return root.resolve("mail");

@@ -54,6 +54,7 @@ public final class MinimapService {
                 preferences.isMinimapNorthUp(),
                 preferences.isMinimapShowClaims(),
                 preferences.isMinimapShowRegions(),
+                preferences.getMapLiveUpdateRadiusChunks(),
                 dimension,
                 centerChunkX,
                 centerChunkZ,

@@ -1,0 +1,20 @@
+SSU 1.6.0-dev12.9 validation report
+
+Base: SSU 1.6.0-dev12.8
+Mod version: 1.6.0-dev12.9
+Network protocol: 35 (unchanged)
+Persistent schemas: unchanged
+
+Focused source changes:
+- WorldMapScreen left toolbar-panel fill moved from [shellLeft, mapLeft - 6] to [shellLeft + 3, mapLeft - 3].
+- ClaimMapScreen left toolbar-panel fill moved from [shellLeft, mapLeft - 6] to [shellLeft + 3, mapLeft - 3].
+- Existing toolbar buttons remain at shellLeft + 6, yielding equal three-pixel inner padding.
+- Outer shell and map/control panel geometry remain unchanged.
+
+Validation performed:
+- Java lexical/delimiter scan over all source files.
+- JSON parse validation over all JSON resources.
+- Focused source assertions for version and matching World Map/Claim Map toolbar geometry.
+- Diff review confirmed no networking, storage, marker-data, map-cache or interaction changes.
+
+Full Gradle/NeoForge build was not run in this container because the project requires Java 25 and Gradle 9.2.1 is not locally cached. Build locally with `gradlew.bat clean build`.

@@ -1,0 +1,50 @@
+SSU 1.6.0-dev10.2 validation report
+====================================
+
+Baseline
+--------
+- Parent source: SSU 1.6.0-dev10.1
+- Mod version: 1.6.0-dev10.2
+- Network protocol: 31 (unchanged)
+- Region record schema: 4 (was 3)
+- Border player-preference schema: 2 (unchanged)
+
+Root cause corrected
+--------------------
+- The Regions-page Show/Hide state was previously stored in the clicking player's
+  pinnedRegions preference.
+- The automatic REGION overview still contained every nearby server region.
+- Hiding a pin therefore only removed REGION_FOCUS and let the same region return
+  through REGION; it could not disable the border for other players.
+
+Validated changes
+-----------------
+- Region now owns a persistent borderVisible boolean, default false.
+- Region JSON reads a missing borderVisible as false and writes schemaVersion 4.
+- Region boundary redefinition copies borderVisible from the old record.
+- Regions-page row state is sourced from Region.isBorderVisible, not player pins.
+- Show/Disable and Disable all require administrator access in the dashboard.
+- The REGION overview filters out every region whose borderVisible is false.
+- REGION_FOCUS is no longer populated and is explicitly cleared during sync.
+- The player's Region borders master toggle and strict BORDER_REGIONS_VIEW gate
+  remain mandatory after the server-owned per-region switch.
+- Region visibility changes save once and force-refresh all online players.
+- /regions show, /regions hide <name> and /regions hide use the same server-owned
+  state and require region editing permission.
+
+Static validation
+-----------------
+- 266 Java source files passed lexical/string/comment and delimiter scanning.
+- Source assertions verified the new field, JSON migration, schema increment,
+  redefinition copy, overview filter and absence of sendPinnedRegions.
+- Region, RegionSettings and RegionRentData compiled successfully with minimal
+  dependency stubs under javac 21.
+- git diff --check passed.
+
+Build limitation
+----------------
+A full Gradle/NeoForge compile could not run in this container. The Gradle wrapper
+requires the uncached Gradle 9.2.1 distribution and external downloads are blocked;
+the installed JDK is Java 21 while SSU targets Java 25. Build locally with Java 25:
+
+    gradlew.bat clean build

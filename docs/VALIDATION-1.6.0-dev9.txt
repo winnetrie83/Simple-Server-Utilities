@@ -1,0 +1,29 @@
+SSU 1.6.0-dev9 validation record
+================================
+
+Baseline
+- Source: SSU 1.6.0-dev8.2.1
+- New version: 1.6.0-dev9
+- Network protocol: 31
+- Mailbox schema: 3 (unchanged)
+- Hologram schema: 4 (unchanged)
+- Player UI preference schema: 3 (unchanged)
+- Border visualization schema: 2 (unchanged)
+
+Completed static checks
+- All 266 Java source files passed a lexical string/comment and delimiter-balance scan.
+- The shared HologramRichTextDocument and new MailRichText classes compiled with javac 21 as dependency-free Java sources.
+- Rich-mail round-trip harness passed for colors, bold, underline, normalization, unsupported obfuscated formatting removal, the 1,024-visible-character limit, and worst-case formatting overhead within the 16,384-character encoded limit.
+- Minecraft 26.2 patched sources were checked for the GuiGraphicsExtractor text overloads, Font.split(FormattedText, int), and MultiLineEditBox value/character/line listener APIs used by dev9.
+- No obsolete editable base-text-color controls remain in HologramEditorScreen.
+- No global fastest-scoreboard scheduler fields remain; refresh state is now keyed by hologram ID.
+- No former 1,024-character mail body network codec remains.
+- Version and protocol declarations resolve to 1.6.0-dev9 / 31.
+
+Not performed in this environment
+- Full Gradle/NeoForge compilation was not performed. The available runtime is Java 21, while Minecraft 26.2 / this project requires Java 25 class-file support. Build locally with Java 25 using:
+
+  gradlew.bat clean build
+
+Minecraft validation
+- Follow docs/TESTING-1.6.0-dev9.md on a dedicated server with a separate client using the exact same dev9 JAR.

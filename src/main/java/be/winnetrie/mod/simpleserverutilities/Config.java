@@ -44,6 +44,78 @@ public class Config {
             .define("enableAdminRegions", true);
 
 
+    public static final ModConfigSpec.BooleanValue ENABLE_TREECAPITATOR = BUILDER
+            .comment("Enable the Treecapitator module globally.")
+            .define("enableTreecapitator", true);
+
+    public static final ModConfigSpec.IntValue TREECAPITATOR_LEAF_SEARCH_RANGE = BUILDER
+            .comment("Maximum Chebyshev distance from connected logs at which Treecapitator includes connected leaves.")
+            .defineInRange("treecapitatorLeafSearchRange", 3, 0, 16);
+
+    public static final ModConfigSpec.BooleanValue TREECAPITATOR_BREAK_NATURAL_LEAVES = BUILDER
+            .comment("Instantly remove only naturally-grown leaves belonging to a fully felled Treecapitator tree.")
+            .define("treecapitatorBreakNaturalLeaves", true);
+
+    public static final ModConfigSpec.IntValue TREECAPITATOR_DEFAULT_MAX_BLOCKS = BUILDER
+            .comment("Default Treecapitator block limit used by the permission core.")
+            .defineInRange("treecapitatorDefaultMaxBlocks", 64, 1, 2048);
+
+    public static final ModConfigSpec.ConfigValue<String> TREECAPITATOR_CUSTOM_LOG_BLOCKS = BUILDER
+            .comment("Comma-separated block identifiers additionally treated as logs.")
+            .define("treecapitatorCustomLogBlocks", "");
+
+    public static final ModConfigSpec.ConfigValue<String> TREECAPITATOR_DISABLED_LOG_BLOCKS = BUILDER
+            .comment("Comma-separated block identifiers excluded even when tagged as logs.")
+            .define("treecapitatorDisabledLogBlocks", "");
+
+    public static final ModConfigSpec.BooleanValue ENABLE_VEINMINER = BUILDER
+            .comment("Enable the Veinminer module globally.")
+            .define("enableVeinminer", true);
+
+    public static final ModConfigSpec.IntValue VEINMINER_DEFAULT_MAX_BLOCKS = BUILDER
+            .comment("Default Veinminer block limit used by the permission core.")
+            .defineInRange("veinminerDefaultMaxBlocks", 24, 1, 2048);
+
+    public static final ModConfigSpec.ConfigValue<String> VEINMINER_CUSTOM_ORE_BLOCKS = BUILDER
+            .comment("Comma-separated block identifiers additionally treated as ores.")
+            .define("veinminerCustomOreBlocks", "");
+
+    public static final ModConfigSpec.ConfigValue<String> VEINMINER_DISABLED_ORE_BLOCKS = BUILDER
+            .comment("Comma-separated block identifiers excluded even when tagged as ores.")
+            .define("veinminerDisabledOreBlocks", "");
+
+    public static final ModConfigSpec.BooleanValue ENABLE_CROPS_HARVESTING = BUILDER
+            .comment("Enable right-click harvesting and automatic replanting of mature crops globally.")
+            .define("enableCropsHarvesting", true);
+
+    public static final ModConfigSpec.ConfigValue<String> CROPS_HARVESTING_CUSTOM_BLOCKS = BUILDER
+            .comment("Comma-separated block identifiers additionally treated as age-based crops.")
+            .define("cropsHarvestingCustomBlocks", "");
+
+    public static final ModConfigSpec.ConfigValue<String> CROPS_HARVESTING_DISABLED_BLOCKS = BUILDER
+            .comment("Comma-separated crop block identifiers excluded from right-click harvesting.")
+            .define("cropsHarvestingDisabledBlocks", "");
+
+    public static final ModConfigSpec.BooleanValue ENABLE_HOLOGRAMS = BUILDER
+            .comment("Enable persistent floating text, clickable links, scoreboards and image hologram definitions.")
+            .define("enableHolograms", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_BLOCK_INFORMATION = BUILDER
+            .comment("Enable the server-controlled Jade-like block information overlay.")
+            .define("enableBlockInformation", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_CUSTOM_STATISTICS = BUILDER
+            .comment("Enable administrator-defined persistent player statistics and statistic holograms.")
+            .define("enableCustomStatistics", true);
+
+    public static final ModConfigSpec.IntValue HOLOGRAM_RENDER_DISTANCE = BUILDER
+            .comment("Global maximum hologram render/load distance in blocks. Individual holograms may use a shorter distance.")
+            .defineInRange("hologramRenderDistance", 64, 8, 512);
+
+    public static final ModConfigSpec.BooleanValue ALLOW_REMOTE_HOLOGRAM_IMAGES = BUILDER
+            .comment("Allow hologram image definitions to reference http/https images. Clients still validate and cache these sources independently.")
+            .define("allowRemoteHologramImages", true);
+
     public static final ModConfigSpec.BooleanValue ENABLE_MAIL = BUILDER
             .comment("Enable the durable player mail system.")
             .define("enableMail", true);

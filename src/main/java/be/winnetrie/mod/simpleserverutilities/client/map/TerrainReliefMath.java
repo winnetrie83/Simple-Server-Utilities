@@ -28,9 +28,9 @@ final class TerrainReliefMath {
         double gradientZ = ((southWest + 2.0D * south + southEast)
                 - (northWest + 2.0D * north + northEast)) / 8.0D;
 
-        double normalX = -gradientX * 0.50D;
+        double normalX = -gradientX * 0.62D;
         double normalY = 1.0D;
-        double normalZ = -gradientZ * 0.50D;
+        double normalZ = -gradientZ * 0.62D;
         double normalLength = Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
 
         double sunX = -0.58D;
@@ -43,7 +43,7 @@ final class TerrainReliefMath {
                 Math.max(Math.max(east, southWest), Math.max(south, southEast))
         );
         double occlusion = Math.min(8, Math.max(0, highestNeighbour - current)) * 0.008D;
-        return clamp(1.0D + (diffuse - sunY) * 0.70D - occlusion, 0.78D, 1.16D);
+        return clamp(1.0D + (diffuse - sunY) * 0.86D - occlusion, 0.74D, 1.20D);
     }
 
     /**
@@ -70,12 +70,12 @@ final class TerrainReliefMath {
         double secondaryDelta = clamp(current - secondaryReference, -8.0D, 8.0D);
 
         double primary = primaryDelta >= 0.0D
-                ? 1.0D + primaryDelta * 0.034D
-                : 1.0D + primaryDelta * 0.050D;
+                ? 1.0D + primaryDelta * 0.045D
+                : 1.0D + primaryDelta * 0.065D;
         double secondary = secondaryDelta >= 0.0D
-                ? 1.0D + secondaryDelta * 0.010D
-                : 1.0D + secondaryDelta * 0.014D;
-        return clamp(primary * secondary, 0.74D, 1.15D);
+                ? 1.0D + secondaryDelta * 0.012D
+                : 1.0D + secondaryDelta * 0.017D;
+        return clamp(primary * secondary, 0.68D, 1.20D);
     }
 
     /** Adds coherent hill and valley shading over a six-block diameter. */
@@ -85,7 +85,7 @@ final class TerrainReliefMath {
         double directional = (-gradientX * 0.62D) + (-gradientZ * 0.38D);
         int highest = Math.max(Math.max(west, east), Math.max(north, south));
         double valley = Math.min(16, Math.max(0, highest - current)) * 0.0045D;
-        return clamp(1.0D + directional * 0.105D - valley, 0.82D, 1.15D);
+        return clamp(1.0D + directional * 0.135D - valley, 0.78D, 1.18D);
     }
 
     /** Adds a low-frequency shade so complete hills and valleys remain legible. */
@@ -95,7 +95,7 @@ final class TerrainReliefMath {
         double directional = (-gradientX * 0.64D) + (-gradientZ * 0.36D);
         int highest = Math.max(Math.max(west, east), Math.max(north, south));
         double basin = Math.min(28, Math.max(0, highest - current)) * 0.0024D;
-        return clamp(1.0D + directional * 0.145D - basin, 0.84D, 1.14D);
+        return clamp(1.0D + directional * 0.170D - basin, 0.80D, 1.17D);
     }
 
     /**

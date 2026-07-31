@@ -10,6 +10,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimChunkStatus;
 import be.winnetrie.mod.simpleserverutilities.client.map.AerialMapAtlas;
+import be.winnetrie.mod.simpleserverutilities.client.map.MapLighting;
 import be.winnetrie.mod.simpleserverutilities.network.MinimapDataPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -345,6 +346,8 @@ final class MinimapTerrainMap implements AutoCloseable {
                 );
                 if (color == be.winnetrie.mod.simpleserverutilities.client.map.TerrainColorSampler.VOID_COLOR) {
                     color = checkerColor(pixelX + dx, pixelZ + dz);
+                } else {
+                    color = MapLighting.apply(level, worldX, worldZ, color);
                 }
                 color = applyClaimOverlay(color, worldX, worldZ);
                 color = applyRegionOverlay(color, worldX, worldZ);
@@ -399,6 +402,8 @@ final class MinimapTerrainMap implements AutoCloseable {
         result = 31 * result + payload.regionColor();
         result = 31 * result + payload.claims().hashCode();
         result = 31 * result + payload.regions().hashCode();
+        ClientLevel level = Minecraft.getInstance().level;
+        result = 31 * result + (level == null ? 0 : MapLighting.nightBucket(level));
         return result;
     }
 

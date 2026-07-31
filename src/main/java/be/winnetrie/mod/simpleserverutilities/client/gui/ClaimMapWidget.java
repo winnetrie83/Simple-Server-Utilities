@@ -36,7 +36,7 @@ final class ClaimMapWidget extends AbstractWidget {
     private final Runnable onSelectionChanged;
     private final Map<Long, ClaimMapDataPayload.Entry> entries = new HashMap<>();
 
-    private boolean rightDragging;
+    private boolean middleDragging;
     private double dragStartX;
     private double dragStartY;
     private double dragCurrentX;
@@ -365,7 +365,7 @@ final class ClaimMapWidget extends AbstractWidget {
             return true;
         }
 
-        return button == 1 && beginRightDrag(event.x(), event.y());
+        return button == 2 && beginMiddleDrag(event.x(), event.y());
     }
 
     @Override
@@ -374,27 +374,27 @@ final class ClaimMapWidget extends AbstractWidget {
             double deltaX,
             double deltaY
     ) {
-        return updateRightDrag(event.x(), event.y());
+        return event.buttonInfo().button() == 2 && updateMiddleDrag(event.x(), event.y());
     }
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
-        return finishRightDrag();
+        return event.buttonInfo().button() == 2 && finishMiddleDrag();
     }
 
-    boolean beginRightDrag(double mouseX, double mouseY) {
+    boolean beginMiddleDrag(double mouseX, double mouseY) {
         if (!isMouseOver(mouseX, mouseY)) {
             return false;
         }
         setFocused(true);
-        rightDragging = true;
+        middleDragging = true;
         dragStartX = dragCurrentX = mouseX;
         dragStartY = dragCurrentY = mouseY;
         return true;
     }
 
-    boolean updateRightDrag(double mouseX, double mouseY) {
-        if (!rightDragging) {
+    boolean updateMiddleDrag(double mouseX, double mouseY) {
+        if (!middleDragging) {
             return false;
         }
         dragCurrentX = mouseX;
@@ -402,14 +402,14 @@ final class ClaimMapWidget extends AbstractWidget {
         return true;
     }
 
-    boolean finishRightDrag() {
-        if (!rightDragging) {
+    boolean finishMiddleDrag() {
+        if (!middleDragging) {
             return false;
         }
 
         int previewX = dragOffsetX();
         int previewY = dragOffsetY();
-        rightDragging = false;
+        middleDragging = false;
 
         int size = Math.max(1, cellSize());
         int chunkDeltaX = MapPanMath.chunkDelta(previewX, size);
@@ -421,8 +421,8 @@ final class ClaimMapWidget extends AbstractWidget {
         return true;
     }
 
-    boolean isRightDragging() {
-        return rightDragging;
+    boolean isMiddleDragging() {
+        return middleDragging;
     }
 
     @Override
@@ -441,11 +441,11 @@ final class ClaimMapWidget extends AbstractWidget {
     }
 
     private int dragOffsetX() {
-        return rightDragging ? (int) Math.round(dragCurrentX - dragStartX) : 0;
+        return middleDragging ? (int) Math.round(dragCurrentX - dragStartX) : 0;
     }
 
     private int dragOffsetY() {
-        return rightDragging ? (int) Math.round(dragCurrentY - dragStartY) : 0;
+        return middleDragging ? (int) Math.round(dragCurrentY - dragStartY) : 0;
     }
 
     private boolean isSelectable(ClaimMapDataPayload.Entry entry) {

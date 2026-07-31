@@ -50,6 +50,14 @@ public final class PermissionCatalog {
         if (known != null) {
             return known;
         }
+        if (normalized.startsWith("ssu.treecapitator.block.")) {
+            return new Definition(normalized, ValueType.BOOLEAN,
+                    "Allows or denies this exact log block for Treecapitator.", 0, 1);
+        }
+        if (normalized.startsWith("ssu.veinminer.block.")) {
+            return new Definition(normalized, ValueType.BOOLEAN,
+                    "Allows or denies this exact custom or modded ore block for Veinminer.", 0, 1);
+        }
         return new Definition(normalized, ValueType.TEXT,
                 "Custom permission value registered outside the built-in SSU catalogue.",
                 Integer.MIN_VALUE, Integer.MAX_VALUE);
@@ -127,7 +135,7 @@ public final class PermissionCatalog {
         bool(values, PermissionKeys.CLAIMS_FLAGS, "Allows changing protection flags on owned claims.");
         bool(values, PermissionKeys.CLAIMS_MAP, "Allows opening and using the interactive claim map.");
         bool(values, PermissionKeys.CLAIMS_VISUALIZE, "Allows temporary in-world visualization of claim borders.");
-        bool(values, PermissionKeys.CLAIMS_TELEPORT, "Allows teleporting to an owned claim spawn.");
+        bool(values, PermissionKeys.CLAIMS_TELEPORT, "Allows teleporting to an owned claim.");
         integer(values, PermissionKeys.CLAIMS_TELEPORT_DELAY, "Delay in seconds before a claim teleport starts.", 0, 86_400);
         integer(values, PermissionKeys.CLAIMS_TELEPORT_COOLDOWN, "Cooldown in seconds after using a claim teleport.", 0, 86_400);
         bool(values, PermissionKeys.CLAIMS_ADMIN_BYPASS, "Bypasses normal player-claim protection checks.");
@@ -206,6 +214,31 @@ public final class PermissionCatalog {
         integer(values, PermissionKeys.MAIL_SEND_COOLDOWN, "Minimum seconds between outgoing player mails.", 0, 86_400);
         bool(values, PermissionKeys.MAIL_ADMIN, "Grants future mail administration capabilities.");
 
+        bool(values, PermissionKeys.HOLOGRAMS_ADMIN, "Allows creating, editing, moving, deleting and refreshing persistent holograms.");
+        bool(values, PermissionKeys.BLOCK_INFORMATION_USE, "Allows using the personal block information overlay while the server module is enabled.");
+        bool(values, PermissionKeys.BLOCK_INFORMATION_DEBUG, "Allows enabling technical Block Information debug details such as IDs, hardness, state and required tool.");
+        bool(values, PermissionKeys.BLOCK_INFORMATION_INVENTORY, "Allows Block Information to show server-authoritative container, display and equipment contents when normal interaction protection also allows access.");
+        bool(values, PermissionKeys.BLOCK_INFORMATION_INVENTORY_FULL, "Shows every available non-empty preview stack up to SSU's hard cap, overriding the numeric inventory preview limit.");
+        integer(values, PermissionKeys.BLOCK_INFORMATION_INVENTORY_MAX_ITEMS, "Maximum number of item stacks shown by Block Information; defaults to one and is hard-capped at 54.", 0, 54);
+        bool(values, PermissionKeys.STATISTICS_ADMIN, "Allows creating, editing, pausing, resetting and deleting custom player statistics.");
+
+        bool(values, PermissionKeys.CROPS_HARVESTING_USE, "Allows right-click harvesting and automatic replanting while the global Crops Harvesting feature is enabled.");
+
+        bool(values, PermissionKeys.UTILITY_MINING_ADMIN, "Allows changing global Treecapitator and Veinminer server settings.");
+        bool(values, PermissionKeys.TREECAPITATOR_USE, "Allows the player to use Treecapitator when the global module and personal setting are enabled.");
+        integer(values, PermissionKeys.TREECAPITATOR_MAX_BLOCKS, "Maximum logs and connected leaves affected by one Treecapitator action.", 0, 2048);
+        bool(values, PermissionKeys.TREECAPITATOR_BLOCKS, "Broad allow/deny gate for Treecapitator blocks; exact block permissions can further restrict individual logs.");
+        bool(values, PermissionKeys.VEINMINER_USE, "Allows the player to use Veinminer when the global module and personal setting are enabled.");
+        integer(values, PermissionKeys.VEINMINER_MAX_BLOCKS, "Maximum ore blocks affected by one Veinminer action.", 0, 2048);
+        bool(values, PermissionKeys.VEINMINER_ORE_COAL, "Allows Veinminer for coal ores, including deepslate coal ore.");
+        bool(values, PermissionKeys.VEINMINER_ORE_IRON, "Allows Veinminer for iron ores.");
+        bool(values, PermissionKeys.VEINMINER_ORE_COPPER, "Allows Veinminer for copper ores.");
+        bool(values, PermissionKeys.VEINMINER_ORE_GOLD, "Allows Veinminer for gold ores.");
+        bool(values, PermissionKeys.VEINMINER_ORE_REDSTONE, "Allows Veinminer for redstone ores.");
+        bool(values, PermissionKeys.VEINMINER_ORE_EMERALD, "Allows Veinminer for emerald ores.");
+        bool(values, PermissionKeys.VEINMINER_ORE_LAPIS, "Allows Veinminer for lapis ores.");
+        bool(values, PermissionKeys.VEINMINER_ORE_DIAMOND, "Allows Veinminer for diamond ores.");
+
         bool(values, PermissionKeys.PERMISSIONS_ADMIN, "Allows editing rank, player and dimension permission overrides.");
 
         bool(values, "ssu.*", "Wildcard that grants or denies every SSU permission.");
@@ -218,10 +251,19 @@ public final class PermissionCatalog {
         bool(values, "ssu.visualization.*", "Wildcard for all visualization permissions.");
         bool(values, "ssu.core.*", "Wildcard for all Core administration permissions.");
         bool(values, "ssu.settings.*", "Wildcard for all personal settings permissions.");
+        bool(values, "ssu.crops_harvesting.*", "Wildcard for all Crops Harvesting permissions.");
         bool(values, "ssu.admin.*", "Wildcard for all dashboard administration permissions.");
         bool(values, "ssu.minimap.*", "Wildcard for all minimap permissions.");
         bool(values, "ssu.economy.*", "Wildcard for all economy permissions.");
         bool(values, "ssu.teleport.*", "Wildcard for all teleport-policy permissions.");
+        bool(values, "ssu.holograms.*", "Wildcard for all floating text, link, scoreboard and image hologram administration permissions.");
+        bool(values, "ssu.block_information.*", "Wildcard for block information access.");
+        bool(values, "ssu.statistics.*", "Wildcard for custom statistic administration.");
+        bool(values, "ssu.treecapitator.*", "Wildcard for Treecapitator use, limits and block access.");
+        bool(values, "ssu.treecapitator.block.*", "Wildcard for all exact Treecapitator block permissions.");
+        bool(values, "ssu.veinminer.*", "Wildcard for Veinminer use, limits and ore access.");
+        bool(values, "ssu.veinminer.ore.*", "Wildcard for all grouped ore permissions.");
+        bool(values, "ssu.veinminer.block.*", "Wildcard for exact custom and modded ore block permissions.");
         bool(values, "*", "Global wildcard that grants or denies every permission resolved by SSU.");
 
         return Map.copyOf(values);

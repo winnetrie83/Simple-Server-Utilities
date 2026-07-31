@@ -39,7 +39,7 @@ public final class MailMessage {
     public String getSubject() { return subject == null ? "" : subject; }
     public void setSubject(String subject) { this.subject = clean(subject, "", 96); }
     public String getBody() { return body == null ? "" : body; }
-    public void setBody(String body) { this.body = clean(body, "", 1024); }
+    public void setBody(String body) { this.body = MailRichText.normalize(body); }
     public MailSource getSource() { return source == null ? MailSource.SYSTEM : source; }
     public void setSource(MailSource source) { this.source = source == null ? MailSource.SYSTEM : source; }
     public MailState getState() { return state == null ? MailState.QUEUED : state; }
@@ -87,7 +87,7 @@ public final class MailMessage {
         senderName = clean(senderName, "Server", 64);
         recipientName = clean(recipientName, "", 64);
         subject = clean(subject, "", 96);
-        body = clean(body, "", 1024);
+        body = MailRichText.normalize(body);
         source = source == null ? MailSource.SYSTEM : source;
         state = state == null ? MailState.QUEUED : state;
         createdAtEpochMilli = Math.max(0L, createdAtEpochMilli);

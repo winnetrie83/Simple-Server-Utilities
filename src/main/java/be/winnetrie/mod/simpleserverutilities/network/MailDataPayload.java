@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.mail.MailRichText;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -90,7 +91,7 @@ public record MailDataPayload(
     }
 
     private static void writeEntry(RegistryFriendlyByteBuf b, Entry e) {
-        b.writeUtf(e.id, 64); b.writeUtf(e.otherParty, 64); b.writeUtf(e.subject, 96); b.writeUtf(e.body, 1024);
+        b.writeUtf(e.id, 64); b.writeUtf(e.otherParty, 64); b.writeUtf(e.subject, 96); b.writeUtf(e.body, MailRichText.MAX_STORED_CHARACTERS);
         b.writeUtf(e.source, 24); b.writeVarLong(e.createdAt); b.writeVarLong(e.visibleSince); b.writeBoolean(e.read);
         b.writeVarInt(e.itemStackCount); b.writeVarInt(e.unclaimedItemCount); b.writeUtf(e.itemSummary, 512);
         b.writeVarLong(e.moneyMinor); b.writeUtf(e.formattedMoney, 128); b.writeBoolean(e.moneyUnclaimed);
@@ -98,7 +99,7 @@ public record MailDataPayload(
     }
 
     private static Entry readEntry(RegistryFriendlyByteBuf b) {
-        return new Entry(b.readUtf(64), b.readUtf(64), b.readUtf(96), b.readUtf(1024), b.readUtf(24),
+        return new Entry(b.readUtf(64), b.readUtf(64), b.readUtf(96), b.readUtf(MailRichText.MAX_STORED_CHARACTERS), b.readUtf(24),
                 b.readVarLong(), b.readVarLong(), b.readBoolean(), b.readVarInt(), b.readVarInt(), b.readUtf(512),
                 b.readVarLong(), b.readUtf(128), b.readBoolean(), b.readVarLong(), b.readVarLong(), b.readVarLong());
     }
@@ -131,7 +132,7 @@ public record MailDataPayload(
     ) {
         public Entry {
             id = bound(id, 64); otherParty = bound(otherParty, 64); subject = bound(subject, 96);
-            body = bound(body, 1024); source = bound(source, 24); createdAt = Math.max(0L, createdAt);
+            body = MailRichText.normalize(body); source = bound(source, 24); createdAt = Math.max(0L, createdAt);
             visibleSince = Math.max(0L, visibleSince); itemStackCount = Math.max(0, Math.min(9, itemStackCount));
             unclaimedItemCount = Math.max(0, Math.min(itemStackCount, unclaimedItemCount));
             itemSummary = bound(itemSummary, 512); moneyMinor = Math.max(0L, moneyMinor);

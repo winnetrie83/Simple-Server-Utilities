@@ -148,6 +148,19 @@ public class RegionManager {
         }
     }
 
+    public void clear() {
+        regions.clear();
+        regionRecordStore.reset();
+        settingsRecordStore.reset();
+        spatialIndex.clear();
+        rentingEnabled = true;
+        rootFolder = null;
+        regionsFolder = null;
+        regionEntriesFolder = null;
+        legacySaveFile = null;
+        veryOldLegacySaveFile = null;
+    }
+
     public RegionOperationResult create(String name, ResourceKey<Level> dimension, BlockPos point1, BlockPos point2) {
         String key = normalizeName(name);
 
@@ -232,6 +245,30 @@ public class RegionManager {
         return regions.containsKey(normalizeName(name));
     }
 
+    public boolean setBorderVisible(String name, boolean visible) {
+        Region region = get(name);
+        if (region == null || region.isBorderVisible() == visible) {
+            return false;
+        }
+        region.setBorderVisible(visible);
+        save();
+        return true;
+    }
+
+    public int setAllBordersVisible(boolean visible) {
+        int changed = 0;
+        for (Region region : regions.values()) {
+            if (region.isBorderVisible() != visible) {
+                region.setBorderVisible(visible);
+                changed++;
+            }
+        }
+        if (changed > 0) {
+            save();
+        }
+        return changed;
+    }
+
     public boolean overlaps2D(ResourceKey<Level> dimension, int minX, int minZ, int maxX, int maxZ) {
         RegionSpatialIndex.CandidateResult candidates = spatialIndex.query2D(dimension, minX, minZ, maxX, maxZ);
         SimpleServerUtilities.PERFORMANCE.recordRegionLookup(candidates.regions().size(), candidates.fallback());
@@ -299,6 +336,7 @@ public class RegionManager {
 
         Region newRegion = new Region(oldRegion.getName(), dimension, point1, point2);
         newRegion.setPriority(oldRegion.getPriority());
+        newRegion.setBorderVisible(oldRegion.isBorderVisible());
 
         newRegion.getManagers().addAll(oldRegion.getManagers());
         newRegion.getMembers().addAll(oldRegion.getMembers());
@@ -446,6 +484,7 @@ public class RegionManager {
             region.getSettings().setAllowFireSpread(getBoolean(settings, "allowFireSpread", false));
         }
 
+        region.setBorderVisible(getBoolean(json, "borderVisible", false));
         region.setWelcomeMessage(getString(json, "welcomeMessage", ""));
         region.setLeaveMessage(getString(json, "leaveMessage", ""));
 
@@ -500,10 +539,11 @@ public class RegionManager {
     private JsonObject regionToJson(Region region) {
         JsonObject json = new JsonObject();
 
-        json.addProperty("schemaVersion", 3);
+        json.addProperty("schemaVersion", 4);
         json.addProperty("name", region.getName());
         json.addProperty("dimension", region.getDimension().identifier().toString());
         json.addProperty("priority", region.getPriority());
+        json.addProperty("borderVisible", region.isBorderVisible());
 
         json.addProperty("minX", region.getMinX());
         json.addProperty("minY", region.getMinY());

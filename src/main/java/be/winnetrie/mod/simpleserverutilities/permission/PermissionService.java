@@ -39,6 +39,39 @@ public class PermissionService {
         return getBoolean(player, permission, fallback, PermissionContext.global(player));
     }
 
+    /**
+     * Resolves a server-controlled boolean without the normal operator bypass.
+     * Use this for capability gates where an explicit server deny must also
+     * apply while testing as an operator.
+     */
+    public static boolean getBooleanWithoutOperatorBypass(
+            ServerPlayer player,
+            String permission,
+            boolean fallback
+    ) {
+        return getBooleanWithoutOperatorBypass(player, permission, fallback, PermissionContext.global(player));
+    }
+
+    public static boolean getBooleanWithoutOperatorBypass(
+            ServerPlayer player,
+            String permission,
+            boolean fallback,
+            PermissionContext context
+    ) {
+        if (!Config.ENABLE_PERMISSION_SYSTEM.get()) {
+            return fallback;
+        }
+
+        String resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, context);
+        if (resolvedValue != null) {
+            Boolean value = parseBoolean(resolvedValue);
+            if (value != null) {
+                return value;
+            }
+        }
+        return fallback;
+    }
+
     public static boolean getBoolean(ServerPlayer player, String permission, boolean fallback, PermissionContext context) {
         if (!Config.ENABLE_PERMISSION_SYSTEM.get()) {
             return fallback;
@@ -144,7 +177,12 @@ public class PermissionService {
                     PermissionKeys.MAIL_ACCESS,
                     PermissionKeys.MAIL_SEND,
                     PermissionKeys.MAIL_SEND_ITEMS,
-                    PermissionKeys.MAIL_SEND_MONEY -> true;
+                    PermissionKeys.MAIL_SEND_MONEY,
+                    PermissionKeys.CROPS_HARVESTING_USE,
+                    PermissionKeys.TREECAPITATOR_USE,
+                    PermissionKeys.TREECAPITATOR_BLOCKS,
+                    PermissionKeys.VEINMINER_USE,
+                    PermissionKeys.VEINMINER_ORE_COAL -> true;
             default -> false;
         };
     }

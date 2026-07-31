@@ -2,6 +2,8 @@ package be.winnetrie.mod.simpleserverutilities.warp;
 
 import java.util.Set;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
+
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModule;
 import be.winnetrie.mod.simpleserverutilities.core.service.SsuServiceRegistry;
 import net.minecraft.server.MinecraftServer;
@@ -18,6 +20,11 @@ public final class WarpModule implements SsuModule {
     @Override
     public String id() {
         return "warps";
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return Config.ENABLE_WARPS.get();
     }
 
     @Override
@@ -38,5 +45,6 @@ public final class WarpModule implements SsuModule {
     @Override
     public void onServerStopping(MinecraftServer server) {
         manager.save();
+        manager.clear();
     }
 }

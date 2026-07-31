@@ -1,0 +1,34 @@
+SSU 1.6.0-dev11.4 validation report
+===================================
+
+Baseline
+--------
+- Parent source: SSU 1.6.0-dev11.3
+- Mod version: 1.6.0-dev11.4
+- Minecraft: 26.2
+- NeoForge: 26.2.0.7-beta
+- Java target: 25
+- Network protocol: 34 (unchanged)
+- All persistent schemas unchanged.
+
+Implemented Block Information semantics correction
+--------------------------------------------------
+- The vertical indicator no longer evaluates optional mining efficiency.
+- Harvestability is green when the block is breakable and either does not require a correct tool for drops or Player.hasCorrectToolForDrops returns true.
+- Harvestability is red when the block is unbreakable or a correct tool is required but the held item is insufficient.
+- The independent tool icon still shows the minimum hard requirement or the lowest-tier icon for an optional recommended tool category.
+- Dirt/grass with an empty hand therefore shows a shovel icon with a green bar; obsidian with an insufficient tool shows a diamond-pickaxe icon with a red bar.
+- Debug Required/Recommended output is unchanged.
+
+Validation
+----------
+- Focused source assertions verify harvestability-only indicator logic and unchanged tool-hint selection.
+- Java lexical string/comment and balanced-delimiter scan passed for all Java source files.
+- BlockInformationClientState compiled with javac 21 against the major-version-downgraded Minecraft 26.2 patched jar and minimal SSU payload/mod stubs.
+- diff --check reported no whitespace errors.
+
+Build limitation
+----------------
+A complete Gradle/NeoForge build could not run in this container because the Gradle 9.2.1 distribution is not cached, external downloads are unavailable and the installed runtime is Java 21 while SSU targets Java 25. Build locally with:
+
+    gradlew.bat clean build

@@ -15,5 +15,18 @@
   "key.category.simpleserverutilities.general": "Simple Server Utilities",
   "key.simpleserverutilities.open_menu": "Open SSU menu",
   "screen.simpleserverutilities.dashboard": "Simple Server Utilities",
-  "key.simpleserverutilities.open_world_map": "Open SSU world map"
+  "key.simpleserverutilities.open_world_map": "Open SSU world map",
+  "simpleserverutilities.configuration.enableTreecapitator": "Enable Treecapitator",
+  "simpleserverutilities.configuration.treecapitatorLeafSearchRange": "Treecapitator Leaf Search Range",
+  "simpleserverutilities.configuration.treecapitatorDefaultMaxBlocks": "Default Treecapitator Block Limit",
+  "simpleserverutilities.configuration.treecapitatorCustomLogBlocks": "Additional Treecapitator Logs",
+  "simpleserverutilities.configuration.treecapitatorDisabledLogBlocks": "Excluded Treecapitator Logs",
+  "simpleserverutilities.configuration.enableVeinminer": "Enable Veinminer",
+  "simpleserverutilities.configuration.veinminerDefaultMaxBlocks": "Default Veinminer Block Limit",
+  "simpleserverutilities.configuration.veinminerCustomOreBlocks": "Additional Veinminer Ores",
+  "simpleserverutilities.configuration.veinminerDisabledOreBlocks": "Excluded Veinminer Ores",
+  "simpleserverutilities.configuration.enableHolograms": "Enable Holograms",
+  "simpleserverutilities.configuration.allowRemoteHologramImages": "Allow Remote Hologram Images",
+  "key.simpleserverutilities.activate_treecapitator": "Activate Treecapitator",
+  "key.simpleserverutilities.activate_veinminer": "Activate Veinminer"
 }

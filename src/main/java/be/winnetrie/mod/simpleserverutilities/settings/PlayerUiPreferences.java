@@ -2,10 +2,12 @@ package be.winnetrie.mod.simpleserverutilities.settings;
 
 import java.util.UUID;
 
+import be.winnetrie.mod.simpleserverutilities.utilitymining.MiningActivationMode;
+
 /** Persistent player-side UI choices, validated by the server. */
 public final class PlayerUiPreferences {
 
-    public static final int CURRENT_SCHEMA = 2;
+    public static final int CURRENT_SCHEMA = 7;
 
     private int schema = CURRENT_SCHEMA;
     private String uuid = "";
@@ -20,9 +22,25 @@ public final class PlayerUiPreferences {
     private boolean minimapShowRegions = true;
     private boolean worldMapShowClaims = true;
     private boolean worldMapShowRegions = true;
+    private boolean worldMapShowMarkers = true;
+    private boolean minimapShowMarkers = true;
+    private boolean worldMarkersVisible = true;
+    private boolean markerBeamsVisible = true;
+    private int markerBeamDistance = 128;
+    private int mapLiveUpdateRadiusChunks = 8;
+    private boolean blockInformationEnabled = true;
+    private boolean blockInformationDebugEnabled;
     private boolean mailAutoDeletePlayerAttachments;
     private boolean mailAutoDeleteSystemAttachments;
     private boolean mailAutoDeleteAuctionAttachments;
+    private boolean treecapitatorEnabled;
+    private MiningActivationMode treecapitatorActivation = MiningActivationMode.SNEAK;
+    private int treecapitatorOutlineColor = 0xFF55FF77;
+    private int treecapitatorOutlineBrightness = 85;
+    private boolean veinminerEnabled;
+    private MiningActivationMode veinminerActivation = MiningActivationMode.SNEAK;
+    private int veinminerOutlineColor = 0xFF55AAFF;
+    private int veinminerOutlineBrightness = 85;
 
     public PlayerUiPreferences() {
         // Required for Gson.
@@ -40,6 +58,31 @@ public final class PlayerUiPreferences {
             worldMapShowClaims = true;
             worldMapShowRegions = true;
         }
+        if (previousSchema < 3) {
+            // New mining helpers are opt-in for existing players.
+            treecapitatorEnabled = false;
+            veinminerEnabled = false;
+        }
+        if (previousSchema < 4) {
+            // Block information is enabled personally by default, while the server remains the hard gate.
+            blockInformationEnabled = true;
+        }
+        if (previousSchema < 5) {
+            // Technical block/entity details are opt-in and permission-gated.
+            blockInformationDebugEnabled = false;
+        }
+        if (previousSchema < 6) {
+            // Personal map markers are visible by default with a conservative beam range.
+            worldMapShowMarkers = true;
+            minimapShowMarkers = true;
+            worldMarkersVisible = true;
+            markerBeamsVisible = true;
+            markerBeamDistance = 128;
+        }
+        if (previousSchema < 7) {
+            // Keep live terrain refresh local and conservative by default.
+            mapLiveUpdateRadiusChunks = 8;
+        }
         schema = CURRENT_SCHEMA;
         minimapSize = Math.max(64, Math.min(256, minimapSize));
         if (minimapShape == null) {
@@ -48,6 +91,18 @@ public final class PlayerUiPreferences {
         if (minimapPosition == null) {
             minimapPosition = MinimapPosition.TOP_RIGHT;
         }
+        if (treecapitatorActivation == null) {
+            treecapitatorActivation = MiningActivationMode.SNEAK;
+        }
+        if (veinminerActivation == null) {
+            veinminerActivation = MiningActivationMode.SNEAK;
+        }
+        treecapitatorOutlineBrightness = clampPercent(treecapitatorOutlineBrightness);
+        veinminerOutlineBrightness = clampPercent(veinminerOutlineBrightness);
+        markerBeamDistance = Math.max(16, Math.min(512, markerBeamDistance));
+        mapLiveUpdateRadiusChunks = Math.max(1, Math.min(32, mapLiveUpdateRadiusChunks));
+        treecapitatorOutlineColor |= 0xFF000000;
+        veinminerOutlineColor |= 0xFF000000;
     }
 
     public String getUuid() {
@@ -145,6 +200,70 @@ public final class PlayerUiPreferences {
         this.worldMapShowRegions = worldMapShowRegions;
     }
 
+    public boolean isWorldMapShowMarkers() {
+        return worldMapShowMarkers;
+    }
+
+    public void setWorldMapShowMarkers(boolean value) {
+        worldMapShowMarkers = value;
+    }
+
+    public boolean isMinimapShowMarkers() {
+        return minimapShowMarkers;
+    }
+
+    public void setMinimapShowMarkers(boolean value) {
+        minimapShowMarkers = value;
+    }
+
+    public boolean isWorldMarkersVisible() {
+        return worldMarkersVisible;
+    }
+
+    public void setWorldMarkersVisible(boolean value) {
+        worldMarkersVisible = value;
+    }
+
+    public boolean isMarkerBeamsVisible() {
+        return markerBeamsVisible;
+    }
+
+    public void setMarkerBeamsVisible(boolean value) {
+        markerBeamsVisible = value;
+    }
+
+    public int getMarkerBeamDistance() {
+        return Math.max(16, Math.min(512, markerBeamDistance));
+    }
+
+    public void setMarkerBeamDistance(int value) {
+        markerBeamDistance = Math.max(16, Math.min(512, value));
+    }
+
+    public int getMapLiveUpdateRadiusChunks() {
+        return Math.max(1, Math.min(32, mapLiveUpdateRadiusChunks));
+    }
+
+    public void setMapLiveUpdateRadiusChunks(int value) {
+        mapLiveUpdateRadiusChunks = Math.max(1, Math.min(32, value));
+    }
+
+    public boolean isBlockInformationEnabled() {
+        return blockInformationEnabled;
+    }
+
+    public void setBlockInformationEnabled(boolean blockInformationEnabled) {
+        this.blockInformationEnabled = blockInformationEnabled;
+    }
+
+    public boolean isBlockInformationDebugEnabled() {
+        return blockInformationDebugEnabled;
+    }
+
+    public void setBlockInformationDebugEnabled(boolean blockInformationDebugEnabled) {
+        this.blockInformationDebugEnabled = blockInformationDebugEnabled;
+    }
+
     public boolean isMailAutoDeletePlayerAttachments() {
         return mailAutoDeletePlayerAttachments;
     }
@@ -175,6 +294,74 @@ public final class PlayerUiPreferences {
             case AUCTION -> mailAutoDeleteAuctionAttachments;
             case SYSTEM, RECOVERY -> mailAutoDeleteSystemAttachments;
         };
+    }
+
+    public boolean isTreecapitatorEnabled() {
+        return treecapitatorEnabled;
+    }
+
+    public void setTreecapitatorEnabled(boolean value) {
+        treecapitatorEnabled = value;
+    }
+
+    public MiningActivationMode getTreecapitatorActivation() {
+        return treecapitatorActivation == null ? MiningActivationMode.SNEAK : treecapitatorActivation;
+    }
+
+    public void setTreecapitatorActivation(MiningActivationMode value) {
+        treecapitatorActivation = value == null ? MiningActivationMode.SNEAK : value;
+    }
+
+    public int getTreecapitatorOutlineColor() {
+        return treecapitatorOutlineColor | 0xFF000000;
+    }
+
+    public void setTreecapitatorOutlineColor(int value) {
+        treecapitatorOutlineColor = value | 0xFF000000;
+    }
+
+    public int getTreecapitatorOutlineBrightness() {
+        return clampPercent(treecapitatorOutlineBrightness);
+    }
+
+    public void setTreecapitatorOutlineBrightness(int value) {
+        treecapitatorOutlineBrightness = clampPercent(value);
+    }
+
+    public boolean isVeinminerEnabled() {
+        return veinminerEnabled;
+    }
+
+    public void setVeinminerEnabled(boolean value) {
+        veinminerEnabled = value;
+    }
+
+    public MiningActivationMode getVeinminerActivation() {
+        return veinminerActivation == null ? MiningActivationMode.SNEAK : veinminerActivation;
+    }
+
+    public void setVeinminerActivation(MiningActivationMode value) {
+        veinminerActivation = value == null ? MiningActivationMode.SNEAK : value;
+    }
+
+    public int getVeinminerOutlineColor() {
+        return veinminerOutlineColor | 0xFF000000;
+    }
+
+    public void setVeinminerOutlineColor(int value) {
+        veinminerOutlineColor = value | 0xFF000000;
+    }
+
+    public int getVeinminerOutlineBrightness() {
+        return clampPercent(veinminerOutlineBrightness);
+    }
+
+    public void setVeinminerOutlineBrightness(int value) {
+        veinminerOutlineBrightness = clampPercent(value);
+    }
+
+    private static int clampPercent(int value) {
+        return Math.max(10, Math.min(100, value));
     }
 
 }

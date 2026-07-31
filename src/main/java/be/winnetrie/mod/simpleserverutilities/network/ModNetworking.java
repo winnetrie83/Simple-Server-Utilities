@@ -13,7 +13,7 @@ public class ModNetworking {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("22");
+        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("36");
 
         registrar.playToClient(
                 ClaimMapDataPayload.TYPE,
@@ -132,6 +132,22 @@ public class ModNetworking {
         );
 
         registrar.playToClient(
+                MapMarkerSyncPayload.TYPE,
+                MapMarkerSyncPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                MapMarkerActionPayload.TYPE,
+                MapMarkerActionPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.mapmarker.MapMarkerService::handleAction
+        );
+
+        registrar.playToClient(
+                MapMarkerActionResultPayload.TYPE,
+                MapMarkerActionResultPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
                 MailDataPayload.TYPE,
                 MailDataPayload.STREAM_CODEC
         );
@@ -168,6 +184,92 @@ public class ModNetworking {
                 MailRecipientSuggestionsRequestPayload.TYPE,
                 MailRecipientSuggestionsRequestPayload.STREAM_CODEC,
                 (payload, context) -> SimpleServerUtilities.MAIL.handleRecipientSuggestions(payload, context)
+        );
+
+        registrar.playToServer(
+                UtilityMiningActivationPayload.TYPE,
+                UtilityMiningActivationPayload.STREAM_CODEC,
+                (payload, context) -> SimpleServerUtilities.UTILITY_MINING.handleActivation(payload, context)
+        );
+
+        registrar.playToServer(
+                UtilityMiningPreviewRequestPayload.TYPE,
+                UtilityMiningPreviewRequestPayload.STREAM_CODEC,
+                (payload, context) -> SimpleServerUtilities.UTILITY_MINING.handlePreview(payload, context)
+        );
+
+        registrar.playToClient(
+                UtilityMiningPreviewPayload.TYPE,
+                UtilityMiningPreviewPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                HologramSyncPayload.TYPE,
+                HologramSyncPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                HologramEditorOpenPayload.TYPE,
+                HologramEditorOpenPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                HologramEditorRequestPayload.TYPE,
+                HologramEditorRequestPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.hologram.HologramEditorService::handleOpenRequest
+        );
+
+        registrar.playToServer(
+                HologramEditorSubmitPayload.TYPE,
+                HologramEditorSubmitPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.hologram.HologramEditorService::handleSubmit
+        );
+
+        registrar.playToClient(
+                HologramEditorResultPayload.TYPE,
+                HologramEditorResultPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                RegionEditorOpenPayload.TYPE,
+                RegionEditorOpenPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                RegionEditorSubmitPayload.TYPE,
+                RegionEditorSubmitPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.region.RegionEditorService::handleSubmit
+        );
+
+        registrar.playToClient(
+                RegionEditorResultPayload.TYPE,
+                RegionEditorResultPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                BlockInformationStatePayload.TYPE,
+                BlockInformationStatePayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                BlockInformationContentPayload.TYPE,
+                BlockInformationContentPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                StatisticEditorOpenPayload.TYPE,
+                StatisticEditorOpenPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                StatisticEditorSubmitPayload.TYPE,
+                StatisticEditorSubmitPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.statistics.StatisticEditorService::handleSubmit
+        );
+
+        registrar.playToClient(
+                StatisticEditorResultPayload.TYPE,
+                StatisticEditorResultPayload.STREAM_CODEC
         );
 
     }

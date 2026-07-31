@@ -14,45 +14,138 @@ public record SsuPropertySettingsDataPayload(
         String notice, boolean error, List<Entry> entries
 ) implements CustomPacketPayload {
     private static final int MAX_ENTRIES = 40;
+    private static final int MAX_OPTIONS = 100;
     public static final Type<SsuPropertySettingsDataPayload> TYPE = new Type<>(
             Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "property_settings_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuPropertySettingsDataPayload> STREAM_CODEC =
             StreamCodec.of(SsuPropertySettingsDataPayload::encode, SsuPropertySettingsDataPayload::decode);
 
     public SsuPropertySettingsDataPayload {
-        kind = bounded(kind, 16); target = bounded(target, 64); title = bounded(title, 128);
-        requestId = Math.max(0L, requestId); notice = bounded(notice, 512);
+        kind = bounded(kind, 16);
+        target = bounded(target, 64);
+        title = bounded(title, 128);
+        requestId = Math.max(0L, requestId);
+        notice = bounded(notice, 512);
         entries = entries == null ? List.of() : List.copyOf(entries);
-        if (entries.size() > MAX_ENTRIES) throw new IllegalArgumentException("Too many property settings entries.");
+        if (entries.size() > MAX_ENTRIES) {
+            throw new IllegalArgumentException("Too many property settings entries.");
+        }
     }
+
     public static SsuPropertySettingsDataPayload error(String kind, String target, long id, String notice) {
         return new SsuPropertySettingsDataPayload(kind, target, "Settings", id, false, notice, true, List.of());
     }
-    private static void encode(RegistryFriendlyByteBuf b, SsuPropertySettingsDataPayload p) {
-        b.writeUtf(p.kind,16); b.writeUtf(p.target,64); b.writeUtf(p.title,128); b.writeVarLong(p.requestId);
-        b.writeBoolean(p.canEdit); b.writeUtf(p.notice,512); b.writeBoolean(p.error); b.writeVarInt(p.entries.size());
-        for (Entry e : p.entries) {
-            b.writeUtf(e.key,64); b.writeUtf(e.label,96); b.writeUtf(e.value,256); b.writeUtf(e.type,16);
-            b.writeUtf(e.description,512); b.writeUtf(e.defaultValue,128); b.writeLong(e.minimum); b.writeLong(e.maximum);
-            b.writeBoolean(e.editable);
+
+    private static void encode(RegistryFriendlyByteBuf buffer, SsuPropertySettingsDataPayload payload) {
+        buffer.writeUtf(payload.kind, 16);
+        buffer.writeUtf(payload.target, 64);
+        buffer.writeUtf(payload.title, 128);
+        buffer.writeVarLong(payload.requestId);
+        buffer.writeBoolean(payload.canEdit);
+        buffer.writeUtf(payload.notice, 512);
+        buffer.writeBoolean(payload.error);
+        buffer.writeVarInt(payload.entries.size());
+        for (Entry entry : payload.entries) {
+            buffer.writeUtf(entry.key, 64);
+            buffer.writeUtf(entry.label, 96);
+            buffer.writeUtf(entry.value, 256);
+            buffer.writeUtf(entry.type, 16);
+            buffer.writeUtf(entry.description, 512);
+            buffer.writeUtf(entry.defaultValue, 128);
+            buffer.writeLong(entry.minimum);
+            buffer.writeLong(entry.maximum);
+            buffer.writeBoolean(entry.editable);
+            buffer.writeVarInt(entry.options.size());
+            for (Option option : entry.options) {
+                buffer.writeUtf(option.value, 64);
+                buffer.writeUtf(option.label, 64);
+            }
         }
     }
-    private static SsuPropertySettingsDataPayload decode(RegistryFriendlyByteBuf b) {
-        String kind=b.readUtf(16), target=b.readUtf(64), title=b.readUtf(128); long id=b.readVarLong();
-        boolean canEdit=b.readBoolean(); String notice=b.readUtf(512); boolean error=b.readBoolean();
-        int size=b.readVarInt(); if(size<0||size>MAX_ENTRIES)throw new IllegalArgumentException("Invalid property settings size: "+size);
-        List<Entry> entries=new ArrayList<>(size); for(int i=0;i<size;i++) entries.add(new Entry(
-                b.readUtf(64),b.readUtf(96),b.readUtf(256),b.readUtf(16),b.readUtf(512),b.readUtf(128),
-                b.readLong(),b.readLong(),b.readBoolean()));
-        return new SsuPropertySettingsDataPayload(kind,target,title,id,canEdit,notice,error,entries);
-    }
-    private static String bounded(String value,int max){String safe=value==null?"":value;return safe.length()<=max?safe:safe.substring(0,max);}
-    @Override public Type<? extends CustomPacketPayload> type(){return TYPE;}
 
-    public record Entry(String key,String label,String value,String type,String description,String defaultValue,
-                        long minimum,long maximum,boolean editable) {
-        public Entry { key=bounded(key,64); label=bounded(label,96); value=bounded(value,256); type=bounded(type,16);
-            description=bounded(description,512); defaultValue=bounded(defaultValue,128);
-            if(maximum<minimum){long swap=minimum;minimum=maximum;maximum=swap;} }
+    private static SsuPropertySettingsDataPayload decode(RegistryFriendlyByteBuf buffer) {
+        String kind = buffer.readUtf(16);
+        String target = buffer.readUtf(64);
+        String title = buffer.readUtf(128);
+        long id = buffer.readVarLong();
+        boolean canEdit = buffer.readBoolean();
+        String notice = buffer.readUtf(512);
+        boolean error = buffer.readBoolean();
+        int size = buffer.readVarInt();
+        if (size < 0 || size > MAX_ENTRIES) {
+            throw new IllegalArgumentException("Invalid property settings size: " + size);
+        }
+
+        List<Entry> entries = new ArrayList<>(size);
+        for (int index = 0; index < size; index++) {
+            String key = buffer.readUtf(64);
+            String label = buffer.readUtf(96);
+            String value = buffer.readUtf(256);
+            String type = buffer.readUtf(16);
+            String description = buffer.readUtf(512);
+            String defaultValue = buffer.readUtf(128);
+            long minimum = buffer.readLong();
+            long maximum = buffer.readLong();
+            boolean editable = buffer.readBoolean();
+            int optionCount = buffer.readVarInt();
+            if (optionCount < 0 || optionCount > MAX_OPTIONS) {
+                throw new IllegalArgumentException("Invalid property setting option count: " + optionCount);
+            }
+            List<Option> options = new ArrayList<>(optionCount);
+            for (int optionIndex = 0; optionIndex < optionCount; optionIndex++) {
+                options.add(new Option(buffer.readUtf(64), buffer.readUtf(64)));
+            }
+            entries.add(new Entry(key, label, value, type, description, defaultValue,
+                    minimum, maximum, editable, options));
+        }
+        return new SsuPropertySettingsDataPayload(kind, target, title, id, canEdit, notice, error, entries);
+    }
+
+    private static String bounded(String value, int maximum) {
+        String safe = value == null ? "" : value;
+        return safe.length() <= maximum ? safe : safe.substring(0, maximum);
+    }
+
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
+    }
+
+    public record Entry(
+            String key,
+            String label,
+            String value,
+            String type,
+            String description,
+            String defaultValue,
+            long minimum,
+            long maximum,
+            boolean editable,
+            List<Option> options
+    ) {
+        public Entry {
+            key = bounded(key, 64);
+            label = bounded(label, 96);
+            value = bounded(value, 256);
+            type = bounded(type, 16);
+            description = bounded(description, 512);
+            defaultValue = bounded(defaultValue, 128);
+            if (maximum < minimum) {
+                long swap = minimum;
+                minimum = maximum;
+                maximum = swap;
+            }
+            options = options == null ? List.of() : List.copyOf(options);
+            if (options.size() > MAX_OPTIONS) {
+                throw new IllegalArgumentException("Too many property setting options.");
+            }
+        }
+    }
+
+    public record Option(String value, String label) {
+        public Option {
+            value = bounded(value, 64);
+            label = bounded(label, 64);
+        }
     }
 }

@@ -1,0 +1,34 @@
+SSU 1.6.0-dev8.2 source validation
+==================================
+Target: Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+Network protocol: 30
+Baseline: SSU 1.6.0-dev8.1
+
+Implemented scope
+-----------------
+- STP 10: removed claim-specific spawn settings and stored claim-spawn fields.
+- STP 11: added bounded server-provided Trust/Untrust player dropdown options.
+- STP 12: added server-side claim-entry transition tracking for welcome messages.
+
+Performed checks
+----------------
+- Confirmed mod_version is 1.6.0-dev8.2.
+- Confirmed network protocol is 30.
+- Confirmed claim settings contain no claim-spawn rows.
+- Confirmed the /claims command tree and help contain no claim setspawn action.
+- Confirmed PlayerClaim no longer serializes spawnX/spawnY/spawnZ/spawnYaw/spawnPitch.
+- Confirmed region spawn and global server spawn code remains present.
+- Confirmed Trust/Untrust actions submit UUID values and revalidate eligibility server-side.
+- Confirmed option lists are bounded to 100 entries in payload construction and decoding.
+- Confirmed ClaimPresenceEvents is registered and runtime state is cleared on claim-module start/stop and logout.
+- Confirmed claim transitions are tracked by claim UUID, preventing repeats between chunks of one claim.
+- Checked changed Java files with javac parsing; no syntax-pattern diagnostics were found.
+- Checked balanced Java delimiters, strings and comments across the source tree.
+- Checked the clean source archive for excluded build/.gradle/run cache folders and archive integrity.
+
+Environment limitation
+----------------------
+A complete Gradle/NeoForge compile was not possible in this environment. The project requires Java 25,
+while the available runtime is Java 21, and the Gradle wrapper distribution was not cached; offline Gradle
+therefore attempted to download Gradle 9.2.1 and failed because this execution environment has no network.
+The build must still be confirmed with `gradlew.bat clean build` under Java 25 and then tested in Minecraft.

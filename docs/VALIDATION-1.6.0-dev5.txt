@@ -1,0 +1,51 @@
+SSU 1.6.0-dev5 validation report
+Date: 2026-07-30
+
+Baseline
+- Parent source: SSU 1.6.0-dev4
+- Mod version: 1.6.0-dev5
+- Network protocol: 27
+- Target: Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+
+Static source validation
+- Java files: 256
+- Java lines: 45508
+- JSON files parsed successfully: 13
+- Package declarations match their source paths.
+- Public top-level type names match their filenames.
+- No duplicate project top-level source types were found.
+- All project-local imports resolve to an existing top-level or nested project type.
+- Java delimiter, string, character, text-block and comment balance checks passed.
+- A full dependency-free javac diagnostic pass reported no syntax-like diagnostics; missing Minecraft/NeoForge/Gson/SLF4J dependency diagnostics were expected.
+- The changed hologram editor, renderer and three hologram payload classes passed an isolated stub-compilation harness.
+- The colour parser harness confirmed six-digit text RGB, six-digit background RGB with default alpha, exact eight-digit ARGB, transparent background and exactly 16 presets.
+- HologramDefinition passed an executable migration harness: schema-1 scale 8 becomes schema-3 scale 1 exactly once, schema-2 scale/background values remain intact, and fresh schema-3 definitions default to transparent background.
+- No obsolete LocalPlayer.displayClientMessage call remains.
+- The unintended JUnit src/test tree is absent.
+
+Targeted implementation checks (19/19)
+- Version is 1.6.0-dev5 and protocol is 27.
+- Treecapitator completion compares the mined selection against the upward log section instead of the complete tree including intentionally retained lower logs.
+- The former full-tree equality comparison that suppressed leaves for higher starting points is absent.
+- UtilityMiningTarget and the break chain use the clearer completeSelectedTreeSection state.
+- HologramDefinition stores a persistent ARGB backgroundColor and uses storage schema 3.
+- Existing schema-1 scale migration remains one-time; schema-2 definitions migrate to schema 3 without changing scale or background values.
+- Hologram editor-open, editor-submit and world-sync payloads encode and decode background colour in matching order.
+- HologramEditorService persists submitted backgrounds and preloads them for both local and remote editing.
+- HologramManager includes background colour in synchronized snapshots.
+- The editor contains all 16 standard Minecraft colour presets.
+- Text and background each have a dedicated preset palette button while direct hexadecimal input remains available.
+- Background input accepts exact AARRGGBB and six-digit RGB with a default semi-transparent alpha.
+- A dedicated transparent/no-background palette action writes 00000000.
+- Background presets preserve a previously chosen non-zero alpha and otherwise use the default alpha.
+- HologramRenderer skips zero-alpha backgrounds.
+- Non-transparent backgrounds render as camera-facing Gizmos.rect quads behind each visible line.
+- Background dimensions reuse the same font-width and scale basis as precise in-world selection.
+- Background and text share the same see-through/always-on-top policy.
+- Existing Treecapitator species, target-height, protection, tool-tag and durability logic remains present.
+
+Build limitation in this environment
+- ./gradlew compileJava --offline was attempted.
+- The wrapper still attempted to download Gradle 9.2.1 and failed because outbound DNS is unavailable in this container (UnknownHostException for services.gradle.org).
+- The container provides Java 21, while the project requires Java 25.
+- Therefore this report does not claim a completed Minecraft/NeoForge compile or in-game test. Run gradlew.bat clean build with Java 25 on the development machine before installing the test JAR.

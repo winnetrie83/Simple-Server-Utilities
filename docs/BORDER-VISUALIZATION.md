@@ -1,24 +1,24 @@
 # Border visualization architecture
 
-SSU 1.1.0-dev5 uses the Minecraft 26.2 client Gizmo system for transient world-space visualization. The server remains authoritative for categories, colors, visibility permissions and geometry; the client only caches and renders received snapshots.
+Current SSU development builds use the Minecraft 26.2 client Gizmo system for transient world-space visualization. The server remains authoritative for categories, colors, visibility permissions and geometry; the client only caches and renders received snapshots.
 
 ## Network compatibility
 
-Dev5 uses SSU network protocol version `5`. Client and server must use the same dev5 build. Dev4 and dev5 must not be mixed.
+SSU 1.6.0-dev10.2 uses network protocol `31`. Client and server must use the exact same development build.
 
 ## Independent layers
 
 - `CLAIM`: automatic nearby claim overview.
 - `REGION`: automatic nearby server-region overview.
 - `CLAIM_FOCUS`: one claim selected with `/claims show <name>`.
-- `REGION_FOCUS`: zero or more individually selected regions.
+- `REGION_FOCUS`: retired legacy layer; dev10.2 actively clears it.
 - `SELECTION`: the current completed temporary region selection.
 
 Updating or clearing one layer does not remove the others.
 
 ## Player visibility preferences
 
-Each player has independent, persistent overview toggles:
+Each player has independent, persistent master visibility toggles:
 
 ```text
 /ssu borders claims on|off
@@ -45,19 +45,35 @@ ssu.borders.claims.view
 ssu.borders.regions.view
 ```
 
-A local preference cannot bypass a denied server permission.
+Effective visibility is the conjunction of three conditions: the relevant server module is enabled, the server permission allows the player to view the layer, and the player's own master toggle is on. A local preference cannot bypass a denied server permission, and the server does not force a border onto a player who turned it off. From dev10.1 onward this capability check deliberately does not use the normal operator bypass: an explicit deny remains a hard server gate even for an operator account.
 
-## Individually selected regions
+## Server-owned region eligibility
 
-Admins can keep multiple exact region boxes visible simultaneously:
+From dev10.2 onward every server region has a persistent `borderVisible` setting. The Regions page controls this server-owned setting:
 
 ```text
-/regions show <name>       # add or keep one region visible
-/regions hide <name>       # hide only this region
-/regions hide              # hide all individually selected regions
+Show        # make this region eligible for players
+Disable     # remove this region from every player overview
+Disable all # disable every server-region border
 ```
 
-These selections persist per player in `pinnedRegions` and are independent from the automatic nearby-region overview. They can also be toggled in the dashboard's Regions page.
+The equivalent administrator commands are:
+
+```text
+/regions show <name>
+/regions hide <name>
+/regions hide
+```
+
+This is not a forced render and it is not a personal pin. A region is sent only when all of the following are true:
+
+1. the Server Regions module is enabled;
+2. the region's own `borderVisible` setting is enabled by the server;
+3. `ssu.borders.regions.view` allows that player;
+4. that player enabled the personal Region borders master switch;
+5. the region is in the player's configured render range and current dimension.
+
+Existing region records without `borderVisible` migrate safely as hidden. The property is stored in region record schema `4` and survives restart and region-boundary redefinition. The old per-player `pinnedRegions` values are ignored for rendering and the legacy `REGION_FOCUS` layer is cleared, so a region cannot be duplicated or become visible again merely because it was disabled from the Regions page.
 
 ## Semantic categories and default colors
 

@@ -1,0 +1,36 @@
+SSU 1.6.0-dev10 validation record
+
+Baseline: 1.6.0-dev9
+Version: 1.6.0-dev10
+Network protocol: 31 (unchanged)
+Stored schemas: unchanged
+
+Implemented scope
+- STP 21: focused/pinned borders are excluded from their overview layer so identical geometry is not emitted twice.
+- STP 22: effective border visibility requires server module enabled + server permission allowed + player preference enabled.
+- Direct focused/pinned sends now pass through the same effective visibility sync path.
+- Permission/rank/dimension/region permission mutations refresh online border snapshots immediately.
+- Back button centered in the wide portrait sidebar.
+- Profile moved below portrait account details; compact no-sidebar layout keeps the original Profile tile.
+
+Static validation requirements
+- gradle.properties resolves to 1.6.0-dev10.
+- ModNetworking remains protocol 31.
+- No payload record or codec changed.
+- No storage schema field changed.
+- Java lexical/delimiter scan must pass before packaging.
+- Source ZIP integrity and SHA-256 are recorded during packaging.
+
+Runtime validation still required
+- Full Java 25 NeoForge build.
+- Dedicated-server/client test using docs/TESTING-1.6.0-dev10.md.
+
+Validation performed in the packaging environment
+- PASS: 266 Java source files passed the lexical string/comment/delimiter scan.
+- PASS: version declaration is 1.6.0-dev10.
+- PASS: network registrar remains protocol 31.
+- PASS: source assertions confirm focused claims and pinned regions are excluded from overview payloads.
+- PASS: source assertions confirm module + permission + player preference gates for both border types.
+- PASS: source assertions confirm wide-layout Profile relocation and centered Back bounds.
+- PASS: Gradle wrapper JAR is included in the source archive.
+- NOT RUN: full Gradle/NeoForge compilation. The container has Java 21 and no cached Gradle 9.2.1 distribution; external distribution download is unavailable. Build locally with Java 25.
