@@ -1,0 +1,49 @@
+SSU 1.7.0-dev1.5 — source validation report
+Date: 2026-08-01
+Status: test source; dedicated client/server validation still required
+
+Baseline
+- Parent source: SSU 1.7.0-dev1.4
+- Mod version: 1.7.0-dev1.5
+- Minecraft: 26.2
+- NeoForge: 26.2.0.7-beta
+- Java toolchain required by project: 25
+- Network protocol: 39
+- Auction listing schema: 3
+- Auction House settings schema: 2
+- Auction purchase journal schema: 1
+
+Implemented scope
+- Removed the temporary held-item/offhand blacklist workflow completely.
+- Added a visible administrator inventory picker with the 9x3 main inventory and 9-slot hotbar.
+- The server receives only the selected inventory slot and revalidates its current item before blacklisting.
+- Added manual full registry-ID entry with client-side visual preview and server-authoritative registry validation.
+- Invalid, missing and empty/air item IDs are rejected and never persisted.
+- Blacklist rows visibly show the registered item icon, display name and canonical registry ID.
+- Administrator cancellation and seizure now require a non-empty reason of at most 200 characters.
+- Cancellation/seizure reasons are included in seller mail and server logs.
+- A seizure reason is stored durably on the listing so recovery after restart preserves the same reason.
+
+Automated/static checks performed
+- 313 Java source files passed lexical string/comment/bracket validation.
+- 14 JSON files parsed successfully.
+- 28 targeted Auction House source invariants passed, covering version/protocol/schema changes,
+  removal of the held-item method, inventory-slot selection and server revalidation, 9x4 inventory UI,
+  manual registry-ID validation and preview, visible blacklist item rendering, mandatory admin reasons,
+  action payload size symmetry, durable seizure reason recovery, mail/log reason propagation,
+  documentation and absence of src/test/JUnit.
+- AuctionListing compiled against focused API stubs and passed a seizure-reason persistence harness.
+- AuctionHouseActionPayload compiled against focused network-buffer stubs.
+- AuctionHouseScreen compiled against focused Minecraft/NeoForge UI stubs.
+- Full-source lexical/static validation found no Java syntax structure errors.
+
+Build limitation in this environment
+- A full Gradle/NeoForge build was not possible.
+- Installed runtime is Java 21; this project requires Java 25.
+- Gradle wrapper distribution 9.2.1 was not cached and external download access was unavailable.
+
+Required local validation
+1. Use Java 25.
+2. Run: gradlew.bat clean build
+3. Install the exact same 1.7.0-dev1.5 JAR on client and dedicated server.
+4. Execute docs/TESTING-1.7.0-dev1.5.md.

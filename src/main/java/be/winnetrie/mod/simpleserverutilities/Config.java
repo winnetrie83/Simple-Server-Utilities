@@ -120,6 +120,10 @@ public class Config {
             .comment("Enable the durable player mail system.")
             .define("enableMail", true);
 
+    public static final ModConfigSpec.BooleanValue ENABLE_AUCTION_HOUSE = BUILDER
+            .comment("Enable the server-authoritative Auction House module.")
+            .define("enableAuctionHouse", true);
+
     public static final ModConfigSpec.IntValue MAIL_VISIBLE_RETENTION_DAYS = BUILDER
             .comment("Days a mail may remain in the visible inbox before cleanup. Queued mail does not age until promoted.")
             .defineInRange("mailVisibleRetentionDays", 30, 1, 3650);

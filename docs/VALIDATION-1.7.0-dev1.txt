@@ -1,0 +1,55 @@
+SSU 1.7.0-dev1 validation report
+================================
+
+Baseline
+--------
+- Parent source: user-confirmed SSU 1.6.0-dev12.11
+- Mod version: 1.7.0-dev1
+- Minecraft: 26.2
+- NeoForge: 26.2.0.7-beta
+- Java toolchain: 25
+- Network protocol: 37
+- Existing player UI preference schema: 7
+- Existing map marker schema: 1
+- Existing aerial client cache format: 5 under map-cache-v4
+- New Auction House listing schema: 1
+- New Auction House purchase schema: 1
+- New Auction House settings schema: 1
+
+Implementation checks
+---------------------
+- Dedicated Auction House Core 2.0 module, lifecycle, storage paths and minute maintenance are registered.
+- Dashboard visibility and general trusted-entry access are separate permissions.
+- Client request/action payloads require a server-granted Auction House session.
+- Fourteen categories, display-name-only substring search and server-side name/quantity/price/time sorting are present.
+- Browse rows transfer/render a real ItemStack and normal item tooltip.
+- Buy flow includes manual quantity, exact currency-formatted total and final confirmation.
+- Sell flow is backed by an AbstractContainerMenu with one offer slot and all 36 player inventory slots.
+- Exact item components are matched while extracting quantities across multiple inventory stacks.
+- Buyer item delivery uses real max stack sizes and batches no more than nine stacks per mail.
+- Seller payout mail records buyer, date, quantity, gross, historical tax rate/amount and net proceeds.
+- Cancelled and expired listing remainders are returned through idempotent system mail.
+- Global tax supports 0.1% increments; active-listing limit is permission-controlled.
+- Buyer capture, seller escrow funding, seller mail, buyer mails and rollbacks use deterministic idempotency keys.
+- Purchase recovery checks committed economy journal keys before transfer retries.
+- Interrupted rollbacks persist ROLLBACK_PENDING and resume safely.
+- Listing/purchase persistence is required before item or money commitment.
+- Terminal purchase journals are retained for thirty days.
+- Auction House activity requires enabled Mail and Economy; stored records are preserved while unavailable.
+- Buy/create confirmation buttons lock while a request is in flight to prevent accidental double submissions.
+
+Static validation
+-----------------
+- No JUnit dependency or src/test source set was added.
+- String/comment-aware Java delimiter validation: passed across 313 Java source files.
+- JSON resource parsing: passed across all 2 JSON resources.
+- Targeted source invariants: 36/36 passed after cleanup.
+- javac parser pass reported no syntax-like diagnostics; unresolved external Minecraft/NeoForge types are expected without the project classpath.
+- No generated javac argument files, build outputs or cache directories are included.
+- Final ZIP integrity is verified after packaging; SHA-256 is reported alongside the downloadable archive.
+
+Environment limitation
+----------------------
+A complete NeoForge/Gradle build cannot run in this container because only Java 21 is installed, the project requires Java 25, the Gradle 9.2.1 distribution is not cached and external Gradle download is blocked. Build locally with Java 25:
+
+    gradlew.bat clean build

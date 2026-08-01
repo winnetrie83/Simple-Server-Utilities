@@ -4,6 +4,10 @@ import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 
+import be.winnetrie.mod.simpleserverutilities.auction.AuctionHouseEvents;
+import be.winnetrie.mod.simpleserverutilities.auction.AuctionHouseManager;
+import be.winnetrie.mod.simpleserverutilities.auction.AuctionHouseModule;
+import be.winnetrie.mod.simpleserverutilities.auction.ModAuctionMenus;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaimManager;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimModule;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimPresenceEvents;
@@ -100,6 +104,7 @@ public class SimpleServerUtilities {
     public static final SsuTransactionManager TRANSACTIONS = new SsuTransactionManager();
     public static final EconomyManager ECONOMY = new EconomyManager();
     public static final MailManager MAIL = new MailManager();
+    public static final AuctionHouseManager AUCTION_HOUSE = new AuctionHouseManager();
 
     public static final PlayerClaimManager PLAYER_CLAIMS = new PlayerClaimManager();
     public static final RegionManager REGIONS = new RegionManager();
@@ -124,6 +129,7 @@ public class SimpleServerUtilities {
 
     public SimpleServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
         ModMailMenus.MENU_TYPES.register(modEventBus);
+        ModAuctionMenus.MENU_TYPES.register(modEventBus);
         CORE.modules().register(new StorageModule(STORAGE));
         CORE.modules().register(new JobSchedulerModule(JOBS));
         CORE.modules().register(new PerformanceModule(PERFORMANCE));
@@ -132,6 +138,7 @@ public class SimpleServerUtilities {
         CORE.modules().register(new ClaimModule(PLAYER_CLAIMS));
         CORE.modules().register(new PermissionModule(PERMISSIONS));
         CORE.modules().register(new MailModule(MAIL));
+        CORE.modules().register(new AuctionHouseModule(AUCTION_HOUSE));
         CORE.modules().register(new HomeModule(HOMES));
         CORE.modules().register(new WarpModule(WARPS));
         CORE.modules().register(new UiPreferencesModule(UI_PREFERENCES));
@@ -166,6 +173,7 @@ public class SimpleServerUtilities {
         NeoForge.EVENT_BUS.register(RegionInteractionEvents.class);
         NeoForge.EVENT_BUS.register(PermissionPlayerEvents.class);
         NeoForge.EVENT_BUS.register(MailEvents.class);
+        NeoForge.EVENT_BUS.register(AuctionHouseEvents.class);
         NeoForge.EVENT_BUS.register(CropsHarvestingEvents.class);
         NeoForge.EVENT_BUS.register(UtilityMiningEvents.class);
         NeoForge.EVENT_BUS.register(HologramEvents.class);

@@ -1,0 +1,16 @@
+SSU 1.7.0-dev1.5.1 — source validation report
+
+Hotfix scope:
+- Renamed registry lookup lambda parameters from `item` to `registeredItem`.
+- Removes the Java shadowing/redeclaration compilation error in `blacklistItemId`.
+- Applied consistently in server blacklist display and client item-ID preview paths.
+
+Versioning:
+- Mod version: 1.7.0-dev1.5.1
+- Network protocol: 39
+- Auction listing schema: 3
+- Auction settings schema: 2
+- Purchase journal schema: 1
+
+No gameplay, network-payload or storage-format changes.
+A full NeoForge build still requires Java 25 and the configured Gradle toolchain.

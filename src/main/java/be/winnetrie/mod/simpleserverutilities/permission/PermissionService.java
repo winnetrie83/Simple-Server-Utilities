@@ -178,6 +178,8 @@ public class PermissionService {
                     PermissionKeys.MAIL_SEND,
                     PermissionKeys.MAIL_SEND_ITEMS,
                     PermissionKeys.MAIL_SEND_MONEY,
+                    PermissionKeys.AUCTION_HOUSE_ACCESS,
+                    PermissionKeys.AUCTION_HOUSE_DASHBOARD,
                     PermissionKeys.CROPS_HARVESTING_USE,
                     PermissionKeys.TREECAPITATOR_USE,
                     PermissionKeys.TREECAPITATOR_BLOCKS,

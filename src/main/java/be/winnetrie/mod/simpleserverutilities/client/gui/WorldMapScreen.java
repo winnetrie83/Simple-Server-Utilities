@@ -184,12 +184,18 @@ public final class WorldMapScreen extends Screen {
         int frameRight = frameLeft + frameWidth;
         int frameBottom = frameTop + frameHeight;
 
-        // Render only the surrounding gutter after child widgets. This keeps the
-        // map from painting over the frame without covering the actual buttons.
-        graphics.fill(frameLeft, frameTop, frameRight, buttonTop, 0xF2161C25);
-        graphics.fill(frameLeft, buttonBottom, frameRight, frameBottom, 0xF2161C25);
-        graphics.fill(frameLeft, buttonTop, buttonLeft, buttonBottom, 0xF2161C25);
-        graphics.fill(buttonRight, buttonTop, frameRight, buttonBottom, 0xF2161C25);
+        // Render the surrounding gutter and the deliberate gaps between buttons
+        // after the map widget. This keeps the map from showing through the panel
+        // without covering the actual child button surfaces.
+        int panelColor = 0xF2161C25;
+        graphics.fill(frameLeft, frameTop, frameRight, buttonTop, panelColor);
+        graphics.fill(frameLeft, buttonBottom, frameRight, frameBottom, panelColor);
+        graphics.fill(frameLeft, buttonTop, buttonLeft, buttonBottom, panelColor);
+        graphics.fill(buttonRight, buttonTop, frameRight, buttonBottom, panelColor);
+        graphics.fill(buttonLeft, buttonTop + 20, buttonRight, buttonTop + 24, panelColor);
+        if (context.marker() != null) {
+            graphics.fill(buttonLeft + 60, buttonTop, buttonLeft + 64, buttonTop + 20, panelColor);
+        }
         graphics.outline(frameLeft, frameTop, frameWidth, frameHeight, 0xFF9FB0C3);
         graphics.outline(frameLeft + 2, frameTop + 2, frameWidth - 4, frameHeight - 4, 0xFF34475A);
     }
@@ -200,7 +206,7 @@ public final class WorldMapScreen extends Screen {
         graphics.text(font, "LAYERS", x, y, ACCENT); y += 17;
         drawLayer(graphics, x, y, showClaims, payload.ownClaimColor(), "Claims"); y += 15;
         drawLayer(graphics, x, y, showRegions, payload.regionColor(), "Server regions"); y += 15;
-        drawLayer(graphics, x, y, showMarkers, 0xFFFFD54F, "Markers"); y += 25;
+        drawLayer(graphics, x, y, true, 0xFFFFD54F, "Player"); y += 25;
 
         graphics.text(font, "LOCATION", x, y, ACCENT); y += 17;
         WorldMapWidget.LocationInfo location = mapWidget == null ? null : mapWidget.locationAt(mouseX, mouseY);

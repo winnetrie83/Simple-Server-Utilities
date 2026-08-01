@@ -101,6 +101,11 @@ public final class PermissionKeys {
     public static final String MAIL_SEND_COOLDOWN = "ssu.mail.send_cooldown";
     public static final String MAIL_ADMIN = "ssu.mail.admin";
 
+    public static final String AUCTION_HOUSE_ACCESS = "ssu.auction_house.access";
+    public static final String AUCTION_HOUSE_DASHBOARD = "ssu.auction_house.dashboard";
+    public static final String AUCTION_HOUSE_MAX_ACTIVE = "ssu.auction_house.max_active";
+    public static final String AUCTION_HOUSE_ADMIN = "ssu.auction_house.admin";
+
     public static final String HOLOGRAMS_ADMIN = "ssu.holograms.admin";
     public static final String BLOCK_INFORMATION_USE = "ssu.block_information.use";
     public static final String BLOCK_INFORMATION_DEBUG = "ssu.block_information.debug";
@@ -234,6 +239,10 @@ public final class PermissionKeys {
             MAIL_DAILY_SEND_LIMIT,
             MAIL_SEND_COOLDOWN,
             MAIL_ADMIN,
+            AUCTION_HOUSE_ACCESS,
+            AUCTION_HOUSE_DASHBOARD,
+            AUCTION_HOUSE_MAX_ACTIVE,
+            AUCTION_HOUSE_ADMIN,
 
             HOLOGRAMS_ADMIN,
             BLOCK_INFORMATION_USE,

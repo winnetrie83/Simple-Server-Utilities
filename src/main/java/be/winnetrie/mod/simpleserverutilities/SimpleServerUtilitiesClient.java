@@ -13,6 +13,8 @@ import be.winnetrie.mod.simpleserverutilities.client.gui.RegionEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.WorldMapScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.MailScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.MailComposeScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.AuctionHouseScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.AuctionSellScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.HologramEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.StatisticEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.blockinfo.BlockInformationClientState;
@@ -39,6 +41,8 @@ import be.winnetrie.mod.simpleserverutilities.network.MinimapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailComposeResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailRecipientSuggestionsPayload;
+import be.winnetrie.mod.simpleserverutilities.network.AuctionHouseDataPayload;
+import be.winnetrie.mod.simpleserverutilities.network.AuctionHouseActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerSyncPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuSnapshotPayload;
@@ -76,6 +80,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import org.lwjgl.glfw.GLFW;
 import be.winnetrie.mod.simpleserverutilities.mail.ModMailMenus;
+import be.winnetrie.mod.simpleserverutilities.auction.ModAuctionMenus;
 
 @Mod(value = SimpleServerUtilities.MODID, dist = Dist.CLIENT)
 @EventBusSubscriber(modid = SimpleServerUtilities.MODID, value = Dist.CLIENT)
@@ -144,6 +149,7 @@ public class SimpleServerUtilitiesClient {
     @SubscribeEvent
     static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         event.register(ModMailMenus.MAIL_COMPOSE.get(), MailComposeScreen::new);
+        event.register(ModAuctionMenus.AUCTION_SELL.get(), AuctionSellScreen::new);
     }
 
     @SubscribeEvent
@@ -236,6 +242,28 @@ public class SimpleServerUtilitiesClient {
                         screen.acceptData(payload);
                     } else {
                         minecraft.setScreenAndShow(new PropertySettingsScreen(payload, minecraft.gui.screen()));
+                    }
+                })
+        );
+
+        event.register(AuctionHouseDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof AuctionHouseScreen screen) {
+                        screen.acceptData(payload);
+                    } else {
+                        minecraft.setScreenAndShow(new AuctionHouseScreen(payload));
+                    }
+                })
+        );
+
+        event.register(AuctionHouseActionResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof AuctionHouseScreen screen) {
+                        screen.acceptResult(payload);
+                    } else if (minecraft.gui.screen() instanceof AuctionSellScreen screen) {
+                        screen.acceptResult(payload);
                     }
                 })
         );

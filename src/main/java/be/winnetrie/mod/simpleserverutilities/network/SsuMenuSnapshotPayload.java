@@ -16,6 +16,7 @@ public record SsuMenuSnapshotPayload(
         UiSettingsSummary uiSettings,
         boolean administrator,
         boolean cropsHarvestingEnabled,
+        boolean auctionHouseDashboardVisible,
         ModuleSettingsSummary moduleSettings,
         AdminAccessSummary adminAccess,
         boolean claimBordersVisible,
@@ -66,6 +67,7 @@ public record SsuMenuSnapshotPayload(
         writeUiSettings(buffer, payload.uiSettings);
         buffer.writeBoolean(payload.administrator);
         buffer.writeBoolean(payload.cropsHarvestingEnabled);
+        buffer.writeBoolean(payload.auctionHouseDashboardVisible);
         writeModuleSettings(buffer, payload.moduleSettings);
         writeAdminAccess(buffer, payload.adminAccess);
         buffer.writeBoolean(payload.claimBordersVisible);
@@ -89,6 +91,7 @@ public record SsuMenuSnapshotPayload(
                 buffer.readUtf(64),
                 buffer.readBoolean(),
                 readUiSettings(buffer),
+                buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
                 readModuleSettings(buffer),
@@ -121,6 +124,7 @@ public record SsuMenuSnapshotPayload(
         buffer.writeBoolean(settings.blockInformation());
         buffer.writeBoolean(settings.statistics());
         buffer.writeBoolean(settings.mail());
+        buffer.writeBoolean(settings.auctionHouse());
         buffer.writeBoolean(settings.permissions());
         buffer.writeBoolean(settings.remoteHologramImages());
         buffer.writeVarInt(settings.hologramRenderDistance());
@@ -133,7 +137,7 @@ public record SsuMenuSnapshotPayload(
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
-                buffer.readBoolean(), buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt()
+                buffer.readBoolean(), buffer.readBoolean(), buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt()
         );
     }
 
@@ -429,6 +433,7 @@ public record SsuMenuSnapshotPayload(
             boolean blockInformation,
             boolean statistics,
             boolean mail,
+            boolean auctionHouse,
             boolean permissions,
             boolean remoteHologramImages,
             int hologramRenderDistance,
@@ -443,7 +448,7 @@ public record SsuMenuSnapshotPayload(
 
         public static ModuleSettingsSummary defaults() {
             return new ModuleSettingsSummary(true, true, true, true, true, true, true, true, true, true,
-                    true, true, true, 64, 128, 128);
+                    true, true, true, true, 64, 128, 128);
         }
     }
 

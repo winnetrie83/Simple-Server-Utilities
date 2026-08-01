@@ -63,6 +63,10 @@ public final class MailManager {
     private Path mailboxFolder;
     private int maintenanceCursor;
 
+    public static UUID escrowAccountId() {
+        return ESCROW_ACCOUNT_ID;
+    }
+
     public synchronized void load(MinecraftServer server) {
         this.server = server;
         this.mailboxFolder = StoragePaths.mailboxes(StoragePaths.root(server));

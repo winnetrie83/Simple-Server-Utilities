@@ -1,0 +1,13 @@
+SSU 1.7.0-dev1.1 validation report
+
+Hotfix scope:
+- Removed unavailable Minecraft 26.2 BlockTags.SAPLINGS reference.
+- Sapling classification remains covered by the existing name/path matcher.
+- Network protocol remains 37.
+- Auction House listing, purchase and settings schemas remain 1.
+
+Static checks:
+- No remaining BlockTags.SAPLINGS references.
+- Java delimiter/string/comment scan passed.
+- JSON parsing passed.
+- Source archive integrity passed.

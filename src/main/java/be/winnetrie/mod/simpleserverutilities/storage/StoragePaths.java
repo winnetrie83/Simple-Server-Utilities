@@ -111,6 +111,22 @@ public final class StoragePaths {
         return mail(root).resolve("mailboxes");
     }
 
+    public static Path auctionHouse(Path root) {
+        return root.resolve("auction_house");
+    }
+
+    public static Path auctionListings(Path root) {
+        return auctionHouse(root).resolve("listings");
+    }
+
+    public static Path auctionPurchases(Path root) {
+        return auctionHouse(root).resolve("purchases");
+    }
+
+    public static Path auctionSettings(Path root) {
+        return auctionHouse(root).resolve("settings.json");
+    }
+
     public static Path serverSpawn(Path root) {
         return root.resolve("spawn").resolve("server_spawn.json");
     }

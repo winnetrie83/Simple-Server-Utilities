@@ -13,7 +13,7 @@ public class ModNetworking {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("36");
+        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("39");
 
         registrar.playToClient(
                 ClaimMapDataPayload.TYPE,
@@ -145,6 +145,28 @@ public class ModNetworking {
         registrar.playToClient(
                 MapMarkerActionResultPayload.TYPE,
                 MapMarkerActionResultPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                AuctionHouseDataPayload.TYPE,
+                AuctionHouseDataPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                AuctionHouseActionResultPayload.TYPE,
+                AuctionHouseActionResultPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                AuctionHouseRequestPayload.TYPE,
+                AuctionHouseRequestPayload.STREAM_CODEC,
+                (payload, context) -> SimpleServerUtilities.AUCTION_HOUSE.handleRequest(payload, context)
+        );
+
+        registrar.playToServer(
+                AuctionHouseActionPayload.TYPE,
+                AuctionHouseActionPayload.STREAM_CODEC,
+                (payload, context) -> SimpleServerUtilities.AUCTION_HOUSE.handleAction(payload, context)
         );
 
         registrar.playToClient(

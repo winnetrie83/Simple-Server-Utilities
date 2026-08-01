@@ -1,0 +1,19 @@
+SSU 1.7.0-dev1.3 validation report
+
+UI hotfix scope:
+- Dashboard sidebar outline height now uses responsive panel height instead of an absolute panel-bottom coordinate.
+- Create Auction screen expanded from 292x246 to 368x286 logical GUI pixels.
+- Offer slot relocated and given a dedicated highlighted frame.
+- Player inventory and hotbar relocated and rendered with explicit framed slot grids.
+- Redundant offer-slot instruction removed.
+- Listing, purchase, tax, mail, permission and persistence logic unchanged.
+- Network protocol remains 37.
+- Auction House listing, purchase and settings schemas remain 1.
+
+Static checks:
+- No dashboard outline call uses panelBottom() as a height argument.
+- Offer slot and all 36 player inventory slots use shared menu layout constants.
+- Create Auction contains one 9x3 inventory grid and one 9x1 hotbar grid.
+- Java delimiter/string/comment scan passed.
+- JSON parsing passed.
+- Source archive integrity passed.

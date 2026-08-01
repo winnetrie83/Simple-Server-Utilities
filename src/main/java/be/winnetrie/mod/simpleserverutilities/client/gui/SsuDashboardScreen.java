@@ -252,7 +252,7 @@ public final class SsuDashboardScreen extends Screen {
             case RENT_OPERATIONS -> addRentOperationButtons(l);
             case CORE -> addCoreButtons(l);
             case PROFILE -> addProfileButtons(l);
-            case MAIL -> { }
+            case MAIL, AUCTION_HOUSE -> { }
         }
     }
 
@@ -278,6 +278,9 @@ public final class SsuDashboardScreen extends Screen {
                 new Module("Wallet", "Balance, payments and transaction history.", ICON_MARKET, Page.ECONOMY, snapshot.economy().enabled()),
                 new Module("Mail", "Inbox, sent mail, items and money attachments.", ICON_MARKET, Page.MAIL, snapshot.moduleSettings().mail())
         ));
+        if (snapshot.auctionHouseDashboardVisible()) {
+            modules.add(new Module("Auction House", "Browse, buy and sell player-listed items.", ICON_MARKET, Page.AUCTION_HOUSE, true));
+        }
         // Compact layouts have no portrait sidebar, so Profile remains available as a normal tile there.
         if (!l.sidebarVisible()) {
             modules.add(new Module("Profile", "Your rank, property and personal settings.", ICON_PLAYERS, Page.PROFILE, true));
@@ -345,6 +348,7 @@ public final class SsuDashboardScreen extends Screen {
                 new ModuleSwitch("Block Information", "block_information", settings.blockInformation()),
                 new ModuleSwitch("Player Statistics", "statistics", settings.statistics()),
                 new ModuleSwitch("Mail", "mail", settings.mail()),
+                new ModuleSwitch("Auction House", "auction_house", settings.auctionHouse()),
                 new ModuleSwitch("Permissions", "permissions", settings.permissions()),
                 new ModuleSwitch("Remote Images", "remote_hologram_images", settings.remoteHologramImages())
         );
@@ -1184,6 +1188,10 @@ public final class SsuDashboardScreen extends Screen {
             ClientPacketDistributor.sendToServer(new MailActionPayload("open_mailbox", "", "inbox", 0, nextRequestId++));
             return;
         }
+        if (target == Page.AUCTION_HOUSE) {
+            action("auction_open", "", "", "");
+            return;
+        }
         if (target == page) return;
         previousPage = page; page = target; pageIndex = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingResetStatistic = ""; pendingDeleteStatistic = "";
         loading = false;
@@ -1637,7 +1645,7 @@ public final class SsuDashboardScreen extends Screen {
     private void drawSidebar(GuiGraphicsExtractor g, Layout l) {
         if (!l.sidebarVisible()) return;
         g.fill(l.sidebarX(),l.panelY()+42,l.sidebarX()+100,l.panelBottom()-36,CARD);
-        g.outline(l.sidebarX(),l.panelY()+42,100,l.panelBottom()-78,PANEL_BORDER);
+        g.outline(l.sidebarX(),l.panelY()+42,100,l.panelHeight()-78,PANEL_BORDER);
         int y=l.panelY()+140;
         center(g,snapshot.playerName(),l.sidebarX()+50,y,TEXT);
         center(g,"Rank: "+(snapshot.primaryRank().isBlank()?"default":snapshot.primaryRank()),l.sidebarX()+50,y+15,MUTED);
@@ -1660,6 +1668,7 @@ public final class SsuDashboardScreen extends Screen {
             case ACCOUNTS -> drawAccounts(g,l); case JOBS -> drawJobs(g,l);
             case RENT_OPERATIONS -> drawRentOps(g,l); case CORE -> drawCore(g,l); case PROFILE -> drawProfile(g,l);
             case MAIL -> g.text(font,"Opening mailbox…",l.contentX(),l.contentTop(),MUTED,false);
+            case AUCTION_HOUSE -> g.text(font,"Opening Auction House…",l.contentX(),l.contentTop(),MUTED,false);
         }
     }
 
@@ -1945,6 +1954,7 @@ public final class SsuDashboardScreen extends Screen {
     private enum Page {
         HOME("Dashboard","Player tools and personal overview",""), PROFILE("Profile","Your server account and property",""),
         MAIL("Mail","Inbox, attachments and sent mail",""),
+        AUCTION_HOUSE("Auction House","Browse, buy and sell player auctions",""),
         CLAIMS("Claims & Land","Owned claims and claim tools","claims"), TRAVEL("Travel","Server spawn, homes and warps","travel"),
         ECONOMY("Wallet & Transactions","Payments and paged transaction history","transactions"),
         REGIONS("Regions & Rentals","Rentals, region details and visibility","regions"), SETTINGS("Settings","Personal settings",""),

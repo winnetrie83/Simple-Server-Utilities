@@ -1,3 +1,115 @@
+## 1.7.0-dev1.5.1
+
+- Fixed a Java compilation error in Auction House blacklist item-ID validation.
+- Registry lookup lambdas now use a distinct `registeredItem` parameter instead of redeclaring the enclosing local variable `item`.
+- Applied the same unambiguous lambda naming to the blacklist display and client preview paths.
+- Network protocol remains 39 and all storage schemas remain unchanged.
+- Client and server must use the exact same `1.7.0-dev1.5.1` build.
+
+## 1.7.0-dev1.5
+
+### Changed
+
+- Replaced the held-item blacklist shortcut with a proper inventory picker inside the administrator Blacklist page. The page renders the player's 9×3 inventory and hotbar; selecting a non-empty slot only transmits its slot index, and the server rechecks the current item before adding its base registry identifier.
+- Added manual item-ID entry alongside inventory selection. The client shows a live visual preview for registered item IDs, while the server parses the identifier and rejects malformed, missing or empty items before persistence. Successfully added entries remain visible with their real item icon and name in the blacklist results.
+- Administrator cancellation and seizure now require a non-empty reason through a dedicated confirmation dialog. The reason is included in seller mail and server logs.
+- Seizure reasons are stored durably with pending seizures so crash/restart mail recovery preserves the exact administrative explanation.
+
+### Compatibility
+
+- Auction House listings migrate from schema 2 to schema **3** for the durable seizure reason. Auction House settings remain schema 2 and purchase journals remain schema 1.
+- Network protocol is now **39** because Auction House action text can carry the required administrative reason.
+- Existing listings, blacklist entries, purchases, mailbox data and all non-Auction-House schemas remain compatible.
+- Client and server must use the exact same `1.7.0-dev1.5` build.
+
+## 1.7.0-dev1.4
+
+### Added
+
+- Added a searchable administrator-only **Admin Overview** containing every active Auction House listing.
+- Administrators with `ssu.auction_house.admin` can cancel any active listing and return its unsold items to the seller by system mail.
+- Administrators can seize an active listing. The unsold items are delivered to the administrator's mailbox and the seller receives a system-mail notice naming the administrator.
+- Added a persistent item blacklist managed from an administrator-only **Blacklist** page. Administrators can add the item held in either hand, remove existing entries, or blacklist the item represented by a selected active listing.
+- New listings are rejected server-side when their base item registry identifier is blacklisted. Existing listings remain active so an administrator can deliberately return or seize them.
+- Administrative cancellation, seizure and blacklist changes are written to the server log.
+
+### Compatibility
+
+- Auction House settings migrate from schema 1 to schema **2** for the persistent blacklist. Listings migrate from schema 1 to schema **2** for durable seizure ownership/recovery; purchase journals remain schema 1.
+- Network protocol is now **38** because Auction House entry/action identifiers can carry full modded item registry identifiers and the administrator modes are synchronized to the client.
+- Existing listings, purchases, economy journals, mailbox data and every non-Auction-House schema remain compatible.
+- Client and server must use the exact same `1.7.0-dev1.4` build.
+
+## 1.7.0-dev1.3
+
+- Fixed the dashboard portrait-sidebar frame using an absolute bottom coordinate as an outline height. The frame now derives its height from the responsive dashboard panel and remains contained at every in-game GUI scale.
+- Expanded and reorganized the Create Auction container screen.
+- Added a clearly highlighted auction-offer slot and removed the redundant “Drop one stack here” text.
+- Added individual slot backgrounds plus framed 9×3 inventory and 9×1 hotbar grids.
+- Spaced the price, quantity, duration, tax and action controls more clearly without changing listing behaviour.
+- Network protocol remains 37 and all Auction House/storage schemas remain unchanged.
+- Client and server must use the exact same `1.7.0-dev1.3` build.
+
+## 1.7.0-dev1.2
+
+- Source compilation hotfix for Java generic type inference in `AuctionSort`.
+- Added explicit `AuctionListingView` lambda parameter types to the ID, quantity, price and expiry comparators so Java no longer infers `Object` and rejects `listing()`.
+- Sorting behaviour is unchanged. Network protocol remains 37 and all Auction House/storage schemas remain unchanged.
+- Client and server must use the exact same `1.7.0-dev1.2` build.
+
+## 1.7.0-dev1.1
+
+- Source compilation hotfix for Minecraft/NeoForge 26.2: removed the unavailable `BlockTags.SAPLINGS` field from Auction House category classification.
+- Saplings remain classified as Plants through the existing localized item-name/registry-path matcher.
+- Network protocol remains 37 and all Auction House/storage schemas remain unchanged.
+- Client and server must use the exact same `1.7.0-dev1.1` build.
+
+## 1.7.0-dev1
+
+### Added
+
+- Added the first complete **Auction House** module with persistent schema-1 listings, purchase journals and global settings under the world `simpleserverutilities/auction_house` folder.
+- Added a permission-aware Auction House dashboard tile. `ssu.auction_house.dashboard` controls only the dashboard entrance, while `ssu.auction_house.access` controls actual use from every trusted server entry point so future NPC access can remain available independently.
+- Added searchable and category-filtered browsing for Weapons, Armor, Tools, Building Blocks, Plants, Seeds, Food, Enchants, Potions, Ores, Metals, Logs, Machines and Miscellaneous.
+- Added display-name substring search and server-side sorting by item name, quantity, unit price and remaining time.
+- Added long selectable listing rows with the real item stack, normal item hover information, name, unit price, remaining quantity, seller and time remaining. The result area supports paging and mouse-wheel navigation.
+- Added a two-step purchase flow with a manual quantity field, exact formatted total price and a final **Buy now** action.
+- Added an inventory-backed selling screen. Players can drag a representative item into the offer slot, see the total matching quantity in their inventory, enter quantity and unit price, select 12/24/48 hours and create the listing.
+- Added **My Auctions** with remaining quantities and cancellation. Cancelled and expired listings return their remaining items through system mail.
+- Added mailbox delivery for purchases. Items are split by their real maximum stack size, limited to nine stacks per mail and automatically continued across multiple mails.
+- Added immediate seller proceeds through a pre-funded Auction House mail containing item, buyer, date, quantity, gross value, historical tax, tax amount and net proceeds.
+- Added a configurable global sale tax with 0.1% precision for players with `ssu.auction_house.admin`.
+- Added `ssu.auction_house.max_active` for rank/player-specific simultaneous listing limits and the `ssu.auction_house.*` wildcard.
+- Added a client purchase confirmation sound using the note-block pling after a transaction fully commits.
+
+### Reliability and security
+
+- All searches, listing creation, inventory extraction, price calculations, balance checks, quantity reservations, tax calculations, purchases, cancellations and deliveries are server-authoritative.
+- Direct Auction House packets require a short-lived server-granted session. Dashboard sessions require both access permissions; the public trusted server/NPC entry requires only general Auction House access.
+- Purchase processing is journaled and idempotent across listing reservation, buyer capture, seller-mail funding, seller delivery and buyer delivery. Recovery consults the economy idempotency journal before retrying or rolling back a step.
+- Listing and purchase reservation files must be persisted before items or money can be committed. Failed listing persistence restores the player's inventory and failed purchase preparation takes no money.
+- Completed/rolled-back purchase journals are retained for thirty days before maintenance cleanup.
+- Auction House operation pauses when Mail or Economy is unavailable; stored listings remain intact.
+
+### Compatibility
+
+- Network protocol is now **37** for the Auction House payloads and dashboard snapshot extension.
+- Auction House listing, purchase and settings storage start at schema 1.
+- Existing claims, regions, mailboxes, economy, permissions, holograms, statistics, map markers, player preferences and aerial map cache data are unchanged.
+- Client and server must use the exact same `1.7.0-dev1` build.
+
+## 1.6.0-dev12.11
+
+### Fixed
+
+- Filled the horizontal and vertical gaps inside the World Map marker context panel so terrain no longer shows through between Edit/Delete/Add and Close.
+- Corrected the yellow World Map legend swatch from **Markers** to **Player**. The player indicator is always shown independently of the personal marker layer toggle.
+
+### Compatibility
+
+- Network protocol remains 36. Player UI preferences remain schema 7, map markers remain schema 1 and the aerial map cache remains format 5 under `map-cache-v4`.
+- No server data, marker data, payload or client-cache migration is required. Client and server should use the exact same dev12.11 build.
+
 ## 1.6.0-dev12.10
 
 ### Added

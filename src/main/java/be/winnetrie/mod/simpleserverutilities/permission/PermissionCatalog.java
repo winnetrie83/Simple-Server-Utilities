@@ -214,6 +214,11 @@ public final class PermissionCatalog {
         integer(values, PermissionKeys.MAIL_SEND_COOLDOWN, "Minimum seconds between outgoing player mails.", 0, 86_400);
         bool(values, PermissionKeys.MAIL_ADMIN, "Grants future mail administration capabilities.");
 
+        bool(values, PermissionKeys.AUCTION_HOUSE_ACCESS, "Allows opening and using the Auction House from any trusted server entry point, including future NPCs.");
+        bool(values, PermissionKeys.AUCTION_HOUSE_DASHBOARD, "Shows and opens the Auction House button in the player dashboard.");
+        integer(values, PermissionKeys.AUCTION_HOUSE_MAX_ACTIVE, "Maximum number of simultaneous active auctions the player may create.", 0, 100_000);
+        bool(values, PermissionKeys.AUCTION_HOUSE_ADMIN, "Allows changing global Auction House settings such as the sale tax.");
+
         bool(values, PermissionKeys.HOLOGRAMS_ADMIN, "Allows creating, editing, moving, deleting and refreshing persistent holograms.");
         bool(values, PermissionKeys.BLOCK_INFORMATION_USE, "Allows using the personal block information overlay while the server module is enabled.");
         bool(values, PermissionKeys.BLOCK_INFORMATION_DEBUG, "Allows enabling technical Block Information debug details such as IDs, hardness, state and required tool.");
@@ -256,6 +261,7 @@ public final class PermissionCatalog {
         bool(values, "ssu.minimap.*", "Wildcard for all minimap permissions.");
         bool(values, "ssu.economy.*", "Wildcard for all economy permissions.");
         bool(values, "ssu.teleport.*", "Wildcard for all teleport-policy permissions.");
+        bool(values, "ssu.auction_house.*", "Wildcard for all Auction House access, dashboard, limit and administration permissions.");
         bool(values, "ssu.holograms.*", "Wildcard for all floating text, link, scoreboard and image hologram administration permissions.");
         bool(values, "ssu.block_information.*", "Wildcard for block information access.");
         bool(values, "ssu.statistics.*", "Wildcard for custom statistic administration.");

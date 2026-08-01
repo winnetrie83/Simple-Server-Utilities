@@ -141,6 +141,7 @@ public final class SsuMenuService {
                 ),
                 administrator,
                 Config.ENABLE_CROPS_HARVESTING.get(),
+                SimpleServerUtilities.AUCTION_HOUSE.dashboardVisible(player),
                 new SsuMenuSnapshotPayload.ModuleSettingsSummary(
                         Config.ENABLE_PLAYER_CLAIMS.get(),
                         Config.ENABLE_HOMES.get(),
@@ -153,6 +154,7 @@ public final class SsuMenuService {
                         Config.ENABLE_BLOCK_INFORMATION.get(),
                         Config.ENABLE_CUSTOM_STATISTICS.get(),
                         Config.ENABLE_MAIL.get(),
+                        Config.ENABLE_AUCTION_HOUSE.get(),
                         Config.ENABLE_PERMISSION_SYSTEM.get(),
                         Config.ALLOW_REMOTE_HOLOGRAM_IMAGES.get(),
                         Config.HOLOGRAM_RENDER_DISTANCE.get(),
@@ -252,6 +254,7 @@ public final class SsuMenuService {
     private ActionResult performAction(ServerPlayer player, SsuMenuActionPayload payload) {
         return switch (payload.action()) {
             case "refresh_shell" -> ActionResult.shell("Dashboard refreshed.");
+            case "auction_open" -> auctionOpen(player, payload.requestId());
             case "pay" -> pay(player, payload.target(), payload.value());
             case "setting" -> setting(player, payload.target(), payload.value());
             case "border" -> border(player, payload.target(), payload.value());
@@ -300,6 +303,11 @@ public final class SsuMenuService {
         };
     }
 
+    private ActionResult auctionOpen(ServerPlayer player, long requestId) {
+        SimpleServerUtilities.AUCTION_HOUSE.openFromDashboard(player, requestId);
+        return ActionResult.ok("Opening Auction House.", "");
+    }
+
     private ActionResult moduleToggle(ServerPlayer player, String rawModule, String rawValue) {
         if (!isAdministrator(player)) return ActionResult.fail("Administrator access is required.", "");
         final boolean enabled;
@@ -324,6 +332,7 @@ public final class SsuMenuService {
             case "block_information" -> setAndSave(Config.ENABLE_BLOCK_INFORMATION, enabled);
             case "statistics" -> setAndSave(Config.ENABLE_CUSTOM_STATISTICS, enabled);
             case "mail" -> setAndSave(Config.ENABLE_MAIL, enabled);
+            case "auction_house" -> setAndSave(Config.ENABLE_AUCTION_HOUSE, enabled);
             case "permissions" -> setAndSave(Config.ENABLE_PERMISSION_SYSTEM, enabled);
             case "remote_hologram_images" -> setAndSave(Config.ALLOW_REMOTE_HOLOGRAM_IMAGES, enabled);
             default -> { return ActionResult.fail("Unknown module switch.", ""); }
@@ -405,6 +414,7 @@ public final class SsuMenuService {
             case "block_information" -> "Block Information";
             case "statistics" -> "Player Statistics";
             case "mail" -> "Mail";
+            case "auction_house" -> "Auction House";
             case "permissions" -> "Permissions";
             case "remote_hologram_images" -> "Remote Hologram Images";
             default -> key;
