@@ -16,7 +16,7 @@ public record MailRecipientSuggestionsRequestPayload(String query, long requestI
                     MailRecipientSuggestionsRequestPayload::decode);
 
     public MailRecipientSuggestionsRequestPayload {
-        query = bound(query, 64).trim();
+        query = PayloadBounds.string(query, 64).trim();
         requestId = Math.max(0L, requestId);
     }
 
@@ -29,10 +29,7 @@ public record MailRecipientSuggestionsRequestPayload(String query, long requestI
         return new MailRecipientSuggestionsRequestPayload(buffer.readUtf(64), buffer.readVarLong());
     }
 
-    private static String bound(String value, int maximum) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= maximum ? safe : safe.substring(0, maximum);
-    }
+
 
     @Override
     public Type<? extends CustomPacketPayload> type() {

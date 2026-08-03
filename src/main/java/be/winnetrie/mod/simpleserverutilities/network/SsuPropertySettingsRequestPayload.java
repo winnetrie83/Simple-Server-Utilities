@@ -14,8 +14,8 @@ public record SsuPropertySettingsRequestPayload(String kind, String target, long
             StreamCodec.of(SsuPropertySettingsRequestPayload::encode, SsuPropertySettingsRequestPayload::decode);
 
     public SsuPropertySettingsRequestPayload {
-        kind = bounded(kind, 16).trim().toLowerCase(java.util.Locale.ROOT);
-        target = bounded(target, 64).trim();
+        kind = PayloadBounds.string(kind, 16).trim().toLowerCase(java.util.Locale.ROOT);
+        target = PayloadBounds.string(target, 64).trim();
         requestId = Math.max(0L, requestId);
     }
 
@@ -25,9 +25,5 @@ public record SsuPropertySettingsRequestPayload(String kind, String target, long
     private static SsuPropertySettingsRequestPayload decode(RegistryFriendlyByteBuf b) {
         return new SsuPropertySettingsRequestPayload(b.readUtf(16), b.readUtf(64), b.readVarLong());
     }
-    private static String bounded(String value, int maximum) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= maximum ? safe : safe.substring(0, maximum);
-    }
-    @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+@Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

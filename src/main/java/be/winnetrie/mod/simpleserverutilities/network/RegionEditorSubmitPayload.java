@@ -35,8 +35,8 @@ public record RegionEditorSubmitPayload(
             StreamCodec.of(RegionEditorSubmitPayload::encode, RegionEditorSubmitPayload::decode);
 
     public RegionEditorSubmitPayload {
-        name = bound(name, 64);
-        rentPrice = bound(rentPrice, 64);
+        name = PayloadBounds.trimmedString(name, 64);
+        rentPrice = PayloadBounds.trimmedString(rentPrice, 64);
         priority = Math.max(-1_000_000, Math.min(1_000_000, priority));
         rentPeriodDays = Math.max(-1, Math.min(365_000, rentPeriodDays));
         requestId = Math.max(0L, requestId);
@@ -74,10 +74,7 @@ public record RegionEditorSubmitPayload(
         );
     }
 
-    private static String bound(String value, int maximum) {
-        String safe = value == null ? "" : value.trim();
-        return safe.length() <= maximum ? safe : safe.substring(0, maximum);
-    }
+
 
     @Override
     public Type<? extends CustomPacketPayload> type() {

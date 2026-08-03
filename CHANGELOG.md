@@ -1,3 +1,739 @@
+# Simple Server Utilities 1.8.0-dev18.3.1
+
+## Auction House maintenance compile hotfix
+
+- Restores `AuctionHouseManager#maintenanceTick()`, which was accidentally removed while moving Auction House tax administration into the protected Economics menu.
+- Restores startup and scheduled maintenance for purchase recovery, pending seizures, expired/empty listings, session cleanup and old purchase-journal cleanup.
+- Network protocol remains **67** and every SSU storage/schema version remains unchanged.
+
+# Simple Server Utilities 1.8.0-dev18.3
+
+## Economics administration and transaction UX
+
+- Adds **Admin Center → Economics** as the single protected entry point for economy accounts, the complete transaction journal, Auction House tax, Player Claim tax status and the region-rent journal.
+- Rebuilds the administrator transaction page with a scrollable known-player selector, a retained exact player-name/UUID compatibility field, independent free-text transaction search, details and history-retention controls.
+- Renames the administrator page from **Wallet & Transactions** to **Transactions**. The player-facing Wallet remains separate and continues to provide payments and personal history.
+- Removes the obsolete **Apply refund policy** controls and their menu action route. Existing stored region-rental refund settings and refund behaviour remain unchanged.
+- Moves Auction House sale-tax editing out of the Auction House screen. Players may still see the active seller tax, while only authorized economy administrators can change it under Economics.
+- Adds a **Player Claim tax** submenu that clearly reports that no claim tax is active. The current claim system has no purchase price, recurring billing schedule or defined insufficient-funds policy, so this build deliberately does not create a non-functional or ambiguous charge.
+- Removes the secondary gray dimension/coordinate text from player Travel rows so destination text cannot appear behind the search field. Admin Travel Management keeps the technical location details.
+- Network protocol remains **67** and every SSU storage/schema version remains unchanged.
+
+# Simple Server Utilities 1.8.0-dev18.2.1
+
+## Travel compile and claim-chunk Home cleanup hotfix
+
+- Fixes the Java effectively-final compilation error in both Travel pages by keeping the mutable destination accumulator separate from the filtered and sorted visible list.
+- Deletes every Home physically located in a successfully removed claim chunk, for individual unclaims and valid Claim Map batch removals.
+- Performs ownership and connected-area validation before Home cleanup, so rejected chunk changes never remove Homes.
+- Network protocol remains **67** and every SSU storage/schema version remains unchanged.
+
+# Simple Server Utilities 1.8.0-dev18.2
+
+## Claim cleanup, focused map navigation and Travel separation
+
+- Deletes every home physically located inside a player claim when that claim is deleted through the Claim Map, dashboard administration or legacy command path. Cleanup runs centrally in `PlayerClaimManager` before the claim chunks are removed, so all deletion routes stay consistent.
+- Makes the Claim Map previous/next buttons request an authoritative viewport centered on the selected owned claim. Remote owned-claim viewports are validated against the claim bounds before normal map actions are accepted.
+- Keeps Claim Map notices inside the bottom panel by left-aligning and width-clipping the message; duplicate disconnected-selection wording is shortened.
+- Rebuilds player **Travel** as a read-only shortcut directory for permitted claim-linked homes, warps and server spawn. It includes All, Homes, Warps and Other filters, name/dimension search, teleport actions and pending-teleport cancellation.
+- Removes all warp/spawn mutation controls from player Travel. Adds **Admin Center → Travel Management** with All, Warps and Spawn filters, search, normal test teleports, warp create/move/delete, server-spawn set/clear and permission-aware disabled controls.
+- Existing `/homes`, `/warps`, `/spawn` and claim commands remain available and continue to use the same server managers and policies.
+- Increases network protocol from **66** to **67** for the extended Claim Map request payload. Border visualization preferences remain schema **3** and every other SSU storage/schema version remains unchanged.
+
+# Simple Server Utilities 1.8.0-dev18.1.1
+
+## Minecraft 26.2 screen API compile hotfix
+
+- Replaces the two invalid `Minecraft#setScreen(...)` calls introduced by the claim-specific Homes navigation with the Minecraft 26.2 `Minecraft#setScreenAndShow(...)` method.
+- Fixes compilation in `ClaimMapScreen` and `PropertySettingsScreen`.
+- Network protocol remains **66**, border visualization preference schema remains **3**, and every other SSU storage/schema version remains unchanged.
+
+# Simple Server Utilities 1.8.0-dev18.1
+
+## Per-claim borders and claim-bound Homes
+
+- Replaces the old one-shot claim border controls with a persistent per-owned-claim **Show / Hide** toggle.
+- Splits personal claim-border settings into a master **Enable claim borders** gate and **Show other claims**.
+- Moves Homes management into each claim's settings and filters the page to homes physically located inside that claim.
+- Requires new or moved homes to be inside the selected owned claim and revalidates `homes.use`, `homes.set`, teleport/delete permissions and the permission-derived total home limit server-side.
+- Existing home records and legacy commands remain available; homes outside claims are not deleted automatically.
+- Network protocol is **66**, border visualization preference schema is **3**, and every other SSU storage/schema version remains unchanged.
+
+# Simple Server Utilities 1.8.0-dev18.0
+
+## GUI-first command migration
+
+- Adds dedicated **Homes** management under **Claims & Homes**. Players can save/update, teleport to and safely delete homes without commands.
+- Keeps direct claim teleport administrator-only in both GUI and the legacy `/claims tp` command route; players navigate to their land through homes.
+- Expands **Travel** with warp creation, relocation and deletion, server-spawn management and pending-teleport cancellation.
+- Adds **Admin Center → Player Claims** for cross-player claim inspection, safe administrator teleport and confirmed deletion.
+- Adds visual rank creation, rename, default-rank selection, deletion and player reset while preserving the existing permission editor and legacy commands.
+- Adds **Region Maintenance** for snapshots, reset, clear, redefine, deletion, selection points/coordinates/fill, rental time, pause/resume and the global renting switch.
+- Adds a complete Utility Mining administration page for Treecapitator/Veinminer limits and custom/disabled block lists.
+- Adds a shared Maintenance page for safe SSU reload, border colors/refresh, hologram refresh/move-here, NPC refresh, NPC-shop buy-back retention and runtime diagnostics.
+- Adds administrator score adjustment controls to the Minigame Lobby and an administrator **Advance stage** control to the Dungeon Lobby.
+- Routes `/ssu reload` and the GUI through the same reload lifecycle, which now includes Auction House, map markers, NPC shops, quests, minigames and dungeons. Managed dimensions remain restart-bound.
+- Existing commands remain available as compatibility, console and recovery routes. GUI actions reuse the existing managers, policies, storage and job locks.
+- Network protocol is **65** because of the new minigame score action payload. All SSU storage/schema versions remain unchanged.
+
+# Simple Server Utilities 1.8.0-dev17.3
+
+## Managed-dimension datapack recovery hotfix
+
+- Rewrites generated dimension-type JSON to the Minecraft 26.2 format.
+- Removes legacy dimension-type fields that were deleted before 26.2, including `effects`, `fixed_time`, `piglin_safe`, `natural`, `ultrawarm`, `bed_works`, `respawn_anchor_works` and `has_raids`.
+- Maps those settings to the current `attributes`, `skybox`, `cardinal_light`, `has_fixed_time`, `default_clock` and `timelines` fields.
+- Generates current 26.2 bed, raid, piglin, respawn-anchor, water/lava, fog, sky and fixed-time attributes for Overworld, Nether, End, Flat and Empty presets.
+- Keeps network protocol **64** and every SSU storage/schema version unchanged.
+- Existing worlds that already contain the malformed generated datapack require the one-time recovery steps in `docs/RECOVERY-1.8.0-dev17.3.md` before Minecraft can load the world.
+
+# Simple Server Utilities 1.8.0-dev17.1
+
+## Compile hotfix
+
+- Fixed `SsuMenuService.permissionEditorData(...)`: the requested dimension is now normalized into a separately assigned final/effectively-final value before it is referenced by a stream lambda.
+- Resolves the Java compile error that `selectedDimension` must be final or effectively final.
+- Network protocol remains **64** and all storage/schema versions remain unchanged.
+
+# Simple Server Utilities 1.8.0-dev16.5
+
+## System-account isolation and entity combat information
+
+- Marks SSU Mail Escrow and Auction House Tax as internal economy system accounts instead of player accounts.
+- Migrates the two existing deterministic account IDs automatically, without changing their balances or transaction history.
+- Excludes system accounts from Trusted Players, player permission/profile selectors, region member resolution, player payments and player mail recipients.
+- Automatically removes an internal system account from a claim's trusted set if it was accidentally added by an earlier build.
+- Keeps system accounts visible only in dedicated administrator economy accounting where their balances are relevant.
+- Block Information now shows health/current maximum health for living entities.
+- Armor is shown only when the inspected entity currently has armor points; armor toughness is shown only when greater than zero.
+- Entity stats are available in normal and debug Block Information views and do not reveal unavailable fields.
+- Network protocol remains **63** and all public storage schemas remain unchanged. Economy account records internally normalize to schema 2 for the system-account marker.
+
+# Simple Server Utilities 1.8.0-dev16.4
+
+## Dedicated trusted-player manager
+
+- Replaces the cramped Claim Settings trusted-player summary plus separate Trust/Untrust controls with one **Trusted players → Manage** entry.
+- Adds a dedicated server-authoritative trusted-player GUI per owned claim.
+- The **Trusted players** tab lists every currently trusted player, supports local name/UUID filtering and removes access with one explicit button.
+- The **Add player** tab searches online and previously known players and adds them without manually typing names or UUIDs.
+- Online players are visually marked and sorted before offline known players.
+- Candidate results are capped at 100 per search response; the GUI reports the full match count and asks the user to narrow broad searches.
+- Claim ownership and `claims.trust` permission are revalidated server-side for every add/remove action.
+- The old property-setting `trust_player` and `untrust_player` actions are removed from the Claim Settings page.
+- Network protocol is **63**; all storage schemas remain unchanged.
+
+# Simple Server Utilities 1.8.0-dev16.2
+
+## World marker beacon-beam refinement
+
+- Replaced the former thin two-line marker beam with a beacon-like three-layer vertical column.
+- The beam now uses a broad translucent marker-colour glow, a brighter inner column and a narrow luminous core.
+- The lower end starts at the first free block above the active `WORLD_SURFACE` column instead of extending to the dimension minimum Y.
+- Surface height is cached for 40 ticks per marker and refreshed when the marker column changes, avoiding a heightmap lookup every rendered frame.
+- Unloaded marker columns safely fall back to the marker's persisted Y until the chunk becomes available.
+- Beam visibility distance, marker colours, map icons, labels, network protocol and every storage schema remain unchanged.
+
+# Simple Server Utilities 1.8.0-dev16.1
+
+## Compile hotfix
+
+- Fixed `ContentProgressionManager.markAccess(UUID)`: `MinecraftServer#getTickCount()` returns an `int`, while `lastAccessTick` stores `Long` values.
+- The tick count is now explicitly widened to `long` before insertion.
+- No network, storage, schema, or runtime-behaviour changes.
+
+# Simple Server Utilities 1.8.0-dev15.4
+
+## NPC and Dialogue Editor usability hotfix
+
+- Keeps the NPC Manager on the **Templates** tab after deleting or spawning a reusable template instead of forcing it back to Placements.
+- Replaces the wide Role button on NPC Identity with compact `<`, role and `>` controls.
+- Adds a dedicated upper-right close button to the NPC editor.
+- **Save** now saves an existing NPC without closing the editor. The manager refreshes when the editor is closed; successful deletion still closes and refreshes immediately.
+- Makes the Template ID read-only while editing an existing NPC so repeated saves continue to target the same reusable template safely.
+- Renames Dialogue Editor tabs to clearer workflow terms: **On open** and **On choose**.
+- Adds a contextual explanation on every Dialogue Editor page and a complete Help window explaining Node, Conditions, On open, Choice and On choose.
+- Adds a selectable **Parameter guide** for every known condition and action type. It lists required/optional keys, descriptions and insertable examples while preserving the free-form `key=value` field for custom and modded handlers.
+- Adds recommended defaults for built-in item and money actions alongside the existing progression, reputation and permission actions.
+- Network protocol remains **61** and every storage schema remains unchanged.
+
+# Simple Server Utilities 1.8.0-dev15.3
+
+## Shop Editor usability hotfix
+
+- Keeps **Save shop** inside the editor and shows a compact saved confirmation instead of closing the screen.
+- Adds a dedicated close button in the upper-right corner.
+- Replaces the previous/next shop labels with compact `<` and `>` buttons.
+- Fits the Count field, Infinite toggle and Down button completely inside the Offers panel.
+- Adds a framed selected-item slot with the normal Minecraft item tooltip.
+- Removes the redundant green price/catalog and copied-item explanatory text from Offers and Trade rules.
+- Adds **View: All / View: Added / View: Not added** filtering to Trade rules so administrators can immediately inspect only rules already present in the active whitelist or blacklist.
+- Preserves missing legacy item/tag rules in the added-only view, even when a mod or tag is no longer available.
+- Network protocol remains **61** and all storage schemas remain unchanged.
+
+# Simple Server Utilities 1.8.0-dev15.2
+
+## Compile hotfix
+
+- Fixed Java generic type inference in `NpcEditorService.shopChoices()`.
+- The shop comparator now explicitly uses `NpcShopDefinition`, so `displayName` and `id` resolve correctly.
+- The faction comparator now explicitly uses `NpcDefinition` as a preventive matching fix.
+- No network or storage format changes.
+
+# Simple Server Utilities 1.8.0-dev15.1
+
+## Compile hotfix
+
+- Replaced the removed `BuiltInRegistries.ITEM.getTagNames()` call in `NpcShopEditorScreen` with the Minecraft 26.2 registry API `BuiltInRegistries.ITEM.getTags()`.
+- Tag identifiers are now read from each `HolderSet.Named<Item>` through `tag.key().location()`.
+- Restores compilation of the visual whitelist/blacklist tag selector without changing shop data, schemas, or network payloads.
+- Network protocol remains **61**.
+- NPC Shop schema remains **4**.
+
+## Previous dev15 changes
+
+## Administrator interface
+
+- Rebuilt **Admin Center → Admin Tools** as a true scrollable list with mouse-wheel support and visible up/down controls. Tool cards no longer collide with the fixed footer buttons on shorter screens.
+- Reduced the complete NPC Shop Editor from **760×480** to **570×360**, exactly 25% smaller in both dimensions, and reflowed every page for the compact window.
+
+## Shop availability
+
+- Replaced the shared offer time window with seven independent weekday rows.
+- Every weekday now has its own enabled switch, **All day** switch, start time and end time.
+- Removed the redundant **Every day** control. Administrators explicitly enable the weekdays they need.
+- Overnight windows remain supported per day, for example Sunday 22:00–Monday 02:00.
+- Migrated schema-3 schedules without changing their meaning: the former empty day mask remains every day, and legacy equal start/end times remain all day.
+
+## Visual trade rules
+
+- Replaced the manually typed whitelist and blacklist editors with visual selectors.
+- Administrators can switch between **Items** and **Tags**, search the active registry, page through results and click a row to add or remove it from the selected list.
+- Every vanilla and modded item is sourced from the active item registry and is shown with its item icon and registry ID.
+- Every item tag known to the connected client is selectable without memorising tag IDs. Existing exact-item and tag rules remain compatible.
+
+## NPC editor usability
+
+- Removed the Basic interaction text field from Identity. NPC conversations now remain the responsibility of Dialogue definitions; existing legacy text is preserved invisibly for compatibility.
+- Replaced the manually typed linked-shop field with a searchable selector containing all existing shared shops.
+- Replaced manually typed faction-relation targets with a searchable selector containing all factions currently defined by NPC templates.
+- Unknown legacy references remain visible as missing references instead of being silently discarded.
+
+## Compatibility
+
+- Mod version: **1.8.0-dev15**.
+- Network protocol increased from **60** to **61** for the NPC editor shop/faction choice lists.
+- NPC Shop schema increased from **3** to **4** for independent weekday hours.
+- NPC definition schema remains **7**, placement schema remains **3**, dialogue schema remains **1**, Item Price Catalog schema remains **1**, and Player UI preference schema remains **8**.
+- Client and dedicated server must use the exact same dev15 build.
+
+# Simple Server Utilities 1.8.0-dev14
+
+## NPC identity
+
+- Moved **Role / occupation** from Functions to the Identity tab. Role is now descriptive metadata only and never creates, replaces or changes NPC services.
+- Removed the **Apply preset** button and all role-to-service preset logic.
+- Added a synchronized three-line NPC identity label: smaller role above the NPC name and faction name below it.
+- Faction labels use the NPC attitude toward players: hostile red, neutral yellow and friendly green.
+- Added a player-facing faction display name while retaining the stable faction ID for reputation and relation logic. Empty display names migrate to a readable form of the faction ID.
+- Disabled the vanilla custom-name plate for managed NPCs while the SSU label is active, preventing duplicate names. The existing **Name visible** option controls the complete SSU identity label.
+
+## Central shop administration
+
+- Added **Shop Manager** to Admin Center → Admin Tools as the single place to create, browse, edit and delete shared shops.
+- Removed Shop Library, Use for NPC and Edit linked shop navigation from the NPC editor.
+- NPC Editor → Functions now contains only a **Linked shop ID** reference for shops. Shop content cannot be edited from an NPC.
+- Migrated legacy generic shop functions into the explicit linked-shop field and removed them from advanced functions during definition normalization.
+- Linked-NPC counts and the Shop Editor's linked-NPC page now read the explicit shop ID.
+
+## Compatibility
+
+- Mod version: **1.8.0-dev14**.
+- Network protocol increased from **59** to **60** for the NPC editor fields and overhead-label synchronization payload.
+- NPC definition schema increased from **6** to **7**.
+- NPC placement schema remains **3**, dialogue schema remains **1**, NPC shop schema remains **3**, Item Price Catalog schema remains **1**, and Player UI preference schema remains **8**.
+- Client and dedicated server must use the exact same dev14 build.
+
+# Simple Server Utilities 1.8.0-dev13.2
+
+- Fixed misleading NPC shop affordability feedback.
+- Shop hover now distinguishes right-click one-item price from left-click offered-stack total.
+- Added the raw synchronized player balance to the shop snapshot so unaffordable one-item and stack prices render in red.
+- Insufficient-funds messages show required amount, current balance and the right-click fallback.
+- Applied the same detailed feedback to buy-back purchases.
+- Network protocol increased from 58 to 59 because `NpcShopDataPayload.Entry` now carries the formatted full-stack price.
+- NPC shop schema remains 3; item price catalog schema remains 1; player UI preference schema remains 8.
+
+# Simple Server Utilities 1.8.0-dev13.1
+
+- Removed the live weekday/time line from the player-facing NPC Shop.
+- Added a live weekday/time line to the SSU dashboard header.
+- Added a personal `Day & time below map` minimap setting, disabled by default and synchronized with the normal minimap payload.
+- Minimap coordinates and the optional weekday/time now render below the minimap for every minimap position.
+- Reduced the Item Price Catalog window from 820×500 to 615×375 (25% smaller in both dimensions).
+- Reflowed the catalog controls and reduced catalog pages from 18 to 12 rows so the compact window remains fully visible.
+- Player UI preference schema increased from 7 to 8.
+- Network protocol increased from 57 to 58.
+
+## 1.8.0-dev13
+
+### Added
+
+- Added a searchable, paged **Item Price Catalog** to **Admin Center → Admin Tools**. It is built from the live Minecraft item registry, so every active vanilla and modded item appears automatically without a hard-coded compatibility list.
+- Added independent global base prices for what a player pays to buy one item and what a player receives when selling one item. Zero disables that direction. The sparse catalog is persisted in `npcs/item_prices.json` with item-price schema **1**.
+- Added per-shop **Trade rules** with sale whitelists and blacklists. Rules accept exact item IDs such as `minecraft:wheat` and item tags such as `#c:crops`; an empty whitelist accepts every globally priced item and the blacklist always wins.
+- Added a reusable seven-day Minecraft calendar from Monday through Sunday. Calendar days change at midnight, repeat every seven world days and share the existing Minecraft clock conversion.
+- Added per-offer **Availability** settings in the Shop Editor: selected weekdays, start time and end time. Overnight windows are supported, including Sunday 22:00 through Monday 02:00.
+- Added the current weekday and time to the player-facing NPC Shop header; it keeps advancing from the synchronized client world clock while the server remains authoritative for availability.
+- Added a central purchase-quote pipeline for future reputation and temporary server-event discounts. Multiple discounts are summed as percentages of the unchanged catalog base price, so discounts never compound on already discounted prices.
+
+### Changed
+
+- Players can now sell any inventory item with a configured global sale price to a shop that permits it through its whitelist/blacklist. The item no longer needs to be one of that shop's purchase offers.
+- Shop offers now define which exact items the NPC sells, their offered stack size, stock/restocking and schedule. Buy and sell prices are no longer edited per offer.
+- Existing schema-2 offer prices are migrated once into the global item catalog and then cleared from the shop entries. An existing catalog value takes priority, allowing administrators to disable a price later by setting it to zero.
+- NPC Shop storage migrates from schema **2** to schema **3** for shop sale filters and scheduled offers. NPC definitions remain schema **6**, placements remain schema **3**, dialogues remain schema **1**, and the Item Price Catalog starts at schema **1**.
+- The network protocol is now **57** for the item-catalog editor payloads, player-shop weekday/time snapshot and per-inventory-slot sale quotes.
+- Client and dedicated server must use the exact same `1.8.0-dev13` build.
+
+### Safety
+
+- Purchase availability and inventory-sale filters are revalidated server-side at transaction time. A stale client screen cannot buy an offer outside its configured day/time window or sell an item rejected by the shop rules.
+- The player shop now receives a bounded sale quote for every occupied inventory slot, showing the current catalog sale price or the exact shop-rule reason that prevents the sale before the player clicks.
+
+## 1.8.0-dev12.1
+
+### Fixed
+
+- Replaced the remaining **Use held item** workflow in the visual NPC Shop Editor with a complete 36-slot inventory and hotbar picker.
+- Clicking a non-empty inventory slot now asks the server to copy that exact stack into the selected shop offer. The original player stack is never moved, reduced or removed.
+- Exact item data is preserved, including count, damage, custom name, enchantments and other data components supported by the existing `NpcItemCodec`.
+- Empty slots are rejected without changing the current offer, and the server independently validates the clicked slot before accepting the item.
+- New offers now instruct administrators to click an inventory stack rather than hold an item in the main hand.
+
+### Changed
+
+- The shop editor submission payload now carries a bounded inventory-slot index, so the network protocol is **56**.
+- NPC Shop storage remains schema **2**. NPC definitions remain schema **6**, placements remain schema **3**, and dialogues remain schema **1**.
+- Client and dedicated server must use the exact same `1.8.0-dev12.1` build.
+
+## 1.8.0-dev12
+
+### Added
+
+- Added a shared-shop workflow based on permanent shop IDs. Multiple NPC functions can point to the same shop ID, and every linked NPC reads the same live offers, prices, stock and buy-back behavior.
+- Added **Shop library** to the NPC Functions editor. It opens the visual shared-shop library without changing the NPC until an administrator selects **Use for NPC**.
+- Added **Use for NPC** to the shop library when it was opened from an NPC editor. The selected shop ID is written directly into that NPC's shop function without manual copying.
+- Added **Edit linked shop** beside shop functions so an administrator can open the currently assigned shared shop directly from the NPC editor.
+- Added previous/next shop browsing and a Shop list shortcut inside the Shop Editor. Browsing saves the current draft first, preventing edits from being lost while moving between shared shops.
+- Added a **Linked NPCs** Shop Editor page showing every NPC template that exposes the current shop, how many shop functions reference it and how many placed NPC instances use that template.
+- Added NPC-reference totals to every Shop Library row.
+
+### Changed
+
+- The visual shop administration model is now intentionally reusable rather than transitional: a shop ID is the single shared source for all NPCs linked to it.
+- Shop deletion is blocked while any NPC template still references the shop ID. The library and server both enforce this guard and report the number of linked templates and placed NPCs.
+- Shop Editor save messages explicitly confirm that linked NPCs use the update immediately.
+- The network protocol is now **55** because the shop manager rows carry NPC-reference totals and the editor payload carries shop navigation state, notices and bounded linked-NPC records.
+- NPC Shop storage remains schema **2**. NPC definitions remain schema **6**, placements remain schema **3**, and dialogues remain schema **1**.
+- Client and dedicated server must use the exact same `1.8.0-dev12` build.
+
+### Scope
+
+- Dev12 keeps the dev11 click-only player buying, inventory selling and timed nine-entry buy-back behavior unchanged. This slice focuses on reusable shop IDs, remote editing, NPC assignment and reference visibility.
+
+## 1.8.0-dev11
+
+### Added
+
+- Added a compact click-only player NPC Shop screen with eighteen shop slots per page and the complete 36-slot player inventory. Shop items never attach to the cursor and no drag-and-drop path exists.
+- Added direct mouse transactions: left-clicking a shop item buys its configured offered stack, right-clicking buys one item, left-clicking an inventory stack sells the complete clicked stack, and right-clicking sells one item from that exact slot.
+- Added a per-player **Buy-back** tab for the latest nine sales to the current NPC shop. Left-click buys back the remaining sold stack and right-click buys back one item at the exact unit price originally paid to the player.
+- Added reserved buy-back stock. Recently sold items remain reserved until bought back or expired; expired and evicted records are safely committed to finite shop stock.
+- Added the common config value `npcShopBuybackMinutes`, defaulting to 5 minutes and bounded from 1 to 1440 minutes. Administrators can inspect or change it at runtime with `/ssu npc shop buyback-minutes [minutes]`.
+- Added dedicated Economy Core transaction types and rollback handling for NPC shop buy-back purchases.
+
+### Changed
+
+- NPC Shop prices, finite stock and restock amounts now use individual item units. The configured `itemCount` only determines the stack bought by a normal left-click.
+- NPC Shop storage migrates from schema **1** to schema **2**. Legacy offer prices are converted to per-item prices and legacy finite offer stock/restock counts are expanded to item counts.
+- Inventory sales are resolved server-side from the clicked slot and exact item components. When duplicate exact offers exist, the valid offer with the highest sell price is selected.
+- The network protocol is now **54** because the player shop snapshot includes eighteen shop entries and nine bounded buy-back entries. NPC definition schema remains **6**, placement schema remains **3**, and dialogue schema remains **1**.
+- Client and dedicated server must use the exact same `1.8.0-dev11` build.
+
+### Scope
+
+- Dev11 implements the new player transaction behavior and buy-back foundation. The next shop slice can remove the reusable/shared Shop Manager architecture and integrate each NPC's shop editor directly into the NPC editor.
+
+## 1.8.0-dev10.1
+
+### Added
+
+- Added a visual **NPC Shop Manager** with search, paging, creation, editing, guarded two-click deletion, enabled/disabled status and offer counts. It opens from the new **Shops** button in the existing NPC Manager or through `/ssu npc shop manage`.
+- Added a two-page **NPC Shop Editor** for identity and offers. Administrators can create reusable shops, edit display name and enabled state, add, duplicate, delete and reorder offers, and preview the selected exact item, prices and stock configuration.
+- Added server-authoritative held-item capture from the editor. The server copies the administrator's current main-hand stack including components, enchantments, damage, trims, dyes, custom names and custom model data, then returns the updated draft without persisting it until Save.
+- Added visual controls for items per offer, buy/sell prices in the configured economy decimal format, infinite/finite stock, current/maximum stock and persisted restock amount/interval.
+- Added `/ssu npc shop edit <shop>` as a direct visual-editor shortcut while retaining all dev10 command administration for automation and recovery.
+
+### Changed
+
+- Existing shop IDs become immutable after first save so NPC Function and dialogue targets cannot silently break through a rename. New shops choose their ID before the first save.
+- Visual-editor saves are fully revalidated on the dedicated server for administrator permission, unique normalized IDs, exact valid ItemStacks, at least one enabled transaction direction, stack-size bounds, stock bounds, entry count and serialized size.
+- Network protocol is now **53** for the six bounded shop-manager/editor payloads. NPC Shop schema remains **1**; NPC definition schema remains **6**, placement schema remains **3**, and dialogue schema remains **1**.
+- Client and dedicated server must use the exact same `1.8.0-dev10.1` build.
+
+### Scope
+
+- Dev10.1 replaces normal shop administration with a visual workflow while preserving the command layer. Categories, search/filtering in the player shop, per-player purchase limits, reputation/rank discounts and generic paid NPC services remain planned dev10 follow-up work.
+
+## 1.8.0-dev10.0.1
+
+### Fixed
+
+- Removed the private `NpcShopScreen#rebuildWidgets()` helper that collided with the inherited Minecraft 26.2 `Screen#rebuildWidgets()` method and caused Java to reject the reduced visibility. `acceptData(...)` now uses the inherited screen rebuild implementation directly.
+
+### Changed
+
+- Network protocol remains **52**. NPC Shop schema remains **1**; NPC definition schema remains **6**, placement schema remains **3**, and dialogue schema remains **1**.
+- Client and dedicated server must use the exact same `1.8.0-dev10.0.1` build.
+- This is a source compilation hotfix only; the dev10 shop feature scope and stored data are unchanged.
+
+## 1.8.0-dev10
+
+### Added
+
+- Added the first persistent **NPC Shop** foundation with independent schema-1 shop definitions stored under `npcs/shops`. A shop can contain up to 128 exact ItemStack offers and is referenced through the extensible NPC service target `shop`.
+- Added a server-authoritative player shop screen with eight offers per page, item rendering/tooltips, current balance, exact buy/sell prices, stock visibility, quantity entry, paging and refresh.
+- Added bidirectional fixed-price transactions. NPCs can sell items to players, buy exact matching items from players, or support only one direction by setting the other price to zero.
+- Added finite or infinite stock, maximum stock, persisted wall-clock restock intervals and catch-up restocking after server downtime without tick-by-tick loops.
+- Added exact inventory planning and rollback snapshots across the 36 storage/hotbar slots. Custom names, components, enchantments, trims, damage, dyes and custom-model data must match when selling.
+- Added Economy Core journal types and idempotency keys for NPC shop purchases, sales and both rollback directions.
+- Added administrator commands under `/ssu npc shop` for listing, creating, deleting, renaming and enabling shops; capturing the held exact item as an offer; removing offers; and configuring finite stock/restock.
+- Added permissions for using, buying from and selling to NPC shops, plus the NPC-service shop gate.
+- Merchant and Blacksmith role presets now use the registered `shop` service. Dialogue Editor target browsing and validation include current NPC shops.
+
+### Changed
+
+- Network protocol is now **52** for the new shop page, refresh and transaction payloads.
+- NPC definition schema remains **6**, NPC placement schema remains **3**, and NPC dialogue schema remains **1**. The new NPC Shop schema is **1**.
+- Shop interactions revalidate the NPC instance, dimension, distance, reputation, permissions, module state, session, shop, offer, stock, inventory capacity/content and current economy result on every request.
+- Client and dedicated server must use the exact same `1.8.0-dev10` build.
+
+### Scope
+
+- This first dev10 slice provides the fixed-price shop runtime, storage, player GUI and safe command-based administration. A visual shop editor, categories, per-player limits, discounts and generic paid NPC services remain planned dev10 follow-up work.
+
+## 1.8.0-dev9.3
+
+### Added
+
+- Added a safe client-only dialogue preview that can start from the currently selected node, follow graph choices, reset to the configured start node and show which entry/choice actions or NPC services would run without executing any side effects.
+- Added a paged Dialogue Editor validation report with separate errors and warnings for missing/duplicate IDs, missing graph targets, unreachable nodes, trapped graph cycles, blank player-facing text, ignored condition children, unknown registered handlers and incomplete service routing.
+- Added server-synchronised target catalogues for warp, quest-offer, quest-turn-in, minigame-queue and dungeon-queue services. The Choice page can now browse actual current server targets while retaining manual input for extensible custom services.
+- Added shared side-effect-free `NpcDialogueValidation` used by both the client editor and authoritative server save path.
+
+### Changed
+
+- Dialogue saves are blocked client-side when validation contains errors and are independently revalidated on the dedicated server. Warnings remain visible but do not prevent intentionally unusual dialogue graphs.
+- Service selection automatically chooses the first available known target when switching to a targeted service whose current target is invalid or empty.
+- Preview mode assumes conditions pass and exposes condition/action/service summaries through tooltips; it never mutates player data, executes actions, teleports, starts quests or opens live services.
+- Network protocol is now **51** because the dialogue-editor open payload carries bounded service-target entries. NPC definition schema remains **6**, NPC placement schema remains **3**, and NPC dialogue schema remains **1**.
+- Client and server must use the exact same `1.8.0-dev9.3` build.
+
+### Scope
+
+- This completes the planned Dialogue Editor 2.0 preview, graph validation and first module-aware target-browser slice. Fully typed parameter widgets and copy/duplicate conveniences can be added later; the next major planned phase is NPC Shops & Paid Services.
+
+## 1.8.0-dev9.2
+
+### Added
+
+- Added the visual nested-condition page for Dialogue Editor 2.0. Every choice condition is displayed as a bounded pre-order tree with the selected node, depth and stable path visible in the editor.
+- Added selection navigation, child creation, deletion and deterministic sibling reordering across the full condition tree.
+- Added one-click AND, OR and NOT wrappers. Adding a child to a leaf safely converts that leaf into an equivalent AND group containing the original condition plus a new `always` child.
+- Added registered condition-type selection and per-type starter-parameter restoration for every selected tree node rather than only the root condition.
+- Added compact tree previews with indentation, parameter summaries and explicit warnings when legacy data stores children below a non-composite handler.
+
+### Changed
+
+- The Dialogue Editor now has five pages: Node, Conditions, Entry actions, Choice and Choice actions. Choice keeps graph/service routing compact and opens the dedicated condition tree for availability logic.
+- Condition editing now preserves arbitrary existing `all`/`any`/`not` nesting while enforcing the shared Content Core maximum depth and node limits during visual mutations.
+- `not` structures are guarded both client-side and during the server-authoritative save: exactly one child is required. Manually modified invalid dialogue JSON is rejected safely.
+- Network protocol remains **50** because no payload changed. NPC definition schema remains **6**, NPC placement schema remains **3**, and NPC dialogue schema remains **1** because the existing condition-tree data model is reused unchanged.
+- Client and server should use the exact same `1.8.0-dev9.2` build.
+
+### Scope
+
+- This slice completes visual nested-condition composition. Rich typed parameter widgets, dialogue preview/testing and module-specific target browsers remain follow-up Dialogue Editor 2.0 work.
+
+## 1.8.0-dev9.1
+
+### Added
+
+- Began **Dialogue Editor 2.0** with four compact pages: Node, Entry actions, Choice and Choice actions.
+- Added full GUI editing for all node-entry actions and all choice actions instead of exposing only the first choice action. Each bounded action list supports selection, addition, deletion and deterministic reordering.
+- Added server-synchronised catalogues for every currently registered content condition, content action and NPC service. Editor buttons now cycle valid registered IDs rather than requiring administrators to remember or type them manually.
+- Added visual graph-target selection across the dialogue's current node IDs and visual service selection including a safe `none` option.
+- Added context-sensitive starter parameters for built-in conditions/actions and service-target guidance for warps, quests, minigames and dungeons.
+- Added dialogue enabled/disabled editing and safe cleanup of choice links that target a deleted node.
+
+### Changed
+
+- Network protocol is now **50** because the dialogue-editor open payload carries the registered condition/action/service catalogues.
+- NPC definition schema remains **6**, NPC placement schema remains **3**, and NPC dialogue schema remains **1** because this build only exposes capabilities already supported by the existing dialogue data model.
+- Existing dialogue JSON remains compatible. Existing nested `all`/`any`/`not` condition children are retained when their parent condition is edited; a visual nested-condition builder remains later Dialogue Editor 2.0 work.
+- Dialogue saves remain server-authoritative and continue to reject unknown action, condition and service IDs.
+- Client and server must use the exact same `1.8.0-dev9.1` build.
+
+### Scope
+
+- This slice completes multi-action editing and registered-type selection. Visual nested condition trees, dialogue preview/testing and richer target pickers remain follow-up work.
+
+## 1.8.0-dev9
+
+### Added
+
+- Added the first **NPC Functions** foundation with a dedicated eighth NPC editor page. Every reusable NPC template can now store a descriptive role, an interaction mode and up to eight named functions.
+- Added fourteen role presets: Citizen, Quest Giver, Merchant, Auctioneer, Postmaster, Healer, Banker, Warp Master, Minigame Host, Dungeon Master, Guard, Trainer, Blacksmith and Innkeeper.
+- Added three player interaction modes: the existing dialogue/fallback-text route, one direct service and a generated service-selection menu.
+- Added a server-synchronised NPC function menu. Each entry is preflight-validated against the existing extensible NPC service registry and unavailable entries are disabled with their validation reason.
+- Added editor-side service selection from the currently registered built-in and module-provided services. Role presets may create a sensible first function when their service is available.
+- NPC Manager searches now also match NPC role IDs.
+
+### Changed
+
+- NPC definition schema is now **6** for roles, interaction modes and function lists. Existing definitions migrate to `citizen` plus `dialogue`, preserving their current dialogue link or one-line fallback behavior exactly.
+- Network protocol is now **49** for the expanded NPC editor payloads and the new function-menu/use payloads.
+- NPC placement schema remains **3**. NPC dialogue, Quest, Minigame, Dungeon and Content Progression schemas remain unchanged.
+- Direct function execution remains server-authoritative: current module state, NPC state, dimension, distance, reputation, service permissions and service targets are revalidated at use time. Client requests are accepted only for NPCs currently configured in service-menu mode.
+- Client and server must use the exact same `1.8.0-dev9` build.
+
+### Scope
+
+- This dev9 slice establishes roles and service routing. The larger Dialogue Editor 2.0 work, richer role-specific configuration and the planned fixed-price NPC Shop remain follow-up work.
+
+## 1.8.0-dev8.3
+
+### Added
+
+- Rebuilt the NPC administrator interface into a compact seven-page editor sized for smaller GUI scales: Identity, Behavior, Relations, Stats, Loadout, Schedule and Respawn. The dialogue editor is now two compact pages, and the model browser uses a searchable three-column grid with paging.
+- Added a real server-synchronised NPC loadout container. Six visual equipment slots and nine loot slots are edited against the player's live inventory with normal pickup/hotbar/shift-click interactions while configuration copies never consume the player's items.
+- Added a compact remote NPC Manager with separate Placements and Templates tabs, search, paging, spawn-from-template, remote edit, delete, teleport-to, bring-to-player, copy and force-respawn actions.
+- Added explicit NPC attitudes toward players and up to sixteen per-faction relations (`friendly`, `neutral`, `hostile`). Hostile managed mobs acquire players or NPCs from configured factions, path toward them and use a basic server-authoritative melee loop even when their vanilla model has no suitable combat goal.
+- Added per-placement respawn settings: enabled state, durable wall-clock delay, dimension, coordinates and yaw. Automatic respawn survives a server restart; administrators can also force an immediate respawn remotely.
+- Added manual gravity simulation for static No-AI NPC shells. Gravity-enabled, non-flying NPCs settle onto terrain and persist the landed position instead of being snapped back to their old floating coordinate.
+- The NPC Tool now resolves entity interaction before block/item fallback. Right-clicking a managed NPC opens its editor directly, while normal empty-space use opens the NPC Manager and sneak-use retains linked copy/paste.
+
+### Changed
+
+- Every managed NPC now uses only its configured SSU nine-slot loot table. The former custom-loot toggle is removed from the editor; an empty table deliberately drops nothing and native entity loot is always suppressed.
+- Visual equipment is always excluded from death loot and remains cosmetic only. Equipment copies retain visual stack identity but do not contribute armor, health, attack, blocking, gliding or other gameplay behavior.
+- Reusable NPC definitions are the template library automatically: creating an NPC creates one template plus one placement, linked copies and template spawns reuse it, and unused templates may be deleted from the manager.
+- NPC definition schema is now **5** for player/faction attitudes. NPC placement schema is now **3** for durable respawn configuration and state.
+- Network protocol is now **48** for the compact editor, relation, respawn, loadout-container and remote-manager payloads.
+- NPC dialogue, Quest definition/journal, Minigame definition/recovery, Dungeon definition/recovery and Content Progression schemas remain unchanged.
+- Existing NPC definitions/placements migrate with neutral relations and their current position as the default respawn anchor. Existing schema-4 equipment, loot and schedules are preserved.
+- Client and server must use the exact same `1.8.0-dev8.3` build.
+
+## 1.8.0-dev8.2
+
+- Compile-only Minecraft 26.2 API hotfix for the NPC editor service and NPC tool.
+- Replaced the removed `ServerPlayer#serverLevel()` calls with the covariant `ServerPlayer#level()` accessor in `NpcEditorService` and `NpcToolManager`.
+- Declared the registry lookup explicitly as `HolderLookup.Provider`, which also resolves the cascading `NpcItemCodec.encode(...)` and `decode(...)` type errors after the invalid level accessor.
+- Network protocol remains 47 and all storage schemas remain unchanged.
+- Client and server must use the exact same `1.8.0-dev8.2` build.
+
+## 1.8.0-dev8.1
+
+- Compile-only Minecraft 26.2 clock API hotfix for NPC schedules.
+- Replaced removed `Level#getDayTime()` calls with `Level#getDefaultClockTime()` in the NPC editor and runtime manager.
+- Network protocol remains 47 and all storage schemas remain unchanged.
+- Client and server must use the exact same `1.8.0-dev8.1` build.
+
+## 1.8.0-dev8
+
+### Added
+
+- Rebuilt the NPC administrator editor into six focused tabs: Identity, Behavior, Stats & Faction, Equipment, Loot Table and Schedule.
+- Replaced typed NPC model IDs with a searchable server-validated model picker containing registered vanilla and modded living entity types. Unsafe native boss shells remain excluded.
+- Replaced typed equipment item IDs with six visual ghost item slots for main hand, offhand, head, chest, legs and feet. Administrators drag-copy items from their live inventory; the player item is never consumed. Exact stack components such as names, dyes, trims, custom models and visual enchantment glint survive save/reload.
+- NPC equipment is now strictly visual. Runtime display copies remove vanilla attribute, weapon, attack-range, blocking, glider and death-protection behavior while retaining cosmetic identity and glint. All mob equipment drop chances are forced to zero and exact-stack death-drop filtering provides an additional safety layer. Equipment never contributes armor, health or damage and never becomes NPC loot.
+- Added an optional nine-slot custom NPC loot table. Each filled slot stores item/count plus an independent 0.01%-100.00% drop chance, and the complete table can be rolled 1-100 times per death so several entries and repeated copies may succeed together.
+- Added normal-gravity, swimming and flying behavior controls. Swimming NPCs retain air and can use water movement; flying schedules use direct three-dimensional travel and ignore gravity while airborne. Static gravity-enabled NPCs may settle downward naturally and persist their settled placement instead of repeatedly snapping back into the air.
+- Added per-placement schedules with up to sixteen sorted time entries. Every entry defines a Minecraft clock time, world target, yaw, speed, walk/teleport travel and an arrival activity (`idle`, `look_around` or visual `chop_tree`).
+- Linked NPC copies now shift schedule targets relative to the pasted placement instead of reusing the source NPC's absolute route coordinates.
+
+### Compatibility
+
+- NPC definitions migrate from schema 3 to schema **4**. Existing typed equipment IDs migrate as visual slots; their legacy equipment drop chance is discarded. Every definition receives nine stable loot-slot positions with custom loot disabled by default.
+- NPC placements migrate from schema 1 to schema **2** for optional per-placement schedules. Existing placements receive an empty disabled schedule.
+- Network protocol is now **47** because the NPC editor payloads carry movement, exact ItemStacks, fixed loot-slot, schedule and model-picker data. Empty slots and client submissions use the bounded optional-untrusted ItemStack stream codec.
+- NPC dialogue schema, Quest definition/journal schemas, Minigame definition/recovery schemas, Dungeon definition/recovery schemas and Content Progression remain unchanged.
+- Existing claims, regions, economy, mail, Auction House, quest, minigame and dungeon data remain unchanged.
+- Client and server must use the exact same `1.8.0-dev8` build.
+
+## 1.8.0-dev7
+
+### Added
+
+- Added the independent, data-driven **Customized Dungeon Framework** without hard NPC, Quest or Minigame dependencies. Dungeon Core depends on Content Core, storage, permissions and the existing Regions module.
+- Added persistent dungeon definitions with player limits, countdown/time-limit/post-run timing, lives, prerequisites, transactional participation/completion/failure rewards, ordered stages and one or more reusable region-backed arena slots.
+- Added four generic ordered stage types: administrator/manual progression, entity kill counts, proximity checkpoints and timed survival.
+- Added required SSU region ownership for every dungeon arena. Kill-count progression only accepts defeated entities inside that configured region, preventing out-of-arena farming.
+- Added server-authoritative queues that form runtime parties, automatic and administrator-forced starts, optional late joining, arena reservation, run countdown/running/post-run/reset phases and live stage/life status.
+- Added lobby, start, spectator and named checkpoint locations; deaths consume configurable lives, respawn at the latest reached checkpoint and eliminate exhausted players to spectator position. Zero configured lives means unlimited lives.
+- Added completion/failure handling, party-wide announcements, Content Core events and at-most-once transaction keys for rewards.
+- Added optional SSU region snapshot restoration after a run, persistent player return-location recovery and durable unsafe-arena markers. Interrupted or failed resets stay blocked after restart until safely restored or explicitly released.
+- Added a player-facing Dungeon Lobby and four-page administrator Dungeon Editor for general lifecycle, arenas/checkpoints, ordered stages and Content Core requirements/rewards.
+- Added optional NPC dialogue services `dungeon_lobby` and `dungeon_queue` without adding an NPC dependency to Dungeon Core.
+- Added `/ssu dungeon` player/admin commands, Admin Center/dashboard integration, `ssu.npcs.service.dungeons` and enforcement of the existing dungeon use, queue and admin permissions.
+- Added `dungeon_queue_joined`, `dungeon_queue_left`, `dungeon_started`, `dungeon_stage_completed`, `dungeon_completed` and `dungeon_failed` Content Core events for independent Quest integration.
+- Compacted the Admin Tools page when six tools are present so the Dungeon Editor and footer controls remain inside the dashboard panel.
+
+### Compatibility
+
+- Added dungeon-definition schema **1** under `simpleserverutilities/dungeons/definitions` and dungeon recovery schema **1** in `simpleserverutilities/dungeons/recovery.json`.
+- Network protocol is now **46** for the bounded dungeon lobby/editor payloads.
+- Minigame definition/recovery schemas remain 1; NPC definition schema remains 3; NPC placement/dialogue, Quest definition/journal and Content Progression schemas remain 1.
+- Existing claims, regions, snapshots, economy, mail, Auction House, NPC, Quest and Minigame data remain unchanged.
+- Client and server must use the exact same `1.8.0-dev7` build.
+- This build supplies region-based instances and generic stage lifecycle. Dynamic copied instances, generated structures, configured waves/bosses, puzzle scripting, invitation parties and cutscenes remain follow-up dungeon work.
+
+## 1.8.0-dev6
+
+### Added
+
+- Added the independent, data-driven **Minigame Framework** with no hard NPC, Quest or Dungeon dependency. The module depends on Content Core, storage, permissions and the existing Regions module.
+- Added persistent minigame definitions containing player limits, team counts, countdown/match/post-game timing, victory mode, prerequisites, participation rewards, winner rewards and one or more reusable arena slots.
+- Added arena configuration for lobby, spectator and team spawn locations, optional SSU region snapshots and independent free/reserved/resetting/blocked lifecycle states.
+- Added server-authoritative queues, automatic and administrator-forced match starts, round-robin team assignment, optional late joining, countdown, running and post-game phases, score mutation, elimination and highest-score, last-team-standing or manual completion modes.
+- Added a player-facing Minigame Lobby and a three-page administrator Minigame Editor for general settings, arenas/team spawns and Content Core requirements/rewards.
+- Added persistent player return-location recovery. Reset-enabled arenas receive durable unsafe markers while in use; an interrupted or failed reset keeps the arena blocked after restart until it is reset successfully or explicitly released by an administrator.
+- Added transactionally delivered participation and winner rewards plus `minigame_queue_joined`, `minigame_queue_left`, `minigame_started`, `minigame_won` and `minigame_completed` Content Core events for optional Quest and future Dungeon integration.
+- Added optional NPC dialogue services `minigame_lobby` and `minigame_queue` without adding an NPC dependency to the minigame module.
+- Added `/ssu minigame` player/admin commands, Admin Center access, the dedicated `ssu.npcs.service.minigames` permission and enforcement of the existing minigame use, queue and admin permissions.
+- Voluntary match leavers are now removed from the live roster, returned safely and cannot receive abandoned-match rewards. Disconnects remain recoverable and rejoin the active match as eliminated spectators.
+
+### Compatibility
+
+- Added minigame-definition schema **1** below `simpleserverutilities/minigames/definitions` and minigame recovery schema **1** in `simpleserverutilities/minigames/recovery.json`.
+- Network protocol is now **45** for the bounded lobby and editor payloads.
+- NPC definition schema remains 3; NPC placement/dialogue schemas, Quest definition/journal schemas and Content Progression remain schema 1.
+- Existing claims, regions, economy, mail, Auction House, NPC and quest data remain unchanged.
+- Client and server must use the exact same `1.8.0-dev6` build.
+- This build provides the generic queue/arena/match framework. Concrete rule handlers such as Spleef, parkour or team deathmatch are intentionally separate follow-up content implementations.
+
+## 1.8.0-dev5.1
+
+- Compile-only Minecraft 26.2 API hotfix for Advanced NPC equipment.
+- `NpcManager` now applies per-slot equipment drop chances only when the runtime shell is a `Mob`; `LivingEntity` itself no longer exposes `setDropChance(...)`.
+- Non-mob living shells still receive configured equipment, while unsupported per-slot drop chances are safely ignored.
+- Network protocol remains 44 and all storage schemas remain unchanged.
+- Client and server must use the exact same `1.8.0-dev5.1` build.
+
+## 1.8.0-dev5
+
+### Added
+
+- Started the Advanced NPC phase with schema-3 reusable NPC templates while preserving independent placements, dialogue graphs and optional Quest Core integration.
+- Added optional server-authoritative attribute overrides for maximum health, movement speed, attack damage, armor, armor toughness, follow range, knockback resistance and entity scale. Blank values inherit the selected living entity model's native attributes.
+- Added persistent equipment for main hand, offhand, head, chest, legs and feet, with validated vanilla/modded item registry IDs and a configurable shared drop chance. Blank slots inherit native equipment; `minecraft:air` explicitly clears a slot.
+- Added faction and reputation interaction gates backed by the independent Content Progression Core, including a configurable denied message and reputation loss when a player attacks an NPC.
+- Added a configurable home radius for native-AI NPCs. A zero radius disables the leash, while static NPCs remain tightly anchored to their saved placement.
+- Replaced the former single-page NPC editor with separate Identity & Placement, Stats & Faction and Equipment pages. Invulnerability is now editable instead of being forced on by the foundation build.
+- Runtime attribute and equipment changes safely respawn linked model shells so returning a field to inherit restores the model's true native value or loadout. Ordinary reconciliation never repeatedly heals damaged NPCs.
+
+### Compatibility
+
+- NPC definitions migrate from schema 2 to schema **3**. Existing definitions receive empty factions/equipment, native inherited attributes, a 16-block home radius and retain their prior invulnerability and dialogue behaviour.
+- Network protocol is now **44** because the bounded NPC editor payloads carry the new advanced template fields.
+- NPC placement schema remains 1, NPC dialogue schema remains 1, quest definition/journal schemas remain 1 and Content Progression remains schema 1.
+- Client and server must use the exact same `1.8.0-dev5` build.
+- Custom inventories, dedicated combat-goal profiles, custom loot tables, routines, animations and external skin rendering remain scheduled for later Advanced NPC iterations.
+
+## 1.8.0-dev4
+
+### Added
+
+- Added the first fully independent **Quest Core**. Quest definitions and player journals use isolated schema-1 storage and do not require NPC Core.
+- Added an exclusive administrator-selected quest entry route: quests are opened through either the SSU dashboard or NPC dialogue services, never both. When NPC Core is disabled, the existing safe effective-mode fallback exposes the questbook through the SSU menu.
+- Added persistent quest lifecycle states for available, active, ready-to-turn-in, completed and abandoned quests, including repeatability, completion counts and bounded cooldowns.
+- Added event-driven objectives for generic Content Core events, plus Minecraft adapters for block breaking/placement, entity kills, player deaths and damage dealt/taken. Existing NPC and dialogue events can be used when NPC Core is enabled without creating a hard module dependency.
+- Added prerequisite conditions for completed, active and ready quests, dependency-cycle validation and reference-safe quest rename/delete behaviour.
+- Added transactionally delivered quest rewards. Built-in item and exact-money rewards join the existing shared permission, unlock, flag, counter and reputation actions.
+- Added a server-authoritative paged Questbook with tracking, abandon, start, turn-in, reward preview, objective progress, completed history and administrator edit/delete access.
+- Added a structured administrator Quest Editor for basic information, prerequisites, repeatability/cooldowns, objectives and rewards, plus `/ssu quest` management commands.
+- Added optional NPC dialogue services `questbook`, `quest_offer` and `quest_turn_in`; these are available only while Quest Core is active and still enforce the exclusive access mode and all NPC/quest permissions.
+- Added dedicated `ssu.npcs.service.quests` permission while retaining separate `ssu.quests.use`, `ssu.quests.track`, `ssu.quests.abandon` and `ssu.quests.admin` controls.
+
+### Compatibility
+
+- Added quest-definition storage schema **1** under `simpleserverutilities/quests/definitions` and player quest-journal schema **1** under `simpleserverutilities/quests/players`.
+- Network protocol is now **43** for the bounded questbook and quest-editor payloads.
+- NPC definition schema remains 2, NPC placement schema remains 1, NPC dialogue schema remains 1 and Content Progression remains schema 1.
+- Existing NPCs, dialogues, claims, regions, mail, Auction House, economy and all other stored data remain compatible.
+- Client and server must use the exact same `1.8.0-dev4` build.
+
+## 1.8.0-dev3
+
+### Added
+
+- Added the first Dialogue & Services slice of NPC phase 3 while keeping NPC Core independent from the future quest module.
+- Added persistent reusable graph-based dialogue definitions with bounded nodes, choices, conditions, transactional actions, node-entry actions, next-node routing, hidden locked choices and explicit close behaviour.
+- Added a server-authoritative player dialogue screen with five-minute sessions, distance checks, replay-resistant request IDs and safe session cleanup on close, logout, module stop and reload.
+- Added a dedicated administrator dialogue graph editor linked from the existing NPC editor. Linked NPC copies continue to share the same reusable dialogue definition.
+- Added an extensible NPC service registry with side-effect-free preflight validation and built-in services for Mail, Auction House, SSU Menu, healing, server spawn and named warps. Existing module and destination permissions remain authoritative.
+- Added `dialogue_opened`, `dialogue_choice` and `npc_service_used` Content Core events for future quests, statistics, minigames and dungeons without introducing hard module dependencies.
+- Added separate NPC dialogue and service permissions, including mail, Auction House, SSU menu, healing and teleport services.
+- Added persistent dialogue reload/save participation in `/ssu reload` and the NPC module lifecycle.
+
+### Compatibility
+
+- NPC definitions migrate from schema 1 to schema **2** for the optional reusable `dialogueId` link. Existing NPCs without a dialogue retain their original one-line interaction text.
+- Added NPC dialogue schema **1** below `simpleserverutilities/npcs/dialogues`. NPC placement schema remains 1 and Content Progression remains schema 1.
+- Network protocol is now **42** for the six bounded dialogue runtime/editor payloads.
+- Client and server must use the exact same `1.8.0-dev3` build.
+- External skin folders, URL/UUID skins, recolouring, advanced aura rendering and animation/routine expansion are intentionally not part of this first phase-3 test slice.
+
+## 1.8.0-dev2.2
+
+- Minecraft 26.2 NPC Foundation compile/API cleanup hotfix.
+- Removed unreachable `ReflectiveOperationException` catches around `EntityType.loadEntityRecursive`; the current API only requires runtime-failure handling.
+- Replaced deprecated `LevelReader#hasChunkAt(BlockPos)` usage in `NpcManager` with `Level#isLoaded(BlockPos)`.
+- Replaced the removed `Entity#moveTo(double, double, double, float, float)` call with the current `Entity#snapTo(double, double, double, float, float)` positioning API.
+- No NPC storage, protocol, permission or gameplay schema changes.
+- Client and server must use the exact same `1.8.0-dev2.2` build.
+
+## 1.8.0-dev2.1
+
+- Fixed Minecraft 26.2 source compilation in `NpcManager`.
+- Vanilla entity constants now use `EntityTypes.PLAYER`; Minecraft 26.2 moved registry object constants out of `EntityType`.
+- Runtime NPC command-tag checks now use `Entity#entityTags()` instead of the removed `Entity#getTags()`.
+- NPC behaviour, network protocol 41 and both NPC storage schemas remain unchanged.
+- Client and server must use the exact same `1.8.0-dev2.1` build.
+
+## 1.8.0-dev1.1
+
+- Fixed the startup failure caused by `content_core` declaring the nonexistent module dependency `transaction`.
+- The dependency now correctly targets the existing shared module ID `transactions`.
+- No gameplay behaviour, network payloads or storage schemas changed.
+- Network protocol remains 40; client and server must use the exact same `1.8.0-dev1.1` build.
+
+## 1.8.0-dev1
+
+### Added
+
+- Added the module-independent Content & Progression Core with persistent per-player and world flags, counters, unlocks and reputation.
+- Added extensible condition, reversible action/reward, content-event and dependency-validation foundations for independent NPC, quest, minigame and dungeon modules.
+- Added exclusive quest access-mode configuration for SSU-menu or NPC delivery, including safe menu fallback while the NPC module is disabled.
+- Added dedicated player and administrator permissions for NPC, quest, minigame, dungeon and shared content access.
+
+### Compatibility
+
+- Added Content Progression storage schema 1.
+- Network protocol is 40. Existing Auction House, mailbox, economy, claim, region and all other stored data remain compatible.
+- Client and server must use the exact same `1.8.0-dev1` build.
+
 ## 1.7.0-dev1.5.1
 
 - Fixed a Java compilation error in Auction House blacklist item-ID validation.

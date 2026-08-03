@@ -48,11 +48,12 @@ import net.neoforged.neoforge.transfer.item.ItemResource;
 
 /** Synchronizes Block Information permissions and safe, server-authoritative content previews. */
 public final class BlockInformationService {
-    private static final int CONTENT_REFRESH_TICKS = 5;
-    private static final int MAX_SCANNED_SLOTS = 4_096;
+    private static final int DEFAULT_CONTENT_REFRESH_TICKS = 5;
 
     private static final Map<UUID, BlockInformationStatePayload> LAST_STATES = new HashMap<>();
     private static final Map<UUID, BlockInformationContentPayload> LAST_CONTENT = new HashMap<>();
+    private static final Map<UUID, TargetRef> LAST_TARGETS = new HashMap<>();
+    private static final Map<UUID, Long> NEXT_FULL_SCAN = new HashMap<>();
     private static long nextPermissionCheckTick;
     private static long nextContentRefreshTick;
 
@@ -72,7 +73,8 @@ public final class BlockInformationService {
             syncContent(player, true);
         }
         nextPermissionCheckTick = server.getTickCount() + 20L;
-        nextContentRefreshTick = server.getTickCount() + CONTENT_REFRESH_TICKS;
+        nextContentRefreshTick = server.getTickCount()
+                + Math.max(1, Config.BLOCK_INFORMATION_TARGET_REFRESH_TICKS.get());
     }
 
     /**
@@ -87,7 +89,8 @@ public final class BlockInformationService {
         if (!checkPermissions && !checkContent) return;
 
         if (checkPermissions) nextPermissionCheckTick = tick + 20L;
-        if (checkContent) nextContentRefreshTick = tick + CONTENT_REFRESH_TICKS;
+        if (checkContent) nextContentRefreshTick = tick
+                + Math.max(1, Config.BLOCK_INFORMATION_TARGET_REFRESH_TICKS.get());
 
         Set<UUID> online = new HashSet<>();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
@@ -97,12 +100,16 @@ public final class BlockInformationService {
         }
         LAST_STATES.keySet().removeIf(id -> !online.contains(id));
         LAST_CONTENT.keySet().removeIf(id -> !online.contains(id));
+        LAST_TARGETS.keySet().removeIf(id -> !online.contains(id));
+        NEXT_FULL_SCAN.keySet().removeIf(id -> !online.contains(id));
     }
 
     public static synchronized void clearPlayer(UUID playerId) {
         if (playerId == null) return;
         LAST_STATES.remove(playerId);
         LAST_CONTENT.remove(playerId);
+        LAST_TARGETS.remove(playerId);
+        NEXT_FULL_SCAN.remove(playerId);
     }
 
     public static synchronized void clearAll(MinecraftServer server) {
@@ -117,6 +124,8 @@ public final class BlockInformationService {
         }
         LAST_STATES.clear();
         LAST_CONTENT.clear();
+        LAST_TARGETS.clear();
+        NEXT_FULL_SCAN.clear();
         nextPermissionCheckTick = 0L;
         nextContentRefreshTick = 0L;
     }
@@ -166,7 +175,17 @@ public final class BlockInformationService {
             return;
         }
 
-        BlockInformationContentPayload payload = inspectCurrentTarget(player, state.inventoryMaxItems());
+        HitResult hit = pickTarget(player);
+        TargetRef target = TargetRef.from(player, hit);
+        TargetRef previousTarget = LAST_TARGETS.put(player.getUUID(), target);
+        long tick = player.level().getServer().getTickCount();
+        long nextScan = NEXT_FULL_SCAN.getOrDefault(player.getUUID(), 0L);
+        boolean targetChanged = !target.equals(previousTarget);
+        if (!force && !targetChanged && tick < nextScan) return;
+
+        BlockInformationContentPayload payload = inspectTarget(player, hit, state.inventoryMaxItems());
+        NEXT_FULL_SCAN.put(player.getUUID(), tick
+                + Math.max(DEFAULT_CONTENT_REFRESH_TICKS, Config.BLOCK_INFORMATION_CONTENT_SCAN_TICKS.get()));
         BlockInformationContentPayload previous = LAST_CONTENT.put(player.getUUID(), payload);
         if (force || !contentEquals(previous, payload)) PacketDistributor.sendToPlayer(player, payload);
     }
@@ -174,15 +193,20 @@ public final class BlockInformationService {
     private static void sendClearContent(ServerPlayer player, boolean force) {
         if (player == null) return;
         BlockInformationContentPayload clear = BlockInformationContentPayload.clear();
+        LAST_TARGETS.remove(player.getUUID());
+        NEXT_FULL_SCAN.remove(player.getUUID());
         BlockInformationContentPayload previous = LAST_CONTENT.put(player.getUUID(), clear);
         if (force || previous == null || previous.targetType() != BlockInformationContentPayload.TARGET_NONE) {
             PacketDistributor.sendToPlayer(player, clear);
         }
     }
 
-    private static BlockInformationContentPayload inspectCurrentTarget(ServerPlayer player, int maximumItems) {
+    private static BlockInformationContentPayload inspectTarget(
+            ServerPlayer player,
+            HitResult hit,
+            int maximumItems
+    ) {
         if (!(player.level() instanceof ServerLevel level)) return BlockInformationContentPayload.clear();
-        HitResult hit = pickTarget(player);
         if (hit instanceof EntityHitResult entityHit) {
             return inspectEntity(player, level, entityHit.getEntity(), maximumItems);
         }
@@ -365,7 +389,7 @@ public final class BlockInformationService {
     ) {
         if (container == null) return BlockInformationContentPayload.clear();
         int totalSlots = Math.max(0, container.getContainerSize());
-        int scanSlots = Math.min(totalSlots, MAX_SCANNED_SLOTS);
+        int scanSlots = Math.min(totalSlots, Math.max(64, Config.BLOCK_INFORMATION_MAX_SCANNED_SLOTS.get()));
         int usedSlots = 0;
         List<ItemStack> items = new ArrayList<>();
         for (int slot = 0; slot < scanSlots; slot++) {
@@ -473,7 +497,7 @@ public final class BlockInformationService {
         } catch (RuntimeException ignored) {
             return BlockInformationContentPayload.clear();
         }
-        int scanSlots = Math.min(totalSlots, MAX_SCANNED_SLOTS);
+        int scanSlots = Math.min(totalSlots, Math.max(64, Config.BLOCK_INFORMATION_MAX_SCANNED_SLOTS.get()));
         int usedSlots = 0;
         List<ItemStack> items = new ArrayList<>();
         try {
@@ -495,6 +519,25 @@ public final class BlockInformationService {
                 usedSlots,
                 totalSlots,
                 usedSlots > items.size() || totalSlots > scanSlots);
+    }
+
+    private record TargetRef(int type, String dimension, long id) {
+        static TargetRef from(ServerPlayer player, HitResult hit) {
+            String dimension = player.level().dimension().identifier().toString();
+            if (hit instanceof EntityHitResult entityHit) {
+                return new TargetRef(
+                        BlockInformationContentPayload.TARGET_ENTITY,
+                        dimension,
+                        entityHit.getEntity().getId());
+            }
+            if (hit instanceof BlockHitResult blockHit && hit.getType() == HitResult.Type.BLOCK) {
+                return new TargetRef(
+                        BlockInformationContentPayload.TARGET_BLOCK,
+                        dimension,
+                        blockHit.getBlockPos().asLong());
+            }
+            return new TargetRef(BlockInformationContentPayload.TARGET_NONE, dimension, 0L);
+        }
     }
 
     private static boolean contentEquals(

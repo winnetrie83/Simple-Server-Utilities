@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimOperationResult;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
@@ -28,10 +29,21 @@ public final class ClaimMapService {
         if (!ClaimPolicy.canUseMap(player)) {
             return;
         }
+        int centerChunkX = payload.centerChunkX();
+        int centerChunkZ = payload.centerChunkZ();
+        if (payload.centerOnSelectedClaim() && !payload.selectedClaimGroup().isBlank()) {
+            PlayerClaim selected = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(
+                    player.getUUID(), payload.selectedClaimGroup());
+            ChunkPos center = claimCenter(selected);
+            if (center != null) {
+                centerChunkX = center.x();
+                centerChunkZ = center.z();
+            }
+        }
         sendMap(
                 player,
-                payload.centerChunkX(),
-                payload.centerChunkZ(),
+                centerChunkX,
+                centerChunkZ,
                 payload.radius(),
                 payload.selectedClaimGroup(),
                 "",
@@ -47,7 +59,8 @@ public final class ClaimMapService {
             return;
         }
 
-        if (!isSafeViewport(player, payload.centerChunkX(), payload.centerChunkZ())) {
+        if (!isSafeViewport(player, payload.centerChunkX(), payload.centerChunkZ(),
+                payload.claimName(), payload.radius())) {
             sendMap(player, player.chunkPosition().x(), player.chunkPosition().z(), payload.radius(),
                     payload.claimName(), "Map operation rejected: view is too far from your position.", true);
             return;
@@ -59,12 +72,16 @@ public final class ClaimMapService {
                         "You do not have permission to delete claims.", true);
                 return;
             }
+            PlayerClaim deletedClaim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(
+                    player.getUUID(), payload.claimName());
             boolean deleted = SimpleServerUtilities.PLAYER_CLAIMS.deleteClaimGroup(
                     player.getUUID(), payload.claimName(), ClaimPolicy.hasAdminBypass(player));
             if (deleted) {
-                SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player);
+                if (deletedClaim != null) {
+                    SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player, deletedClaim);
+                }
                 sendMap(player, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), "",
-                        "Deleted claim '" + payload.claimName() + "'.", false);
+                        "Deleted claim '" + payload.claimName() + "' and its linked homes.", false);
             } else {
                 sendMap(player, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), payload.claimName(),
                         "Claim could not be deleted.", true);
@@ -130,10 +147,12 @@ public final class ClaimMapService {
             String notice,
             boolean error
     ) {
+        boolean ownedClaimViewport = isOwnedClaimViewport(
+                player, centerChunkX, centerChunkZ, selectedClaimGroup, radius);
         ChunkPos playerChunk = player.chunkPosition();
-        int safeCenterX = Math.max(playerChunk.x() - MAX_CENTER_DISTANCE,
+        int safeCenterX = ownedClaimViewport ? centerChunkX : Math.max(playerChunk.x() - MAX_CENTER_DISTANCE,
                 Math.min(playerChunk.x() + MAX_CENTER_DISTANCE, centerChunkX));
-        int safeCenterZ = Math.max(playerChunk.z() - MAX_CENTER_DISTANCE,
+        int safeCenterZ = ownedClaimViewport ? centerChunkZ : Math.max(playerChunk.z() - MAX_CENTER_DISTANCE,
                 Math.min(playerChunk.z() + MAX_CENTER_DISTANCE, centerChunkZ));
 
         ClaimMapData data = SimpleServerUtilities.PLAYER_CLAIMS.getMapData(
@@ -143,15 +162,62 @@ public final class ClaimMapService {
                 radius,
                 selectedClaimGroup,
                 notice,
-                error
+                error,
+                !ownedClaimViewport
         );
         PacketDistributor.sendToPlayer(player, ClaimMapDataPayload.from(data));
     }
 
-    private static boolean isSafeViewport(ServerPlayer player, int centerChunkX, int centerChunkZ) {
+    private static boolean isSafeViewport(ServerPlayer player, int centerChunkX, int centerChunkZ,
+            String selectedClaimGroup, int radius) {
         ChunkPos playerChunk = player.chunkPosition();
-        return Math.abs(centerChunkX - playerChunk.x()) <= MAX_CENTER_DISTANCE
-                && Math.abs(centerChunkZ - playerChunk.z()) <= MAX_CENTER_DISTANCE;
+        return (Math.abs(centerChunkX - playerChunk.x()) <= MAX_CENTER_DISTANCE
+                && Math.abs(centerChunkZ - playerChunk.z()) <= MAX_CENTER_DISTANCE)
+                || isOwnedClaimViewport(player, centerChunkX, centerChunkZ, selectedClaimGroup, radius);
+    }
+
+    private static boolean isOwnedClaimViewport(ServerPlayer player, int centerChunkX, int centerChunkZ,
+            String selectedClaimGroup, int radius) {
+        if (selectedClaimGroup == null || selectedClaimGroup.isBlank()) {
+            return false;
+        }
+        PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(
+                player.getUUID(), selectedClaimGroup);
+        if (claim == null || claim.getChunks().isEmpty()
+                || !claim.getDimension().equals(player.level().dimension().identifier().toString())) {
+            return false;
+        }
+        int minX = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxZ = Integer.MIN_VALUE;
+        for (var chunk : claim.getChunks()) {
+            minX = Math.min(minX, chunk.getX());
+            maxX = Math.max(maxX, chunk.getX());
+            minZ = Math.min(minZ, chunk.getZ());
+            maxZ = Math.max(maxZ, chunk.getZ());
+        }
+        int margin = Math.max(2, Math.min(12, radius));
+        return centerChunkX >= minX - margin && centerChunkX <= maxX + margin
+                && centerChunkZ >= minZ - margin && centerChunkZ <= maxZ + margin;
+    }
+
+    private static ChunkPos claimCenter(PlayerClaim claim) {
+        if (claim == null || claim.getChunks().isEmpty()) {
+            return null;
+        }
+        int minX = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxZ = Integer.MIN_VALUE;
+        for (var chunk : claim.getChunks()) {
+            minX = Math.min(minX, chunk.getX());
+            maxX = Math.max(maxX, chunk.getX());
+            minZ = Math.min(minZ, chunk.getZ());
+            maxZ = Math.max(maxZ, chunk.getZ());
+        }
+        return new ChunkPos(minX + Math.floorDiv(maxX - minX, 2),
+                minZ + Math.floorDiv(maxZ - minZ, 2));
     }
 
     private static String formatResult(
@@ -180,8 +246,8 @@ public final class ClaimMapService {
             case CHUNK_ALREADY_CLAIMED -> "One of the selected chunks is already claimed." + details;
             case CHUNK_NOT_CLAIMED -> "One of the selected chunks is not part of this claim." + details;
             case CHUNK_LIMIT_REACHED -> "You reached the maximum number of claim chunks." + details;
-            case CHUNK_NOT_ADJACENT -> "The final claim must be one connected area." + details;
-            case CHUNK_REMOVAL_DISCONNECTS_CLAIM -> "That removal would split the claim." + details;
+            case CHUNK_NOT_ADJACENT -> "The final claim must be one connected area.";
+            case CHUNK_REMOVAL_DISCONNECTS_CLAIM -> "That removal would split the claim into separate areas.";
             case CHUNK_OVERLAPS_REGION -> "A selected chunk overlaps a server region." + details;
             case EMPTY_SELECTION -> "Select at least one chunk.";
             case INVALID_CLAIM_NAME -> "Invalid claim name." + details;

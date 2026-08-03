@@ -104,6 +104,18 @@ public class Config {
             .comment("Enable the server-controlled Jade-like block information overlay.")
             .define("enableBlockInformation", true);
 
+    public static final ModConfigSpec.IntValue BLOCK_INFORMATION_TARGET_REFRESH_TICKS = BUILDER
+            .comment("Ticks between Block Information target ray checks. Content for an unchanged target is scanned less often.")
+            .defineInRange("blockInformationTargetRefreshTicks", 5, 1, 40);
+
+    public static final ModConfigSpec.IntValue BLOCK_INFORMATION_CONTENT_SCAN_TICKS = BUILDER
+            .comment("Ticks between full inventory scans while the player keeps looking at the same Block Information target.")
+            .defineInRange("blockInformationContentScanTicks", 20, 5, 200);
+
+    public static final ModConfigSpec.IntValue BLOCK_INFORMATION_MAX_SCANNED_SLOTS = BUILDER
+            .comment("Maximum slots inspected in one modded inventory by Block Information.")
+            .defineInRange("blockInformationMaxScannedSlots", 1024, 64, 4096);
+
     public static final ModConfigSpec.BooleanValue ENABLE_CUSTOM_STATISTICS = BUILDER
             .comment("Enable administrator-defined persistent player statistics and statistic holograms.")
             .define("enableCustomStatistics", true);
@@ -123,6 +135,33 @@ public class Config {
     public static final ModConfigSpec.BooleanValue ENABLE_AUCTION_HOUSE = BUILDER
             .comment("Enable the server-authoritative Auction House module.")
             .define("enableAuctionHouse", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_NPCS = BUILDER
+            .comment("Enable the independent SSU NPC foundation: persistent vanilla-model NPC templates, placements, interaction and admin tools.")
+            .define("enableNpcs", false);
+
+    public static final ModConfigSpec.IntValue NPC_SHOP_BUYBACK_MINUTES = BUILDER
+            .comment("Minutes a player's latest nine NPC shop sales remain available in the buy-back tab.")
+            .defineInRange("npcShopBuybackMinutes", 5, 1, 1440);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_QUESTS = BUILDER
+            .comment("Enable the upcoming SSU quest module independently of the NPC module.")
+            .define("enableQuests", false);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_MINIGAMES = BUILDER
+            .comment("Enable the upcoming SSU minigame framework.")
+            .define("enableMinigames", false);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_DUNGEONS = BUILDER
+            .comment("Enable the independent region-based SSU customized dungeon framework.")
+            .define("enableDungeons", false);
+
+    public static final ModConfigSpec.ConfigValue<String> QUEST_ACCESS_MODE = BUILDER
+            .comment("Exclusive quest entry point when Quests is enabled: menu or npc. If NPCs is disabled, menu is always used effectively.")
+            .define("questAccessMode", "menu", value -> {
+                if (!(value instanceof String text)) return false;
+                return text.equalsIgnoreCase("menu") || text.equalsIgnoreCase("npc");
+            });
 
     public static final ModConfigSpec.IntValue MAIL_VISIBLE_RETENTION_DAYS = BUILDER
             .comment("Days a mail may remain in the visible inbox before cleanup. Queued mail does not age until promoted.")

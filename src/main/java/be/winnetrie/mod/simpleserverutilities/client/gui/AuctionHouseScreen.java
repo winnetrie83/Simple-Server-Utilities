@@ -46,7 +46,6 @@ public final class AuctionHouseScreen extends Screen {
     private int selectedIndex = -1;
     private EditBox searchBox;
     private EditBox buyQuantity;
-    private EditBox taxBox;
     private EditBox blacklistIdBox;
     private String blacklistIdDraft = "";
     private Button addInventoryBlacklistButton;
@@ -218,18 +217,6 @@ public final class AuctionHouseScreen extends Screen {
                 addRenderableWidget(Button.builder(Component.literal("Buy"), ignored -> openBuyDialog())
                         .bounds(l.contentRight() - 72, footer, 72, 20).build());
             }
-        }
-
-        if (data.administrator()) {
-            taxBox = new EditBox(font, l.left() + 8, l.bottom() - 69, l.categoryWidth() - 16, 18,
-                    Component.literal("Sale tax percentage"));
-            taxBox.setHint(Component.literal("Tax %"));
-            taxBox.setMaxLength(8);
-            taxBox.setValue(formatTax(data.taxPermille()));
-            addRenderableWidget(taxBox);
-            addRenderableWidget(Button.builder(Component.literal("Apply tax"), ignored ->
-                            action("set_tax", "", 0, taxBox.getValue(), 0))
-                    .bounds(l.left() + 8, l.bottom() - 47, l.categoryWidth() - 16, 20).build());
         }
 
         if (isBlacklistMode()) addBlacklistControls(l);

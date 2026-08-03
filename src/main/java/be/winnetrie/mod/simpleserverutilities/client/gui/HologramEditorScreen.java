@@ -419,14 +419,14 @@ public final class HologramEditorScreen extends Screen {
             int row = index / 4;
             int left = x + column * (cellWidth + gap);
             int top = y + row * (cellHeight + gap);
-            if (inside(mouseX, mouseY, left, top, cellWidth, cellHeight)) {
+            if (SsuGuiGeometry.inside(mouseX, mouseY, left, top, cellWidth, cellHeight)) {
                 applyPreset(index, MINECRAFT_COLORS.get(index).rgb());
                 paletteTarget = PaletteTarget.NONE;
                 return;
             }
         }
         if (paletteTarget == PaletteTarget.BACKGROUND
-                && inside(mouseX, mouseY, x, y + 112, 408, 20)) {
+                && SsuGuiGeometry.inside(mouseX, mouseY, x, y + 112, 408, 20)) {
             backgroundColor.setValue("00000000");
         }
         paletteTarget = PaletteTarget.NONE;
@@ -571,10 +571,7 @@ public final class HologramEditorScreen extends Screen {
         double seconds = Math.max(10, ticks) / 20.0D;
         return formatDouble(seconds);
     }
-    private static boolean inside(double mouseX, double mouseY, int x, int y, int width, int height) {
-        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
-    }
-    private static int contrastColor(int rgb) {
+private static int contrastColor(int rgb) {
         int red = (rgb >>> 16) & 0xFF;
         int green = (rgb >>> 8) & 0xFF;
         int blue = rgb & 0xFF;

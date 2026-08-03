@@ -12,7 +12,12 @@ public final class HologramEvents {
 
     @SubscribeEvent
     public static void onTick(ServerTickEvent.Post event) {
-        SimpleServerUtilities.HOLOGRAMS.tick(event.getServer());
+        long timer = SimpleServerUtilities.PERFORMANCE.startTimer();
+        try {
+            SimpleServerUtilities.HOLOGRAMS.tick(event.getServer());
+        } finally {
+            SimpleServerUtilities.PERFORMANCE.stopTimer("holograms", timer);
+        }
     }
 
     @SubscribeEvent

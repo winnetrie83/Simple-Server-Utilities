@@ -23,12 +23,12 @@ public record StatisticEditorOpenPayload(
             StreamCodec.of(StatisticEditorOpenPayload::encode, StatisticEditorOpenPayload::decode);
 
     public StatisticEditorOpenPayload {
-        originalId = bound(originalId, 64);
-        id = bound(id, 64);
-        displayName = bound(displayName, 64);
+        originalId = PayloadBounds.string(originalId, 64);
+        id = PayloadBounds.string(id, 64);
+        displayName = PayloadBounds.string(displayName, 64);
         eventType = eventType == null ? StatisticEventType.BLOCK_BROKEN : eventType;
-        target = bound(target, 128);
-        unit = bound(unit, 24);
+        target = PayloadBounds.string(target, 128);
+        unit = PayloadBounds.string(unit, 24);
     }
 
     private static void encode(RegistryFriendlyByteBuf b, StatisticEditorOpenPayload p) {
@@ -47,10 +47,7 @@ public record StatisticEditorOpenPayload(
                 b.readEnum(StatisticEventType.class), b.readUtf(128), b.readUtf(24), b.readBoolean());
     }
 
-    private static String bound(String value, int max) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= max ? safe : safe.substring(0, max);
-    }
+
 
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

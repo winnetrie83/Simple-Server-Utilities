@@ -44,13 +44,13 @@ public record HologramEditorOpenPayload(
             StreamCodec.of(HologramEditorOpenPayload::encode, HologramEditorOpenPayload::decode);
 
     public HologramEditorOpenPayload {
-        originalId = bound(originalId, 64);
-        dimension = bound(dimension, 256);
-        id = bound(id, 64);
+        originalId = PayloadBounds.string(originalId, 64);
+        dimension = PayloadBounds.string(dimension, 256);
+        id = PayloadBounds.string(id, 64);
         hologramType = hologramType == null ? HologramType.TEXT : hologramType;
-        text = bound(text, HologramRichText.MAX_STORED_CHARACTERS);
-        urlOrImageSource = bound(urlOrImageSource, 2048);
-        objective = bound(objective, 64);
+        text = PayloadBounds.string(text, HologramRichText.MAX_STORED_CHARACTERS);
+        urlOrImageSource = PayloadBounds.string(urlOrImageSource, 2048);
+        objective = PayloadBounds.string(objective, 64);
         scoreboardMode = scoreboardMode == null ? HologramScoreboardMode.TOP : scoreboardMode;
         scale = Float.isFinite(scale) ? Math.max(1.0F, Math.min(8.0F, scale)) : 1.0F;
         viewDistance = Double.isFinite(viewDistance)
@@ -102,10 +102,7 @@ public record HologramEditorOpenPayload(
         );
     }
 
-    private static String bound(String value, int maximum) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= maximum ? safe : safe.substring(0, maximum);
-    }
+
 
     @Override
     public Type<? extends CustomPacketPayload> type() {

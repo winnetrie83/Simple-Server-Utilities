@@ -21,11 +21,11 @@ public record SsuPropertySettingsDataPayload(
             StreamCodec.of(SsuPropertySettingsDataPayload::encode, SsuPropertySettingsDataPayload::decode);
 
     public SsuPropertySettingsDataPayload {
-        kind = bounded(kind, 16);
-        target = bounded(target, 64);
-        title = bounded(title, 128);
+        kind = PayloadBounds.string(kind, 16);
+        target = PayloadBounds.string(target, 64);
+        title = PayloadBounds.string(title, 128);
         requestId = Math.max(0L, requestId);
-        notice = bounded(notice, 512);
+        notice = PayloadBounds.string(notice, 512);
         entries = entries == null ? List.of() : List.copyOf(entries);
         if (entries.size() > MAX_ENTRIES) {
             throw new IllegalArgumentException("Too many property settings entries.");
@@ -100,13 +100,7 @@ public record SsuPropertySettingsDataPayload(
         }
         return new SsuPropertySettingsDataPayload(kind, target, title, id, canEdit, notice, error, entries);
     }
-
-    private static String bounded(String value, int maximum) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= maximum ? safe : safe.substring(0, maximum);
-    }
-
-    @Override
+@Override
     public Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
@@ -124,12 +118,12 @@ public record SsuPropertySettingsDataPayload(
             List<Option> options
     ) {
         public Entry {
-            key = bounded(key, 64);
-            label = bounded(label, 96);
-            value = bounded(value, 256);
-            type = bounded(type, 16);
-            description = bounded(description, 512);
-            defaultValue = bounded(defaultValue, 128);
+            key = PayloadBounds.string(key, 64);
+            label = PayloadBounds.string(label, 96);
+            value = PayloadBounds.string(value, 256);
+            type = PayloadBounds.string(type, 16);
+            description = PayloadBounds.string(description, 512);
+            defaultValue = PayloadBounds.string(defaultValue, 128);
             if (maximum < minimum) {
                 long swap = minimum;
                 minimum = maximum;
@@ -144,8 +138,8 @@ public record SsuPropertySettingsDataPayload(
 
     public record Option(String value, String label) {
         public Option {
-            value = bounded(value, 64);
-            label = bounded(label, 64);
+            value = PayloadBounds.string(value, 64);
+            label = PayloadBounds.string(label, 64);
         }
     }
 }

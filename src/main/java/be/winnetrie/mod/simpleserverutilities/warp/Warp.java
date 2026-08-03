@@ -2,6 +2,8 @@ package be.winnetrie.mod.simpleserverutilities.warp;
 
 import java.util.UUID;
 
+import be.winnetrie.mod.simpleserverutilities.core.location.WorldPositionValues;
+
 public class Warp {
 
     private String name;
@@ -34,15 +36,20 @@ public class Warp {
             long timestamp
     ) {
         this.name = name;
-        this.dimension = dimension;
-        this.x = x;
-        this.y = y;
-        this.z = z;
-        this.yaw = yaw;
-        this.pitch = pitch;
+        applyPosition(dimension, x, y, z, yaw, pitch);
         this.createdBy = createdBy;
         this.createdAt = timestamp;
         this.updatedAt = timestamp;
+    }
+
+    private void applyPosition(String dimension, double x, double y, double z, float yaw, float pitch) {
+        WorldPositionValues position = WorldPositionValues.normalize(dimension, x, y, z, yaw, pitch);
+        this.dimension = position.dimension();
+        this.x = position.x();
+        this.y = position.y();
+        this.z = position.z();
+        this.yaw = position.yaw();
+        this.pitch = position.pitch();
     }
 
     public String getName() {
@@ -99,12 +106,7 @@ public class Warp {
             UUID updatedBy,
             long timestamp
     ) {
-        this.dimension = dimension;
-        this.x = x;
-        this.y = y;
-        this.z = z;
-        this.yaw = yaw;
-        this.pitch = pitch;
+        applyPosition(dimension, x, y, z, yaw, pitch);
 
         if (createdBy == null) {
             createdBy = updatedBy;

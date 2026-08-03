@@ -15,8 +15,8 @@ public record PlayerUiSettingUpdatePayload(String key, String value) implements 
             StreamCodec.of(PlayerUiSettingUpdatePayload::encode, PlayerUiSettingUpdatePayload::decode);
 
     public PlayerUiSettingUpdatePayload {
-        key = bound(key, 64).trim().toLowerCase(java.util.Locale.ROOT);
-        value = bound(value, 64).trim();
+        key = PayloadBounds.string(key, 64).trim().toLowerCase(java.util.Locale.ROOT);
+        value = PayloadBounds.string(value, 64).trim();
     }
 
     private static void encode(RegistryFriendlyByteBuf buffer, PlayerUiSettingUpdatePayload payload) {
@@ -28,10 +28,7 @@ public record PlayerUiSettingUpdatePayload(String key, String value) implements 
         return new PlayerUiSettingUpdatePayload(buffer.readUtf(64), buffer.readUtf(64));
     }
 
-    private static String bound(String value, int max) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= max ? safe : safe.substring(0, max);
-    }
+
 
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

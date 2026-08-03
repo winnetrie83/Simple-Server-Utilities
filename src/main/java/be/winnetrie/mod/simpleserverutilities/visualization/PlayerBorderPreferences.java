@@ -7,10 +7,12 @@ import java.util.UUID;
 
 public final class PlayerBorderPreferences {
 
-    private int schemaVersion = 2;
+    private int schemaVersion = 3;
     private UUID player;
     private boolean claimBordersVisible;
+    private boolean showOtherClaims;
     private boolean regionBordersVisible;
+    private Set<String> visibleClaims = new LinkedHashSet<>();
     private Set<String> pinnedRegions = new LinkedHashSet<>();
 
     public PlayerBorderPreferences() {
@@ -30,6 +32,37 @@ public final class PlayerBorderPreferences {
 
     public void setClaimBordersVisible(boolean claimBordersVisible) {
         this.claimBordersVisible = claimBordersVisible;
+    }
+
+    public boolean isShowOtherClaims() {
+        return showOtherClaims;
+    }
+
+    public void setShowOtherClaims(boolean showOtherClaims) {
+        this.showOtherClaims = showOtherClaims;
+    }
+
+    public boolean isClaimVisible(UUID claimId) {
+        ensureCollections();
+        return claimId != null && visibleClaims.contains(claimId.toString());
+    }
+
+    public boolean setClaimVisible(UUID claimId, boolean visible) {
+        ensureCollections();
+        if (claimId == null) return false;
+        return visible ? visibleClaims.add(claimId.toString()) : visibleClaims.remove(claimId.toString());
+    }
+
+    public boolean clearVisibleClaims() {
+        ensureCollections();
+        if (visibleClaims.isEmpty()) return false;
+        visibleClaims.clear();
+        return true;
+    }
+
+    public Set<String> getVisibleClaims() {
+        ensureCollections();
+        return Set.copyOf(visibleClaims);
     }
 
     public boolean isRegionBordersVisible() {
@@ -71,7 +104,7 @@ public final class PlayerBorderPreferences {
 
     public void ensureDefaults() {
         ensureCollections();
-        schemaVersion = Math.max(schemaVersion, 2);
+        schemaVersion = Math.max(schemaVersion, 3);
     }
 
     public int getSchemaVersion() {
@@ -79,6 +112,9 @@ public final class PlayerBorderPreferences {
     }
 
     private void ensureCollections() {
+        if (visibleClaims == null) {
+            visibleClaims = new LinkedHashSet<>();
+        }
         if (pinnedRegions == null) {
             pinnedRegions = new LinkedHashSet<>();
         }

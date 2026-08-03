@@ -47,6 +47,7 @@ public final class BorderVisualizationSettingsManager {
                     if (preference != null && preference.getPlayer() != null) {
                         preference.ensureDefaults();
                         playerPreferences.put(preference.getPlayer(), preference);
+                        queuePreferenceSave(preference);
                     }
                 } catch (Exception e) {
                     Path archived = JsonStorage.archiveBrokenFile(file);
@@ -78,6 +79,33 @@ public final class BorderVisualizationSettingsManager {
         preference.setClaimBordersVisible(visible);
         queuePreferenceSave(preference);
         revision++;
+    }
+
+    public void setShowOtherClaims(UUID player, boolean visible) {
+        PlayerBorderPreferences preference = preferences(player);
+        preference.setShowOtherClaims(visible);
+        queuePreferenceSave(preference);
+        revision++;
+    }
+
+    public boolean setClaimVisible(UUID player, UUID claimId, boolean visible) {
+        PlayerBorderPreferences preference = preferences(player);
+        boolean changed = preference.setClaimVisible(claimId, visible);
+        if (changed) {
+            queuePreferenceSave(preference);
+            revision++;
+        }
+        return changed;
+    }
+
+    public boolean clearVisibleClaims(UUID player) {
+        PlayerBorderPreferences preference = preferences(player);
+        boolean changed = preference.clearVisibleClaims();
+        if (changed) {
+            queuePreferenceSave(preference);
+            revision++;
+        }
+        return changed;
     }
 
     public void setRegionsVisible(UUID player, boolean visible) {

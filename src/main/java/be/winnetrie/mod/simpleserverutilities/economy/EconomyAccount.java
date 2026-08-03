@@ -5,13 +5,14 @@ import java.util.UUID;
 
 public final class EconomyAccount {
 
-    private int schemaVersion = 1;
+    private int schemaVersion = 2;
     private UUID playerId;
     private String lastKnownName;
     private long balanceMinor;
     private long revision;
     private long createdAtEpochMilli;
     private long updatedAtEpochMilli;
+    private boolean systemAccount;
 
     public EconomyAccount() {
     }
@@ -27,8 +28,9 @@ public final class EconomyAccount {
     }
 
     public void normalize(UUID fallbackId) {
-        schemaVersion = Math.max(1, schemaVersion);
+        schemaVersion = Math.max(2, schemaVersion);
         playerId = playerId == null ? fallbackId : playerId;
+        systemAccount = systemAccount || EconomySystemAccounts.isKnown(playerId);
         lastKnownName = sanitizeName(lastKnownName);
         balanceMinor = Math.max(0L, balanceMinor);
         revision = Math.max(0L, revision);
@@ -46,6 +48,7 @@ public final class EconomyAccount {
         copy.revision = revision;
         copy.createdAtEpochMilli = createdAtEpochMilli;
         copy.updatedAtEpochMilli = updatedAtEpochMilli;
+        copy.systemAccount = systemAccount;
         return copy;
     }
 
@@ -88,6 +91,17 @@ public final class EconomyAccount {
 
     public long getUpdatedAtEpochMilli() {
         return updatedAtEpochMilli;
+    }
+
+    public void markSystemAccount() {
+        if (!systemAccount) {
+            systemAccount = true;
+            updatedAtEpochMilli = Instant.now().toEpochMilli();
+        }
+    }
+
+    public boolean isSystemAccount() {
+        return systemAccount;
     }
 
     private static String sanitizeName(String name) {

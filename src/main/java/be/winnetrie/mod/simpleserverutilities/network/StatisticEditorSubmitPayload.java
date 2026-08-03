@@ -23,12 +23,12 @@ public record StatisticEditorSubmitPayload(
             StreamCodec.of(StatisticEditorSubmitPayload::encode, StatisticEditorSubmitPayload::decode);
 
     public StatisticEditorSubmitPayload {
-        originalId = bound(originalId, 64);
-        id = bound(id, 64);
-        displayName = bound(displayName, 64);
+        originalId = PayloadBounds.trimmedString(originalId, 64);
+        id = PayloadBounds.trimmedString(id, 64);
+        displayName = PayloadBounds.trimmedString(displayName, 64);
         eventType = eventType == null ? StatisticEventType.BLOCK_BROKEN : eventType;
-        target = bound(target, 128);
-        unit = bound(unit, 24);
+        target = PayloadBounds.trimmedString(target, 128);
+        unit = PayloadBounds.trimmedString(unit, 24);
         requestId = Math.max(0L, requestId);
     }
 
@@ -48,10 +48,7 @@ public record StatisticEditorSubmitPayload(
                 b.readEnum(StatisticEventType.class), b.readUtf(128), b.readUtf(24), b.readBoolean(), b.readVarLong());
     }
 
-    private static String bound(String value, int max) {
-        String safe = value == null ? "" : value.trim();
-        return safe.length() <= max ? safe : safe.substring(0, max);
-    }
+
 
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

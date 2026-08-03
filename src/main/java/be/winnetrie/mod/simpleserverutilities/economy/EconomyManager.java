@@ -11,11 +11,14 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.google.gson.Gson;
@@ -39,7 +42,6 @@ import net.minecraft.server.level.ServerPlayer;
  */
 public final class EconomyManager implements EconomyService {
 
-    private static final int MAX_RECENT_IN_MEMORY = 5_000;
     /** Removed in dev2.1; retained only to discard the experimental dev2 system account safely. */
     private static final UUID LEGACY_TREASURY_ID = UUID.nameUUIDFromBytes(
             (SimpleServerUtilities.MODID + ":server_treasury").getBytes(StandardCharsets.UTF_8));
@@ -52,12 +54,21 @@ public final class EconomyManager implements EconomyService {
     private final Deque<UUID> recentTransactionIds = new ArrayDeque<>();
     private final DirtyJsonRecordStore accountStore = new DirtyJsonRecordStore();
     private final DirtyJsonRecordStore transactionStore = new DirtyJsonRecordStore();
+    private final Map<UUID, Deque<UUID>> retainedByAccount = new HashMap<>();
+    private final Map<UUID, Integer> retentionReferences = new HashMap<>();
+    private final Set<UUID> retentionTracked = new HashSet<>();
+    private final Deque<UUID> retainedUnscoped = new ArrayDeque<>();
+    private final Map<String, Long> committedKeyTimestamps = new LinkedHashMap<>();
+    private final Deque<String> committedKeyOrder = new ArrayDeque<>();
+    private final DirtyJsonRecordStore committedKeyStore = new DirtyJsonRecordStore();
+    private boolean retentionReady;
 
     private EconomySettings settings = new EconomySettings();
     private Path rootFolder;
     private Path accountsFolder;
     private Path transactionsFolder;
     private Path settingsFile;
+    private Path committedKeyFile;
 
     public synchronized void load(MinecraftServer server) {
         Objects.requireNonNull(server, "server");
@@ -65,6 +76,7 @@ public final class EconomyManager implements EconomyService {
         accountsFolder = StoragePaths.economyAccounts(StoragePaths.root(server));
         transactionsFolder = StoragePaths.economyTransactions(StoragePaths.root(server));
         settingsFile = rootFolder.resolve("settings.json");
+        committedKeyFile = rootFolder.resolve("committed_keys.json");
 
         accounts.clear();
         accountNameIndex.clear();
@@ -73,18 +85,30 @@ public final class EconomyManager implements EconomyService {
         recentTransactionIds.clear();
         accountStore.reset();
         transactionStore.reset();
+        retainedByAccount.clear();
+        retentionReferences.clear();
+        retentionTracked.clear();
+        retainedUnscoped.clear();
+        committedKeyTimestamps.clear();
+        committedKeyOrder.clear();
+        committedKeyStore.reset();
+        retentionReady = false;
 
         loadSettings();
+        loadCommittedKeys();
         loadAccounts();
         removeLegacyTreasuryAccount();
         loadTransactions();
         recoverJournal();
+        rebuildRetentionIndexAndPrune(true);
+        retentionReady = true;
         save();
 
         SimpleServerUtilities.LOGGER.info(
-                "Loaded SSU economy: {} account(s), {} transaction record(s).",
+                "Loaded SSU economy: {} account(s), {} retained transaction record(s), {} compact committed key(s).",
                 accounts.size(),
-                transactions.size()
+                transactions.size(),
+                committedKeyTimestamps.size()
         );
     }
 
@@ -95,16 +119,34 @@ public final class EconomyManager implements EconomyService {
 
         settings.normalize();
         accountStore.queueJson(gson, settingsFile, settings);
+        committedKeyStore.queueJson(gson, committedKeyFile, committedKeySnapshot());
         for (EconomyAccount account : accounts.values()) {
             accountStore.queueJson(gson, accountFile(account.getPlayerId()), account);
         }
+        Set<Path> transactionFiles = new HashSet<>();
         for (EconomyTransactionRecord record : transactions.values()) {
-            transactionStore.queueJson(gson, transactionFile(record.getTransactionId()), record);
+            Path file = transactionFile(record.getTransactionId());
+            transactionFiles.add(file.toAbsolutePath().normalize());
+            transactionStore.queueJson(gson, file, record);
         }
+        transactionStore.queueDeleteMissing(transactionFiles);
     }
 
     public synchronized EconomySettings settings() {
         return settings;
+    }
+
+    /**
+     * Changes the number of recent transaction records retained for each
+     * participating account. Prepared journal entries are always preserved
+     * until recovery has completed.
+     */
+    public synchronized int setRecentHistoryLimit(int requestedLimit) {
+        settings.setRecentHistoryLimit(requestedLimit);
+        settings.normalize();
+        rebuildRetentionIndexAndPrune(true);
+        save();
+        return settings.getRecentHistoryLimit();
     }
 
     public synchronized boolean isEnabled() {
@@ -127,9 +169,15 @@ public final class EconomyManager implements EconomyService {
         return ensureAccount(playerId, name, settings.getStartingBalanceMinor());
     }
 
-    /** Creates a non-player account with an explicit initial balance. */
+    /** Creates or upgrades a non-player account with an explicit initial balance. */
     public synchronized EconomyAccount ensureSystemAccount(UUID accountId, String name) {
-        return ensureAccount(accountId, name, 0L);
+        EconomyAccount account = ensureAccount(accountId, name, 0L);
+        if (!account.isSystemAccount()) {
+            account.markSystemAccount();
+            rebuildNameIndex();
+            queueAccount(account);
+        }
+        return account;
     }
 
     private EconomyAccount ensureAccount(UUID playerId, String name, long initialBalanceMinor) {
@@ -171,6 +219,22 @@ public final class EconomyManager implements EconomyService {
             return Optional.empty();
         }
         return Optional.ofNullable(accounts.get(playerId));
+    }
+
+    /** Resolves only real player accounts; internal SSU clearing/escrow accounts are excluded. */
+    public synchronized Optional<EconomyAccount> findPlayerAccountByName(MinecraftServer server, String rawName) {
+        return findAccountByName(server, rawName).filter(account -> !account.isSystemAccount());
+    }
+
+    public synchronized Optional<EconomyAccount> findPlayerAccount(UUID playerId) {
+        EconomyAccount account = accounts.get(playerId);
+        return account == null || account.isSystemAccount() ? Optional.empty() : Optional.of(account);
+    }
+
+    public synchronized boolean isSystemAccount(UUID accountId) {
+        if (EconomySystemAccounts.isKnown(accountId)) return true;
+        EconomyAccount account = accountId == null ? null : accounts.get(accountId);
+        return account != null && account.isSystemAccount();
     }
 
     public synchronized long balance(ServerPlayer player) {
@@ -610,7 +674,7 @@ public final class EconomyManager implements EconomyService {
     }
 
     public synchronized Optional<EconomyTransactionRecord> transactionByIdempotencyKey(String rawKey) {
-        String key = rawKey == null ? "" : rawKey.trim();
+        String key = normalizeIdempotencyKey(rawKey);
         if (key.isEmpty()) {
             return Optional.empty();
         }
@@ -619,26 +683,25 @@ public final class EconomyManager implements EconomyService {
     }
 
     public synchronized boolean isCommittedIdempotencyKey(String rawKey) {
-        return transactionByIdempotencyKey(rawKey)
+        String key = normalizeIdempotencyKey(rawKey);
+        if (key.isEmpty()) return false;
+        if (committedKeyTimestamps.containsKey(key)) return true;
+        return transactionByIdempotencyKey(key)
                 .map(record -> record.getStatus() == EconomyTransactionStatus.COMMITTED)
                 .orElse(false);
     }
 
     public synchronized List<EconomyTransactionRecord> history(UUID playerId, int limit) {
-        int bounded = Math.max(1, Math.min(100, limit));
+        int bounded = playerId == null
+                ? Math.max(1, Math.min(100_000, limit))
+                : Math.max(1, Math.min(settings.getRecentHistoryLimit(), limit));
         List<EconomyTransactionRecord> result = new ArrayList<>(bounded);
-        var iterator = recentTransactionIds.descendingIterator();
+        Deque<UUID> source = playerId == null ? recentTransactionIds : retainedByAccount.get(playerId);
+        if (source == null) return List.of();
+        var iterator = source.descendingIterator();
         while (iterator.hasNext() && result.size() < bounded) {
             EconomyTransactionRecord record = transactions.get(iterator.next());
-            if (record == null) {
-                continue;
-            }
-            if (playerId == null
-                    || playerId.equals(record.getSourceId())
-                    || playerId.equals(record.getDestinationId())
-                    || playerId.equals(record.getActorId())) {
-                result.add(record);
-            }
+            if (record != null) result.add(record);
         }
         return List.copyOf(result);
     }
@@ -668,6 +731,15 @@ public final class EconomyManager implements EconomyService {
 
     public synchronized Collection<EconomyAccount> accounts() {
         return accounts.values().stream()
+                .map(EconomyAccount::copy)
+                .sorted(Comparator.comparing(EconomyAccount::getLastKnownName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    /** Returns only accounts that belong to real players, for player pickers and suggestions. */
+    public synchronized Collection<EconomyAccount> playerAccounts() {
+        return accounts.values().stream()
+                .filter(account -> !account.isSystemAccount())
                 .map(EconomyAccount::copy)
                 .sorted(Comparator.comparing(EconomyAccount::getLastKnownName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
@@ -713,15 +785,9 @@ public final class EconomyManager implements EconomyService {
             String reason,
             String rawIdempotencyKey
     ) {
-        String idempotencyKey = rawIdempotencyKey == null ? "" : rawIdempotencyKey.trim();
-        if (!idempotencyKey.isEmpty()) {
-            UUID previousId = idempotencyIndex.get(idempotencyKey);
-            if (previousId != null) {
-                EconomyTransactionRecord previous = transactions.get(previousId);
-                if (previous != null && previous.getStatus() == EconomyTransactionStatus.COMMITTED) {
-                    return EconomyResult.failure("duplicate", "This transaction was already completed.");
-                }
-            }
+        String idempotencyKey = normalizeIdempotencyKey(rawIdempotencyKey);
+        if (!idempotencyKey.isEmpty() && isCommittedIdempotencyKey(idempotencyKey)) {
+            return EconomyResult.failure("duplicate", "This transaction was already completed.");
         }
 
         UUID transactionId = UUID.randomUUID();
@@ -824,6 +890,47 @@ public final class EconomyManager implements EconomyService {
         accountStore.discoverFile(settingsFile);
     }
 
+    private void loadCommittedKeys() {
+        if (committedKeyFile == null || !Files.exists(committedKeyFile)) return;
+        try {
+            committedKeyStore.discoverFile(committedKeyFile);
+            EconomyCommittedKeyIndex index = JsonStorage.read(
+                    gson, committedKeyFile, EconomyCommittedKeyIndex.class);
+            if (index == null) return;
+            index.normalize();
+            for (EconomyCommittedKeyIndex.Entry entry : index.entries) {
+                rememberCommittedKey(entry.key, entry.committedAtEpochMilli);
+            }
+        } catch (Exception exception) {
+            Path archived = JsonStorage.archiveBrokenFile(committedKeyFile);
+            SimpleServerUtilities.LOGGER.error(
+                    "Failed to load compact economy idempotency index. Archived as {}.", archived, exception);
+        }
+    }
+
+    private EconomyCommittedKeyIndex committedKeySnapshot() {
+        EconomyCommittedKeyIndex index = new EconomyCommittedKeyIndex();
+        for (String key : committedKeyOrder) {
+            index.entries.add(new EconomyCommittedKeyIndex.Entry(
+                    key, committedKeyTimestamps.getOrDefault(key, 0L)));
+        }
+        index.normalize();
+        return index;
+    }
+
+    private void rememberCommittedKey(String rawKey, long committedAtEpochMilli) {
+        String key = normalizeIdempotencyKey(rawKey);
+        if (key.isEmpty()) return;
+        committedKeyOrder.remove(key);
+        committedKeyOrder.addLast(key);
+        committedKeyTimestamps.put(key, Math.max(0L, committedAtEpochMilli));
+        while (committedKeyOrder.size() > EconomyCommittedKeyIndex.MAX_KEYS) {
+            String expired = committedKeyOrder.removeFirst();
+            committedKeyTimestamps.remove(expired);
+        }
+        SimpleServerUtilities.TRANSACTIONS.rememberCommitted(key);
+    }
+
     private void loadAccounts() {
         accountStore.discover(accountsFolder);
         try {
@@ -883,7 +990,7 @@ public final class EconomyManager implements EconomyService {
             if (!record.getIdempotencyKey().isEmpty()
                     && record.getStatus() == EconomyTransactionStatus.COMMITTED) {
                 idempotencyIndex.put(record.getIdempotencyKey(), record.getTransactionId());
-                SimpleServerUtilities.TRANSACTIONS.rememberCommitted(record.getIdempotencyKey());
+                rememberCommittedKey(record.getIdempotencyKey(), record.getCompletedAtEpochMilli());
             }
         }
     }
@@ -959,7 +1066,7 @@ public final class EconomyManager implements EconomyService {
         if (record.getStatus() == EconomyTransactionStatus.COMMITTED
                 && !record.getIdempotencyKey().isEmpty()) {
             idempotencyIndex.put(record.getIdempotencyKey(), record.getTransactionId());
-            SimpleServerUtilities.TRANSACTIONS.rememberCommitted(record.getIdempotencyKey());
+            rememberCommittedKey(record.getIdempotencyKey(), record.getCompletedAtEpochMilli());
         }
         try {
             writeTransactionSynchronously(record);
@@ -970,6 +1077,9 @@ public final class EconomyManager implements EconomyService {
                     e
             );
             transactionStore.queueJson(gson, transactionFile(record.getTransactionId()), record);
+        }
+        if (retentionReady && record.getStatus() != EconomyTransactionStatus.PREPARED) {
+            retainCompletedTransaction(record);
         }
     }
 
@@ -982,9 +1092,141 @@ public final class EconomyManager implements EconomyService {
         UUID id = record.getTransactionId();
         recentTransactionIds.remove(id);
         recentTransactionIds.addLast(id);
-        while (recentTransactionIds.size() > MAX_RECENT_IN_MEMORY) {
+        int maximum = Math.max(settings.getRecentHistoryLimit(), Math.min(100_000,
+                settings.getRecentHistoryLimit() * Math.max(1, accounts.size())));
+        while (recentTransactionIds.size() > maximum) {
             recentTransactionIds.removeFirst();
         }
+    }
+
+    /**
+     * Rebuilds the bounded retention index after startup or an administrator
+     * changes the configured history size. Normal transactions are maintained
+     * incrementally afterwards and do not rescan the whole journal.
+     */
+    private void rebuildRetentionIndexAndPrune(boolean logResult) {
+        retainedByAccount.clear();
+        retentionReferences.clear();
+        retentionTracked.clear();
+        retainedUnscoped.clear();
+        if (transactionsFolder == null || transactions.isEmpty()) return;
+
+        int before = transactions.size();
+        List<EconomyTransactionRecord> ordered = new ArrayList<>(transactions.values());
+        ordered.sort(Comparator
+                .comparingLong(EconomyManager::retentionTimestamp)
+                .thenComparing(record -> record.getTransactionId().toString()));
+        for (EconomyTransactionRecord record : ordered) {
+            if (record.getStatus() != EconomyTransactionStatus.PREPARED) {
+                retainCompletedTransaction(record);
+            }
+        }
+
+        Set<UUID> keep = new HashSet<>(retentionTracked);
+        for (EconomyTransactionRecord record : transactions.values()) {
+            if (record.getStatus() == EconomyTransactionStatus.PREPARED) {
+                keep.add(record.getTransactionId());
+            }
+        }
+        transactions.entrySet().removeIf(entry -> !keep.contains(entry.getKey()));
+        rebuildTransactionIndexes();
+
+        Set<Path> retainedFiles = new HashSet<>();
+        for (UUID id : transactions.keySet()) {
+            retainedFiles.add(transactionFile(id).toAbsolutePath().normalize());
+        }
+        int queuedDeletes = transactionStore.queueDeleteMissing(retainedFiles);
+        if (logResult && (before != transactions.size() || queuedDeletes > 0)) {
+            SimpleServerUtilities.LOGGER.info(
+                    "Pruned SSU economy history from {} to {} record(s); retention is {} per account.",
+                    before, transactions.size(), settings.getRecentHistoryLimit());
+        }
+    }
+
+    /** Adds one completed transaction to the per-account bounded indexes. */
+    private void retainCompletedTransaction(EconomyTransactionRecord record) {
+        UUID transactionId = record.getTransactionId();
+        if (transactionId == null || !retentionTracked.add(transactionId)) return;
+        int limit = settings.getRecentHistoryLimit();
+        Set<UUID> participants = transactionParticipants(record);
+        if (participants.isEmpty()) {
+            retainedUnscoped.addLast(transactionId);
+            incrementRetentionReference(transactionId);
+            while (retainedUnscoped.size() > limit) {
+                decrementRetentionReference(retainedUnscoped.removeFirst());
+            }
+            return;
+        }
+        for (UUID participant : participants) {
+            Deque<UUID> accountHistory = retainedByAccount.computeIfAbsent(
+                    participant, ignored -> new ArrayDeque<>());
+            accountHistory.addLast(transactionId);
+            incrementRetentionReference(transactionId);
+            while (accountHistory.size() > limit) {
+                decrementRetentionReference(accountHistory.removeFirst());
+            }
+        }
+    }
+
+    private void incrementRetentionReference(UUID transactionId) {
+        retentionReferences.merge(transactionId, 1, Integer::sum);
+    }
+
+    private void decrementRetentionReference(UUID transactionId) {
+        Integer current = retentionReferences.get(transactionId);
+        if (current == null || current <= 1) {
+            retentionReferences.remove(transactionId);
+            removeExpiredTransaction(transactionId);
+        } else {
+            retentionReferences.put(transactionId, current - 1);
+        }
+    }
+
+    private void removeExpiredTransaction(UUID transactionId) {
+        EconomyTransactionRecord record = transactions.get(transactionId);
+        if (record == null || record.getStatus() == EconomyTransactionStatus.PREPARED) return;
+        transactions.remove(transactionId);
+        retentionTracked.remove(transactionId);
+        recentTransactionIds.remove(transactionId);
+        if (!record.getIdempotencyKey().isEmpty()
+                && transactionId.equals(idempotencyIndex.get(record.getIdempotencyKey()))) {
+            idempotencyIndex.remove(record.getIdempotencyKey());
+        }
+        Path file = transactionFile(transactionId);
+        transactionStore.forget(file);
+        SimpleServerUtilities.STORAGE.queueDelete(file);
+    }
+
+    private void rebuildTransactionIndexes() {
+        idempotencyIndex.clear();
+        recentTransactionIds.clear();
+        List<EconomyTransactionRecord> ordered = new ArrayList<>(transactions.values());
+        ordered.sort(Comparator.comparingLong(EconomyManager::retentionTimestamp));
+        for (EconomyTransactionRecord record : ordered) {
+            rememberRecent(record);
+            if (record.getStatus() == EconomyTransactionStatus.COMMITTED
+                    && !record.getIdempotencyKey().isEmpty()) {
+                idempotencyIndex.put(record.getIdempotencyKey(), record.getTransactionId());
+            }
+        }
+    }
+
+    private static Set<UUID> transactionParticipants(EconomyTransactionRecord record) {
+        Set<UUID> participants = new HashSet<>(3);
+        if (record.getActorId() != null) participants.add(record.getActorId());
+        if (record.getSourceId() != null) participants.add(record.getSourceId());
+        if (record.getDestinationId() != null) participants.add(record.getDestinationId());
+        return participants;
+    }
+
+    private static long retentionTimestamp(EconomyTransactionRecord record) {
+        return Math.max(record.getCreatedAtEpochMilli(), record.getCompletedAtEpochMilli());
+    }
+
+
+    private static String normalizeIdempotencyKey(String rawKey) {
+        String key = rawKey == null ? "" : rawKey.trim();
+        return key.length() <= 256 ? key : key.substring(0, 256);
     }
 
     private Path accountFile(UUID playerId) {

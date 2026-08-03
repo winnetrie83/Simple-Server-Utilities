@@ -2,7 +2,6 @@ package be.winnetrie.mod.simpleserverutilities.auction;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -23,6 +22,7 @@ import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyResult;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyTransactionType;
+import be.winnetrie.mod.simpleserverutilities.economy.EconomySystemAccounts;
 import be.winnetrie.mod.simpleserverutilities.economy.MoneyFormat;
 import be.winnetrie.mod.simpleserverutilities.mail.MailItemCodec;
 import be.winnetrie.mod.simpleserverutilities.mail.MailOperationResult;
@@ -52,8 +52,7 @@ public final class AuctionHouseManager {
     private static final int DEFAULT_MAX_ACTIVE = 5;
     private static final long SESSION_MILLIS = 15L * 60L * 1000L;
     private static final long PURCHASE_RETENTION_MILLIS = 30L * 24L * 60L * 60L * 1000L;
-    private static final UUID CLEARING_ACCOUNT_ID = UUID.nameUUIDFromBytes(
-            "simpleserverutilities:auction_house_clearing".getBytes(StandardCharsets.UTF_8));
+    private static final UUID CLEARING_ACCOUNT_ID = EconomySystemAccounts.AUCTION_HOUSE_TAX;
     private static final DateTimeFormatter MAIL_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
             .withLocale(Locale.forLanguageTag("nl-BE")).withZone(ZoneId.systemDefault());
 
@@ -120,6 +119,20 @@ public final class AuctionHouseManager {
         for (AuctionListing listing : listings.values()) saveListing(listing);
         for (AuctionPurchaseRecord purchase : purchases.values()) savePurchase(purchase);
     }
+
+    public synchronized int saleTaxPermille() {
+        return settings.getSaleTaxPermille();
+    }
+
+    public synchronized boolean updateSaleTaxPermille(int permille) {
+        int normalized = Math.max(0, Math.min(1_000, permille));
+        int previous = settings.getSaleTaxPermille();
+        settings.setSaleTaxPermille(normalized);
+        if (saveSettings()) return true;
+        settings.setSaleTaxPermille(previous);
+        return false;
+    }
+
 
     public synchronized void clear() {
         listings.clear();
@@ -245,7 +258,6 @@ public final class AuctionHouseManager {
                 case "blacklist_id" -> blacklistItemId(player, payload);
                 case "blacklist_listing" -> blacklistListingItem(player, payload);
                 case "unblacklist" -> unblacklistItem(player, payload);
-                case "set_tax" -> setTax(player, payload);
                 default -> sendResult(player, false, "Unknown Auction House action.", payload.requestId(), false, false);
             }
         }
@@ -806,32 +818,6 @@ public final class AuctionHouseManager {
         if (reason.isBlank()) throw new IllegalArgumentException("Enter a reason before continuing.");
         if (reason.length() > 200) throw new IllegalArgumentException("The reason may contain at most 200 characters.");
         return reason;
-    }
-
-    private void setTax(ServerPlayer player, AuctionHouseActionPayload payload) {
-        if (!canAdmin(player)) {
-            sendResult(player, false, "You do not have Auction House administration permission.",
-                    payload.requestId(), false, false); return;
-        }
-        try {
-            String raw = payload.value().trim().replace(',', '.').replace("%", "");
-            java.math.BigDecimal percentage = new java.math.BigDecimal(raw);
-            int permille = percentage.multiply(java.math.BigDecimal.TEN).intValueExact();
-            if (permille < 0 || permille > 1_000) throw new IllegalArgumentException("Tax must be between 0% and 100%.");
-            int previous = settings.getSaleTaxPermille();
-            settings.setSaleTaxPermille(permille);
-            if (!saveSettings()) {
-                settings.setSaleTaxPermille(previous);
-                sendResult(player, false, "The Auction House tax could not be saved.",
-                        payload.requestId(), false, false);
-                return;
-            }
-            sendResult(player, true, "Auction House tax changed to " + taxPercent() + ".",
-                    payload.requestId(), false, true);
-        } catch (Exception exception) {
-            sendResult(player, false, safeMessage(exception, "Enter a valid tax percentage."),
-                    payload.requestId(), false, false);
-        }
     }
 
     public synchronized void maintenanceTick() {

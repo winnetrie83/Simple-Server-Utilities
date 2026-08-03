@@ -3,7 +3,6 @@ package be.winnetrie.mod.simpleserverutilities.permission.policy;
 import java.util.Locale;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
-import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
@@ -91,15 +90,9 @@ public final class TeleportPolicy {
                         + " are not allowed in region '" + context.getRegion().getName() + "'.";
             }
         }
-        if (context != null && context.getDimension() != null) {
-            var scope = SimpleServerUtilities.PERMISSIONS.getData().getDimensions().get(context.getDimension());
-            if (scope != null
-                    && (isExplicitDeny(scope.getPermission(PermissionKeys.TELEPORT_ESCAPE))
-                    || isExplicitDeny(scope.getPermission(type.usePermission())))) {
-                return "Teleport cancelled: " + type.displayName()
-                        + " are not allowed in dimension '" + context.getDimension() + "'.";
-            }
-        }
+        // Rank/player dimension overrides are included by PermissionService. Unlike the
+        // removed global dimension scope, their exact source is player-specific, so the
+        // generic location message below avoids claiming a server-wide dimension deny.
         return "Teleport cancelled: " + type.displayName() + " are not allowed from your current location.";
     }
 

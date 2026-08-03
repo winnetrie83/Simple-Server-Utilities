@@ -23,10 +23,10 @@ public record SsuMenuPageRequestPayload(
             StreamCodec.of(SsuMenuPageRequestPayload::encode, SsuMenuPageRequestPayload::decode);
 
     public SsuMenuPageRequestPayload {
-        page = bounded(page, 32).trim().toLowerCase(java.util.Locale.ROOT);
+        page = PayloadBounds.string(page, 32).trim().toLowerCase(java.util.Locale.ROOT);
         pageIndex = Math.max(0, pageIndex);
         pageSize = Math.max(1, Math.min(MAX_PAGE_SIZE, pageSize));
-        query = bounded(query, 96).trim();
+        query = PayloadBounds.string(query, 96).trim();
         requestId = Math.max(0L, requestId);
     }
 
@@ -47,13 +47,7 @@ public record SsuMenuPageRequestPayload(
                 buffer.readVarLong()
         );
     }
-
-    private static String bounded(String value, int maxLength) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= maxLength ? safe : safe.substring(0, maxLength);
-    }
-
-    @Override
+@Override
     public Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }

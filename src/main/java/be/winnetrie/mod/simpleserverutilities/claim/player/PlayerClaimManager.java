@@ -228,12 +228,19 @@ public class PlayerClaimManager {
             return false;
         }
 
+        int removedHomes = SimpleServerUtilities.HOMES.deleteHomesInClaim(claim.getOwner(), claim);
+
         for (ClaimChunk chunk : claim.getChunks()) {
             chunkIndex.remove(createKey(claim.getDimension(), chunk.getX(), chunk.getZ()));
         }
 
         claims.remove(claim.getId());
         save();
+        if (removedHomes > 0) {
+            SimpleServerUtilities.LOGGER.info(
+                    "Removed {} home(s) linked to deleted claim '{}' ({})",
+                    removedHomes, claim.getDisplayName(), claim.getId());
+        }
         return true;
     }
 
@@ -612,11 +619,20 @@ public class PlayerClaimManager {
         }
 
         long now = System.currentTimeMillis();
+        Set<ClaimChunk> removedClaimChunks = new HashSet<>();
         for (ChunkPos chunkPos : chunks) {
             claim.removeChunk(chunkPos.x(), chunkPos.z(), now);
             chunkIndex.remove(createKey(dimension, chunkPos.x(), chunkPos.z()));
+            removedClaimChunks.add(new ClaimChunk(chunkPos.x(), chunkPos.z()));
         }
+        int removedHomes = SimpleServerUtilities.HOMES.deleteHomesInChunks(
+                claim.getOwner(), dimension, removedClaimChunks);
         save();
+        if (removedHomes > 0) {
+            SimpleServerUtilities.LOGGER.info(
+                    "Removed {} home(s) from {} removed chunk(s) in claim '{}' ({})",
+                    removedHomes, removedClaimChunks.size(), claim.getDisplayName(), claim.getId());
+        }
         return ClaimMapBatchResult.success(chunks.size());
     }
 
@@ -700,7 +716,15 @@ public class PlayerClaimManager {
         }
 
         chunkIndex.remove(key);
+        int removedHomes = SimpleServerUtilities.HOMES.deleteHomesInChunks(
+                claim.getOwner(), claim.getDimension(),
+                Set.of(new ClaimChunk(chunkPos.x(), chunkPos.z())));
         save();
+        if (removedHomes > 0) {
+            SimpleServerUtilities.LOGGER.info(
+                    "Removed {} home(s) from unclaimed chunk {}, {} in claim '{}' ({})",
+                    removedHomes, chunkPos.x(), chunkPos.z(), claim.getDisplayName(), claim.getId());
+        }
 
         return ClaimOperationResult.success();
     }
@@ -1148,10 +1172,28 @@ public class PlayerClaimManager {
             String notice,
             boolean error
     ) {
+        return getMapData(player, requestedCenterChunkX, requestedCenterChunkZ, radius,
+                selectedClaimGroupName, notice, error, true);
+    }
+
+    public ClaimMapData getMapData(
+            ServerPlayer player,
+            int requestedCenterChunkX,
+            int requestedCenterChunkZ,
+            int radius,
+            String selectedClaimGroupName,
+            String notice,
+            boolean error,
+            boolean constrainCenterToPlayer
+    ) {
         int safeRadius = Math.max(2, Math.min(radius, 12));
         ChunkPos playerChunk = player.chunkPosition();
-        int centerChunkX = clampMapCenter(requestedCenterChunkX, playerChunk.x());
-        int centerChunkZ = clampMapCenter(requestedCenterChunkZ, playerChunk.z());
+        int centerChunkX = constrainCenterToPlayer
+                ? clampMapCenter(requestedCenterChunkX, playerChunk.x())
+                : requestedCenterChunkX;
+        int centerChunkZ = constrainCenterToPlayer
+                ? clampMapCenter(requestedCenterChunkZ, playerChunk.z())
+                : requestedCenterChunkZ;
 
         List<String> ownedClaims = claims.values().stream()
                 .filter(claim -> claim.isOwner(player.getUUID()))

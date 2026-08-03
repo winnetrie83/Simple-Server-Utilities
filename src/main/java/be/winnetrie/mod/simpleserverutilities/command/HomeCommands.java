@@ -90,7 +90,7 @@ public class HomeCommands {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!HomePolicy.canSetHomeAt(player, player.blockPosition())) {
-            player.sendSystemMessage(Component.literal("You do not have permission to set homes here."));
+            player.sendSystemMessage(Component.literal("Homes can only be set inside one of your own claims, with the required permission."));
             return 0;
         }
 

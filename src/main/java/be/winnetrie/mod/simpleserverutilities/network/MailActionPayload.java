@@ -15,8 +15,8 @@ public record MailActionPayload(String action, String mailId, String mode, int p
             StreamCodec.of(MailActionPayload::encode, MailActionPayload::decode);
 
     public MailActionPayload {
-        action = bound(action, 32);
-        mailId = bound(mailId, 64);
+        action = PayloadBounds.trimmedString(action, 32);
+        mailId = PayloadBounds.trimmedString(mailId, 64);
         mode = "sent".equalsIgnoreCase(mode) ? "sent" : "inbox";
         pageIndex = Math.max(0, pageIndex);
         requestId = Math.max(0L, requestId);
@@ -31,10 +31,7 @@ public record MailActionPayload(String action, String mailId, String mode, int p
         return new MailActionPayload(b.readUtf(32), b.readUtf(64), b.readUtf(16), b.readVarInt(), b.readVarLong());
     }
 
-    private static String bound(String value, int max) {
-        String safe = value == null ? "" : value.trim();
-        return safe.length() <= max ? safe : safe.substring(0, max);
-    }
+
 
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

@@ -219,6 +219,34 @@ public final class PermissionCatalog {
         integer(values, PermissionKeys.AUCTION_HOUSE_MAX_ACTIVE, "Maximum number of simultaneous active auctions the player may create.", 0, 100_000);
         bool(values, PermissionKeys.AUCTION_HOUSE_ADMIN, "Allows changing global Auction House settings such as the sale tax.");
 
+        bool(values, PermissionKeys.CONTENT_ADMIN, "Allows Content & Progression Core diagnostics and future progression repair tools.");
+
+        bool(values, PermissionKeys.NPCS_USE, "Allows access to the NPC module when globally enabled.");
+        bool(values, PermissionKeys.NPCS_INTERACT, "Allows interacting with SSU NPCs after the general NPC module gate passes.");
+        bool(values, PermissionKeys.NPCS_DIALOGUE, "Allows opening and navigating graph-based NPC dialogue.");
+        bool(values, PermissionKeys.NPCS_SERVICE_MAIL, "Allows opening the mailbox through an NPC dialogue service.");
+        bool(values, PermissionKeys.NPCS_SERVICE_AUCTION_HOUSE, "Allows opening the Auction House through an NPC dialogue service.");
+        bool(values, PermissionKeys.NPCS_SERVICE_MENU, "Allows opening the SSU menu through an NPC dialogue service.");
+        bool(values, PermissionKeys.NPCS_SERVICE_HEAL, "Allows receiving healing from an NPC dialogue service.");
+        bool(values, PermissionKeys.NPCS_SERVICE_TELEPORT, "Allows NPC dialogue services to request server-spawn or warp teleports; normal teleport permissions still apply.");
+        bool(values, PermissionKeys.NPCS_SERVICE_QUESTS, "Allows using Quest Core through NPC dialogue services when NPC access is selected.");
+        bool(values, PermissionKeys.NPCS_SERVICE_MINIGAMES, "Allows opening the minigame lobby or joining a minigame queue through NPC dialogue services.");
+        bool(values, PermissionKeys.NPCS_SERVICE_DUNGEONS, "Allows opening the dungeon lobby or joining a dungeon queue through NPC dialogue services.");
+        bool(values, PermissionKeys.NPCS_ADMIN, "Allows creating, editing, copying, placing and removing SSU NPCs and their dialogue graphs.");
+
+        bool(values, PermissionKeys.QUESTS_USE, "Allows access to the quest system through its configured exclusive entry point.");
+        bool(values, PermissionKeys.QUESTS_TRACK, "Allows tracking active quests and objectives.");
+        bool(values, PermissionKeys.QUESTS_ABANDON, "Allows abandoning active quests when the quest definition permits it.");
+        bool(values, PermissionKeys.QUESTS_ADMIN, "Allows creating, editing, validating and repairing quests.");
+
+        bool(values, PermissionKeys.MINIGAMES_USE, "Allows access to the SSU minigame framework when globally enabled.");
+        bool(values, PermissionKeys.MINIGAMES_QUEUE, "Allows joining SSU minigame queues.");
+        bool(values, PermissionKeys.MINIGAMES_ADMIN, "Allows creating, editing and administering SSU minigames and arenas.");
+
+        bool(values, PermissionKeys.DUNGEONS_USE, "Allows access to customized SSU dungeons when globally enabled.");
+        bool(values, PermissionKeys.DUNGEONS_QUEUE, "Allows joining SSU dungeon queues.");
+        bool(values, PermissionKeys.DUNGEONS_ADMIN, "Allows creating, editing and administering customized SSU dungeons.");
+
         bool(values, PermissionKeys.HOLOGRAMS_ADMIN, "Allows creating, editing, moving, deleting and refreshing persistent holograms.");
         bool(values, PermissionKeys.BLOCK_INFORMATION_USE, "Allows using the personal block information overlay while the server module is enabled.");
         bool(values, PermissionKeys.BLOCK_INFORMATION_DEBUG, "Allows enabling technical Block Information debug details such as IDs, hardness, state and required tool.");
@@ -244,7 +272,8 @@ public final class PermissionCatalog {
         bool(values, PermissionKeys.VEINMINER_ORE_LAPIS, "Allows Veinminer for lapis ores.");
         bool(values, PermissionKeys.VEINMINER_ORE_DIAMOND, "Allows Veinminer for diamond ores.");
 
-        bool(values, PermissionKeys.PERMISSIONS_ADMIN, "Allows editing rank, player and dimension permission overrides.");
+        bool(values, PermissionKeys.PERMISSIONS_ADMIN, "Allows editing rank and player permissions, including per-dimension overrides.");
+        bool(values, PermissionKeys.DIMENSIONS_ADMIN, "Allows creating, editing and deleting SSU-managed dimensions.");
 
         bool(values, "ssu.*", "Wildcard that grants or denies every SSU permission.");
         bool(values, "ssu.claims.*", "Wildcard for all player-claim permissions.");
@@ -262,6 +291,13 @@ public final class PermissionCatalog {
         bool(values, "ssu.economy.*", "Wildcard for all economy permissions.");
         bool(values, "ssu.teleport.*", "Wildcard for all teleport-policy permissions.");
         bool(values, "ssu.auction_house.*", "Wildcard for all Auction House access, dashboard, limit and administration permissions.");
+        bool(values, "ssu.content.*", "Wildcard for Content & Progression Core administration permissions.");
+        bool(values, "ssu.npcs.*", "Wildcard for all NPC access, dialogue, service and administration permissions.");
+        bool(values, "ssu.npcs.service.*", "Wildcard for all NPC-provided service permissions.");
+        bool(values, "ssu.quests.*", "Wildcard for all quest access, tracking, abandoning and administration permissions.");
+        bool(values, "ssu.minigames.*", "Wildcard for all minigame access, queue and administration permissions.");
+        bool(values, "ssu.dungeons.*", "Wildcard for all dungeon access, queue and administration permissions.");
+        bool(values, "ssu.dimensions.*", "Wildcard for SSU dimension creation and administration permissions.");
         bool(values, "ssu.holograms.*", "Wildcard for all floating text, link, scoreboard and image hologram administration permissions.");
         bool(values, "ssu.block_information.*", "Wildcard for block information access.");
         bool(values, "ssu.statistics.*", "Wildcard for custom statistic administration.");

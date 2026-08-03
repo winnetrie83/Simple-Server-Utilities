@@ -83,7 +83,8 @@ public final class EconomyTransactionRecord {
 
     public void normalize() {
         schemaVersion = Math.max(1, schemaVersion);
-        idempotencyKey = safe(idempotencyKey);
+        idempotencyKey = safe(idempotencyKey).trim();
+        if (idempotencyKey.length() > 256) idempotencyKey = idempotencyKey.substring(0, 256);
         type = type == null ? EconomyTransactionType.RECOVERY : type;
         status = status == null ? EconomyTransactionStatus.FAILED : status;
         module = safe(module);

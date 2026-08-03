@@ -5,9 +5,13 @@ import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramClientEven
 import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramImageCache;
 import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramClientState;
 import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramRenderer;
+import be.winnetrie.mod.simpleserverutilities.client.npc.NpcLabelClientState;
+import be.winnetrie.mod.simpleserverutilities.client.npc.NpcLabelRenderer;
+import be.winnetrie.mod.simpleserverutilities.client.gui.ManagedDimensionScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.ClaimMapScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.SsuDashboardScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.PropertySettingsScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.TrustedPlayersScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.RegionPermissionScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.RegionEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.WorldMapScreen;
@@ -16,6 +20,22 @@ import be.winnetrie.mod.simpleserverutilities.client.gui.MailComposeScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.AuctionHouseScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.AuctionSellScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.HologramEditorScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcEditorScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcLoadoutScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcAdminScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcDialogueScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcDialogueEditorScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcFunctionMenuScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcShopScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcShopAdminScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcShopEditorScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcItemPriceCatalogScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.QuestBookScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.QuestEditorScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.MinigameLobbyScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.MinigameEditorScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.DungeonLobbyScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.DungeonEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.StatisticEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.blockinfo.BlockInformationClientState;
 import be.winnetrie.mod.simpleserverutilities.client.map.AerialMapAtlas;
@@ -34,6 +54,29 @@ import be.winnetrie.mod.simpleserverutilities.network.StatisticEditorResultPaylo
 import be.winnetrie.mod.simpleserverutilities.network.HologramSyncPayload;
 import be.winnetrie.mod.simpleserverutilities.network.HologramEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.HologramEditorResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcEditorOpenPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcLabelSyncPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcEditorResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcLoadoutResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcAdminListPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueViewPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueEditorOpenPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueEditorResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcFunctionMenuPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcShopDataPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcShopAdminDataPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcShopEditorOpenPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcShopEditorResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcItemPriceCatalogDataPayload;
+import be.winnetrie.mod.simpleserverutilities.network.QuestBookDataPayload;
+import be.winnetrie.mod.simpleserverutilities.network.QuestEditorOpenPayload;
+import be.winnetrie.mod.simpleserverutilities.network.QuestEditorResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyDataPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorOpenPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.DungeonLobbyDataPayload;
+import be.winnetrie.mod.simpleserverutilities.network.DungeonEditorOpenPayload;
+import be.winnetrie.mod.simpleserverutilities.network.DungeonEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
@@ -46,11 +89,13 @@ import be.winnetrie.mod.simpleserverutilities.network.AuctionHouseActionResultPa
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerSyncPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuSnapshotPayload;
+import be.winnetrie.mod.simpleserverutilities.network.SsuDimensionManagerDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuPageDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPermissionEditorDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPlayerProfileDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsDataPayload;
+import be.winnetrie.mod.simpleserverutilities.network.SsuTrustedPlayersDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.UtilityMiningActivationPayload;
@@ -81,6 +126,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import org.lwjgl.glfw.GLFW;
 import be.winnetrie.mod.simpleserverutilities.mail.ModMailMenus;
 import be.winnetrie.mod.simpleserverutilities.auction.ModAuctionMenus;
+import be.winnetrie.mod.simpleserverutilities.npc.ModNpcMenus;
 
 @Mod(value = SimpleServerUtilities.MODID, dist = Dist.CLIENT)
 @EventBusSubscriber(modid = SimpleServerUtilities.MODID, value = Dist.CLIENT)
@@ -150,6 +196,7 @@ public class SimpleServerUtilitiesClient {
     static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         event.register(ModMailMenus.MAIL_COMPOSE.get(), MailComposeScreen::new);
         event.register(ModAuctionMenus.AUCTION_SELL.get(), AuctionSellScreen::new);
+        event.register(ModNpcMenus.NPC_LOADOUT.get(), NpcLoadoutScreen::new);
     }
 
     @SubscribeEvent
@@ -160,7 +207,7 @@ public class SimpleServerUtilitiesClient {
                     if (minecraft.gui.screen() instanceof ClaimMapScreen screen) {
                         screen.acceptSnapshot(payload);
                     } else {
-                        minecraft.setScreenAndShow(new ClaimMapScreen(payload));
+                        minecraft.setScreenAndShow(new ClaimMapScreen(payload, minecraft.gui.screen()));
                     }
                 })
         );
@@ -226,6 +273,17 @@ public class SimpleServerUtilitiesClient {
                 })
         );
 
+        event.register(SsuDimensionManagerDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof ManagedDimensionScreen screen) {
+                        screen.acceptData(payload);
+                    } else {
+                        minecraft.setScreenAndShow(new ManagedDimensionScreen(payload, minecraft.gui.screen()));
+                    }
+                })
+        );
+
         event.register(SsuPlayerProfileDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
@@ -242,6 +300,17 @@ public class SimpleServerUtilitiesClient {
                         screen.acceptData(payload);
                     } else {
                         minecraft.setScreenAndShow(new PropertySettingsScreen(payload, minecraft.gui.screen()));
+                    }
+                })
+        );
+
+        event.register(SsuTrustedPlayersDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof TrustedPlayersScreen screen) {
+                        screen.acceptData(payload);
+                    } else if (minecraft.gui.screen() instanceof PropertySettingsScreen parent) {
+                        minecraft.setScreenAndShow(new TrustedPlayersScreen(payload, parent));
                     }
                 })
         );
@@ -354,6 +423,133 @@ public class SimpleServerUtilitiesClient {
                 })
         );
 
+        event.register(NpcLabelSyncPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> NpcLabelClientState.apply(payload))
+        );
+
+        event.register(NpcEditorOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.setScreenAndShow(new NpcEditorScreen(payload, minecraft.gui.screen()));
+                })
+        );
+
+        event.register(NpcEditorResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcEditorScreen screen) {
+                        screen.acceptResult(payload);
+                    }
+                })
+        );
+
+        event.register(NpcLoadoutResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcLoadoutScreen screen) screen.acceptResult(payload);
+                })
+        );
+
+        event.register(NpcAdminListPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcAdminScreen screen) screen.accept(payload);
+                    else minecraft.setScreenAndShow(new NpcAdminScreen(payload, minecraft.gui.screen()));
+                })
+        );
+
+
+        event.register(NpcFunctionMenuPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.setScreenAndShow(new NpcFunctionMenuScreen(payload, minecraft.gui.screen()));
+                })
+        );
+
+        event.register(NpcShopDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcShopScreen screen) {
+                        screen.acceptData(payload);
+                    } else {
+                        minecraft.setScreenAndShow(new NpcShopScreen(payload));
+                    }
+                })
+        );
+
+        event.register(NpcShopAdminDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcShopAdminScreen screen) {
+                        screen.accept(payload);
+                    } else if (minecraft.gui.screen() instanceof NpcShopEditorScreen screen) {
+                        screen.acceptManagerData(payload);
+                    } else {
+                        minecraft.setScreenAndShow(new NpcShopAdminScreen(payload, minecraft.gui.screen()));
+                    }
+                })
+        );
+
+        event.register(NpcShopEditorOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcShopEditorScreen screen) {
+                        screen.acceptOpen(payload);
+                    } else {
+                        minecraft.setScreenAndShow(new NpcShopEditorScreen(payload, minecraft.gui.screen()));
+                    }
+                })
+        );
+
+        event.register(NpcShopEditorResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcShopEditorScreen screen) {
+                        screen.acceptResult(payload);
+                    } else if (minecraft.gui.screen() instanceof NpcShopAdminScreen screen) {
+                        screen.acceptEditorResult(payload);
+                    }
+                })
+        );
+
+        event.register(NpcItemPriceCatalogDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcItemPriceCatalogScreen screen) {
+                        screen.accept(payload);
+                    } else {
+                        minecraft.setScreenAndShow(new NpcItemPriceCatalogScreen(payload, minecraft.gui.screen()));
+                    }
+                })
+        );
+
+        event.register(NpcDialogueViewPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcDialogueScreen screen) {
+                        screen.accept(payload);
+                    } else if (!payload.closed()) {
+                        minecraft.setScreenAndShow(new NpcDialogueScreen(payload, minecraft.gui.screen()));
+                    }
+                })
+        );
+
+        event.register(NpcDialogueEditorOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.setScreenAndShow(new NpcDialogueEditorScreen(payload, minecraft.gui.screen()));
+                })
+        );
+
+        event.register(NpcDialogueEditorResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcDialogueEditorScreen screen) {
+                        screen.acceptResult(payload);
+                    }
+                })
+        );
+
         event.register(StatisticEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
@@ -367,6 +563,79 @@ public class SimpleServerUtilitiesClient {
                     if (minecraft.gui.screen() instanceof StatisticEditorScreen screen) {
                         screen.acceptResult(payload);
                     }
+                })
+        );
+
+        event.register(QuestBookDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof QuestBookScreen screen) {
+                        screen.accept(payload);
+                    } else {
+                        minecraft.setScreenAndShow(new QuestBookScreen(payload, minecraft.gui.screen()));
+                    }
+                })
+        );
+
+        event.register(QuestEditorOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.setScreenAndShow(new QuestEditorScreen(payload, minecraft.gui.screen()));
+                })
+        );
+
+        event.register(QuestEditorResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof QuestEditorScreen screen) screen.acceptResult(payload);
+                })
+        );
+
+
+        event.register(MinigameLobbyDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof MinigameLobbyScreen screen) {
+                        screen.accept(payload);
+                    } else {
+                        minecraft.setScreenAndShow(new MinigameLobbyScreen(payload, minecraft.gui.screen()));
+                    }
+                })
+        );
+
+        event.register(MinigameEditorOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.setScreenAndShow(new MinigameEditorScreen(payload, minecraft.gui.screen()));
+                })
+        );
+
+        event.register(MinigameEditorResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof MinigameEditorScreen screen) screen.accept(payload);
+                })
+        );
+
+        event.register(DungeonLobbyDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof DungeonLobbyScreen screen) screen.accept(payload);
+                    else minecraft.setScreenAndShow(new DungeonLobbyScreen(payload, minecraft.gui.screen()));
+                })
+        );
+
+        event.register(DungeonEditorOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.setScreenAndShow(new DungeonEditorScreen(payload, minecraft.gui.screen()));
+                })
+        );
+
+        event.register(DungeonEditorResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof DungeonEditorScreen screen) screen.accept(payload);
                 })
         );
 
@@ -386,7 +655,7 @@ public class SimpleServerUtilitiesClient {
 
     @SubscribeEvent
     static void onAddClientReloadListeners(AddClientReloadListenersEvent event) {
-        event.addListener(Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "hologram_image_cache"), 
+        event.addListener(Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "hologram_image_cache"),
         (ResourceManagerReloadListener) resourceManager -> HologramImageCache.clear());
     }
 
@@ -395,6 +664,7 @@ public class SimpleServerUtilitiesClient {
         event.register(ClaimRegionBorderRenderer::new);
         event.register(UtilityMiningOutlineRenderer::new);
         event.register(HologramRenderer::new);
+        event.register(NpcLabelRenderer::new);
         event.register(MapMarkerRenderer::new);
     }
 
@@ -426,6 +696,7 @@ public class SimpleServerUtilitiesClient {
         AerialMapAtlas.clear();
         UtilityMiningClientState.clear();
         HologramClientState.clear();
+        NpcLabelClientState.clear();
         MapMarkerClientState.clear();
         utilityMiningTick = 0;
         lastTreeHeld = false;

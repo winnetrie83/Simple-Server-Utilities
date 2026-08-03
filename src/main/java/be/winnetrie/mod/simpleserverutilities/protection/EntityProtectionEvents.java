@@ -1,5 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.protection;
 
+import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -22,6 +23,7 @@ public class EntityProtectionEvents {
         }
 
         Entity target = event.getTarget();
+        if (SimpleServerUtilities.NPCS.isManagedEntity(target.getUUID())) return;
 
         if (target instanceof ServerPlayer) {
             if (ProtectionHelper.canPlayerPvp(player, player.level(), target.blockPosition())) {
@@ -50,6 +52,7 @@ public class EntityProtectionEvents {
         }
 
         Entity target = event.getEntity();
+        if (SimpleServerUtilities.NPCS.isManagedEntity(target.getUUID())) return;
 
         if (target instanceof ServerPlayer) {
             if (ProtectionHelper.canPlayerPvp(player, player.level(), target.blockPosition())) {
@@ -74,6 +77,7 @@ public class EntityProtectionEvents {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
+        if (SimpleServerUtilities.NPCS.isManagedEntity(event.getTarget().getUUID())) return;
 
         if (ProtectionHelper.canPlayerInteract(player, player.level(), event.getTarget().blockPosition())) {
             return;
@@ -97,6 +101,7 @@ public class EntityProtectionEvents {
         }
 
         Entity hitEntity = entityHitResult.getEntity();
+        if (SimpleServerUtilities.NPCS.isManagedEntity(hitEntity.getUUID())) return;
 
         if (projectile.getOwner() instanceof ServerPlayer player) {
             if (hitEntity instanceof ServerPlayer) {

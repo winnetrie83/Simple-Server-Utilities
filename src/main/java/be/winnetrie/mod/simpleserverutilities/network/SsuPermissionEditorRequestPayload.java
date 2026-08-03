@@ -12,6 +12,7 @@ import net.minecraft.resources.Identifier;
 public record SsuPermissionEditorRequestPayload(
         String mode,
         String selectedTarget,
+        String selectedDimension,
         String targetQuery,
         String permissionQuery,
         int pageIndex,
@@ -27,13 +28,12 @@ public record SsuPermissionEditorRequestPayload(
             StreamCodec.of(SsuPermissionEditorRequestPayload::encode, SsuPermissionEditorRequestPayload::decode);
 
     public SsuPermissionEditorRequestPayload {
-        mode = bounded(mode, 16).trim().toLowerCase(Locale.ROOT);
-        if (!mode.equals("rank") && !mode.equals("region") && !mode.equals("dimension")) {
-            mode = "player";
-        }
-        selectedTarget = bounded(selectedTarget, 64).trim();
-        targetQuery = bounded(targetQuery, 64).trim();
-        permissionQuery = bounded(permissionQuery, 96).trim();
+        mode = PayloadBounds.string(mode, 16).trim().toLowerCase(Locale.ROOT);
+        if (!mode.equals("rank") && !mode.equals("region")) mode = "player";
+        selectedTarget = PayloadBounds.string(selectedTarget, 64).trim();
+        selectedDimension = PayloadBounds.string(selectedDimension, 128).trim();
+        targetQuery = PayloadBounds.string(targetQuery, 64).trim();
+        permissionQuery = PayloadBounds.string(permissionQuery, 96).trim();
         pageIndex = Math.max(0, pageIndex);
         pageSize = Math.max(1, Math.min(MAX_PAGE_SIZE, pageSize));
         requestId = Math.max(0L, requestId);
@@ -42,6 +42,7 @@ public record SsuPermissionEditorRequestPayload(
     private static void encode(RegistryFriendlyByteBuf buffer, SsuPermissionEditorRequestPayload payload) {
         buffer.writeUtf(payload.mode, 16);
         buffer.writeUtf(payload.selectedTarget, 64);
+        buffer.writeUtf(payload.selectedDimension, 128);
         buffer.writeUtf(payload.targetQuery, 64);
         buffer.writeUtf(payload.permissionQuery, 96);
         buffer.writeVarInt(payload.pageIndex);
@@ -53,17 +54,13 @@ public record SsuPermissionEditorRequestPayload(
         return new SsuPermissionEditorRequestPayload(
                 buffer.readUtf(16),
                 buffer.readUtf(64),
+                buffer.readUtf(128),
                 buffer.readUtf(64),
                 buffer.readUtf(96),
                 buffer.readVarInt(),
                 buffer.readVarInt(),
                 buffer.readVarLong()
         );
-    }
-
-    private static String bounded(String value, int maxLength) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= maxLength ? safe : safe.substring(0, maxLength);
     }
 
     @Override

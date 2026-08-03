@@ -19,7 +19,6 @@ import be.winnetrie.mod.simpleserverutilities.permission.PlayerPermissionData;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
@@ -51,7 +50,7 @@ public class PermissionCommands {
 
                 .then(Commands.literal("ranks")
                         .executes(context -> ranks(context.getSource())))
-                
+
                 .then(Commands.literal("keys")
                         .executes(context -> keys(context.getSource())))
 
@@ -145,26 +144,6 @@ public class PermissionCommands {
                                                         StringArgumentType.getString(context, "key")
                                                 ))))))
 
-                .then(Commands.literal("dimension")
-                        .then(Commands.argument("dimension", StringArgumentType.word())
-                                .then(Commands.literal("set")
-                                        .then(Commands.argument("key", StringArgumentType.word())
-                                        .suggests(PERMISSION_KEY_SUGGESTIONS)
-                                                .then(Commands.argument("value", StringArgumentType.greedyString())
-                                                        .executes(context -> dimensionSet(
-                                                                context.getSource(),
-                                                                StringArgumentType.getString(context, "dimension"),
-                                                                StringArgumentType.getString(context, "key"),
-                                                                StringArgumentType.getString(context, "value")
-                                                        )))))
-                                .then(Commands.literal("unset")
-                                        .then(Commands.argument("key", StringArgumentType.word())
-                                        .suggests(PERMISSION_KEY_SUGGESTIONS)
-                                                .executes(context -> dimensionUnset(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "dimension"),
-                                                        StringArgumentType.getString(context, "key")
-                                                ))))))
 
                 .then(Commands.literal("claimcontext")
                         .then(Commands.argument("role", StringArgumentType.word())
@@ -361,43 +340,6 @@ public class PermissionCommands {
         return 1;
     }
 
-    private static int dimensionSet(CommandSourceStack source, String dimension, String key, String value) {
-        ServerPlayer player = (ServerPlayer) source.getEntity();
-        try {
-            Identifier.parse(dimension);
-        } catch (Exception exception) {
-            player.sendSystemMessage(Component.literal("Invalid dimension identifier: " + dimension));
-            return 0;
-        }
-        String normalizedKey = key.trim().toLowerCase(java.util.Locale.ROOT);
-        warnIfUnknownKey(player, normalizedKey);
-        final String normalizedValue;
-        try {
-            normalizedValue = PermissionCatalog.normalizeValue(normalizedKey, value);
-        } catch (IllegalArgumentException exception) {
-            player.sendSystemMessage(Component.literal(exception.getMessage()));
-            return 0;
-        }
-        SimpleServerUtilities.PERMISSIONS.setDimensionPermission(dimension, normalizedKey, normalizedValue);
-        player.sendSystemMessage(Component.literal("Set " + normalizedKey + " = " + normalizedValue
-                + " for dimension " + dimension + "."));
-        return 1;
-    }
-
-    private static int dimensionUnset(CommandSourceStack source, String dimension, String key) {
-        ServerPlayer player = (ServerPlayer) source.getEntity();
-        String normalizedKey = key.trim().toLowerCase(java.util.Locale.ROOT);
-        boolean existed = SimpleServerUtilities.PERMISSIONS.removeDimensionPermission(dimension, normalizedKey);
-
-        if (!existed) {
-            player.sendSystemMessage(Component.literal("Permission was not set for dimension " + dimension + ": " + normalizedKey));
-            return 0;
-        }
-
-        player.sendSystemMessage(Component.literal("Removed " + normalizedKey + " from dimension " + dimension + "."));
-        return 1;
-    }
-
     private static int claimContextSet(CommandSourceStack source, String role, String key, String value) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
         warnIfUnknownKey(player, key);
@@ -483,8 +425,6 @@ public class PermissionCommands {
         player.sendSystemMessage(Component.literal(" - /permissions player <player> removerank <rank>"));
         player.sendSystemMessage(Component.literal(" - /permissions player <player> set <key> <value>"));
         player.sendSystemMessage(Component.literal(" - /permissions player <player> unset <key>"));
-        player.sendSystemMessage(Component.literal(" - /permissions dimension <dimension> set <key> <value>"));
-        player.sendSystemMessage(Component.literal(" - /permissions dimension <dimension> unset <key>"));
         player.sendSystemMessage(Component.literal(" - /permissions claimcontext <owner|co_owner|member|visitor|none> set <key> <value>"));
         player.sendSystemMessage(Component.literal(" - /permissions claimcontext <owner|co_owner|member|visitor|none> unset <key>"));
         player.sendSystemMessage(Component.literal(" - /permissions check <key>"));

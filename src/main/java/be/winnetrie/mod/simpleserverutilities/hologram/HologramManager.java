@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,6 +40,7 @@ public final class HologramManager {
     private static final Pattern STAT_RANK_PATTERN = Pattern.compile("\\{\\{rank:([a-zA-Z0-9._-]{1,64})}}", Pattern.CASE_INSENSITIVE);
 
     private final Map<String, HologramDefinition> holograms = new LinkedHashMap<>();
+    private final Map<String, Map<Long, Set<String>>> spatialIndex = new HashMap<>();
     private final DirtyJsonRecordStore recordStore = new DirtyJsonRecordStore();
     private MinecraftServer server;
     private Path saveFile;
@@ -55,6 +57,7 @@ public final class HologramManager {
         this.moduleEnabledLastTick = Config.ENABLE_HOLOGRAMS.get();
         lastPlayerSnapshots.clear();
         holograms.clear();
+        spatialIndex.clear();
         recordStore.reset();
 
         try {
@@ -74,6 +77,7 @@ public final class HologramManager {
                     holograms.put(value.id, value);
                 }
             }
+            rebuildSpatialIndex();
             if (migrated) save();
             SimpleServerUtilities.LOGGER.info("Loaded {} SSU hologram definitions.", holograms.size());
         } catch (Exception exception) {
@@ -103,6 +107,7 @@ public final class HologramManager {
 
     public synchronized void clear() {
         holograms.clear();
+        spatialIndex.clear();
         recordStore.reset();
         server = null;
         saveFile = null;
@@ -118,6 +123,7 @@ public final class HologramManager {
         if (definition.id.isBlank()) return false;
         if (!holograms.containsKey(definition.id) && holograms.size() >= MAX_HOLOGRAMS) return false;
         holograms.put(definition.id, definition);
+        rebuildSpatialIndex();
         scheduleNextScoreboardRefresh(definition);
         save();
         syncAll();
@@ -134,6 +140,7 @@ public final class HologramManager {
         holograms.remove(originalId);
         nextScoreboardRefresh.remove(originalId);
         holograms.put(definition.id, definition);
+        rebuildSpatialIndex();
         scheduleNextScoreboardRefresh(definition);
         save();
         syncAll();
@@ -144,6 +151,7 @@ public final class HologramManager {
         HologramDefinition removed = holograms.remove(HologramDefinition.sanitizeId(rawId));
         if (removed == null) return false;
         nextScoreboardRefresh.remove(removed.id);
+        rebuildSpatialIndex();
         save();
         syncAll();
         return true;
@@ -157,6 +165,29 @@ public final class HologramManager {
         List<HologramDefinition> values = new ArrayList<>(holograms.values());
         values.sort(Comparator.comparing(value -> value.id));
         return List.copyOf(values);
+    }
+
+    public synchronized SpatialStatistics spatialStatistics() {
+        int cells = 0;
+        int references = 0;
+        int maximumBucket = 0;
+        for (Map<Long, Set<String>> dimension : spatialIndex.values()) {
+            cells += dimension.size();
+            for (Set<String> bucket : dimension.values()) {
+                references += bucket.size();
+                maximumBucket = Math.max(maximumBucket, bucket.size());
+            }
+        }
+        return new SpatialStatistics(holograms.size(), spatialIndex.size(), cells, references, maximumBucket);
+    }
+
+    public record SpatialStatistics(
+            int holograms,
+            int dimensions,
+            int cells,
+            int references,
+            int maximumBucketSize
+    ) {
     }
 
     public void tick(MinecraftServer server) {
@@ -231,7 +262,8 @@ public final class HologramManager {
         }
         String dimension = player.level().dimension().identifier().toString();
         List<HologramSyncPayload.Entry> entries = new ArrayList<>();
-        for (HologramDefinition definition : holograms.values()) {
+        for (HologramDefinition definition : nearbyDefinitions(
+                dimension, player.getX(), player.getZ(), globalDistance)) {
             if (!definition.enabled || !dimension.equals(definition.dimension)) continue;
             if (definition.type == HologramType.IMAGE && isRemoteImage(definition.imageSource)
                     && !Config.ALLOW_REMOTE_HOLOGRAM_IMAGES.get()) continue;
@@ -250,6 +282,48 @@ public final class HologramManager {
             entries.add(toSnapshot(player, definition, effectiveDistance, cachedScoreboardLines));
         }
         return List.copyOf(entries);
+    }
+
+    private List<HologramDefinition> nearbyDefinitions(
+            String dimension,
+            double x,
+            double z,
+            int range
+    ) {
+        Map<Long, Set<String>> dimensionIndex = spatialIndex.get(dimension);
+        if (dimensionIndex == null || dimensionIndex.isEmpty()) return List.of();
+        int centerX = ((int) Math.floor(x)) >> 4;
+        int centerZ = ((int) Math.floor(z)) >> 4;
+        int radius = Math.max(1, (int) Math.ceil(Math.max(8, range) / 16.0D));
+        Set<String> ids = new LinkedHashSet<>();
+        for (int chunkX = centerX - radius; chunkX <= centerX + radius; chunkX++) {
+            for (int chunkZ = centerZ - radius; chunkZ <= centerZ + radius; chunkZ++) {
+                Set<String> bucket = dimensionIndex.get(chunkKey(chunkX, chunkZ));
+                if (bucket != null) ids.addAll(bucket);
+            }
+        }
+        List<HologramDefinition> result = new ArrayList<>(ids.size());
+        for (String id : ids) {
+            HologramDefinition definition = holograms.get(id);
+            if (definition != null) result.add(definition);
+        }
+        result.sort(Comparator.comparing(value -> value.id));
+        return result;
+    }
+
+    private void rebuildSpatialIndex() {
+        spatialIndex.clear();
+        for (HologramDefinition definition : holograms.values()) {
+            int chunkX = ((int) Math.floor(definition.x)) >> 4;
+            int chunkZ = ((int) Math.floor(definition.z)) >> 4;
+            spatialIndex.computeIfAbsent(definition.dimension, ignored -> new HashMap<>())
+                    .computeIfAbsent(chunkKey(chunkX, chunkZ), ignored -> new LinkedHashSet<>())
+                    .add(definition.id);
+        }
+    }
+
+    private static long chunkKey(int chunkX, int chunkZ) {
+        return (chunkX & 0xffffffffL) | ((long) chunkZ << 32);
     }
 
     private HologramSyncPayload.Entry toSnapshot(

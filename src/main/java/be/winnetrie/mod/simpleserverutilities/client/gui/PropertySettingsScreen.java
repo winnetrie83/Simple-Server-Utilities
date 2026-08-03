@@ -9,6 +9,7 @@ import be.winnetrie.mod.simpleserverutilities.network.SsuPermissionEditorRequest
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.SsuTrustedPlayersRequestPayload;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -143,7 +144,7 @@ public final class PropertySettingsScreen extends Screen {
             }
             case "player_action" -> addPlayerAction(entry, controlX, y, controlWidth, enabled);
             case "navigate" -> {
-                Button navigate = Button.builder(Component.literal(entry.value()), ignored -> openPermissionEditor(entry.key()))
+                Button navigate = Button.builder(Component.literal(entry.value()), ignored -> openNavigation(entry.key()))
                         .bounds(controlX, y + 2, Math.min(controlWidth, 110), 20).build();
                 navigate.active = enabled;
                 addRenderableWidget(navigate);
@@ -217,11 +218,25 @@ public final class PropertySettingsScreen extends Screen {
         ClientPacketDistributor.sendToServer(new SsuPropertySettingsRequestPayload(data.kind(), data.target(), id));
     }
 
-    private void openPermissionEditor(String destination) {
-        if (!"region_permissions".equals(destination)) return;
+    void refreshFromChild() {
+        requestRefresh();
+    }
+
+    private void openNavigation(String destination) {
         long id = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new SsuPermissionEditorRequestPayload(
-                "region", data.target(), "", "", 0, 8, id));
+        if ("region_permissions".equals(destination)) {
+            ClientPacketDistributor.sendToServer(new SsuPermissionEditorRequestPayload(
+                    "region", data.target(), "", "", "", 0, 8, id));
+        } else if ("trusted_players".equals(destination) && "claim".equals(data.kind())) {
+            ClientPacketDistributor.sendToServer(new SsuTrustedPlayersRequestPayload(data.target(), "", id));
+        } else if ("homes".equals(destination) && "claim".equals(data.kind())) {
+            if (parent instanceof SsuDashboardScreen dashboard) {
+                dashboard.openHomesForClaim(data.target());
+                minecraft.setScreenAndShow(dashboard);
+            } else if (parent instanceof ClaimMapScreen claimMap) {
+                claimMap.openHomesForClaim(data.target());
+            }
+        }
     }
 
     private void changePage(int delta) {

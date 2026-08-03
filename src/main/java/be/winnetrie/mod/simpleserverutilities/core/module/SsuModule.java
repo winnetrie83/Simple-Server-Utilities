@@ -6,8 +6,12 @@ import be.winnetrie.mod.simpleserverutilities.core.service.SsuServiceRegistry;
 import net.minecraft.server.MinecraftServer;
 
 /**
- * Lifecycle contract for future SSU modules. Existing systems remain active
- * through their legacy managers during the first Core 2.0 migration steps.
+ * Lifecycle and dependency adapter for one SSU subsystem.
+ *
+ * <p>The canonical subsystem state is owned by the manager instance registered
+ * in {@code SimpleServerUtilities}. Module objects do not duplicate that state;
+ * they order startup/shutdown and expose the same manager through the service
+ * registry. This is the settled Core 2.0 ownership model.</p>
  */
 public interface SsuModule {
 

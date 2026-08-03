@@ -110,6 +110,35 @@ public final class CoreCommands {
                         + ", coalesced=" + storage.coalesced()
                         + ", failed=" + storage.failed()
         ));
+        var npcRuntime = SimpleServerUtilities.NPCS.runtimeStatistics();
+        source.sendSystemMessage(Component.literal(
+                " - NPCs: " + npcRuntime.placements() + " placement(s), "
+                        + npcRuntime.staticPhysicsPlacements() + " gravity, "
+                        + npcRuntime.scheduledPlacements() + " scheduled, "
+                        + npcRuntime.relationPlacements() + " relation/combat"
+        ));
+        var hologramIndex = SimpleServerUtilities.HOLOGRAMS.spatialStatistics();
+        source.sendSystemMessage(Component.literal(
+                " - Holograms: " + hologramIndex.holograms() + " definition(s), "
+                        + hologramIndex.cells() + " indexed cell(s), max bucket "
+                        + hologramIndex.maximumBucketSize()
+        ));
+        var moduleTimings = SimpleServerUtilities.PERFORMANCE.moduleTimingSnapshot();
+        if (!moduleTimings.isEmpty()) {
+            source.sendSystemMessage(Component.literal(" - Timed subsystems (rolling 256 samples):"));
+            for (var timing : moduleTimings) {
+                source.sendSystemMessage(Component.literal(String.format(
+                        Locale.ROOT,
+                        "   %s: avg %.3f ms, p95 %.3f ms, max %.3f ms, last %.3f ms (%d total)",
+                        timing.module(),
+                        timing.rollingAverageMillis(),
+                        timing.p95Millis(),
+                        timing.maximumMillis(),
+                        timing.lastMillis(),
+                        timing.totalSamples()
+                )));
+            }
+        }
         return 1;
     }
 

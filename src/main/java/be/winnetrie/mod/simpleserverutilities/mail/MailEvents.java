@@ -25,7 +25,12 @@ public final class MailEvents {
         }
         if (tick < nextMaintenanceTick) return;
         nextMaintenanceTick = tick + MAINTENANCE_INTERVAL_TICKS;
-        SimpleServerUtilities.MAIL.maintenanceTick();
+        long timer = SimpleServerUtilities.PERFORMANCE.startTimer();
+        try {
+            SimpleServerUtilities.MAIL.maintenanceTick();
+        } finally {
+            SimpleServerUtilities.PERFORMANCE.stopTimer("mail_maintenance", timer);
+        }
     }
 
     @SubscribeEvent

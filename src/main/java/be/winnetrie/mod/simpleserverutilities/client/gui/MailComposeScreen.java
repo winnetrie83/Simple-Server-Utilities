@@ -556,7 +556,7 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
             int row = index / 4;
             int left = x + column * (cellWidth + gap);
             int top = y + row * (cellHeight + gap);
-            if (inside(mouseX, mouseY, left, top, cellWidth, cellHeight)) {
+            if (SsuGuiGeometry.inside(mouseX, mouseY, left, top, cellWidth, cellHeight)) {
                 applySelectionColor(index);
                 paletteTarget = PaletteTarget.NONE;
                 return;
@@ -590,12 +590,7 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
 
     private int paletteX() { return leftPos + 16; }
     private int paletteY() { return topPos + 92; }
-
-    private static boolean inside(double mouseX, double mouseY, int x, int y, int width, int height) {
-        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
-    }
-
-    private static int contrastColor(int rgb) {
+private static int contrastColor(int rgb) {
         int red = (rgb >>> 16) & 0xFF;
         int green = (rgb >>> 8) & 0xFF;
         int blue = rgb & 0xFF;

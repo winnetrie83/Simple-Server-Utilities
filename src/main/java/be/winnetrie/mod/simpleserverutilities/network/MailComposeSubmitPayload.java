@@ -23,10 +23,10 @@ public record MailComposeSubmitPayload(
 
     public MailComposeSubmitPayload {
         containerId = Math.max(0, containerId);
-        recipient = bound(recipient, 64);
-        subject = bound(subject, 96);
+        recipient = PayloadBounds.trimmedString(recipient, 64);
+        subject = PayloadBounds.trimmedString(subject, 96);
         body = MailRichText.normalize(body);
-        money = bound(money, 64);
+        money = PayloadBounds.trimmedString(money, 64);
         requestId = Math.max(0L, requestId);
     }
 
@@ -40,10 +40,7 @@ public record MailComposeSubmitPayload(
                 b.readUtf(64), b.readVarLong());
     }
 
-    private static String bound(String value, int max) {
-        String safe = value == null ? "" : value.trim();
-        return safe.length() <= max ? safe : safe.substring(0, max);
-    }
+
 
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

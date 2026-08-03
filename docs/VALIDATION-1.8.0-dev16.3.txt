@@ -1,0 +1,12 @@
+SSU 1.8.0-dev16.3 validation
+
+- mod_version: 1.8.0-dev16.3
+- network protocol: 62 (unchanged)
+- storage schemas: unchanged
+- removed custom Gizmo beam layers and WORLD_SURFACE cache
+- uses public BeaconRenderer.submitBeaconBeam overload
+- client LevelRendererAccessor exposes active SubmitNodeStorage
+- accessor registered in simpleserverutilities.mixins.json client list
+- targeted Java stub compilation: PASS
+- mixin JSON parse: PASS
+- ZIP integrity: verified after packaging

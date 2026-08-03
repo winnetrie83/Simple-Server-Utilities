@@ -21,6 +21,7 @@ public record MinimapDataPayload(
         boolean northUp,
         boolean showClaims,
         boolean showRegions,
+        boolean showCalendar,
         int liveUpdateRadiusChunks,
         String dimension,
         int centerChunkX,
@@ -63,6 +64,7 @@ public record MinimapDataPayload(
         buffer.writeBoolean(payload.northUp());
         buffer.writeBoolean(payload.showClaims());
         buffer.writeBoolean(payload.showRegions());
+        buffer.writeBoolean(payload.showCalendar());
         buffer.writeVarInt(payload.liveUpdateRadiusChunks());
         buffer.writeUtf(payload.dimension(), 128);
         buffer.writeVarInt(payload.centerChunkX());
@@ -98,6 +100,7 @@ public record MinimapDataPayload(
         boolean northUp = buffer.readBoolean();
         boolean showClaims = buffer.readBoolean();
         boolean showRegions = buffer.readBoolean();
+        boolean showCalendar = buffer.readBoolean();
         int liveUpdateRadiusChunks = buffer.readVarInt();
         String dimension = buffer.readUtf(128);
         int centerChunkX = buffer.readVarInt();
@@ -130,7 +133,7 @@ public record MinimapDataPayload(
         }
 
         return new MinimapDataPayload(
-                allowed, enabled, size, shape, position, northUp, showClaims, showRegions,
+                allowed, enabled, size, shape, position, northUp, showClaims, showRegions, showCalendar,
                 liveUpdateRadiusChunks,
                 dimension, centerChunkX, centerChunkZ, ownClaimColor, otherClaimColor, regionColor,
                 claims, regions
