@@ -23,8 +23,8 @@ public record SsuPlayerProfileRequestPayload(
             StreamCodec.of(SsuPlayerProfileRequestPayload::encode, SsuPlayerProfileRequestPayload::decode);
 
     public SsuPlayerProfileRequestPayload {
-        selectedPlayer = bounded(selectedPlayer, 64).trim();
-        playerQuery = bounded(playerQuery, 64).trim();
+        selectedPlayer = PayloadBounds.string(selectedPlayer, 64).trim();
+        playerQuery = PayloadBounds.string(playerQuery, 64).trim();
         permissionPageIndex = Math.max(0, permissionPageIndex);
         permissionPageSize = Math.max(1, Math.min(MAX_PERMISSION_PAGE_SIZE, permissionPageSize));
         requestId = Math.max(0L, requestId);
@@ -47,13 +47,7 @@ public record SsuPlayerProfileRequestPayload(
                 buffer.readVarLong()
         );
     }
-
-    private static String bounded(String value, int maximum) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= maximum ? safe : safe.substring(0, maximum);
-    }
-
-    @Override
+@Override
     public Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }

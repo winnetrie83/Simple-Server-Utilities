@@ -21,8 +21,8 @@ public record MailRecipientSuggestionsPayload(String query, long requestId, List
             StreamCodec.of(MailRecipientSuggestionsPayload::encode, MailRecipientSuggestionsPayload::decode);
 
     public MailRecipientSuggestionsPayload {
-        query = bound(query, 64);
-        names = names == null ? List.of() : names.stream().limit(MAX_NAMES).map(name -> bound(name, 64)).toList();
+        query = PayloadBounds.string(query, 64);
+        names = names == null ? List.of() : names.stream().limit(MAX_NAMES).map(name -> PayloadBounds.string(name, 64)).toList();
     }
 
     private static void encode(RegistryFriendlyByteBuf buffer, MailRecipientSuggestionsPayload payload) {
@@ -42,10 +42,7 @@ public record MailRecipientSuggestionsPayload(String query, long requestId, List
         return new MailRecipientSuggestionsPayload(query, requestId, names);
     }
 
-    private static String bound(String value, int maximum) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= maximum ? safe : safe.substring(0, maximum);
-    }
+
 
     @Override
     public Type<? extends CustomPacketPayload> type() {

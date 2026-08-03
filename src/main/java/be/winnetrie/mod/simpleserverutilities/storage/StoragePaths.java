@@ -22,6 +22,14 @@ public final class StoragePaths {
         return server.getWorldPath(LevelResource.ROOT).resolve(LEGACY_ROOT_FOLDER);
     }
 
+    public static Path dimensions(Path root) {
+        return root.resolve("dimensions");
+    }
+
+    public static Path dimensionDefinitions(Path root) {
+        return dimensions(root).resolve("definitions");
+    }
+
     public static Path permissions(Path root) {
         return root.resolve("permissions");
     }
@@ -97,6 +105,78 @@ public final class StoragePaths {
 
     public static Path statistics(Path root) {
         return root.resolve("statistics");
+    }
+
+    public static Path content(Path root) {
+        return root.resolve("content");
+    }
+
+    public static Path contentProgression(Path root) {
+        return content(root).resolve("progression");
+    }
+
+    public static Path contentProgressionPlayers(Path root) {
+        return contentProgression(root).resolve("players");
+    }
+
+    public static Path npcs(Path root) {
+        return root.resolve("npcs");
+    }
+
+    public static Path npcDefinitions(Path root) {
+        return npcs(root).resolve("definitions");
+    }
+
+    public static Path npcInstances(Path root) {
+        return npcs(root).resolve("instances");
+    }
+
+    public static Path npcDialogues(Path root) {
+        return npcs(root).resolve("dialogues");
+    }
+
+    public static Path npcShops(Path root) {
+        return npcs(root).resolve("shops");
+    }
+
+    public static Path npcItemPrices(Path root) {
+        return npcs(root).resolve("item_prices.json");
+    }
+
+    public static Path quests(Path root) {
+        return root.resolve("quests");
+    }
+
+    public static Path questDefinitions(Path root) {
+        return quests(root).resolve("definitions");
+    }
+
+    public static Path questJournals(Path root) {
+        return quests(root).resolve("players");
+    }
+
+    public static Path minigames(Path root) {
+        return root.resolve("minigames");
+    }
+
+    public static Path minigameDefinitions(Path root) {
+        return minigames(root).resolve("definitions");
+    }
+
+    public static Path minigameRecovery(Path root) {
+        return minigames(root).resolve("recovery.json");
+    }
+
+    public static Path dungeons(Path root) {
+        return root.resolve("dungeons");
+    }
+
+    public static Path dungeonDefinitions(Path root) {
+        return dungeons(root).resolve("definitions");
+    }
+
+    public static Path dungeonRecovery(Path root) {
+        return dungeons(root).resolve("recovery.json");
     }
 
     public static Path utilityMining(Path root) {

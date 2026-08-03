@@ -1,5 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.blockinfo;
 
+import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -28,6 +30,11 @@ public final class BlockInformationEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        BlockInformationService.tick(event.getServer());
+        long timer = SimpleServerUtilities.PERFORMANCE.startTimer();
+        try {
+            BlockInformationService.tick(event.getServer());
+        } finally {
+            SimpleServerUtilities.PERFORMANCE.stopTimer("block_information", timer);
+        }
     }
 }

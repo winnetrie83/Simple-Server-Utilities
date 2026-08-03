@@ -67,7 +67,13 @@ public final class StatisticsEvents {
 
     @SubscribeEvent
     public static void onTick(ServerTickEvent.Post event) {
-        if (active()) SimpleServerUtilities.STATISTICS.tick(event.getServer());
+        if (!active()) return;
+        long timer = SimpleServerUtilities.PERFORMANCE.startTimer();
+        try {
+            SimpleServerUtilities.STATISTICS.tick(event.getServer());
+        } finally {
+            SimpleServerUtilities.PERFORMANCE.stopTimer("custom_statistics", timer);
+        }
     }
 
     @SubscribeEvent

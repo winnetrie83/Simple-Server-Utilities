@@ -3,6 +3,7 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -11,7 +12,11 @@ import java.util.function.Consumer;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuActionPayload;
+import be.winnetrie.mod.simpleserverutilities.network.SsuDimensionManagerRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailActionPayload;
+import be.winnetrie.mod.simpleserverutilities.network.QuestBookRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.DungeonLobbyRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuPageDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuPageRequestPayload;
@@ -21,6 +26,7 @@ import be.winnetrie.mod.simpleserverutilities.network.SsuPermissionEditorRequest
 import be.winnetrie.mod.simpleserverutilities.network.SsuPlayerProfileDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPlayerProfileRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.time.GameCalendar;
 import be.winnetrie.mod.simpleserverutilities.mixin.PlayerSkinWidgetAccessor;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -39,6 +45,7 @@ import net.minecraft.resources.Identifier;
  * are requested in bounded pages and every mutation uses a closed typed action.
  */
 public final class SsuDashboardScreen extends Screen {
+    private static String pendingHomesClaimName = "";
 
     private static final int PANEL = 0xF012171E;
     private static final int PANEL_BORDER = 0xFF52606D;
@@ -88,31 +95,53 @@ public final class SsuDashboardScreen extends Screen {
     private EditBox searchBox;
     private EditBox payPlayerBox;
     private EditBox payAmountBox;
-    private EditBox playerRefundBox;
-    private EditBox adminRefundBox;
+    private EditBox economyHistoryLimitBox;
+    private EditBox transactionPlayerBox;
+    private EditBox auctionTaxBox;
     private EditBox permissionTargetSearchBox;
     private EditBox permissionSearchBox;
     private EditBox playerProfileSearchBox;
     private final Map<String, EditBox> permissionValueInputs = new HashMap<>();
     private EditBox accountAmountBox;
+    private EditBox homeNameBox;
+    private EditBox warpNameBox;
+    private EditBox rankNameBox;
+    private EditBox rankRenameBox;
+    private EditBox rankPlayerBox;
+    private EditBox regionDaysBox;
+    private EditBox regionFillBox;
+    private EditBox regionCoordinatesBox;
+    private EditBox miningLeafRangeBox;
+    private EditBox miningTreeMaxBox;
+    private EditBox miningVeinMaxBox;
+    private EditBox miningBlockIdBox;
+    private EditBox maintenanceHexBox;
+    private EditBox maintenanceBuybackBox;
 
     private String draftSearch = "";
     private String draftPayPlayer = "";
     private String draftPayAmount = "";
-    private String draftPlayerRefund;
-    private String draftAdminRefund;
+    private String draftEconomyHistoryLimit;
+    private String selectedTransactionPlayerId = "";
+    private String selectedTransactionPlayerLabel = "";
+    private String draftTransactionPlayer = "";
+    private boolean transactionPlayerDropdownOpen;
+    private int transactionPlayerDropdownScroll;
+    private String draftAuctionTax = "5";
     private SsuPermissionEditorDataPayload permissionData = SsuPermissionEditorDataPayload.empty(
             "player", 0L, "", false);
     private long latestPermissionRequest;
     private boolean permissionLoading;
     private String permissionMode = "player";
     private String selectedPermissionTarget = "";
+    private String selectedPermissionDimension = "";
     private String selectedPermissionLabel = "";
     private String selectedAssignableRank = "";
     private String draftPermissionTargetSearch = "";
     private String draftPermissionSearch = "";
     private boolean permissionModeDropdownOpen;
     private boolean permissionTargetDropdownOpen;
+    private boolean permissionDimensionDropdownOpen;
     private boolean permissionRankDropdownOpen;
     private int permissionDropdownScroll;
     private final Map<String, String> permissionDraftValues = new HashMap<>();
@@ -126,23 +155,63 @@ public final class SsuDashboardScreen extends Screen {
     private int playerProfileDropdownScroll;
     private int playerProfilePermissionPage;
     private String draftAccountAmount = "";
+    private String draftHomeName = "";
+    private String homesClaimName = "";
+    private String draftWarpName = "";
+    private String travelFilter = "all";
+    private String draftRankName = "";
+    private String draftRankRename = "";
+    private String draftRankPlayer = "";
+    private String draftRegionDays = "1";
+    private String draftRegionFill = "minecraft:stone";
+    private String draftRegionCoordinates = "0 64 0";
+    private String draftMiningLeafRange = "3";
+    private String draftMiningTreeMax = "256";
+    private String draftMiningVeinMax = "64";
+    private String draftMiningBlockId = "minecraft:oak_log";
+    private String draftMaintenanceHex = "#42F56C";
+    private String draftMaintenanceBuyback = "30";
     private String pendingUnrentRegion = "";
     private String pendingDeleteHologram = "";
+    private String pendingDeleteHome = "";
+    private String pendingDeleteWarp = "";
+    private String pendingDeleteAdminClaim = "";
+    private String pendingDeleteRank = "";
+    private String pendingDeleteRegion = "";
+    private String pendingResetRegion = "";
+    private String pendingClearRegion = "";
+    private String pendingRedefineRegion = "";
+    private boolean pendingResetAllBorderColors;
     private String pendingResetStatistic = "";
     private String pendingDeleteStatistic = "";
     private final java.util.ArrayList<SettingsTooltip> settingsTooltips = new java.util.ArrayList<>();
     private SettingsCategory settingsCategory = SettingsCategory.GENERAL;
+    private int adminToolScroll;
+    private int adminModuleScroll;
+    private boolean requestInitialRemotePage;
 
     public SsuDashboardScreen(SsuMenuSnapshotPayload snapshot) {
         super(Component.translatable("screen.simpleserverutilities.dashboard"));
         this.snapshot = snapshot;
-        syncPolicyDrafts();
+        String pendingClaim = pendingHomesClaimName;
+        pendingHomesClaimName = "";
+        if (!pendingClaim.isBlank()) {
+            page = Page.HOMES;
+            previousPage = Page.CLAIMS;
+            homesClaimName = pendingClaim;
+            requestInitialRemotePage = true;
+        }
+        syncEconomyDrafts();
+    }
+
+    public static void queueHomesForClaim(String claimName) {
+        pendingHomesClaimName = claimName == null ? "" : claimName.trim();
     }
 
     public void acceptSnapshot(SsuMenuSnapshotPayload updated) {
         if (updated == null) return;
         this.snapshot = updated;
-        if (page != Page.ECONOMY || playerRefundBox == null) syncPolicyDrafts();
+        if (economyHistoryLimitBox == null) syncEconomyDrafts();
         rebuildWidgets();
         if (page.hasRemoteData() || page == Page.PLAYER_INFO) requestPage(false);
     }
@@ -152,6 +221,9 @@ public final class SsuDashboardScreen extends Screen {
         if (!payload.page().equals(page.remoteId())) return;
         latestPageRequest = payload.requestId();
         pageData = payload;
+        if (page == Page.UTILITY_MINING_ADMIN) syncMiningDrafts(payload);
+        if (page == Page.MAINTENANCE) syncMaintenanceDrafts(payload);
+        if (page == Page.AUCTION_TAX) syncAuctionTaxDraft(payload);
         pageIndex = payload.pageIndex();
         selectedRow = -1;
         loading = false;
@@ -167,13 +239,16 @@ public final class SsuDashboardScreen extends Screen {
         if (page != Page.PERMISSIONS || !payload.mode().equals(permissionMode)) return;
 
         String previousTarget = selectedPermissionTarget;
+        String previousDimension = selectedPermissionDimension;
         latestPermissionRequest = payload.requestId();
         permissionData = payload;
         permissionLoading = false;
         pageIndex = payload.pageIndex();
         selectedPermissionTarget = payload.selectedTarget();
+        selectedPermissionDimension = payload.selectedDimension();
         selectedPermissionLabel = payload.selectedLabel();
-        if (!previousTarget.equals(selectedPermissionTarget)) {
+        if (!previousTarget.equals(selectedPermissionTarget)
+                || !previousDimension.equals(selectedPermissionDimension)) {
             permissionDraftValues.clear();
         }
         for (SsuPermissionEditorDataPayload.PermissionEntry entry : payload.permissions()) {
@@ -241,9 +316,20 @@ public final class SsuDashboardScreen extends Screen {
             case HOLOGRAMS -> addHologramButtons(l);
             case STATISTICS -> addStatisticButtons(l);
             case CLAIMS -> addClaimButtons(l);
+            case HOMES -> addHomesButtons(l);
             case TRAVEL -> addTravelButtons(l);
-            case ECONOMY -> addEconomyButtons(l);
+            case TRAVEL_ADMIN -> addAdminTravelButtons(l);
+            case ADMIN_CLAIMS -> addAdminClaimButtons(l);
+            case RANKS -> addRankButtons(l);
+            case WALLET -> addWalletButtons(l);
+            case ECONOMICS -> addEconomicsButtons(l);
+            case TRANSACTIONS -> addTransactionsButtons(l);
+            case AUCTION_TAX -> addAuctionTaxButtons(l);
+            case CLAIM_TAX -> addClaimTaxButtons(l);
             case REGIONS -> addRegionButtons(l);
+            case REGION_ADMIN -> addRegionAdminButtons(l);
+            case UTILITY_MINING_ADMIN -> addUtilityMiningAdminButtons(l);
+            case MAINTENANCE -> addMaintenanceButtons(l);
             case SETTINGS -> addSettingsButtons(l);
             case PERMISSIONS -> addPermissionButtons(l);
             case PLAYER_INFO -> addPlayerInfoButtons(l);
@@ -252,15 +338,19 @@ public final class SsuDashboardScreen extends Screen {
             case RENT_OPERATIONS -> addRentOperationButtons(l);
             case CORE -> addCoreButtons(l);
             case PROFILE -> addProfileButtons(l);
-            case MAIL, AUCTION_HOUSE -> { }
+            case MAIL, AUCTION_HOUSE, QUESTS, MINIGAMES, DUNGEONS -> { }
+        }
+        if (requestInitialRemotePage) {
+            requestInitialRemotePage = false;
+            requestPage(false);
         }
     }
 
     private void clearReferences() {
         skin = null; searchBox = null; payPlayerBox = null; payAmountBox = null;
-        playerRefundBox = null; adminRefundBox = null;
+        economyHistoryLimitBox = null; transactionPlayerBox = null; auctionTaxBox = null;
         permissionTargetSearchBox = null; permissionSearchBox = null; playerProfileSearchBox = null; permissionValueInputs.clear();
-        accountAmountBox = null; settingsTooltips.clear();
+        accountAmountBox = null; homeNameBox = null; warpNameBox = null; rankNameBox = null; rankRenameBox = null; rankPlayerBox = null; regionDaysBox = null; regionFillBox = null; regionCoordinatesBox = null; miningLeafRangeBox = null; miningTreeMaxBox = null; miningVeinMaxBox = null; miningBlockIdBox = null; maintenanceHexBox = null; maintenanceBuybackBox = null; settingsTooltips.clear();
     }
 
     private void addHomeButtons(Layout l) {
@@ -268,18 +358,32 @@ public final class SsuDashboardScreen extends Screen {
     }
 
     private void addAdminButtons(Layout l) {
-        if (!useTexturedTiles(l)) addModuleGrid(l, adminModules());
+        if (!useTexturedTiles(l)) addAdminModuleGrid(l, adminModules());
+    }
+
+    private void addEconomicsButtons(Layout l) {
+        addModuleGrid(l, economicsModules());
     }
 
     private List<Module> homeModules(Layout l) {
         java.util.ArrayList<Module> modules = new java.util.ArrayList<>(List.of(
-                new Module("Claims", "Your connected land claims and map tools.", ICON_CLAIM, Page.CLAIMS, snapshot.moduleSettings().claims()),
-                new Module("Travel", "Homes and available server warps.", ICON_PORTAL, Page.TRAVEL, true),
-                new Module("Wallet", "Balance, payments and transaction history.", ICON_MARKET, Page.ECONOMY, snapshot.economy().enabled()),
+                new Module("Claims & Land", "Your connected land claims, claim settings, homes and map tools.", ICON_CLAIM, Page.CLAIMS, snapshot.moduleSettings().claims()),
+                new Module("Travel", "All available homes, warps and server destinations.", ICON_PORTAL, Page.TRAVEL, true),
+                new Module("Wallet", "Balance, payments and your transaction history.", ICON_MARKET, Page.WALLET, snapshot.economy().enabled()),
                 new Module("Mail", "Inbox, sent mail, items and money attachments.", ICON_MARKET, Page.MAIL, snapshot.moduleSettings().mail())
         ));
         if (snapshot.auctionHouseDashboardVisible()) {
             modules.add(new Module("Auction House", "Browse, buy and sell player-listed items.", ICON_MARKET, Page.AUCTION_HOUSE, true));
+        }
+        if (snapshot.moduleSettings().quests()
+                && "menu".equalsIgnoreCase(snapshot.moduleSettings().effectiveQuestAccessMode())) {
+            modules.add(new Module("Questbook", "Available, active and completed quests.", ICON_SETTINGS, Page.QUESTS, true));
+        }
+        if (snapshot.moduleSettings().minigames()) {
+            modules.add(new Module("Minigames", "Queues, arenas and active matches.", ICON_PORTAL, Page.MINIGAMES, true));
+        }
+        if (snapshot.moduleSettings().dungeons()) {
+            modules.add(new Module("Dungeons", "Parties, stages, checkpoints and customized dungeon runs.", ICON_SHIELD, Page.DUNGEONS, true));
         }
         // Compact layouts have no portrait sidebar, so Profile remains available as a normal tile there.
         if (!l.sidebarVisible()) {
@@ -291,47 +395,107 @@ public final class SsuDashboardScreen extends Screen {
     private List<Module> adminModules() {
         return List.of(
                 new Module("Player info", "Inspect online and offline player profiles.", ICON_PLAYERS, Page.PLAYER_INFO, snapshot.administrator()),
-                new Module("Permissions", "Inspect rank, player and dimension overrides.", ICON_PLAYERS, Page.PERMISSIONS, snapshot.adminAccess().permissions()),
-                new Module("Accounts", "Search and adjust economy accounts.", ICON_MARKET, Page.ACCOUNTS, snapshot.economy().canAdmin()),
-                new Module("Transactions", "Inspect complete transaction details.", ICON_MARKET, Page.ECONOMY, snapshot.economy().canAdmin()),
-                new Module("Rent journal", "Inspect rent reconciliation records.", ICON_PORTAL, Page.RENT_OPERATIONS, snapshot.economy().canAdmin()),
+                new Module("Player claims", "Inspect, teleport to and safely remove player claims.", ICON_CLAIM, Page.ADMIN_CLAIMS,
+                        snapshot.administrator() && snapshot.moduleSettings().claims()),
+                new Module("Travel management", "Create, move, delete and test server warps and spawn.", ICON_PORTAL, Page.TRAVEL_ADMIN,
+                        snapshot.administrator()),
+                new Module("Permissions", "Edit global and per-dimension rank/player permissions.", ICON_PLAYERS, Page.PERMISSIONS, snapshot.adminAccess().permissions()),
+                new Module("Ranks", "Create, rename, default and safely remove permission ranks.", ICON_PLAYERS, Page.RANKS, snapshot.adminAccess().permissions()),
+                new Module("Dimensions", "Create and configure custom server dimensions.", ICON_PORTAL, Page.DIMENSIONS, snapshot.administrator()),
+                new Module("Economics", "Accounts, transactions, taxes and economy journals.", ICON_MARKET, Page.ECONOMICS,
+                        snapshot.economy().canAdmin()),
                 new Module("Active jobs", "View progress and cancel server jobs.", ICON_SETTINGS, Page.JOBS, snapshot.adminAccess().core()),
                 new Module("Core status", "Storage, indexes and migrated modules.", ICON_SETTINGS, Page.CORE, snapshot.adminAccess().core()),
                 new Module("Module settings", "Enable modules and configure world render distances.", ICON_SETTINGS, Page.MODULE_SETTINGS, snapshot.administrator()),
+                new Module("Utility Mining", "Configure Treecapitator and Veinminer block rules.", ICON_SETTINGS, Page.UTILITY_MINING_ADMIN, snapshot.administrator()),
                 new Module("Admin tools", "Get purpose-built world editing and setup tools.", ICON_SETTINGS, Page.ADMIN_TOOLS, snapshot.administrator()),
                 new Module("Holograms", "Edit, teleport to and delete floating text from anywhere.", ICON_SETTINGS, Page.HOLOGRAMS,
                         snapshot.administrator() && snapshot.moduleSettings().holograms()),
                 new Module("Statistics", "Create event counters and publish personal values or leaderboards.", ICON_PLAYERS, Page.STATISTICS,
                         snapshot.administrator() && snapshot.moduleSettings().statistics()),
-                new Module("Regions", "Open region and rental administration.", ICON_SHIELD, Page.REGIONS, snapshot.moduleSettings().regions())
+                new Module("Regions", "Open region and rental administration.", ICON_SHIELD, Page.REGIONS, snapshot.moduleSettings().regions()),
+                new Module("Region maintenance", "Snapshots, recovery, world-edit and rental maintenance.", ICON_SHIELD, Page.REGION_ADMIN,
+                        snapshot.moduleSettings().regions() && snapshot.administrator()),
+                new Module("Maintenance", "Reload SSU, refresh runtime content and manage visualization defaults.", ICON_SETTINGS, Page.MAINTENANCE,
+                        snapshot.administrator())
+        );
+    }
+
+    private List<Module> economicsModules() {
+        return List.of(
+                new Module("Accounts", "Search players and adjust economy balances.", ICON_MARKET, Page.ACCOUNTS,
+                        snapshot.economy().canAdmin()),
+                new Module("Transactions", "Filter and inspect the complete transaction journal.", ICON_MARKET, Page.TRANSACTIONS,
+                        snapshot.economy().canAdmin()),
+                new Module("Auction House tax", "Configure the tax withheld from completed player sales.", ICON_MARKET, Page.AUCTION_TAX,
+                        snapshot.economy().canAdmin()),
+                new Module("Player Claim tax", "Review Player Claim taxation availability.", ICON_CLAIM, Page.CLAIM_TAX,
+                        snapshot.economy().canAdmin()),
+                new Module("Rent journal", "Inspect rental reconciliation and refund operations.", ICON_PORTAL, Page.RENT_OPERATIONS,
+                        snapshot.economy().canAdmin())
         );
     }
 
     private List<AdminTool> adminTools() {
         return List.of(
                 new AdminTool("Region Tool", "Left-click position 1, then left-click position 2. Right-click opens the initial region settings GUI.", "region"),
-                new AdminTool("Hologram Tool", "Right-click to create one block ahead. Right-click an existing hologram with the tool to edit or delete it.", "hologram")
+                new AdminTool("Hologram Tool", "Right-click to create one block ahead. Right-click an existing hologram with the tool to edit or delete it.", "hologram"),
+                new AdminTool("NPC Tool", "Right-click to create/edit. Sneak-right-click an NPC to copy and elsewhere to paste a linked placement.", "npc"),
+                new AdminTool("Shop Manager", "Create and edit shared NPC shops and inspect every linked NPC.", "shops"),
+                new AdminTool("Item Price Catalog", "Edit what players pay and receive for every vanilla and modded item.", "item_prices"),
+                new AdminTool("Quest Editor", "Create and edit quest prerequisites, objectives, rewards and lifecycle settings.", "quest"),
+                new AdminTool("Minigame Editor", "Create queues, teams, arenas, lifecycle settings and rewards.", "minigame"),
+                new AdminTool("Dungeon Editor", "Create region arenas, checkpoints, ordered stages, lives and rewards.", "dungeon")
         );
     }
 
     private void addAdminToolButtons(Layout l) {
         List<AdminTool> tools = adminTools();
-        for (int i = 0; i < tools.size(); i++) {
-            AdminTool tool = tools.get(i);
-            int y = l.contentTop() + 42 + i * 54;
-            Button getTool = Button.builder(Component.literal("Get Tool"), ignored ->
-                            action("admin_tool_get", tool.id(), "", ""))
-                    .bounds(l.contentRight() - 84, y + 8, 84, 20).build();
+        int visible = adminToolVisibleRows(l);
+        int maximum = Math.max(0, tools.size() - visible);
+        adminToolScroll = Math.max(0, Math.min(maximum, adminToolScroll));
+        int rowStart = l.contentTop() + 34;
+        int rowStep = 46;
+        for (int local = 0; local < visible; local++) {
+            int index = adminToolScroll + local;
+            if (index >= tools.size()) break;
+            AdminTool tool = tools.get(index);
+            int y = rowStart + local * rowStep;
+            Button getTool = Button.builder(Component.literal(("quest".equals(tool.id()) || "minigame".equals(tool.id())
+                            || "dungeon".equals(tool.id()) || "shops".equals(tool.id()) || "item_prices".equals(tool.id()))
+                            ? "Open Editor" : "Get Tool"), ignored -> action("admin_tool_get", tool.id(), "", ""))
+                    .bounds(l.contentRight() - 84, y + 10, 84, 20).build();
             getTool.active = !(("region".equals(tool.id()) && !snapshot.moduleSettings().regions())
-                    || ("hologram".equals(tool.id()) && !snapshot.moduleSettings().holograms()));
+                    || ("hologram".equals(tool.id()) && !snapshot.moduleSettings().holograms())
+                    || ("npc".equals(tool.id()) && !snapshot.moduleSettings().npcs())
+                    || ("shops".equals(tool.id()) && !snapshot.moduleSettings().npcs())
+                    || ("item_prices".equals(tool.id()) && !snapshot.moduleSettings().npcs())
+                    || ("quest".equals(tool.id()) && !snapshot.moduleSettings().quests())
+                    || ("minigame".equals(tool.id()) && !snapshot.moduleSettings().minigames())
+                    || ("dungeon".equals(tool.id()) && !snapshot.moduleSettings().dungeons()));
             addRenderableWidget(getTool);
         }
+        Button up = addRenderableWidget(Button.builder(Component.literal("▲"), ignored -> {
+            adminToolScroll = Math.max(0, adminToolScroll - 1); rebuildWidgets();
+        }).bounds(l.contentRight() - 52, l.contentTop(), 24, 20).build());
+        up.active = adminToolScroll > 0;
+        Button down = addRenderableWidget(Button.builder(Component.literal("▼"), ignored -> {
+            adminToolScroll = Math.min(maximum, adminToolScroll + 1); rebuildWidgets();
+        }).bounds(l.contentRight() - 26, l.contentTop(), 24, 20).build());
+        down.active = adminToolScroll < maximum;
+
+        int footerY = l.footerY() - 24;
         Button manageHolograms = Button.builder(Component.literal("Manage holograms"), ignored -> openPage(Page.HOLOGRAMS))
-                .bounds(l.contentX(), l.contentTop() + 160, 132, 20).build();
+                .bounds(l.contentX(), footerY, 132, 20).build();
         manageHolograms.active = snapshot.moduleSettings().holograms();
         addRenderableWidget(manageHolograms);
         addRenderableWidget(Button.builder(Component.literal("Module settings"), ignored -> openPage(Page.MODULE_SETTINGS))
-                .bounds(l.contentRight() - 132, l.contentTop() + 160, 132, 20).build());
+                .bounds(l.contentRight() - 132, footerY, 132, 20).build());
+    }
+
+    private int adminToolVisibleRows(Layout l) {
+        int usable = Math.max(46, l.footerY() - 30 - (l.contentTop() + 34));
+        return Math.max(1, usable / 46);
     }
 
     private void addModuleSettingsButtons(Layout l) {
@@ -349,26 +513,43 @@ public final class SsuDashboardScreen extends Screen {
                 new ModuleSwitch("Player Statistics", "statistics", settings.statistics()),
                 new ModuleSwitch("Mail", "mail", settings.mail()),
                 new ModuleSwitch("Auction House", "auction_house", settings.auctionHouse()),
+                new ModuleSwitch("NPC Core", "npcs", settings.npcs()),
+                new ModuleSwitch("Quest Core", "quests", settings.quests()),
+                new ModuleSwitch("Minigame Core", "minigames", settings.minigames()),
+                new ModuleSwitch("Dungeon Core", "dungeons", settings.dungeons()),
                 new ModuleSwitch("Permissions", "permissions", settings.permissions()),
                 new ModuleSwitch("Remote Images", "remote_hologram_images", settings.remoteHologramImages())
         );
         int columns = l.contentWidth() >= 470 ? 3 : 2;
         int gap = 6;
         int buttonWidth = (l.contentWidth() - gap * (columns - 1)) / columns;
-        int top = l.contentTop() + 24;
+        int top = l.contentTop() + 22;
+        int rowStep = 21;
         for (int i = 0; i < switches.size(); i++) {
             ModuleSwitch value = switches.get(i);
             int x = l.contentX() + (i % columns) * (buttonWidth + gap);
-            int y = top + (i / columns) * 25;
+            int y = top + (i / columns) * rowStep;
             addRenderableWidget(Button.builder(Component.literal(value.label() + ": " + onOff(value.enabled())), ignored ->
                             action("module_toggle", value.key(), "", Boolean.toString(!value.enabled())))
-                    .bounds(x, y, buttonWidth, 20).build());
+                    .bounds(x, y, buttonWidth, 18).build());
         }
 
-        int distanceTop = top + ((switches.size() + columns - 1) / columns) * 25 + 10;
+        int rows = (switches.size() + columns - 1) / columns;
+        int questModeY = top + rows * rowStep + 3;
+        String configuredMode = "npc".equalsIgnoreCase(settings.questAccessMode()) ? "NPCs" : "SSU Menu";
+        String effectiveSuffix = settings.questAccessMode().equalsIgnoreCase(settings.effectiveQuestAccessMode())
+                ? "" : " (effective: SSU Menu)";
+        String nextMode = "npc".equalsIgnoreCase(settings.questAccessMode()) ? "menu" : "npc";
+        Button questMode = Button.builder(Component.literal("Quest access: " + configuredMode + effectiveSuffix), ignored ->
+                        action("quest_access_mode", "", "", nextMode))
+                .bounds(l.contentX(), questModeY, Math.min(260, l.contentWidth()), 18).build();
+        questMode.active = settings.quests() && (settings.npcs() || "npc".equalsIgnoreCase(settings.questAccessMode()));
+        addRenderableWidget(questMode);
+
+        int distanceTop = questModeY + 24;
         addDistanceButtons(l, distanceTop, "holograms", settings.hologramRenderDistance(), 8);
-        addDistanceButtons(l, distanceTop + 27, "claim_borders", settings.claimBorderRenderDistance(), 16);
-        addDistanceButtons(l, distanceTop + 54, "region_borders", settings.regionBorderRenderDistance(), 16);
+        addDistanceButtons(l, distanceTop + 24, "claim_borders", settings.claimBorderRenderDistance(), 16);
+        addDistanceButtons(l, distanceTop + 48, "region_borders", settings.regionBorderRenderDistance(), 16);
     }
 
     private void addDistanceButtons(Layout l, int y, String key, int current, int minimum) {
@@ -390,10 +571,13 @@ public final class SsuDashboardScreen extends Screen {
             int right = l.contentRight();
             addRenderableWidget(Button.builder(Component.literal("Edit"), ignored ->
                             action("hologram_edit", entry.name(), "", ""))
-                    .bounds(right - 190, y, 48, 20).build());
+                    .bounds(right - 256, y, 44, 20).build());
+            addRenderableWidget(Button.builder(Component.literal("Move here"), ignored ->
+                            action("hologram_move_here", entry.name(), "", ""))
+                    .bounds(right - 208, y, 70, 20).build());
             addRenderableWidget(Button.builder(Component.literal("Teleport"), ignored ->
                             action("hologram_teleport", entry.name(), "", ""))
-                    .bounds(right - 138, y, 72, 20).build());
+                    .bounds(right - 134, y, 68, 20).build());
             addRenderableWidget(Button.builder(Component.literal(hologramDeleteLabel(entry.name())), ignored ->
                             requestHologramDelete(entry.name()))
                     .bounds(right - 62, y, 62, 20).build());
@@ -484,6 +668,52 @@ public final class SsuDashboardScreen extends Screen {
         }
     }
 
+    private void addAdminModuleGrid(Layout l, List<Module> modules) {
+        int columns = l.contentWidth() >= 420 ? 3 : 2;
+        int gap = 8;
+        int width = (l.contentWidth() - gap * (columns - 1)) / columns;
+        int startY = l.contentTop() + 35;
+        int visibleRows = Math.max(1, (l.footerY() - startY - 4) / 32);
+        int totalRows = (modules.size() + columns - 1) / columns;
+        int maximumScroll = Math.max(0, totalRows - visibleRows);
+        adminModuleScroll = Math.max(0, Math.min(maximumScroll, adminModuleScroll));
+        int first = adminModuleScroll * columns;
+        int last = Math.min(modules.size(), first + visibleRows * columns);
+        for (int index = first; index < last; index++) {
+            Module module = modules.get(index);
+            int local = index - first;
+            int column = local % columns;
+            int row = local / columns;
+            Button button = Button.builder(Component.literal(module.label()), ignored -> openPage(module.page()))
+                    .bounds(l.contentX() + column * (width + gap), startY + row * 32, width, 24).build();
+            button.active = module.enabled();
+            addRenderableWidget(button);
+        }
+        if (maximumScroll > 0) {
+            Button up = Button.builder(Component.literal("Up"), ignored -> {
+                        adminModuleScroll = Math.max(0, adminModuleScroll - 1);
+                        rebuildWidgets();
+                    }).bounds(l.contentRight() - 104, l.footerY(), 50, 20).build();
+            Button down = Button.builder(Component.literal("Down"), ignored -> {
+                        adminModuleScroll = Math.min(maximumScroll, adminModuleScroll + 1);
+                        rebuildWidgets();
+                    }).bounds(l.contentRight() - 50, l.footerY(), 50, 20).build();
+            up.active = adminModuleScroll > 0;
+            down.active = adminModuleScroll < maximumScroll;
+            addRenderableWidget(up);
+            addRenderableWidget(down);
+        }
+    }
+
+    private int adminModuleMaximumScroll(Layout l) {
+        List<Module> modules = adminModules();
+        int columns = l.contentWidth() >= 420 ? 3 : 2;
+        int startY = l.contentTop() + 35;
+        int visibleRows = Math.max(1, (l.footerY() - startY - 4) / 32);
+        int totalRows = (modules.size() + columns - 1) / columns;
+        return Math.max(0, totalRows - visibleRows);
+    }
+
     private void addListSearch(Layout l) {
         searchBox = box(l.contentX(), l.contentTop() + 24, Math.max(100, l.contentWidth() - 86), "Search", draftSearch,
                 v -> draftSearch = v);
@@ -504,71 +734,334 @@ public final class SsuDashboardScreen extends Screen {
                     .bounds(right - 182, y, 66, 20).build());
             addRenderableWidget(Button.builder(Component.literal("Map"), ignored -> action("claim_map", entry.name(), "", ""))
                     .bounds(right - 112, y, 52, 20).build());
-            addRenderableWidget(Button.builder(Component.literal("Show"), ignored -> action("claim_show", entry.name(), "", ""))
-                    .bounds(right - 56, y, 56, 20).build());
+            Button border = Button.builder(Component.literal(entry.borderVisible() ? "Hide" : "Show"), ignored ->
+                            action("claim_visibility", entry.name(), "", Boolean.toString(!entry.borderVisible())))
+                    .bounds(right - 56, y, 56, 20).build();
+            border.active = snapshot.canViewClaimBorders();
+            addRenderableWidget(border);
         }
+        int mapW = l.contentWidth() < 500 ? 72 : 88;
         addRenderableWidget(Button.builder(Component.literal("Open map"), ignored -> action("claim_map", "", "", ""))
-                .bounds(l.contentX(), l.footerY(), 82, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Hide border"), ignored -> action("claim_hide", "", "", ""))
-                .bounds(l.contentX() + 86, l.footerY(), 88, 20).build());
-        addPagination(l, 180);
+                .bounds(l.contentX(), l.footerY(), mapW, 20).build());
+        if (l.contentWidth() < 500) addCompactPageControls(l, l.footerY(), mapW + 4);
+        else addPagination(l, mapW + 4);
     }
 
-    private void addTravelButtons(Layout l) {
-        addListSearch(l);
+    private void addHomesButtons(Layout l) {
+        boolean canSetHere = homeCapability("set_here");
+        boolean canTeleport = homeCapability("teleport");
+        boolean canDelete = homeCapability("delete");
+        homeNameBox = box(l.contentX(), l.contentTop() + 24, Math.max(90, l.contentWidth() - 168),
+                "Home name", draftHomeName, value -> draftHomeName = value);
+        homeNameBox.active = canSetHere;
+        addRenderableWidget(homeNameBox);
+        Button save = Button.builder(Component.literal("Save here"), ignored -> {
+                    if (draftHomeName.isBlank()) setNotice("Enter a home name first.", true);
+                    else action("home_set", draftHomeName, homesClaimName, "");
+                }).bounds(l.contentRight() - 162, l.contentTop() + 24, 78, 20).build();
+        save.active = canSetHere;
+        addRenderableWidget(save);
+        addRenderableWidget(Button.builder(Component.literal("Cancel TP"), ignored -> action("teleport_cancel", "homes", "", ""))
+                .bounds(l.contentRight() - 80, l.contentTop() + 24, 80, 20).build());
         List<SsuMenuPageDataPayload.LocationEntry> values = pageData.locations();
         for (int i = 0; i < values.size(); i++) {
             var entry = values.get(i); int y = rowY(l, i);
+            Button teleport = Button.builder(Component.literal("Teleport"), ignored -> action("teleport_home", entry.name(), homesClaimName, ""))
+                    .bounds(l.contentRight() - 148, y, 72, 20).build();
+            teleport.active = canTeleport;
+            addRenderableWidget(teleport);
+            Button delete = Button.builder(Component.literal(deleteHomeLabel(entry.name())), ignored -> requestDeleteHome(entry.name()))
+                    .bounds(l.contentRight() - 72, y, 72, 20).build();
+            delete.active = canDelete;
+            addRenderableWidget(delete);
+        }
+        addPagination(l, 0);
+    }
+
+    private boolean homeCapability(String key) {
+        return pageData.permissions().stream()
+                .filter(entry -> "homes".equals(entry.owner()) && key.equals(entry.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value)
+                .map(Boolean::parseBoolean)
+                .findFirst().orElse(false);
+    }
+
+    private void addTravelButtons(Layout l) {
+        addTravelFilterButtons(l, false);
+        addTravelSearch(l, l.contentTop() + 48);
+        List<SsuMenuPageDataPayload.LocationEntry> values = pageData.locations();
+        for (int i = 0; i < values.size(); i++) {
+            var entry = values.get(i);
+            int y = rowY(l, i, 82);
             String actionName = switch (entry.kind()) {
                 case "home" -> "teleport_home";
-                case "spawn" -> "teleport_spawn";
-                default -> "teleport_warp";
+                case "warp" -> "teleport_warp";
+                default -> "teleport_spawn";
             };
+            String secondary = switch (entry.kind()) {
+                case "warp", "spawn" -> "travel";
+                default -> "";
+            };
+            String value = "home".equals(entry.kind()) ? "travel" : "";
             addRenderableWidget(Button.builder(Component.literal("Teleport"), ignored ->
-                    action(actionName, entry.name(), "", ""))
+                            action(actionName, entry.name(), secondary, value))
                     .bounds(l.contentRight() - 74, y, 74, 20).build());
         }
-        if (snapshot.adminAccess().spawn()) {
-            addRenderableWidget(Button.builder(Component.literal("Set spawn here"), ignored ->
-                            action("spawn_set", "", "", ""))
-                    .bounds(l.contentX(), l.footerY(), 96, 20).build());
-            addRenderableWidget(Button.builder(Component.literal("Clear spawn"), ignored ->
-                            action("spawn_clear", "", "", ""))
-                    .bounds(l.contentX() + 100, l.footerY(), 84, 20).build());
-            addPagination(l, 190);
+        addRenderableWidget(Button.builder(Component.literal("Cancel teleport"), ignored -> action("teleport_cancel", "travel", "", ""))
+                .bounds(l.contentX(), l.footerY(), 104, 20).build());
+        addPagination(l, 110);
+    }
+
+    private void addAdminTravelButtons(Layout l) {
+        addTravelFilterButtons(l, true);
+        boolean compact = l.contentWidth() < 500;
+        int controlsY = l.contentTop() + 48;
+        boolean canSetWarp = travelAdminCapability("warp_set");
+        boolean canDeleteWarp = travelAdminCapability("warp_delete");
+        boolean canAdminSpawn = travelAdminCapability("spawn_admin");
+        boolean canTeleportWarp = travelAdminCapability("warp_teleport");
+        boolean canTeleportSpawn = travelAdminCapability("spawn_teleport");
+
+        if (compact) {
+            int nameWidth = Math.max(90, l.contentWidth() - 94);
+            warpNameBox = box(l.contentX(), controlsY, nameWidth, "Warp name", draftWarpName, value -> draftWarpName = value);
+            warpNameBox.active = canSetWarp;
+            addRenderableWidget(warpNameBox);
+            Button setWarp = Button.builder(Component.literal("Set / move"), ignored -> setWarpFromAdmin())
+                    .bounds(l.contentRight() - 90, controlsY, 90, 20).build();
+            setWarp.active = canSetWarp;
+            addRenderableWidget(setWarp);
+            Button setSpawn = Button.builder(Component.literal("Set spawn"), ignored -> action("spawn_set", "", "travel_admin", ""))
+                    .bounds(l.contentX(), controlsY + 24, (l.contentWidth() - 4) / 2, 20).build();
+            setSpawn.active = canAdminSpawn;
+            addRenderableWidget(setSpawn);
+            Button clearSpawn = Button.builder(Component.literal("Clear spawn"), ignored -> action("spawn_clear", "", "travel_admin", ""))
+                    .bounds(l.contentX() + (l.contentWidth() + 4) / 2, controlsY + 24, (l.contentWidth() - 4) / 2, 20).build();
+            clearSpawn.active = canAdminSpawn;
+            addRenderableWidget(clearSpawn);
+            addTravelSearch(l, controlsY + 48);
         } else {
-            addPagination(l, 0);
+            int setW = 84, spawnW = 72, clearW = 82, gap = 4;
+            int nameW = Math.max(90, l.contentWidth() - setW - spawnW - clearW - gap * 3);
+            int x = l.contentX();
+            warpNameBox = box(x, controlsY, nameW, "Warp name", draftWarpName, value -> draftWarpName = value);
+            warpNameBox.active = canSetWarp;
+            addRenderableWidget(warpNameBox);
+            x += nameW + gap;
+            Button setWarp = Button.builder(Component.literal("Set / move"), ignored -> setWarpFromAdmin())
+                    .bounds(x, controlsY, setW, 20).build();
+            setWarp.active = canSetWarp;
+            addRenderableWidget(setWarp);
+            x += setW + gap;
+            Button setSpawn = Button.builder(Component.literal("Set spawn"), ignored -> action("spawn_set", "", "travel_admin", ""))
+                    .bounds(x, controlsY, spawnW, 20).build();
+            setSpawn.active = canAdminSpawn;
+            addRenderableWidget(setSpawn);
+            x += spawnW + gap;
+            Button clearSpawn = Button.builder(Component.literal("Clear spawn"), ignored -> action("spawn_clear", "", "travel_admin", ""))
+                    .bounds(x, controlsY, clearW, 20).build();
+            clearSpawn.active = canAdminSpawn;
+            addRenderableWidget(clearSpawn);
+            addTravelSearch(l, controlsY + 24);
+        }
+
+        int rowOffset = compact ? 130 : 106;
+        List<SsuMenuPageDataPayload.LocationEntry> values = pageData.locations();
+        for (int i = 0; i < values.size(); i++) {
+            var entry = values.get(i);
+            int y = rowY(l, i, rowOffset);
+            int right = l.contentRight();
+            String actionName = "spawn".equals(entry.kind()) ? "teleport_spawn" : "teleport_warp";
+            Button teleport = Button.builder(Component.literal("Teleport"), ignored ->
+                            action(actionName, entry.name(), "travel_admin", ""))
+                    .bounds(right - ("warp".equals(entry.kind()) ? 148 : 74), y, 74, 20).build();
+            teleport.active = "warp".equals(entry.kind()) ? canTeleportWarp : canTeleportSpawn;
+            addRenderableWidget(teleport);
+            if ("warp".equals(entry.kind())) {
+                Button delete = Button.builder(Component.literal(deleteWarpLabel(entry.name())), ignored -> requestDeleteWarp(entry.name()))
+                        .bounds(right - 70, y, 70, 20).build();
+                delete.active = canDeleteWarp;
+                addRenderableWidget(delete);
+            }
+        }
+        addRenderableWidget(Button.builder(Component.literal("Cancel teleport"), ignored -> action("teleport_cancel", "travel_admin", "", ""))
+                .bounds(l.contentX(), l.footerY(), 104, 20).build());
+        addPagination(l, 110);
+    }
+
+    private void addTravelFilterButtons(Layout l, boolean admin) {
+        String[] filters = admin ? new String[]{"all", "warp", "spawn"} : new String[]{"all", "home", "warp", "other"};
+        String[] labels = admin ? new String[]{"All", "Warps", "Spawn"} : new String[]{"All", "Homes", "Warps", "Other"};
+        int gap = 4;
+        int width = Math.max(54, Math.min(76, (l.contentWidth() - gap * (filters.length - 1)) / filters.length));
+        int x = l.contentX();
+        int y = l.contentTop() + 24;
+        for (int i = 0; i < filters.length; i++) {
+            String filter = filters[i];
+            Button button = Button.builder(Component.literal(labels[i]), ignored -> {
+                        travelFilter = filter;
+                        pageIndex = 0;
+                        requestPage(false);
+                    }).bounds(x, y, width, 20).build();
+            button.active = !travelFilter.equals(filter);
+            addRenderableWidget(button);
+            x += width + gap;
         }
     }
 
-    private void addEconomyButtons(Layout l) {
+    private void addTravelSearch(Layout l, int y) {
+        searchBox = box(l.contentX(), y, Math.max(100, l.contentWidth() - 86), "Search destinations", draftSearch,
+                value -> draftSearch = value);
+        addRenderableWidget(searchBox);
+        addRenderableWidget(Button.builder(Component.literal("Search"), ignored -> { pageIndex = 0; requestPage(false); })
+                .bounds(l.contentRight() - 80, y, 80, 20).build());
+    }
+
+    private boolean travelAdminCapability(String key) {
+        return pageData.permissions().stream()
+                .filter(entry -> "travel_admin".equals(entry.owner()) && key.equals(entry.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value)
+                .map(Boolean::parseBoolean)
+                .findFirst().orElse(false);
+    }
+
+    private void setWarpFromAdmin() {
+        if (draftWarpName.isBlank()) {
+            setNotice("Enter a warp name first.", true);
+            return;
+        }
+        action("warp_set", draftWarpName, "travel_admin", "");
+    }
+
+    private void addAdminClaimButtons(Layout l) {
+        addListSearch(l);
+        List<SsuMenuPageDataPayload.ClaimEntry> values = pageData.claims();
+        for (int i = 0; i < values.size(); i++) {
+            var entry = values.get(i); int y = rowY(l, i); int row = i; int right = l.contentRight();
+            addRenderableWidget(Button.builder(Component.literal("Details"), ignored -> select(row))
+                    .bounds(right - 210, y, 56, 20).build());
+            addRenderableWidget(Button.builder(Component.literal("Teleport"), ignored -> action("admin_claim_teleport", entry.id(), "", ""))
+                    .bounds(right - 150, y, 72, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(deleteAdminClaimLabel(entry.id())), ignored -> requestDeleteAdminClaim(entry))
+                    .bounds(right - 74, y, 74, 20).build());
+        }
+        addPagination(l, 0);
+    }
+
+    private void addRankButtons(Layout l) {
+        int top = l.contentTop() + 24;
+        int third = Math.max(84, (l.contentWidth() - 174) / 3);
+        rankNameBox = box(l.contentX(), top, third, "New rank", draftRankName, value -> draftRankName = value);
+        addRenderableWidget(rankNameBox);
+        addRenderableWidget(Button.builder(Component.literal("Create"), ignored -> {
+                    if (draftRankName.isBlank()) setNotice("Enter a rank name first.", true);
+                    else action("rank_create", draftRankName, "", "");
+                }).bounds(l.contentX() + third + 4, top, 54, 20).build());
+        rankPlayerBox = box(l.contentX() + third + 62, top, third, "Player name / UUID", draftRankPlayer, value -> draftRankPlayer = value);
+        addRenderableWidget(rankPlayerBox);
+        addRenderableWidget(Button.builder(Component.literal("Reset rank"), ignored -> {
+                    if (draftRankPlayer.isBlank()) setNotice("Enter a player name or UUID first.", true);
+                    else action("rank_reset_player", draftRankPlayer, "", "");
+                }).bounds(l.contentX() + third * 2 + 66, top, 82, 20).build());
+        rankRenameBox = box(l.contentX(), top + 25, Math.max(130, l.contentWidth() - 88),
+                "New name used by the Rename button", draftRankRename, value -> draftRankRename = value);
+        addRenderableWidget(rankRenameBox);
+        addRenderableWidget(Button.builder(Component.literal("Refresh"), ignored -> requestPage(false))
+                .bounds(l.contentRight() - 82, top + 25, 82, 20).build());
+
+        List<SsuMenuPageDataPayload.PermissionEntry> values = pageData.permissions();
+        for (int i = 0; i < values.size(); i++) {
+            var entry = values.get(i); int y = rowY(l, i, 84); int right = l.contentRight();
+            Button makeDefault = Button.builder(Component.literal("Default"), ignored -> action("rank_default", entry.owner(), "", ""))
+                    .bounds(right - 220, y, 64, 20).build();
+            makeDefault.active = !"default".equals(entry.key());
+            addRenderableWidget(makeDefault);
+            addRenderableWidget(Button.builder(Component.literal("Rename"), ignored -> {
+                        if (draftRankRename.isBlank()) setNotice("Enter the new rank name above first.", true);
+                        else action("rank_rename", entry.owner(), draftRankRename, "");
+                    }).bounds(right - 152, y, 70, 20).build());
+            Button delete = Button.builder(Component.literal(deleteRankLabel(entry.owner())), ignored -> requestDeleteRank(entry.owner()))
+                    .bounds(right - 78, y, 78, 20).build();
+            delete.active = !"default".equals(entry.key()) && !"admin".equalsIgnoreCase(entry.owner());
+            addRenderableWidget(delete);
+        }
+        addPagination(l, 0);
+    }
+
+    private void addWalletButtons(Layout l) {
         int top = l.contentTop() + 22;
         if (snapshot.economy().canPay()) {
             int targetW = Math.max(100, l.contentWidth() / 3);
-            payPlayerBox = box(l.contentX(), top, targetW, "Player", draftPayPlayer, v -> draftPayPlayer = v);
-            payAmountBox = box(l.contentX() + targetW + 6, top, 90, "Amount", draftPayAmount, v -> draftPayAmount = v);
-            addRenderableWidget(payPlayerBox); addRenderableWidget(payAmountBox);
+            payPlayerBox = box(l.contentX(), top, targetW, "Player", draftPayPlayer, value -> draftPayPlayer = value);
+            payAmountBox = box(l.contentX() + targetW + 6, top, 90, "Amount", draftPayAmount,
+                    value -> draftPayAmount = value);
+            addRenderableWidget(payPlayerBox);
+            addRenderableWidget(payAmountBox);
             addRenderableWidget(Button.builder(Component.literal("Pay"), ignored -> submitPayment())
                     .bounds(l.contentX() + targetW + 102, top, 56, 20).build());
         }
-        boolean canEditRentPolicy = snapshot.economy().canAdmin() && snapshot.adminAccess().rentPolicy();
-        if (canEditRentPolicy) {
-            int y = top + 26; int w = 64;
-            playerRefundBox = box(l.contentX(), y, w, "Player %", draftPlayerRefund, v -> draftPlayerRefund = v);
-            adminRefundBox = box(l.contentX() + w + 6, y, w, "Admin %", draftAdminRefund, v -> draftAdminRefund = v);
-            addRenderableWidget(playerRefundBox); addRenderableWidget(adminRefundBox);
-            addRenderableWidget(Button.builder(Component.literal("Apply refund policy"), ignored -> submitPolicy())
-                    .bounds(l.contentX() + (w + 6) * 2, y, 126, 20).build());
-        }
-        int listOffset = canEditRentPolicy ? 86 : 60;
-        addSearchAt(l, l.contentTop() + listOffset);
+        addSearchAt(l, l.contentTop() + 52);
+        addTransactionDetailButtons(l, 78);
+        addPagination(l, 0);
+    }
+
+    private void addTransactionsButtons(Layout l) {
+        int top = l.contentTop() + 22;
+        Rect dropdown = transactionPlayerBounds(l);
+        addRenderableWidget(Button.builder(Component.literal(transactionPlayerButtonLabel()),
+                        ignored -> {
+                            transactionPlayerDropdownOpen = !transactionPlayerDropdownOpen;
+                            transactionPlayerDropdownScroll = 0;
+                        }).bounds(dropdown.x(), dropdown.y(), dropdown.width(), dropdown.height()).build());
+
+        int applyWidth = 52;
+        int manualX = dropdown.x() + dropdown.width() + 6;
+        int manualWidth = Math.max(90, l.contentRight() - manualX - applyWidth - 6);
+        transactionPlayerBox = box(manualX, top, manualWidth, "Exact player name / UUID",
+                draftTransactionPlayer, value -> draftTransactionPlayer = value);
+        addRenderableWidget(transactionPlayerBox);
+        addRenderableWidget(Button.builder(Component.literal("Use"), ignored -> {
+                    pageIndex = 0;
+                    requestPage(false);
+                }).bounds(l.contentRight() - applyWidth, top, applyWidth, 20).build());
+
+        addSearchAt(l, top + 26);
+
+        int settingsY = top + 52;
+        economyHistoryLimitBox = box(l.contentRight() - 122, settingsY, 62, "History",
+                draftEconomyHistoryLimit, value -> draftEconomyHistoryLimit = value);
+        addRenderableWidget(economyHistoryLimitBox);
+        addRenderableWidget(Button.builder(Component.literal("Apply"), ignored -> submitEconomyHistoryLimit())
+                .bounds(l.contentRight() - 54, settingsY, 54, 20).build());
+
+        addTransactionDetailButtons(l, 108);
+        addPagination(l, 0);
+    }
+
+    private void addTransactionDetailButtons(Layout l, int rowOffset) {
         List<SsuMenuPageDataPayload.TransactionEntry> values = pageData.transactions();
         for (int i = 0; i < values.size(); i++) {
-            int y = rowY(l, i, listOffset + 26); int row = i;
+            int y = rowY(l, i, rowOffset);
+            int row = i;
             addRenderableWidget(Button.builder(Component.literal("Details"), ignored -> select(row))
                     .bounds(l.contentRight() - 62, y, 62, 20).build());
         }
-        addPagination(l, 0);
+    }
+
+    private void addAuctionTaxButtons(Layout l) {
+        int y = l.contentTop() + 46;
+        int fieldWidth = Math.min(120, Math.max(80, l.contentWidth() - 88));
+        auctionTaxBox = box(l.contentX(), y, fieldWidth, "Tax percentage", draftAuctionTax,
+                value -> draftAuctionTax = value);
+        auctionTaxBox.setMaxLength(8);
+        addRenderableWidget(auctionTaxBox);
+        addRenderableWidget(Button.builder(Component.literal("Apply"), ignored ->
+                        action("auction_tax_set", "", "", draftAuctionTax))
+                .bounds(l.contentX() + fieldWidth + 6, y, 70, 20).build());
+    }
+
+    private void addClaimTaxButtons(Layout l) {
+        // Informational page. Player Claims currently have no monetary tax base or recurring tax cycle.
     }
 
     private void addSearchAt(Layout l, int y) {
@@ -613,9 +1106,260 @@ public final class SsuDashboardScreen extends Screen {
         addPagination(l, snapshot.administrator() ? 78 : 0);
     }
 
+    private void addUtilityMiningAdminButtons(Layout l) {
+        int top = l.contentTop() + 24;
+        boolean compact = l.contentWidth() < 430;
+        if (!compact) {
+            miningLeafRangeBox = box(l.contentX(), top, 54, "Leaf", draftMiningLeafRange, value -> draftMiningLeafRange = value);
+            addRenderableWidget(miningLeafRangeBox);
+            addRenderableWidget(Button.builder(Component.literal("Apply leaf range"), ignored ->
+                            action("utility_mining_setting", "leaf_range", "", draftMiningLeafRange))
+                    .bounds(l.contentX() + 58, top, 102, 20).build());
+            boolean breakLeaves = miningValue("tree", "break_leaves", "false").equalsIgnoreCase("true");
+            addRenderableWidget(Button.builder(Component.literal("Natural leaves: " + onOff(breakLeaves)), ignored ->
+                            action("utility_mining_setting", "break_leaves", "", Boolean.toString(!breakLeaves)))
+                    .bounds(l.contentX() + 164, top, 118, 20).build());
+            miningTreeMaxBox = box(l.contentX() + 286, top, 58, "Tree max", draftMiningTreeMax, value -> draftMiningTreeMax = value);
+            addRenderableWidget(miningTreeMaxBox);
+            addRenderableWidget(Button.builder(Component.literal("Apply"), ignored ->
+                            action("utility_mining_setting", "tree_default_max", "", draftMiningTreeMax))
+                    .bounds(l.contentX() + 348, top, Math.max(44, l.contentRight() - l.contentX() - 348), 20).build());
+
+            int second = top + 25;
+            miningVeinMaxBox = box(l.contentX(), second, 58, "Vein max", draftMiningVeinMax, value -> draftMiningVeinMax = value);
+            addRenderableWidget(miningVeinMaxBox);
+            addRenderableWidget(Button.builder(Component.literal("Apply vein max"), ignored ->
+                            action("utility_mining_setting", "vein_default_max", "", draftMiningVeinMax))
+                    .bounds(l.contentX() + 62, second, 98, 20).build());
+            miningBlockIdBox = box(l.contentX() + 164, second, Math.max(130, l.contentWidth() - 164),
+                    "Block id used by Add/Remove", draftMiningBlockId, value -> draftMiningBlockId = value);
+            addRenderableWidget(miningBlockIdBox);
+        } else {
+            int leafBoxW = 46, leafApplyW = 82, gap = 4;
+            miningLeafRangeBox = box(l.contentX(), top, leafBoxW, "Leaf", draftMiningLeafRange, value -> draftMiningLeafRange = value);
+            addRenderableWidget(miningLeafRangeBox);
+            addRenderableWidget(Button.builder(Component.literal("Apply range"), ignored ->
+                            action("utility_mining_setting", "leaf_range", "", draftMiningLeafRange))
+                    .bounds(l.contentX() + leafBoxW + gap, top, leafApplyW, 20).build());
+            boolean breakLeaves = miningValue("tree", "break_leaves", "false").equalsIgnoreCase("true");
+            int leavesX = l.contentX() + leafBoxW + leafApplyW + gap * 2;
+            addRenderableWidget(Button.builder(Component.literal("Leaves: " + onOff(breakLeaves)), ignored ->
+                            action("utility_mining_setting", "break_leaves", "", Boolean.toString(!breakLeaves)))
+                    .bounds(leavesX, top, Math.max(72, l.contentRight() - leavesX), 20).build());
+
+            int second = top + 25;
+            int fieldW = 52, buttonW = 54;
+            miningTreeMaxBox = box(l.contentX(), second, fieldW, "Tree", draftMiningTreeMax, value -> draftMiningTreeMax = value);
+            addRenderableWidget(miningTreeMaxBox);
+            addRenderableWidget(Button.builder(Component.literal("Apply"), ignored ->
+                            action("utility_mining_setting", "tree_default_max", "", draftMiningTreeMax))
+                    .bounds(l.contentX() + fieldW + gap, second, buttonW, 20).build());
+            int veinX = l.contentX() + fieldW + buttonW + gap * 2;
+            miningVeinMaxBox = box(veinX, second, fieldW, "Vein", draftMiningVeinMax, value -> draftMiningVeinMax = value);
+            addRenderableWidget(miningVeinMaxBox);
+            addRenderableWidget(Button.builder(Component.literal("Apply"), ignored ->
+                            action("utility_mining_setting", "vein_default_max", "", draftMiningVeinMax))
+                    .bounds(veinX + fieldW + gap, second, buttonW, 20).build());
+
+            int third = top + 50;
+            miningBlockIdBox = box(l.contentX(), third, l.contentWidth(),
+                    "Block id used by Add/Remove", draftMiningBlockId, value -> draftMiningBlockId = value);
+            addRenderableWidget(miningBlockIdBox);
+        }
+
+        int listOffset = compact ? 106 : 92;
+        List<SsuMenuPageDataPayload.PermissionEntry> lists = pageData.permissions().stream()
+                .filter(entry -> "list".equals(entry.kind())).toList();
+        for (int i = 0; i < lists.size(); i++) {
+            var entry = lists.get(i); int y = rowY(l, i, listOffset); int right = l.contentRight();
+            addRenderableWidget(Button.builder(Component.literal("Add"), ignored ->
+                            action("utility_mining_list", entry.key(), "add", draftMiningBlockId))
+                    .bounds(right - 144, y, 42, 20).build());
+            addRenderableWidget(Button.builder(Component.literal("Remove"), ignored ->
+                            action("utility_mining_list", entry.key(), "remove", draftMiningBlockId))
+                    .bounds(right - 98, y, 54, 20).build());
+            addRenderableWidget(Button.builder(Component.literal("Clear"), ignored ->
+                            action("utility_mining_list", entry.key(), "clear", ""))
+                    .bounds(right - 40, y, 40, 20).build());
+        }
+        addRenderableWidget(Button.builder(Component.literal("Refresh"), ignored -> requestPage(false))
+                .bounds(l.contentRight() - 68, l.footerY(), 68, 20).build());
+    }
+
+    private String miningValue(String owner, String key, String fallback) {
+        return pageData.permissions().stream().filter(entry -> owner.equals(entry.owner()) && key.equals(entry.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse(fallback);
+    }
+
+    private void syncMiningDrafts(SsuMenuPageDataPayload payload) {
+        draftMiningLeafRange = payload.permissions().stream().filter(v -> "tree".equals(v.owner()) && "leaf_range".equals(v.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse(draftMiningLeafRange);
+        draftMiningTreeMax = payload.permissions().stream().filter(v -> "tree".equals(v.owner()) && "default_max".equals(v.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse(draftMiningTreeMax);
+        draftMiningVeinMax = payload.permissions().stream().filter(v -> "vein".equals(v.owner()) && "default_max".equals(v.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse(draftMiningVeinMax);
+    }
+
+    private void syncMaintenanceDrafts(SsuMenuPageDataPayload payload) {
+        draftMaintenanceBuyback = payload.permissions().stream()
+                .filter(v -> "buyback_minutes".equals(v.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value)
+                .findFirst().orElse(draftMaintenanceBuyback);
+    }
+
+    private void addMaintenanceButtons(Layout l) {
+        int top = l.contentTop() + 24;
+        int buttonWidth = Math.max(70, (l.contentWidth() - 12) / 4);
+        int x = l.contentX();
+        addRenderableWidget(Button.builder(Component.literal("Reload SSU"), ignored -> action("maintenance_reload", "", "", ""))
+                .bounds(x, top, buttonWidth, 20).build()); x += buttonWidth + 4;
+        addRenderableWidget(Button.builder(Component.literal("Borders"), ignored -> action("maintenance_border_refresh", "", "", ""))
+                .bounds(x, top, buttonWidth, 20).build()); x += buttonWidth + 4;
+        addRenderableWidget(Button.builder(Component.literal("Holograms"), ignored -> action("maintenance_hologram_refresh", "", "", ""))
+                .bounds(x, top, buttonWidth, 20).build()); x += buttonWidth + 4;
+        addRenderableWidget(Button.builder(Component.literal("NPCs"), ignored -> action("maintenance_npc_refresh", "", "", ""))
+                .bounds(x, top, Math.max(40, l.contentRight() - x), 20).build());
+
+        int settingsY = top + 25;
+        maintenanceHexBox = box(l.contentX(), settingsY, 96, "#RRGGBB", draftMaintenanceHex, value -> draftMaintenanceHex = value);
+        addRenderableWidget(maintenanceHexBox);
+        maintenanceBuybackBox = box(l.contentX() + 104, settingsY, 90, "Buyback min.", draftMaintenanceBuyback, value -> draftMaintenanceBuyback = value);
+        addRenderableWidget(maintenanceBuybackBox);
+        addRenderableWidget(Button.builder(Component.literal("Apply buyback"), ignored ->
+                        action("maintenance_buyback_minutes", "", "", draftMaintenanceBuyback))
+                .bounds(l.contentX() + 198, settingsY, 96, 20).build());
+        addRenderableWidget(Button.builder(Component.literal(pendingResetAllBorderColors ? "Confirm reset all" : "Reset all colors"), ignored -> {
+                    if (pendingResetAllBorderColors) {
+                        pendingResetAllBorderColors = false;
+                        action("maintenance_border_reset_all", "", "", "");
+                    } else {
+                        pendingResetAllBorderColors = true;
+                        setNotice("Click Confirm reset all again to restore every border category to its default color.", true);
+                        rebuildWidgets();
+                    }
+                }).bounds(l.contentX(), l.footerY(), 126, 20).build());
+
+        List<SsuMenuPageDataPayload.PermissionEntry> colors = pageData.permissions().stream()
+                .filter(v -> "color".equals(v.kind())).toList();
+        for (int i = 0; i < colors.size(); i++) {
+            var entry = colors.get(i); int y = rowY(l, i, 82); int right = l.contentRight();
+            addRenderableWidget(Button.builder(Component.literal("Set"), ignored ->
+                            action("maintenance_border_color", entry.key(), "", draftMaintenanceHex))
+                    .bounds(right - 104, y, 46, 20).build());
+            addRenderableWidget(Button.builder(Component.literal("Default"), ignored ->
+                            action("maintenance_border_reset", entry.key(), "", ""))
+                    .bounds(right - 54, y, 54, 20).build());
+        }
+        addPagination(l, 130);
+    }
+
+    private void addRegionAdminButtons(Layout l) {
+        addListSearch(l);
+        int toolsY = l.contentTop() + 49;
+        boolean compact = l.contentWidth() < 440;
+        int x = l.contentX();
+        addRenderableWidget(Button.builder(Component.literal("P1 here"), ignored -> action("region_selection_point1", "", "", ""))
+                .bounds(x, toolsY, 54, 20).build()); x += 58;
+        addRenderableWidget(Button.builder(Component.literal("P2 here"), ignored -> action("region_selection_point2", "", "", ""))
+                .bounds(x, toolsY, 54, 20).build()); x += 58;
+        addRenderableWidget(Button.builder(Component.literal("Clear sel."), ignored -> action("region_selection_clear", "", "", ""))
+                .bounds(x, toolsY, 62, 20).build()); x += 66;
+        addRenderableWidget(Button.builder(Component.literal("Unbind"), ignored -> action("region_selection_unbind", "", "", ""))
+                .bounds(x, toolsY, 54, 20).build()); x += 58;
+
+        int coordinateY = compact ? toolsY + 24 : toolsY;
+        if (compact) {
+            addCompactPageControls(l, toolsY, x - l.contentX());
+            x = l.contentX();
+        }
+        int coordinateWidth = Math.max(92, l.contentRight() - x - 88);
+        regionCoordinatesBox = box(x, coordinateY, coordinateWidth, "x y z", draftRegionCoordinates, value -> draftRegionCoordinates = value);
+        addRenderableWidget(regionCoordinatesBox); x += coordinateWidth + 4;
+        addRenderableWidget(Button.builder(Component.literal("Set P1"), ignored -> action("region_selection_coordinates", "1", "", draftRegionCoordinates))
+                .bounds(x, coordinateY, 40, 20).build()); x += 44;
+        addRenderableWidget(Button.builder(Component.literal("Set P2"), ignored -> action("region_selection_coordinates", "2", "", draftRegionCoordinates))
+                .bounds(x, coordinateY, 40, 20).build());
+
+        int secondY = compact ? toolsY + 48 : toolsY + 24;
+        int reserved = compact ? 156 : 330;
+        int fillWidth = Math.max(76, l.contentWidth() - reserved);
+        regionFillBox = box(l.contentX(), secondY, fillWidth, "Block ids", draftRegionFill, value -> draftRegionFill = value);
+        addRenderableWidget(regionFillBox);
+        addRenderableWidget(Button.builder(Component.literal("Fill"), ignored -> action("region_selection_fill", "", "", draftRegionFill))
+                .bounds(l.contentX() + fillWidth + 4, secondY, 46, 20).build());
+        boolean renting = pageData.permissions().stream().filter(v -> "renting".equals(v.key()))
+                .findFirst().map(v -> Boolean.parseBoolean(v.value())).orElse(true);
+        addRenderableWidget(Button.builder(Component.literal("Renting: " + (renting ? "ON" : "PAUSED")), ignored ->
+                        action("region_renting_toggle", "", "", Boolean.toString(!renting)))
+                .bounds(l.contentRight() - 102, secondY, 102, 20).build());
+        if (!compact) addSmallPageControls(l, secondY, fillWidth + 54);
+
+        List<SsuMenuPageDataPayload.RegionEntry> values = pageData.regions();
+        for (int i = 0; i < values.size(); i++) {
+            var entry = values.get(i); int y = rowY(l, i, compact ? 130 : 105); int row = i; int right = l.contentRight();
+            addRenderableWidget(Button.builder(Component.literal(selectedRow == row ? "Selected" : "Select"), ignored -> select(row))
+                    .bounds(right - 198, y, 58, 20).build());
+            addRenderableWidget(Button.builder(Component.literal("Teleport"), ignored -> action("region_admin_teleport", entry.name(), "", ""))
+                    .bounds(right - 136, y, 66, 20).build());
+            addRenderableWidget(Button.builder(Component.literal("Settings"), ignored -> openPropertySettings("region", entry.name()))
+                    .bounds(right - 66, y, 66, 20).build());
+        }
+
+        if (selectedRow >= 0 && selectedRow < values.size()) {
+            var selected = values.get(selectedRow); String region = selected.name();
+            int y1 = l.footerY() - 24; int y2 = l.footerY();
+            int w = Math.max(52, (l.contentWidth() - 12) / 5); int gap = 3;
+            addRenderableWidget(Button.builder(Component.literal("Snapshot"), ignored -> action("region_admin_snapshot", region, "", ""))
+                    .bounds(l.contentX(), y1, w, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(regionConfirmLabel(pendingResetRegion, region, "Reset")), ignored -> requestRegionReset(region))
+                    .bounds(l.contentX() + (w + gap), y1, w, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(regionConfirmLabel(pendingRedefineRegion, region, "Redefine")), ignored -> requestRegionRedefine(region))
+                    .bounds(l.contentX() + 2 * (w + gap), y1, w, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(regionConfirmLabel(pendingClearRegion, region, "Clear")), ignored -> requestRegionClear(region))
+                    .bounds(l.contentX() + 3 * (w + gap), y1, w, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(regionConfirmLabel(pendingDeleteRegion, region, "Delete")), ignored -> requestRegionDelete(region))
+                    .bounds(l.contentX() + 4 * (w + gap), y1, w, 20).build());
+
+            regionDaysBox = box(l.contentX(), y2, 48, "Days", draftRegionDays, value -> draftRegionDays = value);
+            addRenderableWidget(regionDaysBox);
+            addRenderableWidget(Button.builder(Component.literal("Add time"), ignored -> action("region_admin_add_time", region, "", draftRegionDays))
+                    .bounds(l.contentX() + 52, y2, 66, 20).build());
+            boolean paused = "paused".equalsIgnoreCase(selected.remainingText());
+            addRenderableWidget(Button.builder(Component.literal(paused ? "Resume rent" : "Pause rent"), ignored ->
+                            action("region_admin_pause", region, "", Boolean.toString(!paused)))
+                    .bounds(l.contentX() + 122, y2, 82, 20).build());
+            if (selected.rented()) {
+                addRenderableWidget(Button.builder(Component.literal(unrentLabel(region)), ignored -> requestUnrent(region))
+                        .bounds(l.contentX() + 208, y2, 74, 20).build());
+            }
+        }
+    }
+
+    private void addCompactPageControls(Layout l, int y, int offset) {
+        int pages = Math.max(1, (pageData.totalItems() + Math.max(1, pageData.pageSize()) - 1) / Math.max(1, pageData.pageSize()));
+        int x = l.contentX() + offset;
+        Button prev = Button.builder(Component.literal("<"), ignored -> { if (pageIndex > 0) { pageIndex--; requestPage(false); } })
+                .bounds(x, y, 20, 20).build(); prev.active = pageIndex > 0; addRenderableWidget(prev);
+        Button next = Button.builder(Component.literal(">"), ignored -> { if (pageIndex + 1 < pages) { pageIndex++; requestPage(false); } })
+                .bounds(x + 22, y, 20, 20).build(); next.active = pageIndex + 1 < pages; addRenderableWidget(next);
+        addRenderableWidget(Button.builder(Component.literal("Refresh"), ignored -> requestPage(false))
+                .bounds(x + 44, y, Math.max(44, l.contentRight() - (x + 44)), 20).build());
+    }
+
+    private void addSmallPageControls(Layout l, int y, int offset) {
+        int pages = Math.max(1, (pageData.totalItems() + Math.max(1, pageData.pageSize()) - 1) / Math.max(1, pageData.pageSize()));
+        Button prev = Button.builder(Component.literal("<"), ignored -> { if (pageIndex > 0) { pageIndex--; requestPage(false); } })
+                .bounds(l.contentX() + offset, y, 22, 20).build(); prev.active = pageIndex > 0; addRenderableWidget(prev);
+        Button next = Button.builder(Component.literal(">"), ignored -> { if (pageIndex + 1 < pages) { pageIndex++; requestPage(false); } })
+                .bounds(l.contentX() + offset + 26, y, 22, 20).build(); next.active = pageIndex + 1 < pages; addRenderableWidget(next);
+        addRenderableWidget(Button.builder(Component.literal("Refresh"), ignored -> requestPage(false))
+                .bounds(l.contentX() + offset + 52, y, 58, 20).build());
+    }
+
     private void addSettingsButtons(Layout l) {
         int categoryX = l.contentX();
-        int categoryY = l.contentTop() + 24;
+        int headerOffset = settingsCategory == SettingsCategory.BORDERS ? 38 : 24;
+        int categoryY = l.contentTop() + headerOffset;
         int categoryWidth = Math.min(96, Math.max(78, l.contentWidth() / 4));
         for (SettingsCategory category : SettingsCategory.values()) {
             Button button = Button.builder(Component.literal(category.label), ignored -> {
@@ -629,7 +1373,7 @@ public final class SsuDashboardScreen extends Screen {
 
         var s = snapshot.uiSettings();
         int x = categoryX + categoryWidth + 8;
-        int y = l.contentTop() + 28;
+        int y = l.contentTop() + headerOffset + 4;
         int available = Math.max(120, l.contentRight() - x);
         int gap = 6;
         int w = available >= 310 ? (available - gap) / 2 : available;
@@ -678,6 +1422,9 @@ public final class SsuDashboardScreen extends Screen {
                 addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
                         "Marker overlay: " + onOff(s.minimapShowMarkers()),
                         "minimap_markers", !s.minimapShowMarkers());
+                row += twoColumns ? 27 : 54;
+                addSetting(x, y + row, w, "Day & time below map: " + onOff(s.minimapShowCalendar()),
+                        "minimap_calendar", !s.minimapShowCalendar());
             }
             case WORLD_MAP -> {
                 addSetting(x, y, w, "Claim overlay: " + onOff(s.worldMapShowClaims()),
@@ -729,14 +1476,20 @@ public final class SsuDashboardScreen extends Screen {
                         "veinminer_brightness", nextBrightness(s.veinminerOutlineBrightness()));
             }
             case BORDERS -> {
-                Button claims = Button.builder(Component.literal("Claim borders: " + onOff(snapshot.claimBordersVisible())), ignored ->
+                Button claims = Button.builder(Component.literal("Enable claim borders: " + onOff(snapshot.claimBordersVisible())), ignored ->
                                 action("border", "claims", "", Boolean.toString(!snapshot.claimBordersVisible())))
                         .bounds(x, y, w, 20).build();
                 claims.active = snapshot.canViewClaimBorders();
                 addRenderableWidget(claims);
+                Button otherClaims = Button.builder(Component.literal("Show other claims: " + onOff(snapshot.showOtherClaims())), ignored ->
+                                action("border", "other_claims", "", Boolean.toString(!snapshot.showOtherClaims())))
+                        .bounds(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w, 20).build();
+                otherClaims.active = snapshot.canViewClaimBorders();
+                addRenderableWidget(otherClaims);
+                int regionRow = twoColumns ? 27 : 54;
                 Button regions = Button.builder(Component.literal("Region borders: " + onOff(snapshot.regionBordersVisible())), ignored ->
                                 action("border", "regions", "", Boolean.toString(!snapshot.regionBordersVisible())))
-                        .bounds(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w, 20).build();
+                        .bounds(x, y + regionRow, w, 20).build();
                 regions.active = snapshot.canViewRegionBorders();
                 addRenderableWidget(regions);
             }
@@ -811,7 +1564,13 @@ public final class SsuDashboardScreen extends Screen {
             addRenderableWidget(assign);
         }
 
-        permissionSearchBox = box(l.contentX(), y + 48, Math.max(110, l.contentWidth() - 66),
+        Rect dimension = permissionDimensionBounds(l);
+        addRenderableWidget(Button.builder(Component.literal("Dimension: " + selectedPermissionDimensionLabel() + " ▾"),
+                        ignored -> togglePermissionDropdown("dimension"))
+                .bounds(dimension.x(), dimension.y(), dimension.width(), dimension.height()).build());
+        int permissionSearchX = dimension.x() + dimension.width() + 6;
+        permissionSearchBox = box(permissionSearchX, y + 48,
+                Math.max(90, l.contentRight() - permissionSearchX - 66),
                 "Search permission", draftPermissionSearch, value -> draftPermissionSearch = value);
         addRenderableWidget(permissionSearchBox);
         addRenderableWidget(Button.builder(Component.literal("Search"), ignored -> requestPermissionEditor(true))
@@ -823,12 +1582,13 @@ public final class SsuDashboardScreen extends Screen {
             SsuPermissionEditorDataPayload.PermissionEntry entry = entries.get(i);
             int rowY = listTop + i * PERMISSION_ROW_HEIGHT;
             int resetX = l.contentRight() - 22;
+            int checkX = l.contentRight() - 68;
             if ("boolean".equals(entry.valueType())) {
                 String label = permissionBooleanLabel(entry);
                 addRenderableWidget(Button.builder(Component.literal(label), ignored -> toggleBooleanPermission(entry))
-                        .bounds(l.contentRight() - 128, rowY + 4, 102, 20).build());
+                        .bounds(l.contentRight() - 174, rowY + 4, 102, 20).build());
             } else {
-                EditBox value = box(l.contentRight() - 168, rowY + 4, 102,
+                EditBox value = box(l.contentRight() - 214, rowY + 4, 102,
                         "Value", permissionDraftValues.getOrDefault(entry.key(), ""),
                         text -> permissionDraftValues.put(entry.key(), text));
                 if ("integer".equals(entry.valueType())) value.setMaxLength(12);
@@ -836,8 +1596,13 @@ public final class SsuDashboardScreen extends Screen {
                 permissionValueInputs.put(entry.key(), value);
                 addRenderableWidget(Button.builder(Component.literal("Set"), ignored -> setPermissionValue(entry,
                                 permissionDraftValues.getOrDefault(entry.key(), "")))
-                        .bounds(l.contentRight() - 62, rowY + 4, 36, 20).build());
+                        .bounds(l.contentRight() - 108, rowY + 4, 36, 20).build());
             }
+            Button check = Button.builder(Component.literal("Check"), ignored ->
+                            action("permission_check", selectedPermissionTarget, entry.key(), ""))
+                    .bounds(checkX, rowY + 4, 42, 20).build();
+            check.active = "player".equals(permissionMode) && !selectedPermissionTarget.isBlank();
+            addRenderableWidget(check);
             Button reset = Button.builder(Component.literal("×"), ignored -> unsetPermissionValue(entry))
                     .bounds(resetX, rowY + 4, 22, 20).build();
             reset.active = !entry.directValue().isBlank();
@@ -849,27 +1614,29 @@ public final class SsuDashboardScreen extends Screen {
     private void togglePermissionDropdown(String dropdown) {
         boolean modeOpen = "mode".equals(dropdown) && !permissionModeDropdownOpen;
         boolean targetOpen = "target".equals(dropdown) && !permissionTargetDropdownOpen;
+        boolean dimensionOpen = "dimension".equals(dropdown) && !permissionDimensionDropdownOpen;
         boolean rankOpen = "rank".equals(dropdown) && !permissionRankDropdownOpen;
         permissionModeDropdownOpen = modeOpen;
         permissionTargetDropdownOpen = targetOpen;
+        permissionDimensionDropdownOpen = dimensionOpen;
         permissionRankDropdownOpen = rankOpen;
         permissionDropdownScroll = 0;
     }
 
     private String permissionModeLabel() {
-        return switch (permissionMode) {
-            case "rank" -> "Ranks";
-            case "dimension" -> "Dimensions";
-            default -> "Players";
-        };
+        return "rank".equals(permissionMode) ? "Ranks" : "Players";
     }
 
     private String permissionTargetPrompt() {
-        return switch (permissionMode) {
-            case "rank" -> "Choose rank";
-            case "dimension" -> "Choose dimension";
-            default -> "Choose player";
-        };
+        return "rank".equals(permissionMode) ? "Choose rank" : "Choose player";
+    }
+
+    private String selectedPermissionDimensionLabel() {
+        if (selectedPermissionDimension.isBlank()) return "All dimensions";
+        return permissionData.dimensions().stream()
+                .filter(entry -> entry.id().equals(selectedPermissionDimension))
+                .map(SsuPermissionEditorDataPayload.TargetEntry::label)
+                .findFirst().orElse(selectedPermissionDimension);
     }
 
     private String permissionBooleanLabel(SsuPermissionEditorDataPayload.PermissionEntry entry) {
@@ -892,23 +1659,22 @@ public final class SsuDashboardScreen extends Screen {
             setNotice("Choose a permission target first.", true);
             return;
         }
-        String action = switch (permissionMode) {
-            case "rank" -> "permission_rank_set";
-            case "dimension" -> "permission_dimension_set";
-            default -> "permission_player_set";
-        };
-        action(action, selectedPermissionTarget, entry.key(), value);
+        boolean dimensionScoped = !selectedPermissionDimension.isBlank();
+        String action = "rank".equals(permissionMode)
+                ? dimensionScoped ? "permission_rank_dimension_set" : "permission_rank_set"
+                : dimensionScoped ? "permission_player_dimension_set" : "permission_player_set";
+        String sentValue = dimensionScoped ? selectedPermissionDimension + "\n" + value : value;
+        action(action, selectedPermissionTarget, entry.key(), sentValue);
     }
 
     private void unsetPermissionValue(SsuPermissionEditorDataPayload.PermissionEntry entry) {
         if (selectedPermissionTarget.isBlank()) return;
         permissionDraftValues.remove(entry.key());
-        String action = switch (permissionMode) {
-            case "rank" -> "permission_rank_unset";
-            case "dimension" -> "permission_dimension_unset";
-            default -> "permission_player_unset";
-        };
-        action(action, selectedPermissionTarget, entry.key(), "");
+        boolean dimensionScoped = !selectedPermissionDimension.isBlank();
+        String action = "rank".equals(permissionMode)
+                ? dimensionScoped ? "permission_rank_dimension_unset" : "permission_rank_unset"
+                : dimensionScoped ? "permission_player_dimension_unset" : "permission_player_unset";
+        action(action, selectedPermissionTarget, entry.key(), dimensionScoped ? selectedPermissionDimension : "");
     }
 
     private void addPermissionPagination(Layout l) {
@@ -952,6 +1718,10 @@ public final class SsuDashboardScreen extends Screen {
 
     private Rect permissionTargetBounds(Layout l) {
         return new Rect(l.contentX() + 114, l.contentTop() + 4, l.contentWidth() - 114, 20);
+    }
+
+    private Rect permissionDimensionBounds(Layout l) {
+        return new Rect(l.contentX(), l.contentTop() + 52, Math.min(220, Math.max(140, l.contentWidth() / 3)), 20);
     }
 
     private Rect permissionRankBounds(Layout l) {
@@ -1070,7 +1840,8 @@ public final class SsuDashboardScreen extends Screen {
     private void addProfileButtons(Layout l) { }
 
     private void addPagination(Layout l, int offset) {
-        int pages = (int) Math.max(1L, ((long) pageData.totalItems() + PAGE_SIZE - 1L) / PAGE_SIZE);
+        int size = Math.max(1, pageData.pageSize());
+        int pages = (int) Math.max(1L, ((long) pageData.totalItems() + size - 1L) / size);
         Button prev = Button.builder(Component.literal("<"), ignored -> { if(pageIndex>0){pageIndex--;requestPage(false);} })
                 .bounds(l.contentX() + offset, l.footerY(), 24, 20).build(); prev.active = pageIndex > 0; addRenderableWidget(prev);
         Button next = Button.builder(Component.literal(">"), ignored -> { if(pageIndex+1<pages){pageIndex++;requestPage(false);} })
@@ -1096,8 +1867,63 @@ public final class SsuDashboardScreen extends Screen {
         if (draftPayPlayer.isBlank() || draftPayAmount.isBlank()) { setNotice("Player and amount are required.", true); return; }
         action("pay", draftPayPlayer, "", draftPayAmount); draftPayAmount = "";
     }
-    private void submitPolicy() { action("rent_policy", draftPlayerRefund, "", draftAdminRefund); }
+    private void submitEconomyHistoryLimit() {
+        action("economy_history_limit", "", "", draftEconomyHistoryLimit);
+    }
     private void select(int row) { selectedRow = selectedRow == row ? -1 : row; rebuildWidgets(); }
+
+    private String deleteHomeLabel(String home) { return pendingDeleteHome.equalsIgnoreCase(home) ? "Confirm" : "Delete"; }
+    private void requestDeleteHome(String home) {
+        if (pendingDeleteHome.equalsIgnoreCase(home)) { pendingDeleteHome = ""; action("home_delete", home, homesClaimName, ""); return; }
+        pendingDeleteHome = home; pendingDeleteWarp = "";
+        setNotice("Click Confirm again to permanently delete home '" + home + "'.", true);
+    }
+    private String deleteWarpLabel(String warp) { return pendingDeleteWarp.equalsIgnoreCase(warp) ? "Confirm" : "Delete"; }
+    private void requestDeleteWarp(String warp) {
+        if (pendingDeleteWarp.equalsIgnoreCase(warp)) { pendingDeleteWarp = ""; action("warp_delete", warp, page.remoteId(), ""); return; }
+        pendingDeleteWarp = warp; pendingDeleteHome = "";
+        setNotice("Click Confirm again to permanently delete warp '" + warp + "'.", true);
+    }
+    private String deleteAdminClaimLabel(String claimId) { return pendingDeleteAdminClaim.equals(claimId) ? "Confirm" : "Delete"; }
+    private void requestDeleteAdminClaim(SsuMenuPageDataPayload.ClaimEntry entry) {
+        if (pendingDeleteAdminClaim.equals(entry.id())) { pendingDeleteAdminClaim = ""; action("admin_claim_delete", entry.id(), "", ""); return; }
+        pendingDeleteAdminClaim = entry.id();
+        setNotice("Click Confirm again to permanently delete claim '" + entry.name() + "'.", true);
+    }
+
+    private String regionConfirmLabel(String pending, String region, String normal) {
+        return pending.equalsIgnoreCase(region) ? "Confirm" : normal;
+    }
+    private void requestRegionReset(String region) {
+        if (pendingResetRegion.equalsIgnoreCase(region)) { pendingResetRegion = ""; action("region_admin_reset", region, "", ""); return; }
+        clearRegionConfirmations(); pendingResetRegion = region;
+        setNotice("Click Confirm again to restore region '" + region + "' from its saved snapshot.", true);
+    }
+    private void requestRegionRedefine(String region) {
+        if (pendingRedefineRegion.equalsIgnoreCase(region)) { pendingRedefineRegion = ""; action("region_admin_redefine", region, "", ""); return; }
+        clearRegionConfirmations(); pendingRedefineRegion = region;
+        setNotice("Click Confirm again to replace the bounds of '" + region + "' with your current selection.", true);
+    }
+    private void requestRegionClear(String region) {
+        if (pendingClearRegion.equalsIgnoreCase(region)) { pendingClearRegion = ""; action("region_admin_clear", region, "", ""); return; }
+        clearRegionConfirmations(); pendingClearRegion = region;
+        setNotice("Click Confirm again to remove every block inside region '" + region + "'.", true);
+    }
+    private void requestRegionDelete(String region) {
+        if (pendingDeleteRegion.equalsIgnoreCase(region)) { pendingDeleteRegion = ""; action("region_admin_delete", region, "", ""); return; }
+        clearRegionConfirmations(); pendingDeleteRegion = region;
+        setNotice("Click Confirm again to permanently delete region '" + region + "'. Its snapshot will be archived first.", true);
+    }
+    private void clearRegionConfirmations() {
+        pendingDeleteRegion = ""; pendingResetRegion = ""; pendingClearRegion = ""; pendingRedefineRegion = "";
+    }
+
+    private String deleteRankLabel(String rank) { return pendingDeleteRank.equalsIgnoreCase(rank) ? "Confirm" : "Delete"; }
+    private void requestDeleteRank(String rank) {
+        if (pendingDeleteRank.equalsIgnoreCase(rank)) { pendingDeleteRank = ""; action("rank_delete", rank, "", ""); return; }
+        pendingDeleteRank = rank;
+        setNotice("Click Confirm again to delete rank '" + rank + "'. Assigned players will fall back to the default rank.", true);
+    }
 
     private String unrentLabel(String region) {
         return pendingUnrentRegion.equalsIgnoreCase(region) ? "Confirm" : "Unrent";
@@ -1147,8 +1973,29 @@ public final class SsuDashboardScreen extends Screen {
         loading = true;
         long id = nextRequestId++;
         latestPageRequest = id;
+        String query = page == Page.HOMES ? homesClaimName
+                : page == Page.TRAVEL || page == Page.TRAVEL_ADMIN ? travelFilter + "|" + draftSearch
+                : page == Page.TRANSACTIONS ? transactionRequestQuery()
+                : draftSearch;
         ClientPacketDistributor.sendToServer(new SsuMenuPageRequestPayload(
-                page.remoteId(), pageIndex, PAGE_SIZE, draftSearch, id));
+                page.remoteId(), pageIndex, pageRequestSize(), query, id));
+    }
+
+    private int pageRequestSize() {
+        Layout l = layout();
+        if (page == Page.RANKS) return Math.min(5, rowsThatFit(l, 84));
+        if (page == Page.TRAVEL) return Math.min(PAGE_SIZE, rowsThatFit(l, 82));
+        if (page == Page.TRAVEL_ADMIN) return Math.min(PAGE_SIZE, rowsThatFit(l, l.contentWidth() < 500 ? 130 : 106));
+        if (page == Page.WALLET) return Math.min(PAGE_SIZE, rowsThatFit(l, 78));
+        if (page == Page.TRANSACTIONS) return Math.min(PAGE_SIZE, rowsThatFit(l, 108));
+        if (page == Page.REGION_ADMIN) return Math.min(4, rowsThatFit(l, l.contentWidth() < 440 ? 130 : 105));
+        if (page == Page.UTILITY_MINING_ADMIN) return 10;
+        if (page == Page.MAINTENANCE) return Math.min(5, rowsThatFit(l, 82));
+        return Math.min(PAGE_SIZE, rowsThatFit(l, 58));
+    }
+
+    private int rowsThatFit(Layout l, int offset) {
+        return Math.max(1, (l.footerY() - (l.contentTop() + offset) - 2) / 27);
     }
 
     private void requestPlayerProfile(boolean reset) {
@@ -1175,12 +2022,32 @@ public final class SsuDashboardScreen extends Screen {
         ClientPacketDistributor.sendToServer(new SsuPermissionEditorRequestPayload(
                 permissionMode,
                 selectedPermissionTarget,
+                selectedPermissionDimension,
                 draftPermissionTargetSearch,
                 draftPermissionSearch,
                 pageIndex,
                 permissionPageSize(),
                 id
         ));
+    }
+
+    public void openHomesForClaim(String claimName) {
+        String selectedClaim = claimName == null ? "" : claimName.trim();
+        if (selectedClaim.isBlank()) {
+            setNotice("Choose a claim before managing homes.", true);
+            return;
+        }
+        previousPage = Page.CLAIMS;
+        page = Page.HOMES;
+        homesClaimName = selectedClaim;
+        pageIndex = 0;
+        selectedRow = -1;
+        draftHomeName = "";
+        pendingDeleteHome = "";
+        loading = false;
+        pageData = SsuMenuPageDataPayload.empty(Page.HOMES.remoteId(), 0, PAGE_SIZE, 0, "", false);
+        rebuildWidgets();
+        requestPage(false);
     }
 
     private void openPage(Page target) {
@@ -1192,64 +2059,149 @@ public final class SsuDashboardScreen extends Screen {
             action("auction_open", "", "", "");
             return;
         }
+        if (target == Page.QUESTS) {
+            ClientPacketDistributor.sendToServer(new QuestBookRequestPayload("open", "", "menu", 0, nextRequestId++));
+            return;
+        }
+        if (target == Page.MINIGAMES) {
+            ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload("open", "", nextRequestId++));
+            return;
+        }
+        if (target == Page.DUNGEONS) {
+            ClientPacketDistributor.sendToServer(new DungeonLobbyRequestPayload("open", "", nextRequestId++));
+            return;
+        }
+        if (target == Page.DIMENSIONS) {
+            ClientPacketDistributor.sendToServer(new SsuDimensionManagerRequestPayload("", nextRequestId++));
+            return;
+        }
         if (target == page) return;
-        previousPage = page; page = target; pageIndex = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingResetStatistic = ""; pendingDeleteStatistic = "";
+        if (target != Page.HOMES) homesClaimName = "";
+        if (target == Page.TRAVEL || target == Page.TRAVEL_ADMIN) travelFilter = "all";
+        if (target == Page.TRANSACTIONS) {
+            selectedTransactionPlayerId = "";
+            selectedTransactionPlayerLabel = "";
+            draftTransactionPlayer = "";
+        }
+        previousPage = page; page = target; pageIndex = 0; if (target == Page.ADMIN_TOOLS) adminToolScroll = 0; if (target == Page.ADMIN) adminModuleScroll = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingDeleteHome = ""; pendingDeleteWarp = ""; pendingDeleteAdminClaim = ""; pendingDeleteRank = ""; clearRegionConfirmations(); pendingResetAllBorderColors = false; pendingResetStatistic = ""; pendingDeleteStatistic = "";
         loading = false;
         if (target != Page.PERMISSIONS) permissionLoading = false;
         if (target != Page.PLAYER_INFO) playerProfileLoading = false;
         closePermissionDropdowns();
         closePlayerProfileDropdown();
+        closeTransactionPlayerDropdown();
         pageData = SsuMenuPageDataPayload.empty(target.remoteId(), 0, PAGE_SIZE, 0, "", false);
         rebuildWidgets(); requestPage(false);
     }
     private void goBack() {
         if (page == Page.HOME) { onClose(); return; }
-        page = previousPage == page ? Page.HOME : previousPage; previousPage = Page.HOME;
-        pageIndex = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingResetStatistic = ""; pendingDeleteStatistic = "";
+        if (page == Page.HOMES) homesClaimName = "";
+        if (isEconomicsChild(page)) {
+            page = Page.ECONOMICS;
+            previousPage = Page.ADMIN;
+        } else if (page == Page.ECONOMICS) {
+            page = Page.ADMIN;
+            previousPage = Page.HOME;
+        } else {
+            page = previousPage == page ? Page.HOME : previousPage;
+            previousPage = Page.HOME;
+        }
+        pageIndex = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingDeleteHome = ""; pendingDeleteWarp = ""; pendingDeleteAdminClaim = ""; pendingDeleteRank = ""; clearRegionConfirmations(); pendingResetAllBorderColors = false; pendingResetStatistic = ""; pendingDeleteStatistic = "";
         loading = false;
         if (page != Page.PERMISSIONS) permissionLoading = false;
         if (page != Page.PLAYER_INFO) playerProfileLoading = false;
-        closePermissionDropdowns(); closePlayerProfileDropdown(); rebuildWidgets(); requestPage(false);
+        closePermissionDropdowns(); closePlayerProfileDropdown(); closeTransactionPlayerDropdown();
+        pageData = SsuMenuPageDataPayload.empty(page.remoteId(), 0, PAGE_SIZE, 0, "", false);
+        rebuildWidgets(); requestPage(false);
     }
     private void closePlayerProfileDropdown() {
         playerProfileDropdownOpen = false;
         playerProfileDropdownScroll = 0;
     }
 
+    private void closeTransactionPlayerDropdown() {
+        transactionPlayerDropdownOpen = false;
+        transactionPlayerDropdownScroll = 0;
+    }
+
+    private static boolean isEconomicsChild(Page page) {
+        return page == Page.ACCOUNTS || page == Page.TRANSACTIONS || page == Page.AUCTION_TAX
+                || page == Page.CLAIM_TAX || page == Page.RENT_OPERATIONS;
+    }
+
+    private String transactionRequestQuery() {
+        String manual = safeQueryPart(draftTransactionPlayer);
+        String selected = manual.isBlank() ? safeQueryPart(selectedTransactionPlayerId) : "";
+        return selected + "|" + manual + "|" + safeQueryPart(draftSearch);
+    }
+
+    private static String safeQueryPart(String value) {
+        return value == null ? "" : value.replace('|', ' ').replace('\n', ' ').replace('\r', ' ').trim();
+    }
+
+    private Rect transactionPlayerBounds(Layout l) {
+        int width = Math.min(180, Math.max(112, l.contentWidth() / 3));
+        return new Rect(l.contentX(), l.contentTop() + 22, width, 20);
+    }
+
+    private String transactionPlayerButtonLabel() {
+        return selectedTransactionPlayerId.isBlank() ? "All players ▾"
+                : trim(selectedTransactionPlayerLabel.isBlank() ? selectedTransactionPlayerId
+                : selectedTransactionPlayerLabel, 24) + " ▾";
+    }
+
+    private List<SsuMenuPageDataPayload.AccountEntry> transactionPlayerOptions() {
+        ArrayList<SsuMenuPageDataPayload.AccountEntry> options = new ArrayList<>();
+        options.add(new SsuMenuPageDataPayload.AccountEntry("", "All players", "", 0L, 0L, 0L));
+        options.addAll(pageData.accounts());
+        return List.copyOf(options);
+    }
+
+    private List<SsuMenuPageDataPayload.AccountEntry> visibleTransactionPlayers() {
+        return slice(transactionPlayerOptions(), transactionPlayerDropdownScroll, DROPDOWN_VISIBLE_ROWS);
+    }
+
     private void closePermissionDropdowns() {
         permissionModeDropdownOpen = false;
         permissionTargetDropdownOpen = false;
+        permissionDimensionDropdownOpen = false;
         permissionRankDropdownOpen = false;
         permissionDropdownScroll = 0;
     }
 
     private void setNotice(String text, boolean error) { notice = text; noticeError = error; rebuildWidgets(); }
-    private void syncPolicyDrafts() {
-        draftPlayerRefund = Integer.toString(snapshot.economy().playerCancelRefundPercent());
-        draftAdminRefund = Integer.toString(snapshot.economy().adminCancelRefundPercent());
+    private void syncEconomyDrafts() {
+        draftEconomyHistoryLimit = Integer.toString(snapshot.economy().transactionHistoryLimit());
+    }
+
+    private void syncAuctionTaxDraft(SsuMenuPageDataPayload payload) {
+        payload.permissions().stream()
+                .filter(entry -> "auction_house_tax".equals(entry.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value)
+                .findFirst()
+                .ifPresent(value -> draftAuctionTax = value);
     }
 
     private boolean handlePermissionDropdownClick(double mouseX, double mouseY) {
         if (page != Page.PERMISSIONS
-                || (!permissionModeDropdownOpen && !permissionTargetDropdownOpen && !permissionRankDropdownOpen)) {
+                || (!permissionModeDropdownOpen && !permissionTargetDropdownOpen
+                && !permissionDimensionDropdownOpen && !permissionRankDropdownOpen)) {
             return false;
         }
         Layout l = layout();
-        if (permissionModeBounds(l).contains(mouseX, mouseY)
-                || permissionTargetBounds(l).contains(mouseX, mouseY)
-                || permissionRankBounds(l).contains(mouseX, mouseY)) {
-            return false;
-        }
+        Rect activeAnchor = permissionModeDropdownOpen ? permissionModeBounds(l)
+                : permissionTargetDropdownOpen ? permissionTargetBounds(l)
+                : permissionDimensionDropdownOpen ? permissionDimensionBounds(l)
+                : permissionRankBounds(l);
+        // Only the anchor that opened this dropdown may receive the click so it can toggle closed.
+        // Every other click is modal: it is handled by the dropdown or consumed after closing it.
+        if (activeAnchor.contains(mouseX, mouseY)) return false;
 
         if (permissionModeDropdownOpen) {
-            Rect list = dropdownListBounds(permissionModeBounds(l), 3);
+            Rect list = dropdownListBounds(permissionModeBounds(l), 2);
             if (list.contains(mouseX, mouseY)) {
                 int index = (int) ((mouseY - list.y()) / 20.0);
-                String nextMode = switch (index) {
-                    case 1 -> "rank";
-                    case 2 -> "dimension";
-                    default -> "player";
-                };
+                String nextMode = index == 1 ? "rank" : "player";
                 if (!nextMode.equals(permissionMode)) {
                     permissionMode = nextMode;
                     selectedPermissionTarget = "";
@@ -1283,6 +2235,22 @@ public final class SsuDashboardScreen extends Screen {
                     return true;
                 }
             }
+        } else if (permissionDimensionDropdownOpen) {
+            List<SsuPermissionEditorDataPayload.TargetEntry> options = visiblePermissionDimensions();
+            Rect list = dropdownListBounds(permissionDimensionBounds(l), Math.max(1, options.size()));
+            if (list.contains(mouseX, mouseY) && !options.isEmpty()) {
+                int index = (int) ((mouseY - list.y()) / 20.0);
+                if (index >= 0 && index < options.size()) {
+                    selectedPermissionDimension = options.get(index).id();
+                    permissionDraftValues.clear();
+                    pageIndex = 0;
+                    closePermissionDropdowns();
+                    requestPermissionEditor(true);
+                    rebuildWidgets();
+                    playClick();
+                    return true;
+                }
+            }
         } else if (permissionRankDropdownOpen) {
             List<String> options = visiblePermissionRanks();
             Rect list = dropdownListBounds(permissionRankBounds(l), Math.max(1, options.size()));
@@ -1298,7 +2266,8 @@ public final class SsuDashboardScreen extends Screen {
             }
         }
         closePermissionDropdowns();
-        return false;
+        rebuildWidgets();
+        return true;
     }
 
     private boolean handlePlayerProfileDropdownClick(double mouseX, double mouseY) {
@@ -1323,21 +2292,70 @@ public final class SsuDashboardScreen extends Screen {
             }
         }
         closePlayerProfileDropdown();
-        return false;
+        rebuildWidgets();
+        return true;
+    }
+
+    private boolean handleTransactionPlayerDropdownClick(double mouseX, double mouseY) {
+        if (page != Page.TRANSACTIONS || !transactionPlayerDropdownOpen) return false;
+        Layout l = layout();
+        Rect anchor = transactionPlayerBounds(l);
+        if (anchor.contains(mouseX, mouseY)) return false;
+        List<SsuMenuPageDataPayload.AccountEntry> options = visibleTransactionPlayers();
+        Rect list = dropdownListBounds(anchor, Math.max(1, options.size()));
+        if (list.contains(mouseX, mouseY) && !options.isEmpty()) {
+            int index = (int) ((mouseY - list.y()) / 20.0);
+            if (index >= 0 && index < options.size()) {
+                SsuMenuPageDataPayload.AccountEntry selected = options.get(index);
+                selectedTransactionPlayerId = selected.id();
+                selectedTransactionPlayerLabel = selected.name();
+                draftTransactionPlayer = "";
+                pageIndex = 0;
+                closeTransactionPlayerDropdown();
+                requestPage(false);
+                rebuildWidgets();
+                playClick();
+                return true;
+            }
+        }
+        closeTransactionPlayerDropdown();
+        rebuildWidgets();
+        return true;
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (page == Page.ADMIN_TOOLS && scrollY != 0.0) {
+            int maximum = Math.max(0, adminTools().size() - adminToolVisibleRows(layout()));
+            int next = adminToolScroll + (scrollY < 0.0 ? 1 : -1);
+            int bounded = Math.max(0, Math.min(maximum, next));
+            if (bounded != adminToolScroll) { adminToolScroll = bounded; rebuildWidgets(); }
+            return true;
+        }
+        if (page == Page.ADMIN && !useTexturedTiles(layout()) && scrollY != 0.0) {
+            int maximum = adminModuleMaximumScroll(layout());
+            int next = adminModuleScroll + (scrollY < 0.0 ? 1 : -1);
+            int bounded = Math.max(0, Math.min(maximum, next));
+            if (bounded != adminModuleScroll) { adminModuleScroll = bounded; rebuildWidgets(); }
+            return true;
+        }
         if (page == Page.PLAYER_INFO && playerProfileDropdownOpen && scrollY != 0.0) {
             int maximum = Math.max(0, playerProfileData.players().size() - DROPDOWN_VISIBLE_ROWS);
             int next = playerProfileDropdownScroll + (scrollY < 0.0 ? 1 : -1);
             playerProfileDropdownScroll = Math.max(0, Math.min(maximum, next));
             return true;
         }
+        if (page == Page.TRANSACTIONS && transactionPlayerDropdownOpen && scrollY != 0.0) {
+            int maximum = Math.max(0, transactionPlayerOptions().size() - DROPDOWN_VISIBLE_ROWS);
+            int next = transactionPlayerDropdownScroll + (scrollY < 0.0 ? 1 : -1);
+            transactionPlayerDropdownScroll = Math.max(0, Math.min(maximum, next));
+            return true;
+        }
         if (page == Page.PERMISSIONS && scrollY != 0.0
-                && (permissionTargetDropdownOpen || permissionRankDropdownOpen)) {
-            int size = permissionTargetDropdownOpen
-                    ? permissionData.targets().size() : permissionData.rankOptions().size();
+                && (permissionTargetDropdownOpen || permissionDimensionDropdownOpen || permissionRankDropdownOpen)) {
+            int size = permissionTargetDropdownOpen ? permissionData.targets().size()
+                    : permissionDimensionDropdownOpen ? permissionData.dimensions().size()
+                    : permissionData.rankOptions().size();
             int maximum = Math.max(0, size - DROPDOWN_VISIBLE_ROWS);
             int next = permissionDropdownScroll + (scrollY < 0.0 ? 1 : -1);
             permissionDropdownScroll = Math.max(0, Math.min(maximum, next));
@@ -1350,7 +2368,8 @@ public final class SsuDashboardScreen extends Screen {
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (event.buttonInfo().button() == 0
                 && (handlePermissionDropdownClick(event.x(), event.y())
-                || handlePlayerProfileDropdownClick(event.x(), event.y()))) return true;
+                || handlePlayerProfileDropdownClick(event.x(), event.y())
+                || handleTransactionPlayerDropdownClick(event.x(), event.y()))) return true;
         if (super.mouseClicked(event, doubleClick)) return true;
         if (event.buttonInfo().button() != 0) return false;
 
@@ -1399,6 +2418,7 @@ public final class SsuDashboardScreen extends Screen {
         g.outline(l.panelX(),l.panelY(),l.panelWidth(),l.panelHeight(),PANEL_BORDER);
         if (l.sidebarVisible()) g.text(font,"Simple Server Utilities",l.panelX()+11,l.panelY()+13,ACCENT,true);
         drawPageTitle(g, l);
+        drawDashboardCalendar(g, l);
         drawSidebar(g,l); drawPage(g,l,mouseX,mouseY);
         if (!notice.isBlank()) g.text(font,trim(notice,90),l.contentX(),l.panelBottom()-43,noticeError?ERROR:GOOD,false);
         if (loading || (page == Page.PERMISSIONS && permissionLoading)
@@ -1415,7 +2435,9 @@ public final class SsuDashboardScreen extends Screen {
                 mouseX, mouseY, snapshot.settingsAvailable());
         drawUtilityButton(g, adminBounds(l), ICON_SHIELD,
                 page == Page.ADMIN || page == Page.MODULE_SETTINGS || page == Page.ADMIN_TOOLS
-                        || page == Page.HOLOGRAMS || page == Page.PERMISSIONS || page == Page.PLAYER_INFO,
+                        || page == Page.HOLOGRAMS || page == Page.PERMISSIONS || page == Page.PLAYER_INFO
+                        || page == Page.ECONOMICS || page == Page.TRANSACTIONS || page == Page.AUCTION_TAX
+                        || page == Page.CLAIM_TAX || page == Page.ACCOUNTS || page == Page.RENT_OPERATIONS,
                 mouseX, mouseY, snapshot.administrator());
         if (page != Page.HOME) drawBackButton(g, l, mouseX, mouseY);
         if (page == Page.PERMISSIONS) {
@@ -1424,6 +2446,9 @@ public final class SsuDashboardScreen extends Screen {
         }
         if (page == Page.PLAYER_INFO) {
             drawPlayerProfileDropdown(g, l, mouseX, mouseY);
+        }
+        if (page == Page.TRANSACTIONS) {
+            drawTransactionPlayerDropdown(g, l, mouseX, mouseY);
         }
         if (page == Page.SETTINGS) drawSettingsTooltip(g, mouseX, mouseY);
     }
@@ -1441,6 +2466,15 @@ public final class SsuDashboardScreen extends Screen {
         g.pose().scale(scale, scale);
         g.text(font, title, -titleWidth / 2, 0, TEXT, true);
         g.pose().popMatrix();
+    }
+
+    private void drawDashboardCalendar(GuiGraphicsExtractor g, Layout l) {
+        if (minecraft == null || minecraft.level == null) return;
+        String calendar = GameCalendar.fromClockTime(minecraft.level.getDefaultClockTime()).displayText();
+        int left = l.sidebarVisible() ? l.contentX() : l.panelX() + 72;
+        int right = Math.min(closeBounds(l).x() - 8, l.contentRight());
+        int centerX = left + Math.max(1, right - left) / 2;
+        g.centeredText(font, calendar, centerX, l.panelY() + 29, MUTED);
     }
 
     private void drawSettingsTooltip(GuiGraphicsExtractor g, int mouseX, int mouseY) {
@@ -1463,15 +2497,20 @@ public final class SsuDashboardScreen extends Screen {
     }
 
     private void drawPermissionDropdowns(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
-        if (!permissionModeDropdownOpen && !permissionTargetDropdownOpen && !permissionRankDropdownOpen) return;
+        if (!permissionModeDropdownOpen && !permissionTargetDropdownOpen
+                && !permissionDimensionDropdownOpen && !permissionRankDropdownOpen) return;
         g.nextStratum();
         if (permissionModeDropdownOpen) {
-            drawDropdown(g, permissionModeBounds(l), List.of("Players", "Ranks", "Dimensions"), mouseX, mouseY);
+            drawDropdown(g, permissionModeBounds(l), List.of("Players", "Ranks"), mouseX, mouseY);
         } else if (permissionTargetDropdownOpen) {
             List<SsuPermissionEditorDataPayload.TargetEntry> targets = visiblePermissionTargets();
             List<String> labels = targets.stream().map(target -> target.label()
                     + (target.summary().isBlank() ? "" : " — " + target.summary())).toList();
             drawDropdown(g, permissionTargetBounds(l), labels, mouseX, mouseY);
+        } else if (permissionDimensionDropdownOpen) {
+            List<String> labels = visiblePermissionDimensions().stream().map(entry -> entry.label()
+                    + (entry.summary().isBlank() ? "" : " — " + entry.summary())).toList();
+            drawDropdown(g, permissionDimensionBounds(l), labels, mouseX, mouseY);
         } else if (permissionRankDropdownOpen) {
             drawDropdown(g, permissionRankBounds(l), visiblePermissionRanks(), mouseX, mouseY);
         }
@@ -1508,6 +2547,34 @@ public final class SsuDashboardScreen extends Screen {
         }
     }
 
+    private void drawTransactionPlayerDropdown(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
+        if (!transactionPlayerDropdownOpen) return;
+        g.nextStratum();
+        Rect anchor = transactionPlayerBounds(l);
+        List<SsuMenuPageDataPayload.AccountEntry> options = visibleTransactionPlayers();
+        Rect list = dropdownListBounds(anchor, Math.max(1, options.size()));
+        g.fill(list.x(), list.y(), list.x() + list.width(), list.y() + list.height(), 0xFC151C24);
+        g.outline(list.x(), list.y(), list.width(), list.height(), ACCENT);
+        for (int i = 0; i < options.size(); i++) {
+            var option = options.get(i);
+            int y = list.y() + i * 20;
+            if (mouseX >= list.x() && mouseX < list.x() + list.width()
+                    && mouseY >= y && mouseY < y + 20) {
+                g.fill(list.x() + 1, y + 1, list.x() + list.width() - 1, y + 20, 0xD03A4D5C);
+            }
+            String label = option.id().isBlank() ? "All players"
+                    : option.name() + " — " + option.formattedBalance();
+            g.text(font, trim(label, Math.max(10, (list.width() - 10) / 6)),
+                    list.x() + 5, y + 6, option.id().isBlank() ? ACCENT : TEXT, false);
+        }
+        int fullSize = transactionPlayerOptions().size();
+        if (fullSize > DROPDOWN_VISIBLE_ROWS) {
+            g.text(font, (transactionPlayerDropdownScroll + 1) + "–"
+                            + Math.min(fullSize, transactionPlayerDropdownScroll + options.size()) + " / " + fullSize,
+                    list.x() + list.width() - 62, list.y() + list.height() - 12, MUTED, false);
+        }
+    }
+
     private void drawDropdown(GuiGraphicsExtractor g, Rect anchor, List<String> options, int mouseX, int mouseY) {
         int rows = Math.max(1, options.size());
         Rect list = dropdownListBounds(anchor, rows);
@@ -1527,6 +2594,7 @@ public final class SsuDashboardScreen extends Screen {
                     list.x() + 5, y + 6, TEXT, false);
         }
         int fullSize = permissionTargetDropdownOpen ? permissionData.targets().size()
+                : permissionDimensionDropdownOpen ? permissionData.dimensions().size()
                 : permissionRankDropdownOpen ? permissionData.rankOptions().size() : options.size();
         if (fullSize > DROPDOWN_VISIBLE_ROWS) {
             g.text(font, (permissionDropdownScroll + 1) + "–"
@@ -1536,7 +2604,8 @@ public final class SsuDashboardScreen extends Screen {
     }
 
     private void drawPermissionTooltip(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
-        if (permissionModeDropdownOpen || permissionTargetDropdownOpen || permissionRankDropdownOpen) return;
+        if (permissionModeDropdownOpen || permissionTargetDropdownOpen
+                || permissionDimensionDropdownOpen || permissionRankDropdownOpen) return;
         for (int i = 0; i < permissionData.permissions().size(); i++) {
             if (!permissionRowBounds(l, i).contains(mouseX, mouseY)) continue;
             SsuPermissionEditorDataPayload.PermissionEntry entry = permissionData.permissions().get(i);
@@ -1569,6 +2638,10 @@ public final class SsuDashboardScreen extends Screen {
 
     private List<SsuPermissionEditorDataPayload.TargetEntry> visiblePermissionTargets() {
         return slice(permissionData.targets(), permissionDropdownScroll, DROPDOWN_VISIBLE_ROWS);
+    }
+
+    private List<SsuPermissionEditorDataPayload.TargetEntry> visiblePermissionDimensions() {
+        return slice(permissionData.dimensions(), permissionDropdownScroll, DROPDOWN_VISIBLE_ROWS);
     }
 
     private List<String> visiblePermissionRanks() {
@@ -1662,13 +2735,19 @@ public final class SsuDashboardScreen extends Screen {
             case ADMIN_TOOLS -> drawAdminTools(g, l, mouseX, mouseY);
             case HOLOGRAMS -> drawHolograms(g, l);
             case STATISTICS -> drawStatistics(g, l);
-            case CLAIMS -> drawClaims(g,l); case TRAVEL -> drawTravel(g,l); case ECONOMY -> drawEconomy(g,l);
-            case REGIONS -> drawRegions(g,l); case SETTINGS -> drawSettingsIntro(g, l);
+            case CLAIMS -> drawClaims(g,l); case HOMES -> drawHomes(g,l); case TRAVEL -> drawTravel(g,l,false);
+            case TRAVEL_ADMIN -> drawTravel(g,l,true); case ADMIN_CLAIMS -> drawAdminClaims(g,l); case RANKS -> drawRanks(g,l);
+            case WALLET -> drawWallet(g,l); case ECONOMICS -> drawEconomics(g,l); case TRANSACTIONS -> drawTransactions(g,l);
+            case AUCTION_TAX -> drawAuctionTax(g,l); case CLAIM_TAX -> drawClaimTax(g,l);
+            case REGIONS -> drawRegions(g,l); case REGION_ADMIN -> drawRegionAdmin(g,l); case UTILITY_MINING_ADMIN -> drawUtilityMiningAdmin(g,l); case MAINTENANCE -> drawMaintenance(g,l); case SETTINGS -> drawSettingsIntro(g, l);
             case PERMISSIONS -> drawPermissions(g,l,mouseX,mouseY); case PLAYER_INFO -> drawPlayerInfo(g,l);
             case ACCOUNTS -> drawAccounts(g,l); case JOBS -> drawJobs(g,l);
             case RENT_OPERATIONS -> drawRentOps(g,l); case CORE -> drawCore(g,l); case PROFILE -> drawProfile(g,l);
             case MAIL -> g.text(font,"Opening mailbox…",l.contentX(),l.contentTop(),MUTED,false);
             case AUCTION_HOUSE -> g.text(font,"Opening Auction House…",l.contentX(),l.contentTop(),MUTED,false);
+            case QUESTS -> g.text(font,"Opening Questbook…",l.contentX(),l.contentTop(),MUTED,false);
+            case MINIGAMES -> g.text(font,"Opening Minigame Lobby…",l.contentX(),l.contentTop(),MUTED,false);
+            case DUNGEONS -> g.text(font,"Opening Dungeon Lobby…",l.contentX(),l.contentTop(),MUTED,false);
         }
     }
 
@@ -1696,7 +2775,9 @@ public final class SsuDashboardScreen extends Screen {
     }
 
     private boolean useTexturedTiles(Layout l) {
-        return (page == Page.HOME || page == Page.ADMIN) && l.contentWidth() >= 330 && l.panelHeight() >= 320;
+        if ((page != Page.HOME && page != Page.ADMIN) || l.contentWidth() < 330 || l.panelHeight() < 320) return false;
+        if (page == Page.ADMIN && adminModules().size() > 16) return false;
+        return true;
     }
 
     private List<ModuleTile> moduleTiles(Layout l) {
@@ -1719,6 +2800,13 @@ public final class SsuDashboardScreen extends Screen {
     }
 
     private void drawSettingsIntro(GuiGraphicsExtractor g, Layout l) {
+        if (settingsCategory == SettingsCategory.BORDERS) {
+            g.text(font, "Enable claim borders is the master permission for in-world claim outlines.",
+                    l.contentX(), l.contentTop() + 2, TEXT, false);
+            g.text(font, "Use Show/Hide on your claims; Show other claims controls land owned by others.",
+                    l.contentX(), l.contentTop() + 16, MUTED, false);
+            return;
+        }
         g.text(font, "Choose a category, then click a setting to change it.",
                 l.contentX(), l.contentTop() + 4, TEXT, false);
     }
@@ -1728,36 +2816,45 @@ public final class SsuDashboardScreen extends Screen {
         g.text(font, "Disabled modules release their runtime data and make their tools inert.",
                 l.contentX(), l.contentTop(), MUTED, false);
         int columns = l.contentWidth() >= 470 ? 3 : 2;
-        int top = l.contentTop() + 24;
-        int rows = (13 + columns - 1) / columns;
-        int distanceTop = top + rows * 25 + 10;
+        int top = l.contentTop() + 22;
+        int switchCount = 18;
+        int rows = (switchCount + columns - 1) / columns;
+        int questModeY = top + rows * 21 + 3;
+        g.text(font, "Quest entry is exclusive: the SSU menu or NPC interactions, never both.",
+                l.contentX(), questModeY + 20, MUTED, false);
+        int distanceTop = questModeY + 24;
         g.text(font, "Hologram render/load distance: " + settings.hologramRenderDistance() + " blocks",
-                l.contentX(), distanceTop + 6, TEXT, false);
+                l.contentX(), distanceTop + 5, TEXT, false);
         g.text(font, "Claim border render distance: " + settings.claimBorderRenderDistance() + " blocks",
-                l.contentX(), distanceTop + 33, TEXT, false);
+                l.contentX(), distanceTop + 29, TEXT, false);
         g.text(font, "Region border render distance: " + settings.regionBorderRenderDistance() + " blocks",
-                l.contentX(), distanceTop + 60, TEXT, false);
+                l.contentX(), distanceTop + 53, TEXT, false);
     }
 
     private void drawAdminTools(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
-        g.text(font, "Select a specialised admin tool. Tool use is still permission checked by the server.",
-                l.contentX(), l.contentTop(), MUTED, false);
+        g.text(font, "Scroll to browse all specialised admin tools.", l.contentX(), l.contentTop(), MUTED, false);
         List<AdminTool> tools = adminTools();
-        for (int i = 0; i < tools.size(); i++) {
-            AdminTool tool = tools.get(i);
-            int y = l.contentTop() + 42 + i * 54;
-            Rect row = new Rect(l.contentX(), y, l.contentWidth(), 42);
+        int visible = adminToolVisibleRows(l);
+        int maximum = Math.max(0, tools.size() - visible);
+        adminToolScroll = Math.max(0, Math.min(maximum, adminToolScroll));
+        int rowStart = l.contentTop() + 34;
+        int rowStep = 46;
+        int rowHeight = 40;
+        for (int local = 0; local < visible; local++) {
+            int index = adminToolScroll + local;
+            if (index >= tools.size()) break;
+            AdminTool tool = tools.get(index);
+            int y = rowStart + local * rowStep;
+            Rect row = new Rect(l.contentX(), y, l.contentWidth(), rowHeight);
             boolean hovered = row.contains(mouseX, mouseY);
             g.fill(row.x(), row.y(), row.x() + row.width(), row.y() + row.height(), hovered ? 0xD02A3743 : CARD);
             g.outline(row.x(), row.y(), row.width(), row.height(), hovered ? ACCENT : PANEL_BORDER);
-            g.text(font, tool.label(), row.x() + 8, row.y() + 7, TEXT, true);
-            g.text(font, trim(tool.hint(), 62), row.x() + 8, row.y() + 23, MUTED, false);
-            if (hovered) {
-                g.setComponentTooltipForNextFrame(font, List.of(Component.literal(tool.hint())), mouseX, mouseY);
-            }
+            g.text(font, tool.label(), row.x() + 8, row.y() + 6, TEXT, true);
+            g.text(font, trim(tool.hint(), 62), row.x() + 8, row.y() + 22, MUTED, false);
+            if (hovered) g.setComponentTooltipForNextFrame(font, List.of(Component.literal(tool.hint())), mouseX, mouseY);
         }
-        g.text(font, "Module switches and render distances are managed on the Module Settings page.",
-                l.contentX(), l.contentTop() + 146, MUTED, false);
+        if (maximum > 0) g.text(font, (adminToolScroll + 1) + "–" + Math.min(tools.size(), adminToolScroll + visible)
+                + " / " + tools.size(), l.contentRight() - 118, l.contentTop() + 6, MUTED, false);
     }
 
     private void drawHolograms(GuiGraphicsExtractor g, Layout l) {
@@ -1797,14 +2894,90 @@ public final class SsuDashboardScreen extends Screen {
         if(selectedRow>=0&&selectedRow<pageData.claims().size()){var e=pageData.claims().get(selectedRow);
             detail(g,l,"Claim details",List.of("ID: "+e.id(),"Trusted: "+(e.trustedPlayers().isBlank()?e.trustedCount():e.trustedPlayers()),
                     "Flags: "+e.flags()));}}
-    private void drawTravel(GuiGraphicsExtractor g,Layout l){if(pageData.locations().isEmpty())empty(g,l,"No server spawn, homes or warps on this page.");
+    private void drawHomes(GuiGraphicsExtractor g,Layout l){
+        boolean canSetHere=homeCapability("set_here");
+        g.text(font,"Claim: "+blank(homesClaimName)+" | Total homes: "+snapshot.core().homeCount()+" / "+snapshot.core().maxHomes(),
+                l.contentX(),l.contentTop()+2,MUTED,false);
+        if(!canSetHere)g.text(font,"Stand inside this claim and ensure your home-set permission is allowed to save a home.",
+                l.contentX(),l.contentTop()+14,WARNING,false);
+        if(pageData.locations().isEmpty())empty(g,l,"No homes are linked to this claim. Stand inside it, enter a name and choose Save here.");
         for(int i=0;i<pageData.locations().size();i++){var e=pageData.locations().get(i);int y=rowTextY(l,i);
-            g.text(font,cap(e.kind())+": "+e.name(),l.contentX(),y,TEXT,false);g.text(font,shortDim(e.dimension())+" | "+pos(e.x(),e.y(),e.z()),l.contentX()+130,y,MUTED,false);}}
-    private void drawEconomy(GuiGraphicsExtractor g,Layout l){g.text(font,"Balance: "+snapshot.economy().formattedBalance(),l.contentX(),l.contentTop(),GOOD,false);
-        int offset=snapshot.economy().canAdmin()&&snapshot.adminAccess().rentPolicy()?112:86;for(int i=0;i<pageData.transactions().size();i++){var e=pageData.transactions().get(i);int y=rowTextY(l,i,offset);
-            g.text(font,e.type()+"  "+e.formattedAmount(),l.contentX(),y,TEXT,false);g.text(font,e.status(),l.contentX()+170,y,MUTED,false);}
-        if(selectedRow>=0&&selectedRow<pageData.transactions().size()){var e=pageData.transactions().get(selectedRow);detail(g,l,"Transaction",
-                List.of("ID: "+e.id(),"From: "+blank(e.source()),"To: "+blank(e.destination()),"Actor: "+blank(e.actor()),"Reason: "+blank(e.reason()),"Failure: "+blank(e.failure())));}}
+            g.text(font,e.name(),l.contentX(),y,TEXT,false);g.text(font,shortDim(e.dimension())+" | "+pos(e.x(),e.y(),e.z()),l.contentX()+100,y,MUTED,false);}}
+    private void drawAdminClaims(GuiGraphicsExtractor g,Layout l){if(pageData.claims().isEmpty())empty(g,l,"No player claims on this page.");
+        for(int i=0;i<pageData.claims().size();i++){var e=pageData.claims().get(i);int y=rowTextY(l,i);
+            g.text(font,trim(e.name(),34),l.contentX(),y,TEXT,false);g.text(font,e.chunkCount()+" chunks | "+shortDim(e.dimension()),l.contentX()+170,y,MUTED,false);}
+        if(selectedRow>=0&&selectedRow<pageData.claims().size()){var e=pageData.claims().get(selectedRow);
+            detail(g,l,"Administrative claim details",List.of("Claim ID: "+e.id(),"Owner / claim: "+e.name(),"Trusted: "+(e.trustedPlayers().isBlank()?e.trustedCount():e.trustedPlayers()),"Flags: "+e.flags()));}}
+    private void drawTravel(GuiGraphicsExtractor g,Layout l,boolean admin){
+        if(pageData.locations().isEmpty())empty(g,l,admin?"No server warps or spawn match this filter.":"No available travel destinations match this filter.");
+        int offset=admin?(l.contentWidth()<500?130:106):82;
+        for(int i=0;i<pageData.locations().size();i++){var e=pageData.locations().get(i);int y=rowTextY(l,i,offset);
+            g.text(font,cap(e.kind())+": "+e.name(),l.contentX(),y,TEXT,false);
+            if(admin)g.text(font,shortDim(e.dimension())+" | "+pos(e.x(),e.y(),e.z()),l.contentX()+130,y,MUTED,false);}}
+    private void drawRanks(GuiGraphicsExtractor g,Layout l){if(pageData.permissions().isEmpty())empty(g,l,"No ranks on this page.");
+        for(int i=0;i<pageData.permissions().size();i++){var e=pageData.permissions().get(i);int y=rowTextY(l,i,84);
+            g.text(font,e.owner(),l.contentX(),y,"default".equals(e.key())?GOOD:TEXT,false);
+            g.text(font,("default".equals(e.key())?"server default • ":"")+"priority "+e.value()+" • "+e.source(),l.contentX()+100,y,MUTED,false);}}
+    private void drawWallet(GuiGraphicsExtractor g, Layout l) {
+        g.text(font, "Balance: " + snapshot.economy().formattedBalance(), l.contentX(), l.contentTop(), GOOD, false);
+        drawTransactionRows(g, l, 78);
+    }
+
+    private void drawEconomics(GuiGraphicsExtractor g, Layout l) {
+        g.text(font, "Choose an economy section. These pages are only available to authorized administrators.",
+                l.contentX(), l.contentTop() + 4, MUTED, false);
+    }
+
+    private void drawTransactions(GuiGraphicsExtractor g, Layout l) {
+        String filter = !draftTransactionPlayer.isBlank() ? "Exact player: " + draftTransactionPlayer
+                : selectedTransactionPlayerId.isBlank() ? "All players"
+                : "Selected player: " + blank(selectedTransactionPlayerLabel);
+        int filterCharacters = Math.max(12, (l.contentWidth() - 132) / 6);
+        g.text(font, trim(filter, filterCharacters), l.contentX(), l.contentTop() + 80, MUTED, false);
+        drawTransactionRows(g, l, 108);
+    }
+
+    private void drawAuctionTax(GuiGraphicsExtractor g, Layout l) {
+        g.text(font, "Auction House sale tax", l.contentX(), l.contentTop() + 4, ACCENT, true);
+        g.text(font, "This percentage is withheld from the seller when a purchase is completed.",
+                l.contentX(), l.contentTop() + 19, MUTED, false);
+        g.text(font, "Players can see the active tax while selling, but only economy administrators can change it here.",
+                l.contentX(), l.contentTop() + 31, MUTED, false);
+    }
+
+    private void drawClaimTax(GuiGraphicsExtractor g, Layout l) {
+        g.text(font, "Player Claim tax is not currently active.", l.contentX(), l.contentTop() + 8, WARNING, true);
+        g.text(font, "Player Claims have no purchase price, recurring billing cycle or taxable income in the current system.",
+                l.contentX(), l.contentTop() + 27, MUTED, false);
+        g.text(font, "A tax rate cannot be applied safely until its amount, timing and insufficient-funds behaviour are defined.",
+                l.contentX(), l.contentTop() + 42, MUTED, false);
+        g.text(font, "No player is being charged by this page.", l.contentX(), l.contentTop() + 62, GOOD, false);
+    }
+
+    private void drawTransactionRows(GuiGraphicsExtractor g, Layout l, int offset) {
+        if (pageData.transactions().isEmpty()) {
+            g.text(font, page == Page.TRANSACTIONS ? "No transactions match the selected player and search."
+                    : "No transactions match this search.", l.contentX(), l.contentTop() + offset + 6, MUTED, false);
+        }
+        for (int i = 0; i < pageData.transactions().size(); i++) {
+            var entry = pageData.transactions().get(i);
+            int y = rowTextY(l, i, offset);
+            g.text(font, trim(entry.type() + "  " + entry.formattedAmount(), 28), l.contentX(), y, TEXT, false);
+            g.text(font, entry.status(), l.contentX() + 170, y, MUTED, false);
+        }
+        if (selectedRow >= 0 && selectedRow < pageData.transactions().size()) {
+            var entry = pageData.transactions().get(selectedRow);
+            detail(g, l, "Transaction", List.of(
+                    "ID: " + entry.id(),
+                    "From: " + blank(entry.source()),
+                    "To: " + blank(entry.destination()),
+                    "Actor: " + blank(entry.actor()),
+                    "Module: " + blank(entry.module()),
+                    "Reason: " + blank(entry.reason()),
+                    "Failure: " + blank(entry.failure())
+            ));
+        }
+    }
     private void drawRegions(GuiGraphicsExtractor g,Layout l){if(pageData.regions().isEmpty())empty(g,l,"No regions on this page.");
         for(int i=0;i<pageData.regions().size();i++){var e=pageData.regions().get(i);int y=rowTextY(l,i);g.text(font,e.name(),l.contentX(),y,e.rentedByPlayer()?GOOD:TEXT,false);
             String state=e.rentedByPlayer()?"yours | "+e.remainingText():e.rented()?"rented":e.rentable()?e.formattedPrice()+" / "+e.periodText():"not rentable";
@@ -1815,6 +2988,56 @@ public final class SsuDashboardScreen extends Screen {
                         "Rent: "+e.rentPolicy(),"Priority: "+e.priority()+" | Volume: "+e.volume(),
                         "Spawn: "+(e.hasSpawn()?e.spawn():"none")+" | Snapshot: "+yesNo(e.snapshotAvailable()),
                         "Active job lock: "+yesNo(e.jobLocked())));}}
+    private void drawUtilityMiningAdmin(GuiGraphicsExtractor g,Layout l){
+        List<SsuMenuPageDataPayload.PermissionEntry> lists=pageData.permissions().stream().filter(e->"list".equals(e.kind())).toList();
+        for(int i=0;i<lists.size();i++){var e=lists.get(i);int y=rowTextY(l,i,l.contentWidth()<430?106:92);
+            g.text(font,cap(e.key().replace('_',' ')),l.contentX(),y,TEXT,false);
+            g.text(font,trim(e.value(),48),l.contentX()+120,y,MUTED,false);}
+        g.text(font,"Add and Remove use the block id field above. Clear empties the selected list immediately.",l.contentX(),l.footerY()-18,MUTED,false);
+    }
+
+    private void drawMaintenance(GuiGraphicsExtractor g, Layout l) {
+        int jobs = pageData.permissions().stream().filter(v -> "jobs".equals(v.key()))
+                .map(v -> parseDisplayInt(v.value())).findFirst().orElse(snapshot.activeJobs());
+        long pending = pageData.permissions().stream().filter(v -> "storage_pending".equals(v.key()))
+                .map(v -> parseDisplayLong(v.value())).findFirst().orElse((long) snapshot.pendingStorageWrites());
+        g.text(font, "Runtime: " + jobs + " active job(s) • " + pending + " pending storage record(s)",
+                l.contentX(), l.contentTop() + 4, jobs > 0 ? WARNING : MUTED, false);
+        String questState = pageData.permissions().stream().filter(v -> "quests".equals(v.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse("unavailable");
+        String minigameState = pageData.permissions().stream().filter(v -> "minigames".equals(v.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse("unavailable");
+        String dungeonState = pageData.permissions().stream().filter(v -> "dungeons".equals(v.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse("unavailable");
+        g.text(font, trim("Quests: " + questState + " • Minigames: " + minigameState + " • Dungeons: " + dungeonState, 108),
+                l.contentX(), l.contentTop() + 14, MUTED, false);
+        List<SsuMenuPageDataPayload.PermissionEntry> colors = pageData.permissions().stream()
+                .filter(v -> "color".equals(v.kind())).toList();
+        if (colors.isEmpty()) empty(g, l, "No border color categories on this page.");
+        for (int i = 0; i < colors.size(); i++) {
+            var entry = colors.get(i); int y = rowTextY(l, i, 82);
+            g.text(font, cap(entry.key().replace('_', ' ')), l.contentX(), y, TEXT, false);
+            g.text(font, entry.value() + " • " + entry.source(), l.contentX() + 150, y, MUTED, false);
+        }
+        g.text(font, "Set uses the shared RGB field. Reload is blocked while long-running jobs are active.",
+                l.contentX(), l.footerY() - 18, MUTED, false);
+    }
+
+    private static int parseDisplayInt(String raw) {
+        try { return Integer.parseInt(raw); } catch (RuntimeException ignored) { return 0; }
+    }
+
+    private static long parseDisplayLong(String raw) {
+        try { return Long.parseLong(raw); } catch (RuntimeException ignored) { return 0L; }
+    }
+
+    private void drawRegionAdmin(GuiGraphicsExtractor g,Layout l){if(pageData.regions().isEmpty())empty(g,l,"No regions on this page.");
+        for(int i=0;i<pageData.regions().size();i++){var e=pageData.regions().get(i);int y=rowTextY(l,i,l.contentWidth()<440?130:105);
+            g.text(font,e.name(),l.contentX(),y,selectedRow==i?ACCENT:TEXT,false);
+            String state=e.rented()?"rented by "+blank(e.renterName())+("paused".equalsIgnoreCase(e.remainingText())?" • paused":""):"available";
+            g.text(font,trim(shortDim(e.dimension())+" • "+e.volume()+" blocks • "+state,42),l.contentX()+100,y,MUTED,false);}
+        if(selectedRow<0)g.text(font,"Select a region to show safe snapshot, reset, redefine, clear and rental controls.",l.contentX(),l.footerY()-18,MUTED,false);}
+
     private void drawPlayerInfo(GuiGraphicsExtractor g, Layout l) {
         if (!playerProfileData.profile().selected()) {
             g.text(font, "Choose a player from the dropdown or enter an exact name.",
@@ -1867,7 +3090,7 @@ public final class SsuDashboardScreen extends Screen {
 
     private void drawPermissions(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
         if (selectedPermissionTarget.isBlank()) {
-            g.text(font, "Choose a player, rank or dimension from the lists above.", l.contentX(), permissionListTop(l) + 8, MUTED, false);
+            g.text(font, "Choose a player or rank from the lists above.", l.contentX(), permissionListTop(l) + 8, MUTED, false);
             return;
         }
         g.text(font, trim(permissionData.selectedLabel() + " — " + permissionData.targetSummary(), 76),
@@ -1955,14 +3178,25 @@ public final class SsuDashboardScreen extends Screen {
         HOME("Dashboard","Player tools and personal overview",""), PROFILE("Profile","Your server account and property",""),
         MAIL("Mail","Inbox, attachments and sent mail",""),
         AUCTION_HOUSE("Auction House","Browse, buy and sell player auctions",""),
-        CLAIMS("Claims & Land","Owned claims and claim tools","claims"), TRAVEL("Travel","Server spawn, homes and warps","travel"),
-        ECONOMY("Wallet & Transactions","Payments and paged transaction history","transactions"),
-        REGIONS("Regions & Rentals","Rentals, region details and visibility","regions"), SETTINGS("Settings","Personal settings",""),
-        ADMIN("Admin Center","Paged administrative tools",""), MODULE_SETTINGS("Module Settings","Global module switches and render distances",""),
+        QUESTS("Questbook","Available, active and completed quests",""),
+        MINIGAMES("Minigames","Queues, arenas and active matches",""),
+        DUNGEONS("Customized Dungeons","Parties, stages, checkpoints and dungeon runs",""),
+        CLAIMS("Claims & Land","Owned claims, border visibility and claim-linked homes","claims"), HOMES("Homes","Personal teleport locations linked to one claim","homes"),
+        TRAVEL("Travel","Homes, warps and server destinations","travel"), TRAVEL_ADMIN("Travel Management","Server warp and spawn administration","travel_admin"), ADMIN_CLAIMS("Player Claims","Administrative claim inspection and recovery","admin_claims"),
+        RANKS("Rank Management","Create, rename and maintain permission ranks","ranks"),
+        WALLET("Wallet & Transactions","Payments and your personal transaction history","wallet_transactions"),
+        ECONOMICS("Economics","Accounts, transactions, taxes and economy journals",""),
+        TRANSACTIONS("Transactions","Filter and inspect the complete transaction journal","transactions"),
+        AUCTION_TAX("Auction House Tax","Tax withheld from completed Auction House sales","auction_tax"),
+        CLAIM_TAX("Player Claim Tax","Player Claim taxation status and configuration","claim_tax"),
+        REGIONS("Regions & Rentals","Rentals, region details and visibility","regions"),
+        REGION_ADMIN("Region Maintenance","Snapshots, recovery, selection and rental administration","region_admin"),
+        UTILITY_MINING_ADMIN("Utility Mining","Server rules for Treecapitator and Veinminer","utility_mining_admin"), MAINTENANCE("Maintenance","Reload, refresh and visualization defaults","maintenance"), SETTINGS("Settings","Personal settings",""),
+        ADMIN("Admin Center","Paged administrative tools",""), DIMENSIONS("Dimensions","Create and configure custom dimensions",""), MODULE_SETTINGS("Module Settings","Global module switches and render distances",""),
         ADMIN_TOOLS("Admin Tools","Purpose-built setup and editing tools",""),
         HOLOGRAMS("Holograms","Remote floating-text and hologram administration","holograms"),
         STATISTICS("Player Statistics","Custom counters, storage and Floating Text sources","statistics"), PLAYER_INFO("Player Info & Profile","Admin player browser and effective permissions",""),
-        PERMISSIONS("Permissions","Rank, player and dimension overrides","permissions"),
+        PERMISSIONS("Permissions","Global and per-dimension rank/player permissions","permissions"),
         ACCOUNTS("Economy Accounts","Searchable account browser","accounts"),
         JOBS("Active Jobs","Scheduler progress and cancellation","jobs"),
         RENT_OPERATIONS("Rent Journal","Rental reconciliation operations","rent_operations"), CORE("Core Status","Storage, indexing and module migration"," ");

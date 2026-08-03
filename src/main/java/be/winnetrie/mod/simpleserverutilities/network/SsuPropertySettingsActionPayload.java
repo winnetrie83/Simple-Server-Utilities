@@ -14,10 +14,10 @@ public record SsuPropertySettingsActionPayload(String kind, String target, Strin
             StreamCodec.of(SsuPropertySettingsActionPayload::encode, SsuPropertySettingsActionPayload::decode);
 
     public SsuPropertySettingsActionPayload {
-        kind = bounded(kind, 16).trim().toLowerCase(java.util.Locale.ROOT);
-        target = bounded(target, 64).trim();
-        key = bounded(key, 64).trim().toLowerCase(java.util.Locale.ROOT);
-        value = bounded(value, 256).trim();
+        kind = PayloadBounds.string(kind, 16).trim().toLowerCase(java.util.Locale.ROOT);
+        target = PayloadBounds.string(target, 64).trim();
+        key = PayloadBounds.string(key, 64).trim().toLowerCase(java.util.Locale.ROOT);
+        value = PayloadBounds.string(value, 256).trim();
         requestId = Math.max(0L, requestId);
     }
     private static void encode(RegistryFriendlyByteBuf b, SsuPropertySettingsActionPayload p) {
@@ -26,9 +26,5 @@ public record SsuPropertySettingsActionPayload(String kind, String target, Strin
     private static SsuPropertySettingsActionPayload decode(RegistryFriendlyByteBuf b) {
         return new SsuPropertySettingsActionPayload(b.readUtf(16), b.readUtf(64), b.readUtf(64), b.readUtf(256), b.readVarLong());
     }
-    private static String bounded(String value, int maximum) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= maximum ? safe : safe.substring(0, maximum);
-    }
-    @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+@Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

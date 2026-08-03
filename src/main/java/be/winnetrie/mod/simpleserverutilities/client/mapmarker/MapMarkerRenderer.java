@@ -1,7 +1,10 @@
 package be.winnetrie.mod.simpleserverutilities.client.mapmarker;
 
+import be.winnetrie.mod.simpleserverutilities.mixin.LevelRendererAccessor;
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerSyncPayload;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.blockentity.BeaconRenderer;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.debug.DebugRenderer;
 import net.minecraft.gizmos.GizmoStyle;
@@ -88,7 +91,7 @@ public final class MapMarkerRenderer implements DebugRenderer.SimpleDebugRendere
                 }
             }
             if (MapMarkerClientState.showBeams() && horizontalDistanceSquared <= beamDistanceSquared) {
-                drawBeam(centerX, centerZ, marker.colorArgb());
+                drawBeam(marker, camX, camY, camZ, partialTicks, marker.colorArgb());
             }
         }
 
@@ -194,15 +197,40 @@ public final class MapMarkerRenderer implements DebugRenderer.SimpleDebugRendere
         return Math.round(distance) + " m";
     }
 
-    private void drawBeam(double x, double z, int color) {
-        double minimumY = minecraft.level.getMinY();
-        double maximumY = minecraft.level.getMaxY() + 1.0D;
-        Vec3 bottom = new Vec3(x, minimumY, z);
-        Vec3 top = new Vec3(x, maximumY, z);
-        int translucent = 0x66000000 | (color & 0x00FFFFFF);
-        int core = 0xCC000000 | (color & 0x00FFFFFF);
-        Gizmos.line(bottom, top, translucent, 8.0F).setAlwaysOnTop();
-        Gizmos.line(bottom, top, core, 3.0F).setAlwaysOnTop();
+    private void drawBeam(
+            MapMarkerSyncPayload.Entry marker,
+            double camX,
+            double camY,
+            double camZ,
+            float partialTicks,
+            int color
+    ) {
+        if (minecraft.level == null || minecraft.levelRenderer == null) return;
+
+        int minimumY = minecraft.level.getMinY();
+        int maximumYExclusive = minecraft.level.getMaxY() + 1;
+        int height = maximumYExclusive - minimumY;
+        if (height <= 0) return;
+
+        PoseStack poseStack = new PoseStack();
+        poseStack.translate(
+                marker.x() - camX,
+                minimumY - camY,
+                marker.z() - camZ);
+
+        float animationTime = (float) (minecraft.level.getGameTime() + partialTicks);
+        int opaqueColor = 0xFF000000 | (color & 0x00FFFFFF);
+        BeaconRenderer.submitBeaconBeam(
+                poseStack,
+                ((LevelRendererAccessor) minecraft.levelRenderer).ssu$getSubmitNodeStorage(),
+                BeaconRenderer.BEAM_LOCATION,
+                1.0F,
+                animationTime,
+                0,
+                height,
+                opaqueColor,
+                BeaconRenderer.SOLID_BEAM_RADIUS,
+                BeaconRenderer.BEAM_GLOW_RADIUS);
     }
 
     private static double visualScale(double distance) {

@@ -17,6 +17,8 @@ import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.HomePolicy;
+import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimChunk;
+import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
@@ -30,6 +32,12 @@ public class PlayerHomeManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private final Map<UUID, Map<String, PlayerHome>> homesByOwner = new HashMap<>();
+    private final Map<UUID, Path> knownOwnerFiles = new HashMap<>();
+    private final Set<UUID> loadedOwners = new HashSet<>();
+    private final Set<UUID> dirtyOwners = new HashSet<>();
+    private final Map<UUID, Long> ownerAccess = new HashMap<>();
+    private long accessSequence;
+    private static final int MAX_LOADED_OWNER_RECORDS = 256;
     private final DirtyJsonRecordStore homeRecordStore = new DirtyJsonRecordStore();
 
     private Path rootFolder;
@@ -42,14 +50,18 @@ public class PlayerHomeManager {
         this.legacySaveFile = rootFolder.resolve("homes.json");
 
         homesByOwner.clear();
+        knownOwnerFiles.clear();
+        loadedOwners.clear();
+        dirtyOwners.clear();
+        ownerAccess.clear();
+        accessSequence = 0L;
         homeRecordStore.reset();
 
         try {
             Files.createDirectories(rootFolder);
 
             if (JsonStorage.hasJsonFiles(playersFolder)) {
-                homeRecordStore.discover(playersFolder);
-                loadSplitHomes();
+                indexSplitHomes();
             } else if (Files.exists(legacySaveFile)) {
                 loadLegacyHomes();
                 save();
@@ -63,49 +75,52 @@ public class PlayerHomeManager {
                 }
             } else {
                 Files.createDirectories(playersFolder);
-                homeRecordStore.discover(playersFolder);
                 save();
             }
 
-            SimpleServerUtilities.LOGGER.info("Loaded {} player homes for {} players.", countAllHomes(), homesByOwner.size());
+            SimpleServerUtilities.LOGGER.info(
+                    "Indexed SSU home records for {} player(s); records are loaded on demand.",
+                    knownOwnerFiles.size() + loadedOwners.size());
         } catch (Exception e) {
             SimpleServerUtilities.LOGGER.error("Failed to load player homes.", e);
         }
     }
 
-    public void save() {
-        if (playersFolder == null) {
-            return;
-        }
-
+    public synchronized void save() {
+        if (playersFolder == null || dirtyOwners.isEmpty()) return;
         try {
             Files.createDirectories(playersFolder);
-            Set<Path> keptFiles = new HashSet<>();
-
-            for (Map.Entry<UUID, Map<String, PlayerHome>> entry : homesByOwner.entrySet()) {
-                if (entry.getValue().isEmpty()) {
-                    continue;
-                }
-
-                UUID owner = entry.getKey();
-                HomePlayerSaveData data = new HomePlayerSaveData();
-                data.player = owner.toString();
-                data.homes = new ArrayList<>(entry.getValue().values());
-                data.homes.sort(Comparator.comparing(PlayerHome::getDisplayName, String::compareToIgnoreCase));
-
+            for (UUID owner : Set.copyOf(dirtyOwners)) {
                 Path file = StoragePaths.jsonFile(playersFolder, owner.toString());
-                homeRecordStore.queueJson(GSON, file, data);
-                keptFiles.add(file);
+                Map<String, PlayerHome> ownerHomes = homesByOwner.get(owner);
+                if (ownerHomes == null || ownerHomes.isEmpty()) {
+                    SimpleServerUtilities.STORAGE.queueDelete(file);
+                    homeRecordStore.forget(file);
+                    knownOwnerFiles.remove(owner);
+                } else {
+                    HomePlayerSaveData data = new HomePlayerSaveData();
+                    data.player = owner.toString();
+                    data.homes = new ArrayList<>(ownerHomes.values());
+                    data.homes.sort(Comparator.comparing(PlayerHome::getDisplayName, String::compareToIgnoreCase));
+                    homeRecordStore.queueJson(GSON, file, data);
+                    knownOwnerFiles.put(owner, file);
+                }
+                dirtyOwners.remove(owner);
             }
-
-            homeRecordStore.queueDeleteMissing(keptFiles);
+            trimLoadedOwnerCache();
         } catch (IOException e) {
             SimpleServerUtilities.LOGGER.error("Failed to queue player home saves.", e);
         }
     }
 
     public void clear() {
+        save();
         homesByOwner.clear();
+        knownOwnerFiles.clear();
+        loadedOwners.clear();
+        dirtyOwners.clear();
+        ownerAccess.clear();
+        accessSequence = 0L;
         homeRecordStore.reset();
         rootFolder = null;
         playersFolder = null;
@@ -116,7 +131,7 @@ public class PlayerHomeManager {
         String name = sanitizeName(rawName);
         UUID owner = player.getUUID();
 
-        Map<String, PlayerHome> ownerHomes = homesByOwner.computeIfAbsent(owner, uuid -> new HashMap<>());
+        Map<String, PlayerHome> ownerHomes = ensureOwnerLoaded(owner);
         String normalizedName = normalizeName(name);
 
         PlayerHome existingHome = ownerHomes.get(normalizedName);
@@ -133,6 +148,7 @@ public class PlayerHomeManager {
                     now
             );
 
+            dirtyOwners.add(owner);
             save();
             return true;
         }
@@ -154,36 +170,101 @@ public class PlayerHomeManager {
         );
 
         ownerHomes.put(normalizedName, home);
+        dirtyOwners.add(owner);
         save();
 
         return true;
     }
 
     public boolean deleteHome(UUID owner, String rawName) {
-        Map<String, PlayerHome> ownerHomes = homesByOwner.get(owner);
+        Map<String, PlayerHome> ownerHomes = ensureOwnerLoaded(owner);
 
-        if (ownerHomes == null) {
+        if (ownerHomes.isEmpty()) {
             return false;
         }
 
         PlayerHome removed = ownerHomes.remove(normalizeName(sanitizeName(rawName)));
 
-        if (ownerHomes.isEmpty()) {
-            homesByOwner.remove(owner);
-        }
-
         if (removed == null) {
             return false;
         }
 
+        dirtyOwners.add(owner);
         save();
         return true;
     }
 
-    public PlayerHome getHome(UUID owner, String rawName) {
-        Map<String, PlayerHome> ownerHomes = homesByOwner.get(owner);
+    /**
+     * Removes every home physically linked to the supplied claim. This is called
+     * by the claim manager before the claim itself disappears, so no orphaned
+     * teleport destinations survive a claim deletion.
+     */
+    public synchronized int deleteHomesInClaim(UUID owner, PlayerClaim claim) {
+        if (owner == null || claim == null) {
+            return 0;
+        }
 
-        if (ownerHomes == null) {
+        Map<String, PlayerHome> ownerHomes = ensureOwnerLoaded(owner);
+        if (ownerHomes.isEmpty()) {
+            return 0;
+        }
+
+        int before = ownerHomes.size();
+        ownerHomes.entrySet().removeIf(entry -> ClaimHomeSupport.contains(claim, entry.getValue()));
+        int removed = before - ownerHomes.size();
+        if (removed > 0) {
+            dirtyOwners.add(owner);
+            save();
+        }
+        return removed;
+    }
+
+    /**
+     * Removes every home located in one of the supplied claim chunks. The claim
+     * manager calls this only after validating that the chunk removal itself is
+     * allowed, so rejected or disconnecting selections never delete homes.
+     */
+    public synchronized int deleteHomesInChunks(
+            UUID owner,
+            String dimension,
+            Collection<ClaimChunk> chunks
+    ) {
+        if (owner == null || dimension == null || dimension.isBlank() || chunks == null || chunks.isEmpty()) {
+            return 0;
+        }
+
+        Set<ClaimChunk> removedChunks = new HashSet<>(chunks);
+        Map<String, PlayerHome> ownerHomes = ensureOwnerLoaded(owner);
+        if (ownerHomes.isEmpty()) {
+            return 0;
+        }
+
+        int before = ownerHomes.size();
+        ownerHomes.entrySet().removeIf(entry -> {
+            PlayerHome home = entry.getValue();
+            if (home == null || !dimension.equals(home.getDimension())) {
+                return false;
+            }
+            int blockX = (int) Math.floor(home.getX());
+            int blockZ = (int) Math.floor(home.getZ());
+            return removedChunks.contains(new ClaimChunk(
+                    Math.floorDiv(blockX, 16),
+                    Math.floorDiv(blockZ, 16)
+            ));
+        });
+
+        int removed = before - ownerHomes.size();
+        if (removed > 0) {
+            dirtyOwners.add(owner);
+            save();
+        }
+        return removed;
+    }
+
+    public PlayerHome getHome(UUID owner, String rawName) {
+        Map<String, PlayerHome> ownerHomes = ensureOwnerLoaded(owner);
+
+        if (ownerHomes.isEmpty()) {
             return null;
         }
 
@@ -191,9 +272,9 @@ public class PlayerHomeManager {
     }
 
     public Collection<PlayerHome> getHomes(UUID owner) {
-        Map<String, PlayerHome> ownerHomes = homesByOwner.get(owner);
+        Map<String, PlayerHome> ownerHomes = ensureOwnerLoaded(owner);
 
-        if (ownerHomes == null) {
+        if (ownerHomes.isEmpty()) {
             return java.util.List.of();
         }
 
@@ -203,8 +284,7 @@ public class PlayerHomeManager {
     }
 
     public int countHomes(UUID owner) {
-        Map<String, PlayerHome> ownerHomes = homesByOwner.get(owner);
-        return ownerHomes == null ? 0 : ownerHomes.size();
+        return ensureOwnerLoaded(owner).size();
     }
 
     public int getMaxHomes(ServerPlayer player) {
@@ -223,24 +303,72 @@ public class PlayerHomeManager {
         return DEFAULT_HOME_NAME;
     }
 
-    private void loadSplitHomes() throws IOException {
+    private void indexSplitHomes() throws IOException {
         for (Path file : JsonStorage.listJsonFiles(playersFolder)) {
             try {
-                HomePlayerSaveData data = JsonStorage.read(GSON, file, HomePlayerSaveData.class);
-
-                if (data == null || data.homes == null) {
-                    continue;
-                }
-
-                UUID owner = data.player == null || data.player.isBlank()
-                        ? UUID.fromString(StoragePaths.fileBaseName(file))
-                        : UUID.fromString(data.player);
-
-                loadOwnerHomes(owner, data.homes);
-            } catch (Exception e) {
+                UUID owner = UUID.fromString(StoragePaths.fileBaseName(file));
+                knownOwnerFiles.put(owner, file);
+            } catch (Exception exception) {
                 Path archived = JsonStorage.archiveBrokenFile(file);
-                SimpleServerUtilities.LOGGER.error("Failed to load player home file. Broken file archived as: {}", archived, e);
+                SimpleServerUtilities.LOGGER.error(
+                        "Invalid player home filename. Broken file archived as: {}", archived, exception);
             }
+        }
+    }
+
+    private Map<String, PlayerHome> ensureOwnerLoaded(UUID owner) {
+        if (owner == null) return Map.of();
+        if (loadedOwners.contains(owner)) {
+            markOwnerAccess(owner);
+            return homesByOwner.computeIfAbsent(owner, ignored -> new HashMap<>());
+        }
+        loadedOwners.add(owner);
+        markOwnerAccess(owner);
+        Map<String, PlayerHome> result = homesByOwner.computeIfAbsent(owner, ignored -> new HashMap<>());
+        Path file = knownOwnerFiles.get(owner);
+        if (file == null || !Files.exists(file)) {
+            trimLoadedOwnerCache();
+            return result;
+        }
+        try {
+            homeRecordStore.discoverFile(file);
+            HomePlayerSaveData data = JsonStorage.read(GSON, file, HomePlayerSaveData.class);
+            if (data != null && data.homes != null) loadOwnerHomes(owner, data.homes);
+        } catch (Exception exception) {
+            Path archived = JsonStorage.archiveBrokenFile(file);
+            knownOwnerFiles.remove(owner);
+            result.clear();
+            SimpleServerUtilities.LOGGER.error(
+                    "Failed to load player home file on demand. Broken file archived as: {}", archived, exception);
+        }
+        trimLoadedOwnerCache();
+        return homesByOwner.computeIfAbsent(owner, ignored -> new HashMap<>());
+    }
+
+    private void markOwnerAccess(UUID owner) {
+        if (owner != null) ownerAccess.put(owner, ++accessSequence);
+    }
+
+    private void trimLoadedOwnerCache() {
+        while (loadedOwners.size() > MAX_LOADED_OWNER_RECORDS) {
+            UUID oldest = null;
+            long oldestAccess = Long.MAX_VALUE;
+            for (UUID owner : loadedOwners) {
+                if (dirtyOwners.contains(owner)) continue;
+                Path file = knownOwnerFiles.getOrDefault(owner,
+                        playersFolder == null ? null : StoragePaths.jsonFile(playersFolder, owner.toString()));
+                if (file != null && (SimpleServerUtilities.STORAGE.hasPending(file)
+                        || SimpleServerUtilities.STORAGE.requiresRetry(file))) continue;
+                long accessed = ownerAccess.getOrDefault(owner, Long.MIN_VALUE);
+                if (oldest == null || accessed < oldestAccess) {
+                    oldest = owner;
+                    oldestAccess = accessed;
+                }
+            }
+            if (oldest == null) return;
+            loadedOwners.remove(oldest);
+            homesByOwner.remove(oldest);
+            ownerAccess.remove(oldest);
         }
     }
 
@@ -260,6 +388,9 @@ public class PlayerHomeManager {
                 homesByOwner
                         .computeIfAbsent(home.getOwner(), uuid -> new HashMap<>())
                         .put(normalizeName(home.getName()), home);
+                loadedOwners.add(home.getOwner());
+                markOwnerAccess(home.getOwner());
+                dirtyOwners.add(home.getOwner());
             }
         } catch (Exception e) {
             Path archived = JsonStorage.archiveBrokenFile(legacySaveFile);
@@ -268,6 +399,7 @@ public class PlayerHomeManager {
     }
 
     private void loadOwnerHomes(UUID owner, Collection<PlayerHome> homes) {
+        loadedOwners.add(owner);
         Map<String, PlayerHome> ownerHomes = homesByOwner.computeIfAbsent(owner, uuid -> new HashMap<>());
 
         for (PlayerHome home : homes) {
@@ -288,16 +420,6 @@ public class PlayerHomeManager {
         if (ownerHomes.isEmpty()) {
             homesByOwner.remove(owner);
         }
-    }
-
-    private int countAllHomes() {
-        int count = 0;
-
-        for (Map<String, PlayerHome> ownerHomes : homesByOwner.values()) {
-            count += ownerHomes.size();
-        }
-
-        return count;
     }
 
     private String getDimensionId(ServerPlayer player) {

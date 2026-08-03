@@ -11,6 +11,7 @@ import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.SsuMenuActionPayload;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -35,6 +36,7 @@ public final class ClaimMapScreen extends Screen {
 
     private ClaimMapDataPayload payload;
     private ClaimMapOperation operation;
+    private final Screen parent;
     private final Set<Long> selectedChunks = new LinkedHashSet<>();
     private ClaimMapWidget mapWidget;
     private ClaimTerrainMap terrainMap = new ClaimTerrainMap();
@@ -44,6 +46,7 @@ public final class ClaimMapScreen extends Screen {
     private Button clearButton;
     private String draftClaimName = "";
     private String pendingDeleteClaim = "";
+    private String pendingCenteredClaim = "";
     private long nextSettingsRequestId = 1L;
     private int mapSize = 384;
     private int mapLeft;
@@ -51,14 +54,32 @@ public final class ClaimMapScreen extends Screen {
     private int controlLeft;
     private int shellLeft;
 
-    public ClaimMapScreen(ClaimMapDataPayload payload) {
+    public ClaimMapScreen(ClaimMapDataPayload payload, Screen parent) {
         super(Component.literal("Interactive Claim Map"));
         this.payload = payload;
+        this.parent = parent;
         this.operation = payload.selectedClaimGroup().isBlank() ? ClaimMapOperation.CREATE : ClaimMapOperation.ADD;
     }
 
+    public boolean openHomesForClaim(String claimName) {
+        if (parent instanceof SsuDashboardScreen dashboard) {
+            dashboard.openHomesForClaim(claimName);
+            minecraft.setScreenAndShow(dashboard);
+            return true;
+        }
+        SsuDashboardScreen.queueHomesForClaim(claimName);
+        ClientPacketDistributor.sendToServer(new SsuMenuActionPayload(
+                "refresh_shell", "", "", "", nextSettingsRequestId++));
+        return true;
+    }
+
     public void acceptSnapshot(ClaimMapDataPayload updated) {
-        if (updated.centerChunkX() != payload.centerChunkX()
+        if (!pendingCenteredClaim.isBlank()) {
+            if (!updated.selectedClaimGroup().equalsIgnoreCase(pendingCenteredClaim)) {
+                return;
+            }
+            pendingCenteredClaim = "";
+        } else if (updated.centerChunkX() != payload.centerChunkX()
                 || updated.centerChunkZ() != payload.centerChunkZ()
                 || updated.radius() != payload.radius()) {
             return;
@@ -218,7 +239,10 @@ public final class ClaimMapScreen extends Screen {
         } else {
             bottom = "Left-click: select   •   Middle-drag: pan   •   Wheel: zoom";
         }
-        graphics.centeredText(font, bottom, mapLeft + mapSize / 2, height - MARGIN - 17,
+        int bottomX = shellLeft + 16;
+        int bottomWidth = Math.max(40, controlLeft + CONTROL_WIDTH - bottomX - 10);
+        String visibleBottom = font.plainSubstrByWidth(bottom, bottomWidth);
+        graphics.text(font, visibleBottom, bottomX, height - MARGIN - 17,
                 payload.error() ? 0xFFFF6B6B : 0xFFCED7E2);
     }
 
@@ -248,7 +272,7 @@ public final class ClaimMapScreen extends Screen {
         int next = Math.floorMod((current < 0 ? 0 : current) + direction, claims.size());
         operation = ClaimMapOperation.ADD;
         pendingDeleteClaim = "";
-        requestMap(payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), claims.get(next));
+        requestMap(payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), claims.get(next), true);
     }
 
     private void pan(int dx, int dz) {
@@ -272,12 +296,17 @@ public final class ClaimMapScreen extends Screen {
     }
 
     private void requestMap(int centerX, int centerZ, int radius, String selectedClaim) {
+        requestMap(centerX, centerZ, radius, selectedClaim, false);
+    }
+
+    private void requestMap(int centerX, int centerZ, int radius, String selectedClaim, boolean centerOnSelectedClaim) {
         selectedChunks.clear();
+        pendingCenteredClaim = centerOnSelectedClaim ? selectedClaim : "";
 
         /*
-         * Move the viewport immediately. Existing terrain and claim entries are
-         * kept as geographically anchored preview data until the authoritative
-         * server snapshot for the new view arrives.
+         * Move ordinary pan/zoom requests immediately. When cycling claims the
+         * server determines the claim's center, while the selected claim label
+         * is still updated immediately for responsive navigation.
          */
         payload = new ClaimMapDataPayload(
                 centerX,
@@ -301,7 +330,8 @@ public final class ClaimMapScreen extends Screen {
                 payload.chunks()
         );
         rebuildWidgets();
-        ClientPacketDistributor.sendToServer(new ClaimMapRequestPayload(centerX, centerZ, radius, selectedClaim));
+        ClientPacketDistributor.sendToServer(new ClaimMapRequestPayload(
+                centerX, centerZ, radius, selectedClaim, centerOnSelectedClaim));
     }
 
     private void applySelection() {

@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.utilitymining.MiningActivationMode
 /** Persistent player-side UI choices, validated by the server. */
 public final class PlayerUiPreferences {
 
-    public static final int CURRENT_SCHEMA = 7;
+    public static final int CURRENT_SCHEMA = 8;
 
     private int schema = CURRENT_SCHEMA;
     private String uuid = "";
@@ -24,6 +24,7 @@ public final class PlayerUiPreferences {
     private boolean worldMapShowRegions = true;
     private boolean worldMapShowMarkers = true;
     private boolean minimapShowMarkers = true;
+    private boolean minimapShowCalendar;
     private boolean worldMarkersVisible = true;
     private boolean markerBeamsVisible = true;
     private int markerBeamDistance = 128;
@@ -82,6 +83,10 @@ public final class PlayerUiPreferences {
         if (previousSchema < 7) {
             // Keep live terrain refresh local and conservative by default.
             mapLiveUpdateRadiusChunks = 8;
+        }
+        if (previousSchema < 8) {
+            // The day/time HUD line is optional and remains off for existing players.
+            minimapShowCalendar = false;
         }
         schema = CURRENT_SCHEMA;
         minimapSize = Math.max(64, Math.min(256, minimapSize));
@@ -214,6 +219,14 @@ public final class PlayerUiPreferences {
 
     public void setMinimapShowMarkers(boolean value) {
         minimapShowMarkers = value;
+    }
+
+    public boolean isMinimapShowCalendar() {
+        return minimapShowCalendar;
+    }
+
+    public void setMinimapShowCalendar(boolean value) {
+        minimapShowCalendar = value;
     }
 
     public boolean isWorldMarkersVisible() {

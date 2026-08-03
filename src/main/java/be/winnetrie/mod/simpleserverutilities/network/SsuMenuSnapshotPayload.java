@@ -20,6 +20,7 @@ public record SsuMenuSnapshotPayload(
         ModuleSettingsSummary moduleSettings,
         AdminAccessSummary adminAccess,
         boolean claimBordersVisible,
+        boolean showOtherClaims,
         boolean regionBordersVisible,
         boolean canViewClaimBorders,
         boolean canViewRegionBorders,
@@ -71,6 +72,7 @@ public record SsuMenuSnapshotPayload(
         writeModuleSettings(buffer, payload.moduleSettings);
         writeAdminAccess(buffer, payload.adminAccess);
         buffer.writeBoolean(payload.claimBordersVisible);
+        buffer.writeBoolean(payload.showOtherClaims);
         buffer.writeBoolean(payload.regionBordersVisible);
         buffer.writeBoolean(payload.canViewClaimBorders);
         buffer.writeBoolean(payload.canViewRegionBorders);
@@ -100,6 +102,7 @@ public record SsuMenuSnapshotPayload(
                 buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
+                buffer.readBoolean(),
                 buffer.readVarInt(),
                 buffer.readVarInt(),
                 readCore(buffer),
@@ -125,6 +128,12 @@ public record SsuMenuSnapshotPayload(
         buffer.writeBoolean(settings.statistics());
         buffer.writeBoolean(settings.mail());
         buffer.writeBoolean(settings.auctionHouse());
+        buffer.writeBoolean(settings.npcs());
+        buffer.writeBoolean(settings.quests());
+        buffer.writeBoolean(settings.minigames());
+        buffer.writeBoolean(settings.dungeons());
+        buffer.writeUtf(settings.questAccessMode(), 16);
+        buffer.writeUtf(settings.effectiveQuestAccessMode(), 16);
         buffer.writeBoolean(settings.permissions());
         buffer.writeBoolean(settings.remoteHologramImages());
         buffer.writeVarInt(settings.hologramRenderDistance());
@@ -137,7 +146,9 @@ public record SsuMenuSnapshotPayload(
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
-                buffer.readBoolean(), buffer.readBoolean(), buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt()
+                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
+                buffer.readUtf(16), buffer.readUtf(16), buffer.readBoolean(), buffer.readBoolean(),
+                buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt()
         );
     }
 
@@ -165,6 +176,7 @@ public record SsuMenuSnapshotPayload(
         buffer.writeBoolean(settings.worldMapShowRegions());
         buffer.writeBoolean(settings.worldMapShowMarkers());
         buffer.writeBoolean(settings.minimapShowMarkers());
+        buffer.writeBoolean(settings.minimapShowCalendar());
         buffer.writeBoolean(settings.worldMarkersVisible());
         buffer.writeBoolean(settings.markerBeamsVisible());
         buffer.writeVarInt(settings.markerBeamDistance());
@@ -192,6 +204,7 @@ public record SsuMenuSnapshotPayload(
                 buffer.readVarInt(),
                 buffer.readUtf(16),
                 buffer.readUtf(16),
+                buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
@@ -233,6 +246,7 @@ public record SsuMenuSnapshotPayload(
         buffer.writeVarInt(core.regionCount());
         buffer.writeVarInt(core.activeRentalCount());
         buffer.writeVarInt(core.homeCount());
+        buffer.writeVarInt(core.maxHomes());
         buffer.writeVarInt(core.warpCount());
     }
 
@@ -243,6 +257,7 @@ public record SsuMenuSnapshotPayload(
                 buffer.readVarInt(),
                 buffer.readVarLong(),
                 buffer.readDouble(),
+                buffer.readVarInt(),
                 buffer.readVarInt(),
                 buffer.readVarInt(),
                 buffer.readVarInt(),
@@ -265,6 +280,7 @@ public record SsuMenuSnapshotPayload(
         buffer.writeVarInt(economy.playerCancelRefundPercent());
         buffer.writeVarInt(economy.adminCancelRefundPercent());
         buffer.writeVarInt(economy.pendingRentOperations());
+        buffer.writeVarInt(economy.transactionHistoryLimit());
         buffer.writeVarInt(economy.recentTransactions().size());
         for (TransactionSummary transaction : economy.recentTransactions()) {
             buffer.writeUtf(transaction.type(), 64);
@@ -287,6 +303,7 @@ public record SsuMenuSnapshotPayload(
         int playerCancelRefundPercent = buffer.readVarInt();
         int adminCancelRefundPercent = buffer.readVarInt();
         int pendingRentOperations = buffer.readVarInt();
+        int transactionHistoryLimit = buffer.readVarInt();
         int transactionCount = readBoundedSize(buffer, 20, "economy transactions");
         List<TransactionSummary> transactions = new ArrayList<>(transactionCount);
         for (int i = 0; i < transactionCount; i++) {
@@ -310,6 +327,7 @@ public record SsuMenuSnapshotPayload(
                 playerCancelRefundPercent,
                 adminCancelRefundPercent,
                 pendingRentOperations,
+                transactionHistoryLimit,
                 transactions
         );
     }
@@ -434,6 +452,12 @@ public record SsuMenuSnapshotPayload(
             boolean statistics,
             boolean mail,
             boolean auctionHouse,
+            boolean npcs,
+            boolean quests,
+            boolean minigames,
+            boolean dungeons,
+            String questAccessMode,
+            String effectiveQuestAccessMode,
             boolean permissions,
             boolean remoteHologramImages,
             int hologramRenderDistance,
@@ -441,6 +465,8 @@ public record SsuMenuSnapshotPayload(
             int regionBorderRenderDistance
     ) {
         public ModuleSettingsSummary {
+            questAccessMode = questAccessMode == null ? "menu" : questAccessMode;
+            effectiveQuestAccessMode = effectiveQuestAccessMode == null ? "menu" : effectiveQuestAccessMode;
             hologramRenderDistance = Math.max(8, Math.min(512, hologramRenderDistance));
             claimBorderRenderDistance = Math.max(16, Math.min(512, claimBorderRenderDistance));
             regionBorderRenderDistance = Math.max(16, Math.min(512, regionBorderRenderDistance));
@@ -448,7 +474,7 @@ public record SsuMenuSnapshotPayload(
 
         public static ModuleSettingsSummary defaults() {
             return new ModuleSettingsSummary(true, true, true, true, true, true, true, true, true, true,
-                    true, true, true, true, 64, 128, 128);
+                    true, true, false, false, false, false, "menu", "menu", true, true, 64, 128, 128);
         }
     }
 
@@ -471,6 +497,7 @@ public record SsuMenuSnapshotPayload(
             boolean worldMapShowRegions,
             boolean worldMapShowMarkers,
             boolean minimapShowMarkers,
+            boolean minimapShowCalendar,
             boolean worldMarkersVisible,
             boolean markerBeamsVisible,
             int markerBeamDistance,
@@ -506,7 +533,7 @@ public record SsuMenuSnapshotPayload(
             return new UiSettingsSummary(
                     true, false, 96, "CIRCLE", "TOP_RIGHT",
                     true, true, true, true, true,
-                    true, true, true, true, 128,
+                    true, true, false, true, true, 128,
                     8,
                     true, false, false,
                     false, false, false,
@@ -529,6 +556,7 @@ public record SsuMenuSnapshotPayload(
             int regionCount,
             int activeRentalCount,
             int homeCount,
+            int maxHomes,
             int warpCount
     ) {
         public CoreSummary {
@@ -544,11 +572,12 @@ public record SsuMenuSnapshotPayload(
             regionCount = Math.max(0, regionCount);
             activeRentalCount = Math.max(0, activeRentalCount);
             homeCount = Math.max(0, homeCount);
+            maxHomes = Math.max(0, maxHomes);
             warpCount = Math.max(0, warpCount);
         }
 
         public static CoreSummary empty() {
-            return new CoreSummary(0L, 0, 0, 0L, 0.0D, 0, 0, 0, 0, 0, 0, 0, 0);
+            return new CoreSummary(0L, 0, 0, 0L, 0.0D, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         }
     }
 
@@ -563,6 +592,7 @@ public record SsuMenuSnapshotPayload(
             int playerCancelRefundPercent,
             int adminCancelRefundPercent,
             int pendingRentOperations,
+            int transactionHistoryLimit,
             List<TransactionSummary> recentTransactions
     ) {
         public EconomySummary {
@@ -573,6 +603,7 @@ public record SsuMenuSnapshotPayload(
             playerCancelRefundPercent = Math.max(0, Math.min(100, playerCancelRefundPercent));
             adminCancelRefundPercent = Math.max(0, Math.min(100, adminCancelRefundPercent));
             pendingRentOperations = Math.max(0, pendingRentOperations);
+            transactionHistoryLimit = Math.max(1, Math.min(1_000, transactionHistoryLimit));
             recentTransactions = recentTransactions == null ? List.of() : List.copyOf(recentTransactions);
             if (recentTransactions.size() > 20) {
                 throw new IllegalArgumentException("Too many economy transactions in SSU menu snapshot.");
@@ -581,7 +612,7 @@ public record SsuMenuSnapshotPayload(
 
         public static EconomySummary empty() {
             return new EconomySummary(false, "", 0L, false, false,
-                    0, "", 0, 100, 0, List.of());
+                    0, "", 0, 100, 0, 50, List.of());
         }
     }
 

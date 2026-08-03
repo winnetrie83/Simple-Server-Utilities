@@ -1,0 +1,11 @@
+SSU 1.8.0-dev17.3 validation
+
+- mod version: 1.8.0-dev17.3
+- network protocol: 64
+- storage/schema versions: unchanged
+- data pack format: 107.1
+- generated dimension-type JSON contains current fields: attributes, skybox/cardinal_light where applicable, has_fixed_time, default_clock/timelines where applicable
+- removed legacy generated fields: effects, fixed_time, piglin_safe, natural, ultrawarm, bed_works, respawn_anchor_works, has_raids
+- source parse reached symbol resolution without Java syntax errors
+- resource JSON parse check: passed (14 JSON files)
+- zip integrity: passed after packaging

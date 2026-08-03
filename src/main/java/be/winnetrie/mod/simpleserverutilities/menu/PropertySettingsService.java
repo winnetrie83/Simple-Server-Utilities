@@ -2,19 +2,19 @@ package be.winnetrie.mod.simpleserverutilities.menu;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimSettings;
+import be.winnetrie.mod.simpleserverutilities.home.ClaimHomeSupport;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.economy.MoneyFormat;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.ClaimPolicy;
+import be.winnetrie.mod.simpleserverutilities.permission.policy.HomePolicy;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.RegionPolicy;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
 import be.winnetrie.mod.simpleserverutilities.region.RegionRentData;
@@ -79,11 +79,13 @@ public final class PropertySettingsService {
         entries.add(editable(bool("allow_ownerless_projectiles", "Ownerless projectiles", s.isAllowOwnerlessProjectiles(), false, "Allows projectiles without a known owner to affect the claim."), canEditFlags));
         entries.add(editable(bool("allow_fire_spread", "Allow fire spread", s.isAllowFireSpread(), false, "Allows fire to spread and burn blocks inside this claim."), canEditFlags));
         entries.add(editable(text("welcome_message", "Welcome message", claim.getWelcomeMessage(), "", "Message shown when a player enters the claim."), owner));
-        entries.add(readonly("trusted_players", "Trusted players", displayNames(player, claim.getTrustedPlayers()), "Players with trusted access to this claim."));
-        entries.add(editable(playerAction("trust_player", "Trust player", trustOptions(player, claim),
-                "Choose an online or previously known player to grant trusted access."), canTrust));
-        entries.add(editable(playerAction("untrust_player", "Untrust player", untrustOptions(player, claim),
-                "Choose one of this claim's trusted players to remove their access."), canTrust));
+        entries.add(editable(navigate("trusted_players", "Trusted players (" + claim.getTrustedPlayers().size() + ")", "Manage",
+                "Open the dedicated trusted-player manager for this claim."), canTrust));
+        int homesInClaim = ClaimHomeSupport.homesInClaim(player.getUUID(), claim).size();
+        int maxHomes = HomePolicy.getMaxHomes(player);
+        entries.add(editable(navigate("homes", "Homes", "Manage",
+                "Manage " + homesInClaim + " home(s) linked to this claim. Your total home limit is " + maxHomes + "."),
+                owner && HomePolicy.canUseHomes(player)));
         return new SsuPropertySettingsDataPayload("claim", claim.getDisplayName(), "Claim settings — " + claim.getDisplayName(),
                 id, owner, notice, error, List.copyOf(entries));
     }
@@ -144,20 +146,6 @@ public final class PropertySettingsService {
             case "allow_ownerless_projectiles" -> { requireClaimFlags(player); s.setAllowOwnerlessProjectiles(parseBoolean(value)); }
             case "allow_fire_spread" -> { requireClaimFlags(player); s.setAllowFireSpread(parseBoolean(value)); }
             case "welcome_message" -> claim.setWelcomeMessage(value);
-            case "trust_player" -> {
-                requireClaimTrust(player);
-                UUID target = resolvePlayerId(player, value);
-                if (target.equals(claim.getOwner())) throw new IllegalArgumentException("The claim owner already has access.");
-                if (claim.isTrusted(target)) throw new IllegalArgumentException("That player is already trusted.");
-                if (!knownPlayerNames(player).containsKey(target)) throw new IllegalArgumentException("That player is no longer available.");
-                claim.trust(target);
-            }
-            case "untrust_player" -> {
-                requireClaimTrust(player);
-                UUID target = resolvePlayerId(player, value);
-                if (!claim.isTrusted(target)) throw new IllegalArgumentException("That player is not trusted in this claim.");
-                claim.untrust(target);
-            }
             default -> throw new IllegalArgumentException("Unknown claim setting.");
         }
         SimpleServerUtilities.PLAYER_CLAIMS.save();
@@ -211,9 +199,6 @@ public final class PropertySettingsService {
     private static void requireClaimFlags(ServerPlayer player) {
         if (!ClaimPolicy.canEditFlags(player)) throw new IllegalArgumentException("You cannot edit claim protection flags.");
     }
-    private static void requireClaimTrust(ServerPlayer player) {
-        if (!ClaimPolicy.canTrust(player)) throw new IllegalArgumentException("You cannot manage trusted claim players.");
-    }
     private static void requireRegionEdit(boolean allowed) {
         if (!allowed) throw new IllegalArgumentException("Region settings administration denied.");
     }
@@ -232,58 +217,19 @@ public final class PropertySettingsService {
         ServerPlayer online = actor.level().getServer().getPlayerList().getPlayerByName(name);
         if (online != null) return online.getUUID();
         UUID known = SimpleServerUtilities.PERMISSIONS.findKnownPlayerId(name);
-        if (known != null) return known;
-        return SimpleServerUtilities.ECONOMY.findAccountByName(actor.level().getServer(), name)
+        if (known != null && !SimpleServerUtilities.ECONOMY.isSystemAccount(known)) return known;
+        return SimpleServerUtilities.ECONOMY.findPlayerAccountByName(actor.level().getServer(), name)
                 .map(account -> account.getPlayerId())
                 .orElseThrow(() -> new IllegalArgumentException("Player not found: " + name));
     }
 
-    private static List<SsuPropertySettingsDataPayload.Option> trustOptions(ServerPlayer viewer, PlayerClaim claim) {
-        return knownPlayerNames(viewer).entrySet().stream()
-                .filter(entry -> !entry.getKey().equals(claim.getOwner()))
-                .filter(entry -> !claim.isTrusted(entry.getKey()))
-                .sorted(Map.Entry.comparingByValue(String.CASE_INSENSITIVE_ORDER))
-                .limit(100)
-                .map(entry -> new SsuPropertySettingsDataPayload.Option(entry.getKey().toString(), entry.getValue()))
-                .toList();
-    }
-
-    private static List<SsuPropertySettingsDataPayload.Option> untrustOptions(ServerPlayer viewer, PlayerClaim claim) {
-        Map<UUID, String> known = knownPlayerNames(viewer);
-        return claim.getTrustedPlayers().stream()
-                .map(playerId -> Map.entry(playerId, known.getOrDefault(playerId, displayName(viewer, playerId))))
-                .sorted(Map.Entry.comparingByValue(String.CASE_INSENSITIVE_ORDER))
-                .limit(100)
-                .map(entry -> new SsuPropertySettingsDataPayload.Option(entry.getKey().toString(), entry.getValue()))
-                .toList();
-    }
-
-    private static Map<UUID, String> knownPlayerNames(ServerPlayer viewer) {
-        Map<UUID, String> known = new LinkedHashMap<>();
-        for (var entry : SimpleServerUtilities.PERMISSIONS.getKnownPlayers()) {
-            String name = entry.name() == null || entry.name().isBlank()
-                    ? entry.playerId().toString().substring(0, 8)
-                    : entry.name();
-            known.put(entry.playerId(), name);
-        }
-        for (var account : SimpleServerUtilities.ECONOMY.accounts()) {
-            String name = account.getLastKnownName().isBlank()
-                    ? account.getPlayerId().toString().substring(0, 8)
-                    : account.getLastKnownName();
-            known.putIfAbsent(account.getPlayerId(), name);
-        }
-        for (ServerPlayer online : viewer.level().getServer().getPlayerList().getPlayers()) {
-            known.put(online.getUUID(), online.getName().getString());
-        }
-        return known;
-    }
 
     private static String displayName(ServerPlayer viewer, UUID playerId) {
         ServerPlayer online = viewer.level().getServer().getPlayerList().getPlayer(playerId);
         if (online != null) return online.getName().getString();
         var data = SimpleServerUtilities.PERMISSIONS.getPlayerData(playerId);
         if (data != null && !data.getLastKnownName().isBlank()) return data.getLastKnownName();
-        return SimpleServerUtilities.ECONOMY.findAccount(playerId)
+        return SimpleServerUtilities.ECONOMY.findPlayerAccount(playerId)
                 .map(account -> account.getLastKnownName().isBlank()
                         ? playerId.toString().substring(0, 8)
                         : account.getLastKnownName())
@@ -299,6 +245,7 @@ public final class PropertySettingsService {
         if (ids.size() > names.size()) names.add("+" + (ids.size() - names.size()) + " more");
         return String.join(", ", names);
     }
+
     private static boolean parseBoolean(String value) {
         if ("true".equalsIgnoreCase(value)) return true; if ("false".equalsIgnoreCase(value)) return false;
         throw new IllegalArgumentException("Boolean values must be true or false.");
@@ -324,15 +271,6 @@ public final class PropertySettingsService {
     }
     private static SsuPropertySettingsDataPayload.Entry navigate(String key,String label,String value,String description) {
         return new SsuPropertySettingsDataPayload.Entry(key,label,value,"navigate",description,"",0,0,true,List.of());
-    }
-    private static SsuPropertySettingsDataPayload.Entry playerAction(
-            String key,
-            String label,
-            List<SsuPropertySettingsDataPayload.Option> options,
-            String description
-    ) {
-        return new SsuPropertySettingsDataPayload.Entry(
-                key, label, "", "player_action", description, "", 0, 0, true, options);
     }
     private static SsuPropertySettingsDataPayload.Entry editable(SsuPropertySettingsDataPayload.Entry e,boolean editable) {
         return new SsuPropertySettingsDataPayload.Entry(e.key(),e.label(),e.value(),e.type(),e.description(),e.defaultValue(),e.minimum(),e.maximum(),editable,e.options());

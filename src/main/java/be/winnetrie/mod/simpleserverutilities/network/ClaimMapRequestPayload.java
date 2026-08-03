@@ -10,7 +10,8 @@ public record ClaimMapRequestPayload(
         int centerChunkX,
         int centerChunkZ,
         int radius,
-        String selectedClaimGroup
+        String selectedClaimGroup,
+        boolean centerOnSelectedClaim
 ) implements CustomPacketPayload {
 
     public static final Type<ClaimMapRequestPayload> TYPE = new Type<>(
@@ -30,6 +31,7 @@ public record ClaimMapRequestPayload(
         buffer.writeVarInt(payload.centerChunkZ);
         buffer.writeVarInt(payload.radius);
         buffer.writeUtf(payload.selectedClaimGroup, 64);
+        buffer.writeBoolean(payload.centerOnSelectedClaim);
     }
 
     private static ClaimMapRequestPayload decode(RegistryFriendlyByteBuf buffer) {
@@ -37,7 +39,8 @@ public record ClaimMapRequestPayload(
                 buffer.readVarInt(),
                 buffer.readVarInt(),
                 buffer.readVarInt(),
-                buffer.readUtf(64)
+                buffer.readUtf(64),
+                buffer.readBoolean()
         );
     }
 

@@ -1,0 +1,6 @@
+package be.winnetrie.mod.simpleserverutilities.network;
+import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;import net.minecraft.network.RegistryFriendlyByteBuf;import net.minecraft.network.codec.StreamCodec;import net.minecraft.network.protocol.common.custom.CustomPacketPayload;import net.minecraft.resources.Identifier;
+public record QuestEditorOpenPayload(String originalQuestId,String questJson,long requestId) implements CustomPacketPayload{
+ public static final Type<QuestEditorOpenPayload> TYPE=new Type<>(Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID,"quest_editor_open"));
+ public static final StreamCodec<RegistryFriendlyByteBuf,QuestEditorOpenPayload> STREAM_CODEC=StreamCodec.of(QuestEditorOpenPayload::encode,QuestEditorOpenPayload::decode);
+ public QuestEditorOpenPayload{originalQuestId=PayloadBounds.string(originalQuestId,64);questJson=PayloadBounds.string(questJson,65_535);requestId=Math.max(0L,requestId);}private static void encode(RegistryFriendlyByteBuf b,QuestEditorOpenPayload p){b.writeUtf(p.originalQuestId,64);b.writeUtf(p.questJson,65_535);b.writeVarLong(p.requestId);}private static QuestEditorOpenPayload decode(RegistryFriendlyByteBuf b){return new QuestEditorOpenPayload(b.readUtf(64),b.readUtf(65_535),b.readVarLong());}@Override public Type<? extends CustomPacketPayload> type(){return TYPE;}}

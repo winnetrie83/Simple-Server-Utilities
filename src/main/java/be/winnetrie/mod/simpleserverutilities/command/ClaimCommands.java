@@ -110,6 +110,8 @@ public class ClaimCommands {
                         .executes(context -> hideClaimBoundary(context.getSource())))
 
                 .then(Commands.literal("tp")
+                        .requires(source -> source.getEntity() instanceof ServerPlayer player
+                                && ClaimPolicy.hasAdminBypass(player))
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(context -> teleportToOwnClaim(
                                         context.getSource(),
@@ -778,7 +780,7 @@ public class ClaimCommands {
         source.sendSystemMessage(Component.literal(" - /claims gui [name]"));
         source.sendSystemMessage(Component.literal(" - /claims show <name>"));
         source.sendSystemMessage(Component.literal(" - /claims hide"));
-        source.sendSystemMessage(Component.literal(" - /claims tp <name>"));
+        source.sendSystemMessage(Component.literal(" - /claims tp <name> (admin only)"));
 
         source.sendSystemMessage(Component.literal("Admin commands:"));
         source.sendSystemMessage(Component.literal(" - /claims admin list <player>"));
@@ -866,16 +868,18 @@ public class ClaimCommands {
         }
 
         SimpleServerUtilities.BORDER_VISUALIZATIONS.showClaim(player, claim);
-        player.sendSystemMessage(Component.literal(
-                "Showing border for claim '" + claim.getDisplayName() + "'. Use /claims hide to stop."
-        ));
+        boolean enabled = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID()).isClaimBordersVisible();
+        player.sendSystemMessage(Component.literal(enabled
+                ? "Showing border for claim '" + claim.getDisplayName() + "'. Use /claims hide to clear selected claim borders."
+                : "Selected border for claim '" + claim.getDisplayName()
+                        + "'. Enable claim borders in personal settings to render it."));
         return 1;
     }
 
     private static int hideClaimBoundary(CommandSourceStack source) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
         SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player);
-        player.sendSystemMessage(Component.literal("Claim boundary visualization hidden."));
+        player.sendSystemMessage(Component.literal("All individually selected claim borders are hidden."));
         return 1;
     }
 

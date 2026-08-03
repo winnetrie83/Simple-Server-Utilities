@@ -1,7 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.mail;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -13,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.google.gson.Gson;
@@ -23,6 +23,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyAccount;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyResult;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyTransactionType;
+import be.winnetrie.mod.simpleserverutilities.economy.EconomySystemAccounts;
 import be.winnetrie.mod.simpleserverutilities.economy.MoneyFormat;
 import be.winnetrie.mod.simpleserverutilities.network.MailActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailComposeResultPayload;
@@ -54,11 +55,16 @@ public final class MailManager {
     public static final int DEFAULT_SOFT_CAP = 20;
     public static final int DEFAULT_PAGE_SIZE = 6;
     private static final long DAY_MILLIS = Duration.ofDays(1).toMillis();
-    private static final UUID ESCROW_ACCOUNT_ID = UUID.nameUUIDFromBytes(
-            "simpleserverutilities:mail_escrow".getBytes(StandardCharsets.UTF_8));
+    private static final UUID ESCROW_ACCOUNT_ID = EconomySystemAccounts.MAIL_ESCROW;
 
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    private static final int MAX_LOADED_MAILBOXES = 256;
+    private static final int MAINTENANCE_BATCH_SIZE = 8;
+
     private final Map<UUID, MailboxData> mailboxes = new HashMap<>();
+    private final Map<UUID, Path> knownMailboxFiles = new HashMap<>();
+    private final Map<UUID, Long> mailboxAccess = new HashMap<>();
+    private long accessSequence;
     private MinecraftServer server;
     private Path mailboxFolder;
     private int maintenanceCursor;
@@ -71,22 +77,25 @@ public final class MailManager {
         this.server = server;
         this.mailboxFolder = StoragePaths.mailboxes(StoragePaths.root(server));
         mailboxes.clear();
+        knownMailboxFiles.clear();
+        mailboxAccess.clear();
+        accessSequence = 0L;
         maintenanceCursor = 0;
         SimpleServerUtilities.ECONOMY.ensureSystemAccount(ESCROW_ACCOUNT_ID, "SSU Mail Escrow");
         try {
             Files.createDirectories(mailboxFolder);
             for (Path file : JsonStorage.listJsonFiles(mailboxFolder)) {
-                try {
-                    MailboxData data = JsonStorage.read(gson, file, MailboxData.class);
-                    UUID fallback = parseUuid(StoragePaths.fileBaseName(file));
-                    if (data == null || (data.getPlayerId() == null && fallback == null)) continue;
-                    data.normalize(fallback);
-                    mailboxes.put(data.getPlayerId(), data);
-                } catch (Exception e) {
-                    JsonStorage.archiveBrokenFile(file);
-                    SimpleServerUtilities.LOGGER.error("Failed to load mailbox {}.", file, e);
+                UUID playerId = parseUuid(StoragePaths.fileBaseName(file));
+                if (playerId == null) {
+                    Path archived = JsonStorage.archiveBrokenFile(file);
+                    SimpleServerUtilities.LOGGER.error(
+                            "Invalid mailbox filename. Archived as {}.", archived);
+                    continue;
                 }
+                knownMailboxFiles.put(playerId, file);
             }
+            SimpleServerUtilities.LOGGER.info(
+                    "Indexed {} SSU mailbox record(s); mailboxes load on demand.", knownMailboxFiles.size());
         } catch (IOException e) {
             SimpleServerUtilities.LOGGER.error("Failed to initialize SSU mail storage.", e);
         }
@@ -96,7 +105,9 @@ public final class MailManager {
         if (mailboxFolder == null) return;
         for (MailboxData mailbox : mailboxes.values()) {
             try {
-                JsonStorage.write(gson, file(mailbox.getPlayerId()), mailbox);
+                Path target = file(mailbox.getPlayerId());
+                JsonStorage.write(gson, target, mailbox);
+                knownMailboxFiles.put(mailbox.getPlayerId(), target);
             } catch (IOException e) {
                 SimpleServerUtilities.LOGGER.error("Failed to save mailbox {}.", mailbox.getPlayerId(), e);
             }
@@ -105,26 +116,37 @@ public final class MailManager {
 
     public synchronized void clear() {
         mailboxes.clear();
+        knownMailboxFiles.clear();
+        mailboxAccess.clear();
+        accessSequence = 0L;
         server = null;
         mailboxFolder = null;
         maintenanceCursor = 0;
     }
 
-    /** Performs bounded periodic retention and queue promotion for offline mailboxes. */
+    /** Performs bounded periodic retention and queue promotion without loading every mailbox at startup. */
     public synchronized void maintenanceTick() {
-        if (mailboxes.isEmpty() || mailboxFolder == null) return;
-        List<UUID> ids = mailboxes.keySet().stream().sorted().toList();
-        int count = Math.min(64, ids.size());
+        if (mailboxFolder == null) return;
+        Set<UUID> allIds = new java.util.TreeSet<>();
+        allIds.addAll(knownMailboxFiles.keySet());
+        allIds.addAll(mailboxes.keySet());
+        if (allIds.isEmpty()) return;
+        List<UUID> ids = List.copyOf(allIds);
+        int count = Math.min(MAINTENANCE_BATCH_SIZE, ids.size());
         int start = Math.floorMod(maintenanceCursor, ids.size());
         long now = System.currentTimeMillis();
         for (int offset = 0; offset < count; offset++) {
             UUID id = ids.get((start + offset) % ids.size());
-            MailboxData box = mailboxes.get(id);
-            if (box == null) continue;
-            // Offline maintenance uses the last permission-derived cap observed for this mailbox.
-            if (cleanupAndReconcile(box, box.getLastKnownInboxSoftCap(), box.getLastKnownSentLimit(), now)) queueSave(box);
+            MailboxData box = mailbox(id, "");
+            if (cleanupAndReconcile(box, box.getLastKnownInboxSoftCap(), box.getLastKnownSentLimit(), now)) {
+                queueSave(box);
+            }
+            if (server == null || server.getPlayerList().getPlayer(id) == null) {
+                evictMailbox(id);
+            }
         }
         maintenanceCursor = (start + count) % ids.size();
+        trimMailboxCache();
     }
 
     public synchronized void ensurePlayer(ServerPlayer player) {
@@ -132,10 +154,12 @@ public final class MailManager {
         MailboxData box = mailbox(player.getUUID(), player.getName().getString());
         int cap = inboxSoftCap(player);
         int sentLimit = sentLimit(player);
+        boolean metadataChanged = cap != box.getLastKnownInboxSoftCap()
+                || sentLimit != box.getLastKnownSentLimit();
         box.updateInboxSoftCap(cap);
         box.updateSentLimit(sentLimit);
         boolean changed = cleanupAndReconcile(box, cap, sentLimit, System.currentTimeMillis());
-        if (changed) queueSave(box);
+        if (changed || metadataChanged) queueSave(box);
         if (PermissionService.getBoolean(player, PermissionKeys.MAIL_ACCESS, true)) {
             int queued = queuedCount(box);
             int unread = unreadCount(box);
@@ -580,10 +604,12 @@ public final class MailManager {
         MailboxData box = mailbox(player.getUUID(), player.getName().getString());
         int cap = inboxSoftCap(player);
         int sentLimit = sentLimit(player);
+        boolean metadataChanged = cap != box.getLastKnownInboxSoftCap()
+                || sentLimit != box.getLastKnownSentLimit();
         box.updateInboxSoftCap(cap);
         box.updateSentLimit(sentLimit);
         boolean changed = cleanupAndReconcile(box, cap, sentLimit, System.currentTimeMillis());
-        if (changed) queueSave(box);
+        if (changed || metadataChanged) queueSave(box);
 
         boolean sentMode = "sent".equalsIgnoreCase(mode);
         List<MailDataPayload.Entry> all = sentMode ? sentEntries(box) : inboxEntries(box);
@@ -664,11 +690,14 @@ public final class MailManager {
         String query = rawQuery == null ? "" : rawQuery.trim().toLowerCase(Locale.ROOT);
         Map<String, String> names = new LinkedHashMap<>();
         SimpleServerUtilities.PERMISSIONS.getKnownPlayers().stream()
+                .filter(value -> !SimpleServerUtilities.ECONOMY.isSystemAccount(value.playerId()))
                 .map(value -> value.name())
                 .filter(name -> name != null && !name.isBlank())
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .forEach(name -> names.putIfAbsent(name.toLowerCase(Locale.ROOT), name));
-        mailboxes.values().stream().map(MailboxData::getLastKnownName)
+        mailboxes.values().stream()
+                .filter(box -> !SimpleServerUtilities.ECONOMY.isSystemAccount(box.getPlayerId()))
+                .map(MailboxData::getLastKnownName)
                 .filter(name -> name != null && !name.isBlank())
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .forEach(name -> names.putIfAbsent(name.toLowerCase(Locale.ROOT), name));
@@ -726,22 +755,23 @@ public final class MailManager {
         ServerPlayer online = server.getPlayerList().getPlayerByName(name);
         if (online != null) return new Recipient(online.getUUID(), online.getName().getString());
         UUID id = SimpleServerUtilities.PERMISSIONS.findKnownPlayerId(name);
-        if (id != null) {
+        if (id != null && !SimpleServerUtilities.ECONOMY.isSystemAccount(id)) {
             var data = SimpleServerUtilities.PERMISSIONS.getPlayerData(id);
             return new Recipient(id, data == null || data.getLastKnownName().isBlank() ? name : data.getLastKnownName());
         }
         MailboxData knownMailbox = mailboxes.values().stream()
-                .filter(box -> box.getPlayerId() != null && box.getLastKnownName().equalsIgnoreCase(name))
+                .filter(box -> box.getPlayerId() != null
+                        && !SimpleServerUtilities.ECONOMY.isSystemAccount(box.getPlayerId())
+                        && box.getLastKnownName().equalsIgnoreCase(name))
                 .findFirst().orElse(null);
         if (knownMailbox != null) return new Recipient(knownMailbox.getPlayerId(), knownMailbox.getLastKnownName());
-        Optional<EconomyAccount> account = SimpleServerUtilities.ECONOMY.findAccountByName(server, name);
+        Optional<EconomyAccount> account = SimpleServerUtilities.ECONOMY.findPlayerAccountByName(server, name);
         return account.map(value -> new Recipient(value.getPlayerId(), value.getLastKnownName())).orElse(null);
     }
 
     private boolean hasCorrelation(UUID recipientId, MailSource source, String correlationKey) {
         if (recipientId == null || correlationKey == null || correlationKey.isBlank()) return false;
-        MailboxData box = mailboxes.get(recipientId);
-        if (box == null) return false;
+        MailboxData box = mailbox(recipientId, "");
         String key = correlationKey.trim();
         MailSource safeSource = source == null ? MailSource.SYSTEM : source;
         return box.hasDeliveryReceipt(safeSource, key) || box.getInbox().stream().anyMatch(mail ->
@@ -749,8 +779,67 @@ public final class MailManager {
     }
 
     private MailboxData mailbox(UUID id, String name) {
-        MailboxData result = mailboxes.computeIfAbsent(id, key -> new MailboxData(key, name));
-        result.updateName(name); result.normalize(id); return result;
+        if (id == null) throw new IllegalArgumentException("Mailbox owner is required.");
+        MailboxData result = mailboxes.get(id);
+        if (result == null) {
+            Path storedFile = knownMailboxFiles.get(id);
+            if (storedFile != null && Files.exists(storedFile)) {
+                try {
+                    result = JsonStorage.read(gson, storedFile, MailboxData.class);
+                    if (result == null) throw new IllegalArgumentException("Empty mailbox file.");
+                    result.normalize(id);
+                } catch (Exception exception) {
+                    Path archived = JsonStorage.archiveBrokenFile(storedFile);
+                    knownMailboxFiles.remove(id);
+                    SimpleServerUtilities.LOGGER.error(
+                            "Failed to load mailbox on demand. Archived as {}.", archived, exception);
+                    result = null;
+                }
+            }
+            if (result == null) result = new MailboxData(id, name);
+            mailboxes.put(id, result);
+        }
+        boolean nameChanged = name != null && !name.isBlank()
+                && !name.trim().equals(result.getLastKnownName());
+        result.updateName(name);
+        result.normalize(id);
+        if (nameChanged) queueSave(result);
+        touchMailbox(id);
+        trimMailboxCache();
+        return result;
+    }
+
+    private void touchMailbox(UUID playerId) {
+        mailboxAccess.put(playerId, ++accessSequence);
+    }
+
+    private void trimMailboxCache() {
+        while (mailboxes.size() > MAX_LOADED_MAILBOXES) {
+            UUID oldest = null;
+            long oldestAccess = Long.MAX_VALUE;
+            for (UUID playerId : Set.copyOf(mailboxes.keySet())) {
+                if (server != null && server.getPlayerList().getPlayer(playerId) != null) continue;
+                Path target = mailboxFolder == null ? null : file(playerId);
+                if (target != null && (SimpleServerUtilities.STORAGE.hasPending(target)
+                        || SimpleServerUtilities.STORAGE.requiresRetry(target))) continue;
+                long accessed = mailboxAccess.getOrDefault(playerId, Long.MIN_VALUE);
+                if (oldest == null || accessed < oldestAccess) {
+                    oldest = playerId;
+                    oldestAccess = accessed;
+                }
+            }
+            if (oldest == null) return;
+            evictMailbox(oldest);
+        }
+    }
+
+    private void evictMailbox(UUID playerId) {
+        if (playerId == null) return;
+        Path target = mailboxFolder == null ? null : file(playerId);
+        if (target != null && (SimpleServerUtilities.STORAGE.hasPending(target)
+                || SimpleServerUtilities.STORAGE.requiresRetry(target))) return;
+        mailboxes.remove(playerId);
+        mailboxAccess.remove(playerId);
     }
 
     private MailMessage visibleMail(ServerPlayer player, String rawId) {
@@ -882,11 +971,18 @@ public final class MailManager {
     }
 
     private void queueSave(MailboxData box) {
-        if (mailboxFolder != null) SimpleServerUtilities.STORAGE.queueJson(gson, file(box.getPlayerId()), box);
+        if (mailboxFolder == null || box == null || box.getPlayerId() == null) return;
+        Path target = file(box.getPlayerId());
+        SimpleServerUtilities.STORAGE.queueJson(gson, target, box);
+        knownMailboxFiles.put(box.getPlayerId(), target);
+        touchMailbox(box.getPlayerId());
     }
     private void writeSync(MailboxData box) throws IOException {
         if (mailboxFolder == null) throw new IOException("Mail storage is not initialized.");
-        JsonStorage.write(gson, file(box.getPlayerId()), box);
+        Path target = file(box.getPlayerId());
+        JsonStorage.write(gson, target, box);
+        knownMailboxFiles.put(box.getPlayerId(), target);
+        touchMailbox(box.getPlayerId());
     }
     private Path file(UUID playerId) { return StoragePaths.jsonFile(mailboxFolder, playerId.toString()); }
     private static UUID parseUuid(String raw) {

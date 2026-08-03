@@ -2,6 +2,8 @@ package be.winnetrie.mod.simpleserverutilities.spawn;
 
 import java.util.UUID;
 
+import be.winnetrie.mod.simpleserverutilities.core.location.WorldPositionValues;
+
 /** Persisted, dimension-aware server spawn destination. */
 public final class ServerSpawn {
 
@@ -43,12 +45,13 @@ public final class ServerSpawn {
             String updatedByName,
             long updatedAt
     ) {
-        this.dimension = dimension == null || dimension.isBlank() ? "minecraft:overworld" : dimension;
-        this.x = x;
-        this.y = y;
-        this.z = z;
-        this.yaw = yaw;
-        this.pitch = pitch;
+        WorldPositionValues position = WorldPositionValues.normalize(dimension, x, y, z, yaw, pitch);
+        this.dimension = position.dimension();
+        this.x = position.x();
+        this.y = position.y();
+        this.z = position.z();
+        this.yaw = position.yaw();
+        this.pitch = position.pitch();
         this.updatedBy = updatedBy;
         this.updatedByName = updatedByName == null ? "" : updatedByName;
         this.updatedAt = Math.max(0L, updatedAt);

@@ -89,6 +89,7 @@ public final class PermissionKeys {
     public static final String TELEPORT_CANCEL_ON_MOVE = "ssu.teleport.cancel_on_move";
 
     public static final String PERMISSIONS_ADMIN = "ssu.permissions.admin";
+    public static final String DIMENSIONS_ADMIN = "ssu.dimensions.admin";
 
     public static final String MAIL_ACCESS = "ssu.mail.access";
     public static final String MAIL_SEND = "ssu.mail.send";
@@ -105,6 +106,40 @@ public final class PermissionKeys {
     public static final String AUCTION_HOUSE_DASHBOARD = "ssu.auction_house.dashboard";
     public static final String AUCTION_HOUSE_MAX_ACTIVE = "ssu.auction_house.max_active";
     public static final String AUCTION_HOUSE_ADMIN = "ssu.auction_house.admin";
+
+    public static final String CONTENT_ADMIN = "ssu.content.admin";
+
+    public static final String NPCS_USE = "ssu.npcs.use";
+    public static final String NPCS_INTERACT = "ssu.npcs.interact";
+    public static final String NPCS_DIALOGUE = "ssu.npcs.dialogue";
+    public static final String NPCS_SERVICE_MAIL = "ssu.npcs.service.mail";
+    public static final String NPCS_SERVICE_AUCTION_HOUSE = "ssu.npcs.service.auction_house";
+    public static final String NPCS_SERVICE_MENU = "ssu.npcs.service.menu";
+    public static final String NPCS_SERVICE_HEAL = "ssu.npcs.service.heal";
+    public static final String NPCS_SERVICE_TELEPORT = "ssu.npcs.service.teleport";
+    public static final String NPCS_SERVICE_QUESTS = "ssu.npcs.service.quests";
+    public static final String NPCS_SERVICE_MINIGAMES = "ssu.npcs.service.minigames";
+    public static final String NPCS_SERVICE_DUNGEONS = "ssu.npcs.service.dungeons";
+    public static final String NPCS_SERVICE_SHOPS = "ssu.npcs.service.shops";
+    public static final String NPCS_ADMIN = "ssu.npcs.admin";
+
+    public static final String NPC_SHOPS_USE = "ssu.npc_shops.use";
+    public static final String NPC_SHOPS_BUY = "ssu.npc_shops.buy";
+    public static final String NPC_SHOPS_SELL = "ssu.npc_shops.sell";
+    public static final String NPC_SHOPS_ADMIN = "ssu.npc_shops.admin";
+
+    public static final String QUESTS_USE = "ssu.quests.use";
+    public static final String QUESTS_TRACK = "ssu.quests.track";
+    public static final String QUESTS_ABANDON = "ssu.quests.abandon";
+    public static final String QUESTS_ADMIN = "ssu.quests.admin";
+
+    public static final String MINIGAMES_USE = "ssu.minigames.use";
+    public static final String MINIGAMES_QUEUE = "ssu.minigames.queue";
+    public static final String MINIGAMES_ADMIN = "ssu.minigames.admin";
+
+    public static final String DUNGEONS_USE = "ssu.dungeons.use";
+    public static final String DUNGEONS_QUEUE = "ssu.dungeons.queue";
+    public static final String DUNGEONS_ADMIN = "ssu.dungeons.admin";
 
     public static final String HOLOGRAMS_ADMIN = "ssu.holograms.admin";
     public static final String BLOCK_INFORMATION_USE = "ssu.block_information.use";
@@ -228,6 +263,7 @@ public final class PermissionKeys {
             TELEPORT_CANCEL_ON_MOVE,
 
             PERMISSIONS_ADMIN,
+            DIMENSIONS_ADMIN,
 
             MAIL_ACCESS,
             MAIL_SEND,
@@ -243,6 +279,34 @@ public final class PermissionKeys {
             AUCTION_HOUSE_DASHBOARD,
             AUCTION_HOUSE_MAX_ACTIVE,
             AUCTION_HOUSE_ADMIN,
+            CONTENT_ADMIN,
+            NPCS_USE,
+            NPCS_INTERACT,
+            NPCS_DIALOGUE,
+            NPCS_SERVICE_MAIL,
+            NPCS_SERVICE_AUCTION_HOUSE,
+            NPCS_SERVICE_MENU,
+            NPCS_SERVICE_HEAL,
+            NPCS_SERVICE_TELEPORT,
+            NPCS_SERVICE_QUESTS,
+            NPCS_SERVICE_MINIGAMES,
+            NPCS_SERVICE_DUNGEONS,
+            NPCS_SERVICE_SHOPS,
+            NPCS_ADMIN,
+            NPC_SHOPS_USE,
+            NPC_SHOPS_BUY,
+            NPC_SHOPS_SELL,
+            NPC_SHOPS_ADMIN,
+            QUESTS_USE,
+            QUESTS_TRACK,
+            QUESTS_ABANDON,
+            QUESTS_ADMIN,
+            MINIGAMES_USE,
+            MINIGAMES_QUEUE,
+            MINIGAMES_ADMIN,
+            DUNGEONS_USE,
+            DUNGEONS_QUEUE,
+            DUNGEONS_ADMIN,
 
             HOLOGRAMS_ADMIN,
             BLOCK_INFORMATION_USE,
@@ -283,6 +347,14 @@ public final class PermissionKeys {
             "ssu.economy.*",
             "ssu.teleport.*",
             "ssu.mail.*",
+            "ssu.auction_house.*",
+            "ssu.content.*",
+            "ssu.npcs.*",
+            "ssu.npc_shops.*",
+            "ssu.quests.*",
+            "ssu.minigames.*",
+            "ssu.dungeons.*",
+            "ssu.dimensions.*",
             "ssu.holograms.*",
             "ssu.block_information.*",
             "ssu.statistics.*",

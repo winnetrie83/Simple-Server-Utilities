@@ -41,6 +41,7 @@ public final class BatchedStorageService {
     private final AtomicLong coalescedWrites = new AtomicLong();
     private final AtomicLong activeTasks = new AtomicLong();
     private final Set<Path> retryRequired = ConcurrentHashMap.newKeySet();
+    private final Set<Path> activePaths = ConcurrentHashMap.newKeySet();
 
     private volatile ExecutorService executor;
 
@@ -136,6 +137,8 @@ public final class BatchedStorageService {
                     continue;
                 }
 
+                activePaths.add(file);
+                long storageTimer = SimpleServerUtilities.PERFORMANCE.startTimer();
                 try {
                     if (operation.type() == OperationType.DELETE) {
                         Files.deleteIfExists(file);
@@ -164,6 +167,9 @@ public final class BatchedStorageService {
                         retryRequired.add(file);
                         SimpleServerUtilities.LOGGER.error("Failed queued SSU storage operation for {}.", file, e);
                     }
+                } finally {
+                    activePaths.remove(file);
+                    SimpleServerUtilities.PERFORMANCE.stopTimer("storage_io", storageTimer);
                 }
             }
         } finally {
@@ -233,6 +239,13 @@ public final class BatchedStorageService {
             return false;
         }
         return retryRequired.contains(rawFile.toAbsolutePath().normalize());
+    }
+
+    /** Returns whether the newest write/delete for this path is still queued or executing. */
+    public boolean hasPending(Path rawFile) {
+        if (rawFile == null) return false;
+        Path file = rawFile.toAbsolutePath().normalize();
+        return pending.containsKey(file) || order.contains(file) || activePaths.contains(file);
     }
 
     public StorageStatistics statistics() {

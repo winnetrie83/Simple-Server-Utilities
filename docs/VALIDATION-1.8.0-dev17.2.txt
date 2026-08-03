@@ -1,0 +1,21 @@
+SSU 1.8.0-dev17.2 validation
+
+Metadata
+- mod version: 1.8.0-dev17.2
+- network protocol: 64
+- all storage/schema versions unchanged from dev17.1
+
+Permission dropdown input hotfix
+- open permission dropdowns use only their own active anchor as a pass-through toggle
+- dropdown-list clicks are handled before any underlying widget can receive them
+- clicks outside an open dropdown close it and are consumed
+- visually overlapping target, dimension, rank and permission controls cannot be activated through the overlay
+- Player Profile dropdown uses the same modal outside-click behavior
+
+Archive/source checks
+- old all-anchor early-return condition removed
+- activeAnchor is selected from the currently open dropdown only
+- outside close paths return true after rebuilding widgets
+- gradle.properties version verified
+- resource JSON parse check completed
+- zip integrity check required after packaging

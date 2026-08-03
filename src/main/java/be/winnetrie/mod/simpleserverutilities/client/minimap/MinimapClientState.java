@@ -6,6 +6,7 @@ import be.winnetrie.mod.simpleserverutilities.network.MapMarkerSyncPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinimapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinimapRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuSnapshotPayload;
+import be.winnetrie.mod.simpleserverutilities.time.GameCalendar;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -24,6 +25,7 @@ public final class MinimapClientState {
     private static MinimapDataPayload data = defaults();
     private static int requestCountdown;
     private static String lastDimension = "";
+    private static boolean showCalendar;
 
     private MinimapClientState() {
     }
@@ -32,6 +34,7 @@ public final class MinimapClientState {
         // Terrain.tick compares the effective overlay hash itself. Repeated,
         // identical server snapshots must not invalidate the visible texture.
         data = payload;
+        showCalendar = payload.showCalendar();
         AerialMapAtlas.setLiveUpdateRadiusChunks(payload.liveUpdateRadiusChunks());
         requestCountdown = payload.enabled() ? ENABLED_REFRESH_TICKS : DISABLED_REFRESH_TICKS;
     }
@@ -46,6 +49,7 @@ public final class MinimapClientState {
                 settings.minimapNorthUp(),
                 settings.minimapShowClaims(),
                 settings.minimapShowRegions(),
+                settings.minimapShowCalendar(),
                 settings.mapLiveUpdateRadiusChunks(),
                 data.dimension(),
                 data.centerChunkX(),
@@ -56,6 +60,7 @@ public final class MinimapClientState {
                 data.claims(),
                 data.regions()
         );
+        showCalendar = settings.minimapShowCalendar();
         // Size, position and rotation are presentation-only. Shape and overlay
         // changes are detected without clearing the currently visible map.
         requestCountdown = 0;
@@ -105,11 +110,14 @@ public final class MinimapClientState {
             return;
         }
 
+        int calendarFooterHeight = showCalendar ? 26 : 0;
         int maximumWidth = graphics.guiWidth() - MARGIN * 2;
-        int maximumHeight = graphics.guiHeight() - 36;
+        int maximumHeight = showCalendar
+                ? graphics.guiHeight() - MARGIN * 2 - calendarFooterHeight
+                : graphics.guiHeight() - 36;
         int maximum = Math.max(48, Math.min(maximumWidth, maximumHeight));
         int size = Math.max(48, Math.min(data.size(), maximum));
-        Position position = position(graphics.guiWidth(), graphics.guiHeight(), size, data.position());
+        Position position = position(graphics.guiWidth(), graphics.guiHeight(), size, data.position(), calendarFooterHeight);
         int x = position.x();
         int y = position.y();
         boolean circle = "CIRCLE".equalsIgnoreCase(data.shape());
@@ -146,11 +154,12 @@ public final class MinimapClientState {
 
         String coordinates = (int) Math.floor(minecraft.player.getX())
                 + ", " + (int) Math.floor(minecraft.player.getZ());
-        int labelY = position.bottom() ? y - 11 : y + size + 4;
-        int textWidth = minecraft.font.width(coordinates);
-        graphics.fill(x + size / 2 - textWidth / 2 - 3, labelY - 2,
-                x + size / 2 + textWidth / 2 + 3, labelY + 10, 0xA0000000);
-        graphics.centeredText(minecraft.font, coordinates, x + size / 2, labelY, 0xFFF2F2F2);
+        int labelY = position.bottom() && !showCalendar ? y - 11 : y + size + 4;
+        drawCenteredHudLabel(graphics, minecraft, coordinates, x + size / 2, labelY);
+        if (showCalendar) {
+            String calendar = GameCalendar.fromClockTime(minecraft.level.getDefaultClockTime()).displayText();
+            drawCenteredHudLabel(graphics, minecraft, calendar, x + size / 2, labelY + 12);
+        }
     }
 
 
@@ -196,10 +205,19 @@ public final class MinimapClientState {
         graphics.fill(x, y, x + 1, y + 1, 0xFFFFFFFF);
     }
 
+    private static void drawCenteredHudLabel(GuiGraphicsExtractor graphics, Minecraft minecraft,
+                                                 String text, int centerX, int y) {
+        int textWidth = minecraft.font.width(text);
+        graphics.fill(centerX - textWidth / 2 - 3, y - 2,
+                centerX + textWidth / 2 + 3, y + 10, 0xA0000000);
+        graphics.centeredText(minecraft.font, text, centerX, y, 0xFFF2F2F2);
+    }
+
     public static void clear() {
         data = defaults();
         requestCountdown = 0;
         lastDimension = "";
+        showCalendar = false;
         TERRAIN.close();
     }
 
@@ -215,18 +233,20 @@ public final class MinimapClientState {
         graphics.pose().popMatrix();
     }
 
-    private static Position position(int guiWidth, int guiHeight, int size, String rawPosition) {
+    private static Position position(int guiWidth, int guiHeight, int size, String rawPosition, int footerHeight) {
         String normalized = rawPosition == null ? "TOP_RIGHT" : rawPosition.toUpperCase(java.util.Locale.ROOT);
         boolean right = normalized.endsWith("RIGHT");
         boolean bottom = normalized.startsWith("BOTTOM");
         int x = right ? guiWidth - size - MARGIN : MARGIN;
-        int y = bottom ? guiHeight - size - MARGIN - 12 : MARGIN;
+        int y = bottom
+                ? guiHeight - size - MARGIN - (footerHeight > 0 ? footerHeight : 12)
+                : MARGIN;
         return new Position(x, y, bottom);
     }
 
     private static MinimapDataPayload defaults() {
         return new MinimapDataPayload(
-                true, false, 96, "CIRCLE", "TOP_RIGHT", true, true, true, 8,
+                true, false, 96, "CIRCLE", "TOP_RIGHT", true, true, true, false, 8,
                 "", 0, 0, 0xFF4BCB63, 0xFFE05B5B, 0xFFFFB347,
                 java.util.List.of(), java.util.List.of()
         );

@@ -129,13 +129,19 @@ public class PermissionManager {
     }
 
     private String resolveUncached(ServerPlayer player, String key, PermissionContext context) {
-        // Personal permissions are always the final player-specific override.
+        // A dimension-specific personal override is the most precise player rule.
+        String playerDimensionValue = getPlayerDimensionValue(player, key, context);
+        if (playerDimensionValue != null) {
+            return playerDimensionValue;
+        }
+
+        // Global personal permissions remain the final player-wide override.
         String playerValue = getPlayerValue(player, key);
         if (playerValue != null) {
             return playerValue;
         }
 
-        // Context rules remain compatible, but can never override a personal value.
+        // Area policies stay above rank defaults, exactly as before.
         String regionValue = getRegionValue(key, context);
         if (regionValue != null) {
             return regionValue;
@@ -146,9 +152,9 @@ public class PermissionManager {
             return playerClaimContextValue;
         }
 
-        String dimensionValue = getDimensionValue(key, context);
-        if (dimensionValue != null) {
-            return dimensionValue;
+        String rankDimensionValue = getRankDimensionValue(player, key, context);
+        if (rankDimensionValue != null) {
+            return rankDimensionValue;
         }
 
         return getRankValue(player, key);
@@ -226,6 +232,35 @@ public class PermissionManager {
             merged.putAll(getRankPermissionsWithInheritance(rankName, new HashSet<>()));
         }
         return Map.copyOf(merged);
+    }
+
+    /** Returns inherited rank defaults with dimension-specific rank overrides applied. */
+    public Map<String, String> getEffectiveRankPermissions(String rankName, String dimensionId) {
+        Map<String, String> merged = new HashMap<>(getEffectiveRankPermissions(rankName));
+        merged.putAll(getRankDimensionPermissionsWithInheritance(rankName, normalizeDimensionId(dimensionId), new HashSet<>()));
+        return Map.copyOf(merged);
+    }
+
+    /** Returns the player's assigned rank defaults with dimension-specific rank overrides applied. */
+    public Map<String, String> getEffectiveRankPermissions(UUID playerId, String dimensionId) {
+        Map<String, String> merged = new HashMap<>(getEffectiveRankPermissions(playerId));
+        ArrayList<String> rankNames = assignedRankNames(playerId);
+        for (String rankName : rankNames) {
+            merged.putAll(getRankDimensionPermissionsWithInheritance(rankName, normalizeDimensionId(dimensionId), new HashSet<>()));
+        }
+        return Map.copyOf(merged);
+    }
+
+    private ArrayList<String> assignedRankNames(UUID playerId) {
+        ArrayList<String> rankNames = new ArrayList<>();
+        PlayerPermissionData playerData = getPlayerData(playerId);
+        if (playerData != null) rankNames.addAll(playerData.getRanks());
+        if (rankNames.isEmpty()) rankNames.add(settings.getDefaultRank());
+        rankNames.sort(Comparator.comparingInt(rankName -> {
+            PermissionRank rank = getRank(rankName);
+            return rank == null ? 0 : rank.getPriority();
+        }));
+        return rankNames;
     }
 
     public record KnownPlayer(UUID playerId, String name, List<String> ranks) {
@@ -381,26 +416,68 @@ public class PermissionManager {
         return existed;
     }
 
-    public PermissionScope getOrCreateDimensionScope(String dimensionId) {
-        return data.getDimensions().computeIfAbsent(dimensionId, ignored -> new PermissionScope());
+    public Map<String, String> getRankDimensionPermissions(String rankName, String dimensionId) {
+        PermissionRank rank = getRank(rankName);
+        PermissionScope scope = rank == null ? null : rank.getDimensionScope(normalizeDimensionId(dimensionId));
+        return scope == null ? Map.of() : Map.copyOf(scope.getPermissions());
     }
 
-    public void setDimensionPermission(String dimensionId, String key, String value) {
-        getOrCreateDimensionScope(dimensionId).setPermission(key, value);
+    public Map<String, String> getPlayerDimensionPermissions(UUID playerId, String dimensionId) {
+        PlayerPermissionData playerData = getPlayerData(playerId);
+        PermissionScope scope = playerData == null ? null : playerData.getDimensionScope(normalizeDimensionId(dimensionId));
+        return scope == null ? Map.of() : Map.copyOf(scope.getPermissions());
+    }
+
+    public void setRankDimensionPermission(String rankName, String dimensionId, String key, String value) {
+        PermissionRank rank = getOrCreateRank(rankName);
+        rank.getOrCreateDimensionScope(normalizeDimensionId(dimensionId)).setPermission(key, value);
+        rank.removeDimensionScopeIfEmpty(normalizeDimensionId(dimensionId));
         save();
     }
 
-    public boolean removeDimensionPermission(String dimensionId, String key) {
-        PermissionScope scope = data.getDimensions().get(dimensionId);
-
-        if (scope == null) {
-            return false;
-        }
-
+    public boolean removeRankDimensionPermission(String rankName, String dimensionId, String key) {
+        PermissionRank rank = getRank(rankName);
+        if (rank == null) return false;
+        PermissionScope scope = rank.getDimensionScope(normalizeDimensionId(dimensionId));
+        if (scope == null) return false;
         boolean existed = scope.getPermissions().containsKey(key);
         scope.removePermission(key);
-        save();
+        rank.removeDimensionScopeIfEmpty(normalizeDimensionId(dimensionId));
+        if (existed) save();
         return existed;
+    }
+
+    public void setPlayerDimensionPermission(UUID playerId, String dimensionId, String key, String value) {
+        PlayerPermissionData playerData = getOrCreatePlayerData(playerId);
+        playerData.getOrCreateDimensionScope(normalizeDimensionId(dimensionId)).setPermission(key, value);
+        playerData.removeDimensionScopeIfEmpty(normalizeDimensionId(dimensionId));
+        save();
+    }
+
+    public boolean removePlayerDimensionPermission(UUID playerId, String dimensionId, String key) {
+        PlayerPermissionData playerData = getPlayerData(playerId);
+        if (playerData == null) return false;
+        PermissionScope scope = playerData.getDimensionScope(normalizeDimensionId(dimensionId));
+        if (scope == null) return false;
+        boolean existed = scope.getPermissions().containsKey(key);
+        scope.removePermission(key);
+        playerData.removeDimensionScopeIfEmpty(normalizeDimensionId(dimensionId));
+        if (existed) save();
+        return existed;
+    }
+
+    /** Removes all rank/player overrides tied to a deleted dimension. */
+    public boolean removeDimensionOverrides(String dimensionId) {
+        String normalized = normalizeDimensionId(dimensionId);
+        boolean changed = false;
+        for (PermissionRank rank : data.getRanks().values()) {
+            changed |= rank.getDimensionPermissions().remove(normalized) != null;
+        }
+        for (PlayerPermissionData playerData : data.getPlayers().values()) {
+            changed |= playerData.getDimensionPermissions().remove(normalized) != null;
+        }
+        if (changed) save();
+        return changed;
     }
 
     public PermissionScope getOrCreatePlayerClaimContextScope(String roleName) {
@@ -860,18 +937,18 @@ public class PermissionManager {
         return scope.getPermission(key);
     }
 
-    private String getDimensionValue(String key, PermissionContext context) {
-        if (context == null || context.getDimension() == null) {
-            return null;
-        }
+    private String getPlayerDimensionValue(ServerPlayer player, String key, PermissionContext context) {
+        if (player == null || context == null || context.getDimension() == null) return null;
+        PlayerPermissionData playerData = getPlayerData(player.getUUID());
+        if (playerData == null) return null;
+        PermissionScope scope = playerData.getDimensionScope(normalizeDimensionId(context.getDimension()));
+        return scope == null ? null : scope.getPermission(key);
+    }
 
-        PermissionScope scope = data.getDimensions().get(context.getDimension());
-
-        if (scope == null) {
-            return null;
-        }
-
-        return scope.getPermission(key);
+    private String getRankDimensionValue(ServerPlayer player, String key, PermissionContext context) {
+        if (context == null || context.getDimension() == null) return null;
+        Map<String, String> merged = getMergedRankDimensionPermissions(player, normalizeDimensionId(context.getDimension()));
+        return PermissionValueResolver.getValue(merged, key);
     }
 
     private String getPlayerValue(ServerPlayer player, String key) {
@@ -945,6 +1022,56 @@ public class PermissionManager {
         return mergedPermissions;
     }
 
+    private Map<String, String> getMergedRankDimensionPermissions(ServerPlayer player, String dimensionId) {
+        ArrayList<String> rankNames = new ArrayList<>();
+        if (player != null) {
+            PlayerPermissionData playerData = getPlayerData(player.getUUID());
+            if (playerData != null) rankNames.addAll(playerData.getRanks());
+        }
+        if (rankNames.isEmpty()) rankNames.add(settings.getDefaultRank());
+        rankNames.sort(Comparator.comparingInt(rankName -> {
+            PermissionRank rank = getRank(rankName);
+            return rank == null ? 0 : rank.getPriority();
+        }));
+        Map<String, String> merged = new HashMap<>();
+        for (String rankName : rankNames) {
+            merged.putAll(getRankDimensionPermissionsWithInheritance(rankName, dimensionId, new HashSet<>()));
+        }
+        return merged;
+    }
+
+    private Map<String, String> getRankDimensionPermissionsWithInheritance(
+            String rankName, String dimensionId, Set<String> visited
+    ) {
+        String normalizedRank = normalizeRankName(rankName);
+        if (!visited.add(normalizedRank)) return Map.of();
+        PermissionRank rank = getRank(normalizedRank);
+        if (rank == null) return Map.of();
+        Map<String, String> merged = new HashMap<>();
+        for (String inheritedRankName : rank.getInherits()) {
+            merged.putAll(getRankDimensionPermissionsWithInheritance(inheritedRankName, dimensionId, visited));
+        }
+        PermissionScope scope = rank.getDimensionScope(dimensionId);
+        if (scope != null) merged.putAll(scope.getPermissions());
+        return merged;
+    }
+
+    private boolean migrateLegacyGlobalDimensionScopes() {
+        if (data.getDimensions().isEmpty()) return false;
+        for (Map.Entry<String, PermissionScope> dimensionEntry : new HashMap<>(data.getDimensions()).entrySet()) {
+            String dimensionId = normalizeDimensionId(dimensionEntry.getKey());
+            Map<String, String> legacyValues = dimensionEntry.getValue().getPermissions();
+            for (PermissionRank rank : data.getRanks().values()) {
+                PermissionScope target = rank.getOrCreateDimensionScope(dimensionId);
+                legacyValues.forEach(target.getPermissions()::putIfAbsent);
+                rank.removeDimensionScopeIfEmpty(dimensionId);
+            }
+        }
+        data.getDimensions().clear();
+        SimpleServerUtilities.LOGGER.info("Migrated legacy global dimension permissions into per-rank dimension overrides.");
+        return true;
+    }
+
     private boolean ensureDefaultDataUpToDate() {
         boolean changed = false;
 
@@ -967,6 +1094,8 @@ public class PermissionManager {
         } else {
             changed |= setDefaultPermission(adminRank, "ssu.*", true);
         }
+
+        changed |= migrateLegacyGlobalDimensionScopes();
 
         changed |= ensurePlayerClaimContextScope("owner");
         changed |= ensurePlayerClaimContextScope("co_owner");
@@ -1059,6 +1188,7 @@ public class PermissionManager {
         changed |= setDefaultPermission(rank, PermissionKeys.TELEPORT_COOLDOWN_BYPASS, false);
 
         changed |= setDefaultPermission(rank, PermissionKeys.PERMISSIONS_ADMIN, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.DIMENSIONS_ADMIN, false);
 
         changed |= setDefaultPermission(rank, PermissionKeys.MAIL_ACCESS, true);
         changed |= setDefaultPermission(rank, PermissionKeys.MAIL_SEND, true);
@@ -1131,6 +1261,11 @@ public class PermissionManager {
         }
 
         return rankName.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private String normalizeDimensionId(String dimensionId) {
+        if (dimensionId == null || dimensionId.isBlank()) return "minecraft:overworld";
+        return dimensionId.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     private String normalizeRoleName(String roleName) {

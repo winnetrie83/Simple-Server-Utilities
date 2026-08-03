@@ -1,0 +1,32 @@
+Simple Server Utilities 1.8.0-dev18.2 validation
+=================================================
+
+Target
+------
+Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+Network protocol: 67
+Border visualization preference schema: 3
+All other SSU storage schemas: unchanged
+
+Static validation completed
+---------------------------
+- All 520 Java source files passed delimiter/comment/string structural scanning.
+- A javac 21 parser/type pass found no Java syntax diagnostics; expected external Minecraft, NeoForge and Gson symbols are unavailable in this isolated source-only environment.
+- All 13 resource/template JSON files parsed successfully.
+- Every ClaimMapRequestPayload construction site carries the new five-field record layout.
+- Version 1.8.0-dev18.2 and network protocol 67 are synchronized in Gradle metadata and ModNetworking.
+- No obsolete Minecraft#setScreen(...) calls remain.
+- Source-tree whitespace and generated-artifact checks passed.
+
+Behavioural safeguards reviewed
+-------------------------------
+- Claim deletion cleanup is centralized in PlayerClaimManager, before claim chunks are removed. Claim Map, Admin Center and legacy command deletion paths all call this manager.
+- Home cleanup matches claim dimension plus claimed chunk and does not remove homes in unrelated claims.
+- Claim Map center-on-selection is server-authoritative. Remote viewports are accepted only when they remain within a bounded margin of the selected claim owned by the requesting player in the current dimension.
+- Ordinary player Travel contains only destination shortcuts and cancellation; warp/spawn mutation controls exist only in Admin Center -> Travel Management.
+- Travel destinations are permission-filtered, while every teleport or mutation is revalidated through the existing HomePolicy, WarpPolicy, SpawnPolicy and TeleportPolicy services.
+- Existing /homes, /warps, /spawn and claim commands remain registered and use the same managers.
+
+Full build limitation in this container
+---------------------------------------
+The container provides Java 21 rather than the required Java 25. Gradle 9.2.1 is not available locally and the wrapper cannot download it in the offline environment, so a complete NeoForge `gradlew.bat clean build` could not be executed here. Dev18.2 must still be built and tested by the user with Java 25.

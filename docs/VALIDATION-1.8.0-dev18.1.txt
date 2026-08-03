@@ -1,0 +1,36 @@
+Simple Server Utilities 1.8.0-dev18.1 validation
+=================================================
+
+Target
+------
+Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+Network protocol: 66
+Border visualization preference schema: 3
+All other SSU storage schemas: unchanged
+
+Static validation completed
+---------------------------
+- All 520 Java source files passed delimiter/comment/string structural scanning.
+- All 14 JSON files parsed successfully.
+- PlayerBorderPreferences.java compiled independently with javac 21.
+- Dashboard snapshot/page record constructor arities were checked against their updated record layouts.
+- The two ClaimEntry construction sites carry the new borderVisible field.
+- The menu snapshot encoder/decoder carry showOtherClaims and maxHomes symmetrically.
+- Version/protocol, per-claim border action, claim Homes navigation, home placement policy and legacy command retention assertions passed.
+- git diff whitespace check reported no whitespace errors.
+- Source-tree and generated ZIP integrity tests passed before publication.
+
+Behavioural safeguards reviewed
+-------------------------------
+- Existing commands remain registered.
+- GUI and /homes sethome both pass through HomePolicy before PlayerHomeManager mutation.
+- Homes can only be created/moved while standing inside an owned claim; the claim-specific GUI additionally requires the exact selected claim.
+- PlayerHomeManager remains the single authority for the permission-derived total home limit.
+- Existing home records are not migrated, deleted or renamed.
+- Individual claim-border visibility is stored by claim UUID and is gated by the existing server permission plus the new master personal toggle.
+- Other-player claim borders are independent from selected owned claims.
+- Claim-map deletion removes only the deleted claim from that player's selected-border set.
+
+Full build limitation in this container
+---------------------------------------
+The Gradle wrapper attempted to download Gradle 9.2.1, but the container has no DNS/network access to services.gradle.org. The container also provides Java 21 rather than the required Java 25. Therefore a complete NeoForge `gradlew.bat clean build` could not be executed here. The previous dev18.0 source was confirmed by the user to build; dev18.1 must still be built and tested with Java 25 by the user.

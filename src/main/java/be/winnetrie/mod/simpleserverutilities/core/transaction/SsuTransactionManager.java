@@ -114,7 +114,8 @@ public final class SsuTransactionManager {
     }
 
     private static String normalizeKey(String key) {
-        return key == null ? "" : key.trim();
+        String normalized = key == null ? "" : key.trim();
+        return normalized.length() <= 256 ? normalized : normalized.substring(0, 256);
     }
 
     public interface TransactionStep {

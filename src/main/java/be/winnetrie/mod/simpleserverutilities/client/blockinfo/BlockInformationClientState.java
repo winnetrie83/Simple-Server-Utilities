@@ -14,6 +14,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -96,7 +99,7 @@ public final class BlockInformationClientState {
         String title = state.getBlock().getName().getString();
 
         if (!debugAllowed || !debugEnabled) {
-            renderCompact(graphics, minecraft, title, icon, canHarvest, preview);
+            renderCompact(graphics, minecraft, title, icon, canHarvest, List.of(), preview);
             return;
         }
 
@@ -118,12 +121,16 @@ public final class BlockInformationClientState {
     ) {
         if (entity == null) return;
         String title = entity.getType().getDescription().getString();
+        List<String> stats = entityStats(entity);
         if (!debugAllowed || !debugEnabled) {
-            renderCompact(graphics, minecraft, title, ItemStack.EMPTY, true, preview);
+            renderCompact(graphics, minecraft, title, ItemStack.EMPTY, true, stats, preview);
             return;
         }
         String id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
-        renderDebug(graphics, minecraft, title, ItemStack.EMPTY, true, List.of("ID: " + id), preview);
+        List<String> details = new ArrayList<>();
+        details.add("ID: " + id);
+        details.addAll(stats);
+        renderDebug(graphics, minecraft, title, ItemStack.EMPTY, true, details, preview);
     }
 
     private static void renderCompact(
@@ -132,24 +139,35 @@ public final class BlockInformationClientState {
             String title,
             ItemStack toolIcon,
             boolean positive,
+            List<String> details,
             ContentPreview preview
     ) {
         String visibleTitle = trim(title, 64);
+        List<String> visibleDetails = details == null ? List.of() : details.stream()
+                .map(detail -> trim(detail, 72))
+                .toList();
         int toolSpace = toolIcon.isEmpty() ? 0 : 21;
         ContentLayout contentLayout = layoutContent(graphics, preview);
         int titleWidth = minecraft.font.width(visibleTitle) + 20 + toolSpace;
+        int detailWidth = 0;
+        for (String detail : visibleDetails) detailWidth = Math.max(detailWidth, minecraft.font.width(detail) + 20);
         int width = Math.min(
-                Math.max(92, Math.max(titleWidth, contentLayout.preferredWidth())),
+                Math.max(92, Math.max(Math.max(titleWidth, detailWidth), contentLayout.preferredWidth())),
                 Math.max(92, graphics.guiWidth() - 24));
         contentLayout = layoutContent(width, preview);
-        int height = 28 + contentLayout.height();
+        int detailsHeight = visibleDetails.size() * 11;
+        int height = 28 + detailsHeight + contentLayout.height();
         int x = (graphics.guiWidth() - width) / 2;
         int y = 8;
         drawPanel(graphics, x, y, width, height, positive);
         int textY = y + (28 - 9) / 2;
         graphics.text(minecraft.font, visibleTitle, x + 10, textY, 0xFFF5F7FA, true);
         if (!toolIcon.isEmpty()) graphics.item(toolIcon, x + width - 20, y + 6);
-        drawContent(graphics, minecraft, x, y + 28, width, preview, contentLayout);
+        for (int i = 0; i < visibleDetails.size(); i++) {
+            graphics.text(minecraft.font, visibleDetails.get(i), x + 10, y + 27 + i * 11,
+                    0xFFD4DCE3, false);
+        }
+        drawContent(graphics, minecraft, x, y + 28 + detailsHeight, width, preview, contentLayout);
     }
 
     private static void renderDebug(
@@ -183,6 +201,26 @@ public final class BlockInformationClientState {
         }
         if (!toolIcon.isEmpty()) graphics.item(toolIcon, x + width - 20, y + 3);
         drawContent(graphics, minecraft, x, y + textHeight, width, preview, contentLayout);
+    }
+
+    private static List<String> entityStats(Entity entity) {
+        if (!(entity instanceof LivingEntity living)) return List.of();
+        List<String> stats = new ArrayList<>();
+        float maximumHealth = living.getMaxHealth();
+        if (maximumHealth > 0.0F) {
+            stats.add("Health: " + trimDecimal(Math.max(0.0F, living.getHealth()))
+                    + " / " + trimDecimal(maximumHealth));
+        }
+
+        AttributeInstance armor = living.getAttribute(Attributes.ARMOR);
+        if (armor != null && armor.getValue() > 0.001D) {
+            stats.add("Armor: " + trimDecimal((float) armor.getValue()));
+        }
+        AttributeInstance toughness = living.getAttribute(Attributes.ARMOR_TOUGHNESS);
+        if (toughness != null && toughness.getValue() > 0.001D) {
+            stats.add("Toughness: " + trimDecimal((float) toughness.getValue()));
+        }
+        return List.copyOf(stats);
     }
 
     private static ContentPreview matchingPreview(Minecraft minecraft, HitResult hitResult) {

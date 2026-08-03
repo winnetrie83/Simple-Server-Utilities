@@ -34,13 +34,13 @@ public record SsuPlayerProfileDataPayload(
             StreamCodec.of(SsuPlayerProfileDataPayload::encode, SsuPlayerProfileDataPayload::decode);
 
     public SsuPlayerProfileDataPayload {
-        selectedPlayer = bounded(selectedPlayer, 64);
-        selectedLabel = bounded(selectedLabel, 64);
+        selectedPlayer = PayloadBounds.string(selectedPlayer, 64);
+        selectedLabel = PayloadBounds.string(selectedLabel, 64);
         permissionPageIndex = Math.max(0, permissionPageIndex);
         permissionPageSize = Math.max(1, Math.min(MAX_PERMISSIONS, permissionPageSize));
         totalPermissions = Math.max(0, totalPermissions);
         requestId = Math.max(0L, requestId);
-        notice = bounded(notice, 512);
+        notice = PayloadBounds.string(notice, 512);
         players = copy(players, MAX_PLAYERS, "players");
         profile = profile == null ? Profile.empty() : profile;
         permissions = copy(permissions, MAX_PERMISSIONS, "permissions");
@@ -145,22 +145,16 @@ public record SsuPlayerProfileDataPayload(
         }
         return result;
     }
-
-    private static String bounded(String value, int maximum) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= maximum ? safe : safe.substring(0, maximum);
-    }
-
-    @Override
+@Override
     public Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 
     public record PlayerEntry(String id, String label, String summary, boolean online) {
         public PlayerEntry {
-            id = bounded(id, 64);
-            label = bounded(label, 64);
-            summary = bounded(summary, 192);
+            id = PayloadBounds.string(id, 64);
+            label = PayloadBounds.string(label, 64);
+            summary = PayloadBounds.string(summary, 192);
         }
     }
 
@@ -184,20 +178,20 @@ public record SsuPlayerProfileDataPayload(
             int directOverrides
     ) {
         public Profile {
-            playerId = bounded(playerId, 64);
-            name = bounded(name, 64);
-            primaryRank = bounded(primaryRank, 64);
-            assignedRanks = bounded(assignedRanks, 256);
-            adminStatus = bounded(adminStatus, 128);
-            formattedBalance = bounded(formattedBalance, 64);
+            playerId = PayloadBounds.string(playerId, 64);
+            name = PayloadBounds.string(name, 64);
+            primaryRank = PayloadBounds.string(primaryRank, 64);
+            assignedRanks = PayloadBounds.string(assignedRanks, 256);
+            adminStatus = PayloadBounds.string(adminStatus, 128);
+            formattedBalance = PayloadBounds.string(formattedBalance, 64);
             claimGroups = Math.max(0, claimGroups);
             claimChunks = Math.max(0, claimChunks);
             homes = Math.max(0, homes);
             rentals = Math.max(0, rentals);
-            rentalNames = bounded(rentalNames, 512);
-            dimension = bounded(dimension, 128);
-            position = bounded(position, 96);
-            healthAndFood = bounded(healthAndFood, 128);
+            rentalNames = PayloadBounds.string(rentalNames, 512);
+            dimension = PayloadBounds.string(dimension, 128);
+            position = PayloadBounds.string(position, 96);
+            healthAndFood = PayloadBounds.string(healthAndFood, 128);
             directOverrides = Math.max(0, directOverrides);
         }
 
@@ -209,9 +203,9 @@ public record SsuPlayerProfileDataPayload(
 
     public record PermissionLine(String key, String value, String source) {
         public PermissionLine {
-            key = bounded(key, 128);
-            value = bounded(value, 128);
-            source = bounded(source, 64);
+            key = PayloadBounds.string(key, 128);
+            value = PayloadBounds.string(value, 128);
+            source = PayloadBounds.string(source, 64);
         }
     }
 }

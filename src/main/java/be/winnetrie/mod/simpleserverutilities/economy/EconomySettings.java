@@ -2,7 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.economy;
 
 public final class EconomySettings {
 
-    private int schemaVersion = 1;
+    private int schemaVersion = 2;
     private boolean enabled = true;
     private String currencyName = "euro";
     private String currencySymbol = "€";
@@ -11,10 +11,13 @@ public final class EconomySettings {
     private long maximumBalanceMinor = 9_000_000_000_000_000L;
     private long minimumTransferMinor = 1L;
     private long maximumTransferMinor = 1_000_000_000_000L;
-    private int recentHistoryLimit = 100;
+    private int recentHistoryLimit = 50;
 
     public void normalize() {
-        schemaVersion = Math.max(1, schemaVersion);
+        if (schemaVersion < 2) {
+            recentHistoryLimit = 50;
+        }
+        schemaVersion = Math.max(2, schemaVersion);
         currencyName = currencyName == null || currencyName.isBlank() ? "currency" : currencyName.trim();
         currencySymbol = currencySymbol == null ? "" : currencySymbol.trim();
         decimalPlaces = Math.max(0, Math.min(4, decimalPlaces));
@@ -22,7 +25,7 @@ public final class EconomySettings {
         maximumBalanceMinor = Math.max(startingBalanceMinor, maximumBalanceMinor);
         minimumTransferMinor = Math.max(1L, minimumTransferMinor);
         maximumTransferMinor = Math.max(minimumTransferMinor, maximumTransferMinor);
-        recentHistoryLimit = Math.max(10, Math.min(1_000, recentHistoryLimit));
+        recentHistoryLimit = Math.max(1, Math.min(1_000, recentHistoryLimit));
     }
 
     public int getSchemaVersion() {
@@ -63,5 +66,9 @@ public final class EconomySettings {
 
     public int getRecentHistoryLimit() {
         return recentHistoryLimit;
+    }
+
+    public void setRecentHistoryLimit(int recentHistoryLimit) {
+        this.recentHistoryLimit = Math.max(1, Math.min(1_000, recentHistoryLimit));
     }
 }

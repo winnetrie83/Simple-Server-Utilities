@@ -53,8 +53,8 @@ public record MailDataPayload(
         queuedCount = Math.max(0, queuedCount);
         unreadCount = Math.max(0, unreadCount);
         retentionDays = Math.max(1, retentionDays);
-        formattedBalance = bound(formattedBalance, 128);
-        notice = bound(notice, 256);
+        formattedBalance = PayloadBounds.string(formattedBalance, 128);
+        notice = PayloadBounds.string(notice, 256);
         entries = entries == null ? List.of() : List.copyOf(entries);
         if (entries.size() > MAX_ENTRIES) throw new IllegalArgumentException("Too many mail entries in payload.");
     }
@@ -104,10 +104,7 @@ public record MailDataPayload(
                 b.readVarLong(), b.readUtf(128), b.readBoolean(), b.readVarLong(), b.readVarLong(), b.readVarLong());
     }
 
-    private static String bound(String value, int max) {
-        String safe = value == null ? "" : value;
-        return safe.length() <= max ? safe : safe.substring(0, max);
-    }
+
 
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 
@@ -131,12 +128,12 @@ public record MailDataPayload(
             long moneyClaimedAt
     ) {
         public Entry {
-            id = bound(id, 64); otherParty = bound(otherParty, 64); subject = bound(subject, 96);
-            body = MailRichText.normalize(body); source = bound(source, 24); createdAt = Math.max(0L, createdAt);
+            id = PayloadBounds.string(id, 64); otherParty = PayloadBounds.string(otherParty, 64); subject = PayloadBounds.string(subject, 96);
+            body = MailRichText.normalize(body); source = PayloadBounds.string(source, 24); createdAt = Math.max(0L, createdAt);
             visibleSince = Math.max(0L, visibleSince); itemStackCount = Math.max(0, Math.min(9, itemStackCount));
             unclaimedItemCount = Math.max(0, Math.min(itemStackCount, unclaimedItemCount));
-            itemSummary = bound(itemSummary, 512); moneyMinor = Math.max(0L, moneyMinor);
-            formattedMoney = bound(formattedMoney, 128); openedAt = Math.max(0L, openedAt);
+            itemSummary = PayloadBounds.string(itemSummary, 512); moneyMinor = Math.max(0L, moneyMinor);
+            formattedMoney = PayloadBounds.string(formattedMoney, 128); openedAt = Math.max(0L, openedAt);
             itemsClaimedAt = Math.max(0L, itemsClaimedAt); moneyClaimedAt = Math.max(0L, moneyClaimedAt);
         }
     }

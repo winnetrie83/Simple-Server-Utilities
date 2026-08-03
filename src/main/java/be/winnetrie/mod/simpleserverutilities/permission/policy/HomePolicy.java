@@ -1,6 +1,8 @@
 package be.winnetrie.mod.simpleserverutilities.permission.policy;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
+import be.winnetrie.mod.simpleserverutilities.home.ClaimHomeSupport;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
@@ -31,7 +33,17 @@ public class HomePolicy {
     }
 
     public static boolean canSetHomeAt(ServerPlayer player, BlockPos pos) {
-        return canSetHome(player, PermissionContext.at(player, pos));
+        PlayerClaim claim = ClaimHomeSupport.ownedClaimAt(player, pos);
+        return claim != null
+                && ClaimHomeSupport.contains(claim, player.level(), pos)
+                && canSetHome(player, PermissionContext.at(player, pos));
+    }
+
+    public static boolean canSetHomeInClaim(ServerPlayer player, BlockPos pos, PlayerClaim claim) {
+        return claim != null
+                && claim.isOwner(player.getUUID())
+                && ClaimHomeSupport.contains(claim, player.level(), pos)
+                && canSetHome(player, PermissionContext.at(player, pos));
     }
 
     public static boolean canTeleportHome(ServerPlayer player, PermissionContext context) {

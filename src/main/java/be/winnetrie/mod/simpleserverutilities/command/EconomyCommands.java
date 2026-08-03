@@ -32,7 +32,7 @@ public final class EconomyCommands {
                         .executes(context -> balance(context.getSource())))
                 .then(Commands.literal("history")
                         .executes(context -> historySelf(context.getSource(), 10))
-                        .then(Commands.argument("limit", IntegerArgumentType.integer(1, 100))
+                        .then(Commands.argument("limit", IntegerArgumentType.integer(1, 1000))
                                 .executes(context -> historySelf(
                                         context.getSource(),
                                         IntegerArgumentType.getInteger(context, "limit")
@@ -91,6 +91,13 @@ public final class EconomyCommands {
                                                 StringArgumentType.getString(context, "player"),
                                                 StringArgumentType.getString(context, "amount")
                                         )))))
+                .then(Commands.literal("history-limit")
+                        .executes(context -> showHistoryLimit(context.getSource()))
+                        .then(Commands.argument("limit", IntegerArgumentType.integer(1, 1000))
+                                .executes(context -> setHistoryLimit(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "limit")
+                                ))))
                 .then(Commands.literal("history")
                         .then(Commands.argument("player", StringArgumentType.word())
                                 .executes(context -> adminHistory(
@@ -98,7 +105,7 @@ public final class EconomyCommands {
                                         StringArgumentType.getString(context, "player"),
                                         10
                                 ))
-                                .then(Commands.argument("limit", IntegerArgumentType.integer(1, 100))
+                                .then(Commands.argument("limit", IntegerArgumentType.integer(1, 1000))
                                         .executes(context -> adminHistory(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "player"),
@@ -145,7 +152,7 @@ public final class EconomyCommands {
 
         EconomyAccount sourceAccount = SimpleServerUtilities.ECONOMY.ensureAccount(player);
         EconomyAccount target = SimpleServerUtilities.ECONOMY
-                .findAccountByName(source.getServer(), targetName)
+                .findPlayerAccountByName(source.getServer(), targetName)
                 .orElse(null);
         if (target == null) {
             player.sendSystemMessage(Component.literal(
@@ -213,6 +220,27 @@ public final class EconomyCommands {
                 + MoneyFormat.format(statistics.totalSupplyMinor(), settings)));
         source.sendSystemMessage(Component.literal(" - Transactions loaded: " + statistics.loadedTransactions()
                 + " (prepared: " + statistics.preparedTransactions() + ")"));
+        return 1;
+    }
+
+    private static int showHistoryLimit(CommandSourceStack source) {
+        if (!canAdmin(source)) {
+            source.sendFailure(Component.literal("You do not have permission to manage the economy."));
+            return 0;
+        }
+        source.sendSystemMessage(Component.literal("Economy transaction history retention: "
+                + SimpleServerUtilities.ECONOMY.settings().getRecentHistoryLimit() + " per account."));
+        return 1;
+    }
+
+    private static int setHistoryLimit(CommandSourceStack source, int limit) {
+        if (!canAdmin(source)) {
+            source.sendFailure(Component.literal("You do not have permission to manage the economy."));
+            return 0;
+        }
+        int applied = SimpleServerUtilities.ECONOMY.setRecentHistoryLimit(limit);
+        source.sendSystemMessage(Component.literal("Economy transaction history retention set to "
+                + applied + " per account."));
         return 1;
     }
 

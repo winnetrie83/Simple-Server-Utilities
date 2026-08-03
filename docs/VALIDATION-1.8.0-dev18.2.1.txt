@@ -1,0 +1,31 @@
+Simple Server Utilities 1.8.0-dev18.2.1 validation
+===================================================
+
+Target
+------
+Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+Network protocol: 67
+Border visualization preference schema: 3
+All other SSU storage schemas: unchanged
+
+Static validation completed
+---------------------------
+- All 520 Java source files passed delimiter/comment/string structural scanning.
+- A javac 21 source pass found no effectively-final/lambda diagnostic in the repaired Travel builders. Expected external Minecraft, NeoForge and Gson symbols are unavailable in this isolated source-only environment.
+- Both player Travel and Admin Travel retain a mutable accumulator and filter/sort into a separate immutable `visible` list.
+- All 13 resource/template JSON files parsed successfully.
+- Version 1.8.0-dev18.2.1 is synchronized in Gradle metadata, README and changelog.
+- Network protocol remains 67; no payload or storage layout changed.
+
+Behavioural safeguards reviewed
+-------------------------------
+- Full claim deletion still removes all homes linked to the claim.
+- A successful individual chunk unclaim removes every home physically located in that chunk.
+- A successful Claim Map batch removal removes homes in all successfully removed chunks through one centralized PlayerHomeManager operation.
+- Ownership and connected-shape validation run before home cleanup. Rejected or disconnecting chunk removals leave homes untouched.
+- Cleanup matches both dimension and exact chunk coordinates, so homes in unrelated claims or dimensions are preserved.
+- Existing commands and GUI routes continue to call PlayerClaimManager and therefore receive the same cleanup behaviour.
+
+Full build limitation in this container
+---------------------------------------
+The container provides Java 21 rather than the required Java 25. Gradle 9.2.1 is not available locally and the wrapper cannot download it in the offline environment, so a complete NeoForge `gradlew.bat clean build` could not be executed here. Dev18.2.1 must still be built and tested by the user with Java 25.

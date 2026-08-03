@@ -162,7 +162,7 @@ public final class RegionPermissionScreen extends Screen {
     private void requestPage(int pageIndex) {
         long id = nextRequestId++;
         ClientPacketDistributor.sendToServer(new SsuPermissionEditorRequestPayload(
-                "region", data.selectedTarget(), "", query,
+                "region", data.selectedTarget(), "", "", query,
                 Math.max(0, pageIndex), PAGE_SIZE, id));
     }
 

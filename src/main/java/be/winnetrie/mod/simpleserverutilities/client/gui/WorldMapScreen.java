@@ -394,7 +394,7 @@ public final class WorldMapScreen extends Screen {
     private void openClaimMap() {
         int claimRadius = Math.max(2, Math.min(12, payload.radius()));
         ClientPacketDistributor.sendToServer(new ClaimMapRequestPayload(
-                payload.centerChunkX(), payload.centerChunkZ(), claimRadius, ""));
+                payload.centerChunkX(), payload.centerChunkZ(), claimRadius, "", false));
     }
 
     private void backToMenu() {
@@ -440,21 +440,21 @@ public final class WorldMapScreen extends Screen {
         MapMarkerSyncPayload.Entry marker = context.marker();
 
         if (marker == null) {
-            if (inside(mouseX, mouseY, left, top, 126, 20)) {
+            if (SsuGuiGeometry.inside(mouseX, mouseY, left, top, 126, 20)) {
                 createMarker();
                 return true;
             }
         } else {
-            if (inside(mouseX, mouseY, left, top, 60, 20)) {
+            if (SsuGuiGeometry.inside(mouseX, mouseY, left, top, 60, 20)) {
                 editMarker(marker);
                 return true;
             }
-            if (inside(mouseX, mouseY, left + 64, top, 62, 20)) {
+            if (SsuGuiGeometry.inside(mouseX, mouseY, left + 64, top, 62, 20)) {
                 deleteMarker(marker);
                 return true;
             }
         }
-        if (inside(mouseX, mouseY, left, top + 24, 126, 20)) {
+        if (SsuGuiGeometry.inside(mouseX, mouseY, left, top + 24, 126, 20)) {
             closeContext();
             return true;
         }
@@ -472,12 +472,7 @@ public final class WorldMapScreen extends Screen {
     private int contextMenuTop() {
         return Math.max(mapTop + 8, Math.min(mapTop + mapSize - 52, context.screenY() + 5));
     }
-
-    private static boolean inside(double mouseX, double mouseY, int left, int top, int width, int height) {
-        return mouseX >= left && mouseX < left + width && mouseY >= top && mouseY < top + height;
-    }
-
-    @Override
+@Override
     public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
         if (mapWidget != null && mapWidget.isMiddleDragging()) {
             return mapWidget.updateMiddleDrag(event.x(), event.y());

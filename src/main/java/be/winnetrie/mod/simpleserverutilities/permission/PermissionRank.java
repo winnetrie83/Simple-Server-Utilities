@@ -10,6 +10,7 @@ public class PermissionRank {
     private int priority = 0;
     private List<String> inherits = new ArrayList<>();
     private Map<String, String> permissions = new HashMap<>();
+    private Map<String, PermissionScope> dimensionPermissions = new HashMap<>();
 
     public PermissionRank() {
         // Required for Gson
@@ -41,6 +42,32 @@ public class PermissionRank {
         }
 
         return permissions;
+    }
+
+
+    public Map<String, PermissionScope> getDimensionPermissions() {
+        if (dimensionPermissions == null) {
+            dimensionPermissions = new HashMap<>();
+        }
+        return dimensionPermissions;
+    }
+
+    public PermissionScope getOrCreateDimensionScope(String dimensionId) {
+        if (dimensionId == null || dimensionId.isBlank()) {
+            throw new IllegalArgumentException("Dimension id is required.");
+        }
+        return getDimensionPermissions().computeIfAbsent(dimensionId.trim(), ignored -> new PermissionScope());
+    }
+
+    public PermissionScope getDimensionScope(String dimensionId) {
+        return dimensionId == null ? null : getDimensionPermissions().get(dimensionId.trim());
+    }
+
+    public void removeDimensionScopeIfEmpty(String dimensionId) {
+        PermissionScope scope = getDimensionScope(dimensionId);
+        if (scope != null && scope.getPermissions().isEmpty()) {
+            getDimensionPermissions().remove(dimensionId.trim());
+        }
     }
 
     public void setPermission(String key, String value) {
