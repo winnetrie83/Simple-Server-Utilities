@@ -9,8 +9,11 @@ import java.util.Map;
 import be.winnetrie.mod.simpleserverutilities.content.ContentAction;
 import be.winnetrie.mod.simpleserverutilities.mail.MailItemCodec;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameArenaDefinition;
+import be.winnetrie.mod.simpleserverutilities.minigame.MinigameBoostRules;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameLocation;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameRewardSet;
+import be.winnetrie.mod.simpleserverutilities.minigame.MinigameRoleProfile;
+import be.winnetrie.mod.simpleserverutilities.minigame.MinigameRoleRules;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameSpawnPoint;
 import be.winnetrie.mod.simpleserverutilities.minigame.CaptureTheFlagRules;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameFlagPoint;
@@ -31,8 +34,8 @@ import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
     private static final int W = 645, H = 352;
     private static final int TAB_Y = 10;
-    private static final String[] TABS = {"General", "Arena", "Player spawns", "Rewards", "Flags & rules"};
-    private static final int[] TAB_WIDTHS = {86, 72, 112, 76, 98};
+    private static final String[] TABS = {"General", "Arena", "Player spawns", "Rewards", "Flags & rules", "Boosts", "Roles"};
+    private static final int[] TAB_WIDTHS = {76, 62, 102, 68, 92, 66, 58};
 
     private int page;
     private int arenaIndex;
@@ -44,7 +47,7 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
     private int carriedInventorySlot = -1;
 
     // General
-    private EditBox id, name, icon, minPlayers, maxPlayers, countdown, duration, postGame;
+    private EditBox id, name, icon, minPlayers, maxPlayers, countdown, respawnDelay, duration, postGame;
     private MultiLineEditBox description;
     private String descriptionValue = "";
     private boolean enabled, automaticStart;
@@ -74,6 +77,24 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
     private EditBox flagDimension, flagX, flagY, flagZ, flagYaw, flagPitch;
     private boolean allowFriendlyFire;
 
+    // Boosts
+    private boolean boostsEnabled, boostAutoMode, boostSpeed, boostRegeneration, boostArmor, boostJump;
+    private Button boostsEnabledButton, boostModeButton, boostSpeedButton, boostRegenerationButton, boostArmorButton, boostJumpButton;
+    private EditBox boostMaximumActive, boostInitialDelay, boostRespawnMin, boostRespawnMax, boostSpacing;
+    private EditBox boostSpeedDuration, boostSpeedColor, boostRegenerationDuration, boostRegenerationColor;
+    private EditBox boostArmorDuration, boostArmorColor, boostArmorPoints, boostJumpDuration, boostJumpColor;
+
+    // Optional tactical roles
+    private int rolePage;
+    private boolean rolesEnabled;
+    private Button rolesEnabledButton, rolePageButton;
+    private EditBox dpsMin, dpsMax, dpsHealth, dpsArmor, dpsToughness;
+    private EditBox tankMin, tankMax, tankHealth, tankArmor, tankToughness;
+    private EditBox healerMin, healerMax, healerHealth, healerArmor, healerToughness;
+    private EditBox tankSlowRange, tankKnockback, tankSlowDuration, tankSlowCooldown;
+    private EditBox healerSingleAmount, healerSingleCooldown, healerAoeAmount, healerAoeRange, healerAoeCooldown, healerSelfCooldown;
+    private EditBox dpsArrowEffect, dpsArrowLevel, dpsArrowDuration;
+
     CaptureTheFlagMinigameEditorScreen(MinigameEditorOpenPayload initial, Screen parent) {
         super(initial, parent, "Capture the Flag Editor");
         afterDraftReloaded();
@@ -83,6 +104,8 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
         if (draft.arenas == null) draft.arenas = new ArrayList<>();
         if (draft.arenas.isEmpty()) draft.arenas.add(new MinigameArenaDefinition());
         if (draft.captureTheFlag == null) draft.captureTheFlag = new CaptureTheFlagRules();
+        if (draft.captureTheFlag.roles == null) draft.captureTheFlag.roles = new MinigameRoleRules();
+        draft.captureTheFlag.roles.normalize();
         if (draft.participationReward == null) draft.participationReward = new MinigameRewardSet();
         if (draft.winnerReward == null) draft.winnerReward = new MinigameRewardSet();
         arenaIndex = Math.max(0, Math.min(arenaIndex, draft.arenas.size() - 1));
@@ -115,7 +138,9 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
         else if (page == 1) initArena(left, top);
         else if (page == 2) initSpawns(left, top);
         else if (page == 3) initRewards(left, top);
-        else initRules(left, top);
+        else if (page == 4) initRules(left, top);
+        else if (page == 5) initBoosts(left, top);
+        else initRoles(left, top);
 
         addRenderableWidget(Button.builder(Component.literal("Cancel"), ignored -> onClose())
                 .bounds(left + 14, top + H - 30, 78, 20).build());
@@ -136,11 +161,12 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
                 .build(font, 617, 54, Component.literal("Description"));
         description.setCharacterLimit(8_192); description.setLineLimit(24); description.setValue(descriptionValue);
         description.setValueListener(value -> descriptionValue = value); addRenderableWidget(description);
-        minPlayers = field(left + 14, top + 208, 112, 3, "Minimum players", Integer.toString(draft.minPlayers));
-        maxPlayers = field(left + 134, top + 208, 112, 3, "Maximum players", Integer.toString(draft.maxPlayers));
-        countdown = field(left + 254, top + 208, 112, 6, "Countdown", Integer.toString(draft.countdownSeconds));
-        duration = field(left + 374, top + 208, 112, 8, "Match duration", Integer.toString(draft.matchDurationSeconds));
-        postGame = field(left + 494, top + 208, 137, 6, "Post-game duration", Integer.toString(draft.postGameSeconds));
+        minPlayers = field(left + 14, top + 208, 96, 3, "Minimum players", Integer.toString(draft.minPlayers));
+        maxPlayers = field(left + 118, top + 208, 96, 3, "Maximum players", Integer.toString(draft.maxPlayers));
+        countdown = field(left + 222, top + 208, 96, 6, "Countdown", Integer.toString(draft.countdownSeconds));
+        respawnDelay = field(left + 326, top + 208, 96, 3, "Respawn delay", Integer.toString(draft.respawnDelaySeconds));
+        duration = field(left + 430, top + 208, 96, 8, "Match duration", Integer.toString(draft.matchDurationSeconds));
+        postGame = field(left + 534, top + 208, 97, 6, "Post-game duration", Integer.toString(draft.postGameSeconds));
         enabled = draft.enabled; automaticStart = draft.automaticStart;
         enabledButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> { enabled = !enabled; updateLabels(); })
                 .bounds(left + 14, top + 270, 146, 20).build());
@@ -264,6 +290,111 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
         updateLabels();
     }
 
+    private void initBoosts(int left, int top) {
+        MinigameBoostRules boosts = draft.captureTheFlag.boosts;
+        boostsEnabled = boosts.enabled;
+        boostAutoMode = boosts.automatic();
+        boostSpeed = boosts.speedEnabled;
+        boostRegeneration = boosts.regenerationEnabled;
+        boostArmor = boosts.armorEnabled;
+        boostJump = boosts.jumpEnabled;
+        boostsEnabledButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> {
+            boostsEnabled = !boostsEnabled; updateLabels();
+        }).bounds(left + 14, top + 43, 196, 20).build());
+        boostModeButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> {
+            boostAutoMode = !boostAutoMode; updateLabels();
+        }).bounds(left + 220, top + 43, 196, 20).build());
+        boostMaximumActive = field(left + 14, top + 92, 105, 3, "Max active", Integer.toString(boosts.maximumActive));
+        boostInitialDelay = field(left + 129, top + 92, 105, 6, "Initial delay", Integer.toString(boosts.initialSpawnDelaySeconds));
+        boostRespawnMin = field(left + 244, top + 92, 105, 6, "Respawn min", Integer.toString(boosts.respawnMinSeconds));
+        boostRespawnMax = field(left + 359, top + 92, 105, 6, "Respawn max", Integer.toString(boosts.respawnMaxSeconds));
+        boostSpacing = field(left + 474, top + 92, 105, 3, "Min spacing", Integer.toString((int) Math.round(boosts.minimumSpacing)));
+
+        boostSpeedButton = boostToggle(left + 14, top + 146, 150, () -> { boostSpeed = !boostSpeed; updateLabels(); });
+        boostSpeedDuration = field(left + 174, top + 146, 96, 6, "Duration", Integer.toString(boosts.speedDurationSeconds));
+        boostSpeedColor = field(left + 280, top + 146, 96, 8, "Mist RGB", rgb(boosts.speedColor));
+
+        boostRegenerationButton = boostToggle(left + 14, top + 184, 150, () -> { boostRegeneration = !boostRegeneration; updateLabels(); });
+        boostRegenerationDuration = field(left + 174, top + 184, 96, 6, "Duration", Integer.toString(boosts.regenerationDurationSeconds));
+        boostRegenerationColor = field(left + 280, top + 184, 96, 8, "Mist RGB", rgb(boosts.regenerationColor));
+
+        boostArmorButton = boostToggle(left + 14, top + 222, 150, () -> { boostArmor = !boostArmor; updateLabels(); });
+        boostArmorDuration = field(left + 174, top + 222, 96, 6, "Duration", Integer.toString(boosts.armorDurationSeconds));
+        boostArmorColor = field(left + 280, top + 222, 96, 8, "Mist RGB", rgb(boosts.armorColor));
+        boostArmorPoints = field(left + 386, top + 222, 96, 3, "Armor points", Integer.toString((int) Math.round(boosts.armorPoints)));
+
+        boostJumpButton = boostToggle(left + 14, top + 260, 150, () -> { boostJump = !boostJump; updateLabels(); });
+        boostJumpDuration = field(left + 174, top + 260, 96, 6, "Duration", Integer.toString(boosts.jumpDurationSeconds));
+        boostJumpColor = field(left + 280, top + 260, 96, 8, "Mist RGB", rgb(boosts.jumpColor));
+        updateLabels();
+    }
+
+
+    private void initRoles(int left, int top) {
+        MinigameRoleRules roles = draft.captureTheFlag.roles;
+        roles.normalize();
+        rolesEnabled = roles.enabled;
+        rolesEnabledButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> {
+            rolesEnabled = !rolesEnabled; updateLabels();
+        }).bounds(left + 14, top + 43, 196, 20).build());
+        rolePageButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> switchRolePage())
+                .bounds(left + 220, top + 43, 196, 20).build());
+
+        if (rolePage == 0) {
+            dpsMin = roleField(left + 100, top + 108, 70, "DPS minimum", roles.dps.minimumPerTeam);
+            dpsMax = roleField(left + 180, top + 108, 70, "DPS maximum", roles.dps.maximumPerTeam);
+            dpsHealth = roleField(left + 260, top + 108, 90, "DPS health", roles.dps.maxHealth);
+            dpsArmor = roleField(left + 360, top + 108, 90, "DPS armor", roles.dps.armor);
+            dpsToughness = roleField(left + 460, top + 108, 100, "DPS toughness", roles.dps.armorToughness);
+
+            tankMin = roleField(left + 100, top + 164, 70, "Tank minimum", roles.tank.minimumPerTeam);
+            tankMax = roleField(left + 180, top + 164, 70, "Tank maximum", roles.tank.maximumPerTeam);
+            tankHealth = roleField(left + 260, top + 164, 90, "Tank health", roles.tank.maxHealth);
+            tankArmor = roleField(left + 360, top + 164, 90, "Tank armor", roles.tank.armor);
+            tankToughness = roleField(left + 460, top + 164, 100, "Tank toughness", roles.tank.armorToughness);
+
+            healerMin = roleField(left + 100, top + 220, 70, "Healer minimum", roles.healer.minimumPerTeam);
+            healerMax = roleField(left + 180, top + 220, 70, "Healer maximum", roles.healer.maximumPerTeam);
+            healerHealth = roleField(left + 260, top + 220, 90, "Healer health", roles.healer.maxHealth);
+            healerArmor = roleField(left + 360, top + 220, 90, "Healer armor", roles.healer.armor);
+            healerToughness = roleField(left + 460, top + 220, 100, "Healer toughness", roles.healer.armorToughness);
+        } else {
+            tankSlowRange = roleField(left + 14, top + 108, 100, "Tank slow radius", roles.tankSlowRadius);
+            tankSlowDuration = roleField(left + 124, top + 108, 100, "Tank slow duration", roles.tankSlowDurationSeconds);
+            tankSlowCooldown = roleField(left + 234, top + 108, 100, "Tank slow cooldown", roles.tankSlowCooldownSeconds);
+            tankKnockback = roleField(left + 344, top + 108, 100, "Tank knockback", roles.tankKnockbackStrength);
+
+            healerSingleAmount = roleField(left + 14, top + 174, 90, "Single heal amount", roles.healerSingleHealAmount);
+            healerSingleCooldown = roleField(left + 114, top + 174, 90, "Single heal cooldown", roles.healerSingleHealCooldownSeconds);
+            healerAoeAmount = roleField(left + 214, top + 174, 90, "AOE heal amount", roles.healerAoeHealAmount);
+            healerAoeRange = roleField(left + 314, top + 174, 90, "AOE heal radius", roles.healerAoeHealRadius);
+            healerAoeCooldown = roleField(left + 414, top + 174, 90, "AOE heal cooldown", roles.healerAoeHealCooldownSeconds);
+            healerSelfCooldown = roleField(left + 514, top + 174, 90, "Self-heal cooldown", roles.healerSelfHealCooldownSeconds);
+
+            dpsArrowEffect = field(left + 14, top + 250, 250, 128, "Arrow effect ID", roles.dpsArrowEffect);
+            dpsArrowLevel = roleField(left + 274, top + 250, 100, "Arrow level", roles.dpsArrowEffectAmplifier + 1);
+            dpsArrowDuration = roleField(left + 384, top + 250, 120, "Arrow duration", roles.dpsArrowEffectDurationSeconds);
+        }
+        updateLabels();
+    }
+
+    private EditBox roleField(int x, int y, int width, String hint, int value) {
+        return field(x, y, width, 8, hint, Integer.toString(value));
+    }
+
+    private EditBox roleField(int x, int y, int width, String hint, double value) {
+        return field(x, y, width, 12, hint, roleNumber(value));
+    }
+
+    private static String roleNumber(double value) {
+        long rounded = Math.round(value);
+        return Math.abs(value - rounded) < 0.000001D ? Long.toString(rounded) : Double.toString(value);
+    }
+
+    private Button boostToggle(int x, int y, int width, Runnable action) {
+        return addRenderableWidget(Button.builder(Component.empty(), ignored -> action.run()).bounds(x, y, width, 20).build());
+    }
+
     private boolean saveCurrentPage() {
         try {
             if (page == 0 && id != null) saveGeneral();
@@ -271,6 +402,8 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
             else if (page == 2 && spawnDimension != null) saveSpawn();
             else if (page == 3 && rewardMoney != null) saveRewards();
             else if (page == 4 && flagDimension != null) saveRules();
+            else if (page == 5 && boostMaximumActive != null) saveBoosts();
+            else if (page == 6) saveRoles();
             return true;
         } catch (RuntimeException exception) {
             setNotice(exception.getMessage() == null ? "A field contains an invalid value." : exception.getMessage(), true);
@@ -286,6 +419,7 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
         draft.minPlayers = parseInt(minPlayers, "Minimum players", 2, 64);
         draft.maxPlayers = parseInt(maxPlayers, "Maximum players", draft.minPlayers, 64);
         draft.countdownSeconds = parseInt(countdown, "Countdown seconds", 0, 600);
+        draft.respawnDelaySeconds = parseInt(respawnDelay, "Respawn delay", 1, 300);
         draft.matchDurationSeconds = parseInt(duration, "Match duration", 0, 86_400);
         draft.postGameSeconds = parseInt(postGame, "Result screen duration", 0, 600);
         draft.enabled = enabled; draft.automaticStart = automaticStart;
@@ -347,6 +481,91 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
         rules.flagTakeCastSeconds = parseInt(flagTakeCast, "Flag take cast", 1, 60);
         rules.weaponItem = weaponItem.getValue().trim();
         rules.allowFriendlyFire = allowFriendlyFire;
+    }
+
+    private void saveBoosts() {
+        MinigameBoostRules boosts = draft.captureTheFlag.boosts;
+        boosts.enabled = boostsEnabled;
+        boosts.placementMode = boostAutoMode ? "automatic" : "manual";
+        boosts.maximumActive = parseInt(boostMaximumActive, "Maximum active boosts", 1, 16);
+        boosts.initialSpawnDelaySeconds = parseInt(boostInitialDelay, "Initial boost delay", 0, 86_400);
+        boosts.respawnMinSeconds = parseInt(boostRespawnMin, "Minimum boost respawn", 1, 86_400);
+        boosts.respawnMaxSeconds = parseInt(boostRespawnMax, "Maximum boost respawn", boosts.respawnMinSeconds, 86_400);
+        boosts.minimumSpacing = parseInt(boostSpacing, "Minimum boost spacing", 1, 32);
+        boosts.speedEnabled = boostSpeed;
+        boosts.speedDurationSeconds = parseInt(boostSpeedDuration, "Speed duration", 1, 600);
+        boosts.speedColor = parseRgb(boostSpeedColor, "Speed mist color");
+        boosts.regenerationEnabled = boostRegeneration;
+        boosts.regenerationDurationSeconds = parseInt(boostRegenerationDuration, "Regeneration duration", 1, 600);
+        boosts.regenerationColor = parseRgb(boostRegenerationColor, "Regeneration mist color");
+        boosts.armorEnabled = boostArmor;
+        boosts.armorDurationSeconds = parseInt(boostArmorDuration, "Armor duration", 1, 600);
+        boosts.armorColor = parseRgb(boostArmorColor, "Armor mist color");
+        boosts.armorPoints = parseInt(boostArmorPoints, "Temporary armor points", 1, 20);
+        boosts.jumpEnabled = boostJump;
+        boosts.jumpDurationSeconds = parseInt(boostJumpDuration, "Jump duration", 1, 600);
+        boosts.jumpColor = parseRgb(boostJumpColor, "Jump mist color");
+        boosts.normalize();
+    }
+
+
+    private void saveRoles() {
+        MinigameRoleRules roles = draft.captureTheFlag.roles;
+        roles.enabled = rolesEnabled;
+        if (rolePage == 0 && dpsMin != null) {
+            saveRoleProfile(roles.dps, dpsMin, dpsMax, dpsHealth, dpsArmor, dpsToughness, "DPS");
+            saveRoleProfile(roles.tank, tankMin, tankMax, tankHealth, tankArmor, tankToughness, "Tank");
+            saveRoleProfile(roles.healer, healerMin, healerMax, healerHealth, healerArmor, healerToughness, "Healer");
+        } else if (rolePage == 1 && tankSlowDuration != null) {
+            roles.tankSlowRadius = roleDouble(tankSlowRange, "Tank slow radius", 1.0D, 16.0D);
+            roles.tankKnockbackStrength = roleDouble(tankKnockback, "Tank knockback strength", 0.0D, 5.0D);
+            roles.tankSlowDurationSeconds = parseInt(tankSlowDuration, "Tank slow duration", 1, 60);
+            roles.tankSlowCooldownSeconds = parseInt(tankSlowCooldown, "Tank slow cooldown", 1, 600);
+            roles.healerSingleHealAmount = roleDouble(healerSingleAmount, "Single-target heal", 1.0D, 100.0D);
+            roles.healerSingleHealCooldownSeconds = parseInt(healerSingleCooldown, "Single-target heal cooldown", 1, 600);
+            roles.healerAoeHealAmount = roleDouble(healerAoeAmount, "AOE heal", 0.5D, 100.0D);
+            roles.healerAoeHealRadius = roleDouble(healerAoeRange, "AOE heal radius", 1.0D, 16.0D);
+            if (roles.healerAoeHealAmount >= roles.healerSingleHealAmount)
+                throw new IllegalArgumentException("AOE heal must be weaker than the single-target heal.");
+            roles.healerAoeHealCooldownSeconds = parseInt(healerAoeCooldown, "AOE heal cooldown", 1, 600);
+            roles.healerSelfHealCooldownSeconds = parseInt(healerSelfCooldown, "Self-heal cooldown", 1, 600);
+            roles.dpsArrowEffect = dpsArrowEffect.getValue().trim().toLowerCase(Locale.ROOT);
+            if (roles.dpsArrowEffect.isBlank()) throw new IllegalArgumentException("DPS arrow effect ID cannot be empty.");
+            try { net.minecraft.resources.Identifier.parse(roles.dpsArrowEffect); }
+            catch (RuntimeException exception) { throw new IllegalArgumentException("DPS arrow effect ID is invalid."); }
+            roles.dpsArrowEffectAmplifier = parseInt(dpsArrowLevel, "DPS arrow effect level", 1, 10) - 1;
+            roles.dpsArrowEffectDurationSeconds = parseInt(dpsArrowDuration, "DPS arrow effect duration", 1, 600);
+        }
+        roles.normalize();
+        if (roles.enabled && roles.minimumTotalPerTeam() > draft.minPlayers / 2)
+            throw new IllegalArgumentException("Role minimums do not fit the smallest team at the configured minimum player count.");
+        if (roles.enabled && roles.maximumTotalPerTeam() < (draft.maxPlayers + 1) / 2)
+            throw new IllegalArgumentException("Role maximums cannot hold the largest possible team.");
+    }
+
+    private void saveRoleProfile(MinigameRoleProfile profile, EditBox minimum, EditBox maximum, EditBox health,
+                                 EditBox armor, EditBox toughness, String label) {
+        int min = parseInt(minimum, label + " minimum per team", 0, 64);
+        int max = parseInt(maximum, label + " maximum per team", Math.max(1, min), 64);
+        profile.minimumPerTeam = min;
+        profile.maximumPerTeam = max;
+        profile.maxHealth = roleDouble(health, label + " max health", 1.0D, 1024.0D);
+        profile.armor = roleDouble(armor, label + " armor", 0.0D, 100.0D);
+        profile.armorToughness = roleDouble(toughness, label + " armor toughness", 0.0D, 100.0D);
+        profile.normalize();
+    }
+
+    private double roleDouble(EditBox box, String label, double minimum, double maximum) {
+        double value = parseDouble(box, label);
+        if (value < minimum || value > maximum)
+            throw new IllegalArgumentException(label + " must be between " + roleNumber(minimum) + " and " + roleNumber(maximum) + ".");
+        return value;
+    }
+
+    private void switchRolePage() {
+        if (!saveCurrentPage()) return;
+        rolePage = rolePage == 0 ? 1 : 0;
+        rebuildWidgets();
     }
 
     private void saveAll() { if (saveCurrentPage()) submitDraft(); }
@@ -519,12 +738,13 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int left = left(), top = top();
         g.fill(0, 0, width, height, 0xA9000000); g.fill(left, top, left + W, top + H, PANEL); g.outline(left, top, W, H, BORDER);
-        g.text(font, "Capture the Flag Editor", left + W - 162, top + 17, TEXT, true);
         if (page == 0) renderGeneral(g, left, top);
         else if (page == 1) renderArena(g, left, top);
         else if (page == 2) renderSpawns(g, left, top);
         else if (page == 3) renderRewards(g, left, top, mouseX, mouseY);
-        else renderRules(g, left, top);
+        else if (page == 4) renderRules(g, left, top);
+        else if (page == 5) renderBoosts(g, left, top);
+        else renderRoles(g, left, top);
         if (!notice.isBlank()) g.text(font, trim(notice, 68), left + 102, top + H - 24, noticeError ? ERROR : GOOD, false);
         super.extractRenderState(g, mouseX, mouseY, partialTick);
         if (page == 3 && carriedInventorySlot >= 0) renderGhostCursor(g, mouseX, mouseY);
@@ -536,11 +756,12 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
         fieldInfo(g, left + 428, top + 42, "Menu icon", "Item ID used in the minigame menu.", 203);
         g.text(font, "Description", left + 14, top + 100, TEXT, true);
         g.text(font, "Explain the goal and important rules to players.", left + 104, top + 100, MUTED, false);
-        fieldInfo(g, left + 14, top + 192, "Minimum players", "Needed before start.", 112);
-        fieldInfo(g, left + 134, top + 192, "Maximum players", "Also required spawns.", 112);
-        fieldInfo(g, left + 254, top + 192, "Countdown", "Seconds before start.", 112);
-        fieldInfo(g, left + 374, top + 192, "Match time", "0 means unlimited.", 112);
-        fieldInfo(g, left + 494, top + 192, "Post-game time", "Seconds before return.", 137);
+        fieldInfo(g, left + 14, top + 192, "Minimum", "Players to start.", 96);
+        fieldInfo(g, left + 118, top + 192, "Maximum", "Player limit.", 96);
+        fieldInfo(g, left + 222, top + 192, "Countdown", "Lobby seconds.", 96);
+        fieldInfo(g, left + 326, top + 192, "Respawn", "Delay after death.", 96);
+        fieldInfo(g, left + 430, top + 192, "Match time", "0 = unlimited.", 96);
+        fieldInfo(g, left + 534, top + 192, "Post-game", "Return delay.", 97);
         g.text(font, "Capture the Flag uses two teams, highest capture score and no late joining.", left + 14, top + 304, GOOD, false);
     }
 
@@ -632,6 +853,69 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
                 left + 14, top + 302, 617, MUTED, 1);
     }
 
+    private void renderBoosts(GuiGraphicsExtractor g, int left, int top) {
+        wrapped(g, boostAutoMode
+                        ? "Automatic CTF placement searches safe random ground positions throughout the arena."
+                        : "Manual placement uses the boost spawn slots registered with the Minigame Setup Tool.",
+                left + 428, top + 43, 203, boostAutoMode ? GOOD : MUTED, 3);
+        fieldInfo(g, left + 14, top + 76, "Max active", "Maximum boosts present together.", 105);
+        fieldInfo(g, left + 129, top + 76, "Initial delay", "Seconds after match start.", 105);
+        fieldInfo(g, left + 244, top + 76, "Respawn min", "Shortest random delay.", 105);
+        fieldInfo(g, left + 359, top + 76, "Respawn max", "Longest random delay.", 105);
+        fieldInfo(g, left + 474, top + 76, "Min spacing", "No boosts closer than this.", 105);
+        g.text(font, "Allowed boost", left + 14, top + 130, TEXT, true);
+        g.text(font, "Duration (seconds)", left + 174, top + 130, TEXT, true);
+        g.text(font, "Gaussian-like mist RGB", left + 280, top + 130, TEXT, true);
+        wrapped(g, "Items float without an entity glow. A soft cloud of colored dust surrounds each item; walking through it consumes the boost and schedules a new random spawn.",
+                left + 386, top + 146, 245, MUTED, 6);
+        wrapped(g, "Temporary armor adds real armor points and restores the player's original base armor value when its timer expires or the match ends.",
+                left + 386, top + 242, 245, GOOD, 4);
+        g.text(font, "Use six-digit RGB colors without alpha, for example 40C4FF.", left + 14, top + 298, MUTED, false);
+    }
+
+
+    private void renderRoles(GuiGraphicsExtractor g, int left, int top) {
+        if (rolePage == 0) {
+            g.text(font, "Role", left + 14, top + 90, TEXT, true);
+            g.text(font, "Minimum / team", left + 100, top + 90, TEXT, true);
+            g.text(font, "Maximum / team", left + 180, top + 90, TEXT, true);
+            g.text(font, "Max health", left + 260, top + 90, TEXT, true);
+            g.text(font, "Armor", left + 360, top + 90, TEXT, true);
+            g.text(font, "Toughness", left + 460, top + 90, TEXT, true);
+            g.text(font, "DPS", left + 14, top + 114, GOOD, true);
+            g.text(font, "Tank", left + 14, top + 170, 0xFFFFC857, true);
+            g.text(font, "Healer", left + 14, top + 226, 0xFF7FE3A1, true);
+            wrapped(g, "Players choose a preferred role before joining. SSU first satisfies each team's minimums, then respects preferences while staying within the maxima; a preference is never guaranteed.",
+                    left + 14, top + 266, 617, GOOD, 3);
+            wrapped(g, "Every role wears team-colored cosmetic leather. These base health, armor and toughness values provide the real combat statistics; two health points equal one heart.",
+                    left + 14, top + 298, 617, MUTED, 2);
+        } else {
+            g.text(font, "Tank defensive field", left + 14, top + 84, TEXT, true);
+            g.text(font, "Radius", left + 14, top + 96, MUTED, false);
+            g.text(font, "Slow duration", left + 124, top + 96, MUTED, false);
+            g.text(font, "Cooldown", left + 234, top + 96, MUTED, false);
+            g.text(font, "Knockback", left + 344, top + 96, MUTED, false);
+            wrapped(g, "Slows and pushes enemy players away inside the configured AOE radius. Knockback 0 disables the push. Activating without a target still consumes the cooldown.", left + 454, top + 86, 170, GOOD, 4);
+
+            g.text(font, "Healer abilities", left + 14, top + 142, TEXT, true);
+            g.text(font, "Single heal", left + 14, top + 160, MUTED, false);
+            g.text(font, "Single CD", left + 114, top + 160, MUTED, false);
+            g.text(font, "AOE heal", left + 214, top + 160, MUTED, false);
+            g.text(font, "AOE radius", left + 314, top + 160, MUTED, false);
+            g.text(font, "AOE CD", left + 414, top + 160, MUTED, false);
+            g.text(font, "Self CD", left + 514, top + 160, MUTED, false);
+            wrapped(g, "The straight single-target beam reaches eight blocks. AOE heals allies inside its configured radius, including the caster, and must remain weaker. Every ability may be fired without a valid target and still consumes its cooldown.",
+                    left + 14, top + 204, 570, GOOD, 3);
+
+            g.text(font, "DPS infinite arrow", left + 14, top + 226, TEXT, true);
+            g.text(font, "Effect ID", left + 14, top + 238, MUTED, false);
+            g.text(font, "Level", left + 274, top + 238, MUTED, false);
+            g.text(font, "Duration (s)", left + 384, top + 238, MUTED, false);
+            wrapped(g, "Default: minecraft:poison, level 1. The special arrow is replenished automatically after it is fired.",
+                    left + 14, top + 278, 570, MUTED, 2);
+        }
+    }
+
     private void renderRewardSlots(GuiGraphicsExtractor g, int startX, int startY, int mouseX, int mouseY) {
         for (int slot = 0; slot < MinigameRewardSet.MAX_ITEM_STACKS; slot++) {
             int x = startX + (slot % 3) * 34, y = startY + (slot / 3) * 34;
@@ -707,6 +991,14 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
         if (flagTeamButton != null) flagTeamButton.setMessage(Component.literal("Editing flag: "
                 + draft.captureTheFlag.teamName(flagTeam)));
         if (friendlyFireButton != null) friendlyFireButton.setMessage(Component.literal("Friendly fire: " + yes(allowFriendlyFire)));
+        if (boostsEnabledButton != null) boostsEnabledButton.setMessage(Component.literal("Boost system: " + yes(boostsEnabled)));
+        if (boostModeButton != null) boostModeButton.setMessage(Component.literal("Placement: " + (boostAutoMode ? "Automatic" : "Manual")));
+        if (boostSpeedButton != null) boostSpeedButton.setMessage(Component.literal("Speed: " + yes(boostSpeed)));
+        if (boostRegenerationButton != null) boostRegenerationButton.setMessage(Component.literal("Regeneration: " + yes(boostRegeneration)));
+        if (boostArmorButton != null) boostArmorButton.setMessage(Component.literal("Temporary armor: " + yes(boostArmor)));
+        if (boostJumpButton != null) boostJumpButton.setMessage(Component.literal("Jump boost: " + yes(boostJump)));
+        if (rolesEnabledButton != null) rolesEnabledButton.setMessage(Component.literal("Tactical roles: " + yes(rolesEnabled)));
+        if (rolePageButton != null) rolePageButton.setMessage(Component.literal(rolePage == 0 ? "Open abilities & arrows" : "Open limits & attributes"));
     }
 
     private void fillCurrent(EditBox dimension, EditBox x, EditBox y, EditBox z, EditBox yaw, EditBox pitch) {
@@ -833,6 +1125,15 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
             if (!value.isBlank() && !result.contains(value)) result.add(value);
         }
         return result;
+    }
+
+    private static String rgb(int color) { return String.format(Locale.ROOT, "%06X", color & 0xFFFFFF); }
+
+    private static int parseRgb(EditBox field, String label) {
+        String value = field.getValue().trim().replace("#", "");
+        if (value.length() != 6) throw new IllegalArgumentException(label + " must be a six-digit RGB hex value.");
+        try { return Integer.parseInt(value, 16) & 0xFFFFFF; }
+        catch (RuntimeException exception) { throw new IllegalArgumentException(label + " must be a six-digit RGB hex value."); }
     }
 
     private static String yes(boolean value) { return value ? "Yes" : "No"; }

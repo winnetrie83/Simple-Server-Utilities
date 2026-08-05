@@ -1,0 +1,31 @@
+Simple Server Utilities 1.9.0-dev2.6 validation
+Date: 2026-08-05
+
+Versioning
+- Mod version: 1.9.0-dev2.6
+- Network protocol: 79
+- Minigame definition schema: 11
+- Minigame recovery schema: 3
+
+Implemented checks
+- Spleef standard Snowball unlock, per-player cooldown, one-block floor impact and automatic replenishment are server-authoritative.
+- Spleef Power Egg delayed random awards, random intervals, finite stacking cap and horizontal five-block impact are server-authoritative.
+- CTF/Domination boost configuration supports manual/automatic placement, active cap, initial delay, random respawn range, minimum spacing, allowed boost types, per-type durations/colors and armor points.
+- Manual boost positions are registered through the Minigame Setup Tool and validated for uniqueness, region containment, clear space and sturdy ground.
+- Automatic CTF candidates are distributed through the arena; automatic Domination candidates are generated near linked node respawns.
+- Floating boost item entities use no gravity and no entity glow; colored dust particles provide the surrounding mist.
+- Pickup is proximity-controlled, consumes the active boost and schedules a replacement after a random configured interval.
+- Match finish removes active boost entities and restores temporary armor. Startup removes orphan boost entities.
+- Recovery schema 3 stores the original base armor attribute so logout/crash recovery cannot leave temporary armor behind.
+- Spleef, CTF and Domination editors expose all new settings.
+
+Static validation
+- 581 Java source files passed delimiter/comment/string balance scanning.
+- Targeted javac parsing reported no syntax-form diagnostics; dependency resolution could not complete without Minecraft/NeoForge artifacts.
+- 2 resource JSON files parsed successfully.
+- Rules normalization harness passed for boost caps/ranges and Spleef projectile cooldown/interval/stack bounds.
+- Version, protocol, schema, Setup Tool action and editor-tab invariants passed.
+
+Build limitation
+- A complete Gradle compile could not run in this offline container because Gradle 9.2.1 is not installed locally and the wrapper attempted to download it from services.gradle.org.
+- The source must therefore still be compiled and tested in the normal Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25 development environment.

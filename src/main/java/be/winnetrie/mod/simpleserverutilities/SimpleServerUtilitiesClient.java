@@ -183,6 +183,12 @@ public class SimpleServerUtilitiesClient {
             GLFW.GLFW_KEY_V,
             SSU_CATEGORY
     );
+    private static final KeyMapping TOGGLE_MINIGAME_HUD = new KeyMapping(
+            "key.simpleserverutilities.toggle_minigame_hud",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_L,
+            SSU_CATEGORY
+    );
 
     private static int utilityMiningTick;
     private static boolean lastTreeHeld;
@@ -202,6 +208,7 @@ public class SimpleServerUtilitiesClient {
         event.register(OPEN_WORLD_MAP);
         event.register(ACTIVATE_TREECAPITATOR);
         event.register(ACTIVATE_VEINMINER);
+        event.register(TOGGLE_MINIGAME_HUD);
     }
 
     @SubscribeEvent
@@ -213,6 +220,10 @@ public class SimpleServerUtilitiesClient {
         event.registerAboveAll(
                 Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "block_information"),
                 BlockInformationClientState::render
+        );
+        event.registerAboveAll(
+                Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "utility_mining_info"),
+                UtilityMiningClientState::render
         );
         event.registerAboveAll(
                 Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_hud"),
@@ -799,6 +810,14 @@ public class SimpleServerUtilitiesClient {
                         minecraft.player.chunkPosition().z(),
                         8
                 ));
+            }
+        }
+        while (TOGGLE_MINIGAME_HUD.consumeClick()) {
+            if (minecraft.player != null && minecraft.gui.screen() == null
+                    && MinigameHudClientState.isServerVisible()) {
+                boolean shown = MinigameHudClientState.toggleVisibility();
+                minecraft.player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                        "Minigame scoreboard " + (shown ? "shown" : "hidden") + "."));
             }
         }
     }

@@ -153,28 +153,32 @@ public final class AuctionHouseScreen extends Screen {
 
         int searchY = top + 26;
         if (isBlacklistMode()) {
-            searchBox = new EditBox(font, l.contentLeft(), searchY, Math.max(100, l.contentWidth() - 118), 20,
+            int searchWidth = Math.max(100, (int)Math.floor((l.contentWidth() - 118) * 0.75D));
+            int controlsX = l.contentLeft() + searchWidth + 8;
+            searchBox = new EditBox(font, l.contentLeft(), searchY, searchWidth, 20,
                     Component.literal("Search blacklisted item name"));
             searchBox.setHint(Component.literal("Search blacklisted items…"));
             searchBox.setMaxLength(96);
             searchBox.setValue(data.search());
             addRenderableWidget(searchBox);
             addRenderableWidget(Button.builder(Component.literal("Search"), ignored -> search())
-                    .bounds(l.contentRight() - 114, searchY, 58, 20).build());
-            addRenderableWidget(sortButton("Name", "name", l.contentRight() - 52, searchY, 52));
+                    .bounds(controlsX, searchY, 58, 20).build());
+            addRenderableWidget(sortButton("Name", "name", controlsX + 62, searchY, 52));
         } else {
-            searchBox = new EditBox(font, l.contentLeft(), searchY, Math.max(100, l.contentWidth() - 252), 20,
+            int searchWidth = Math.max(100, (int)Math.floor((l.contentWidth() - 252) * 0.75D));
+            int controlsX = l.contentLeft() + searchWidth + 8;
+            searchBox = new EditBox(font, l.contentLeft(), searchY, searchWidth, 20,
                     Component.literal("Search item name"));
             searchBox.setHint(Component.literal("Search by item name…"));
             searchBox.setMaxLength(96);
             searchBox.setValue(data.search());
             addRenderableWidget(searchBox);
             addRenderableWidget(Button.builder(Component.literal("Search"), ignored -> search())
-                    .bounds(l.contentRight() - 246, searchY, 58, 20).build());
-            addRenderableWidget(sortButton("Name", "name", l.contentRight() - 184, searchY, 42));
-            addRenderableWidget(sortButton("Qty", "quantity", l.contentRight() - 138, searchY, 40));
-            addRenderableWidget(sortButton("Price", "price", l.contentRight() - 94, searchY, 44));
-            addRenderableWidget(sortButton("Time", "time", l.contentRight() - 46, searchY, 44));
+                    .bounds(controlsX, searchY, 58, 20).build());
+            addRenderableWidget(sortButton("Name", "name", controlsX + 62, searchY, 42));
+            addRenderableWidget(sortButton("Qty", "quantity", controlsX + 108, searchY, 40));
+            addRenderableWidget(sortButton("Price", "price", controlsX + 152, searchY, 44));
+            addRenderableWidget(sortButton("Time", "time", controlsX + 200, searchY, 44));
         }
 
         int rowHeight = Math.max(32, (l.listBottom() - l.listTop()) / PAGE_SIZE);
@@ -423,8 +427,9 @@ public final class AuctionHouseScreen extends Screen {
     }
 
     private void drawCategories(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
-        g.fill(l.left() + 5, l.top() + 31, l.left() + l.categoryWidth() - 4, l.bottom() - 76, SUBPANEL);
-        g.outline(l.left() + 5, l.top() + 31, l.categoryWidth() - 9, l.height() - 107, BORDER);
+        g.fill(l.left() + 5, l.top() + 31, l.left() + l.categoryWidth() - 4, l.listBottom(), SUBPANEL);
+        g.outline(l.left() + 5, l.top() + 31, l.categoryWidth() - 9,
+                l.listBottom() - (l.top() + 31), BORDER);
         if (isBlacklistMode()) {
             drawBlacklistManager(g, l, mouseX, mouseY);
         } else {
@@ -436,9 +441,6 @@ public final class AuctionHouseScreen extends Screen {
                 drawCategory(g, l, category.id(), category.label(), y, mouseX, mouseY);
                 y += 17;
             }
-        }
-        if (data.administrator()) {
-            g.text(font, "Sale tax", l.left() + 8, l.bottom() - 82, MUTED, false);
         }
     }
 
@@ -688,8 +690,8 @@ public final class AuctionHouseScreen extends Screen {
     }
 
     private Layout layout() {
-        int panelWidth = Math.min(1040, Math.max(620, width - 16));
-        int panelHeight = Math.min(590, Math.max(390, height - 16));
+        int panelWidth = Math.min(920, Math.max(620, width - 24));
+        int panelHeight = Math.min(510, Math.max(390, height - 24));
         int left = (width - panelWidth) / 2;
         int top = (height - panelHeight) / 2;
         int categoryWidth = isBlacklistMode() ? 190 : 152;

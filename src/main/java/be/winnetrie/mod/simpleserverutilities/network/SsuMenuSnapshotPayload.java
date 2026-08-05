@@ -22,6 +22,8 @@ public record SsuMenuSnapshotPayload(
         boolean claimBordersVisible,
         boolean showOtherClaims,
         boolean regionBordersVisible,
+        boolean minigameGameBorderVisible,
+        boolean minigameSpectatorBorderVisible,
         boolean canViewClaimBorders,
         boolean canViewRegionBorders,
         int activeJobs,
@@ -74,6 +76,8 @@ public record SsuMenuSnapshotPayload(
         buffer.writeBoolean(payload.claimBordersVisible);
         buffer.writeBoolean(payload.showOtherClaims);
         buffer.writeBoolean(payload.regionBordersVisible);
+        buffer.writeBoolean(payload.minigameGameBorderVisible);
+        buffer.writeBoolean(payload.minigameSpectatorBorderVisible);
         buffer.writeBoolean(payload.canViewClaimBorders);
         buffer.writeBoolean(payload.canViewRegionBorders);
         buffer.writeVarInt(payload.activeJobs);
@@ -98,6 +102,8 @@ public record SsuMenuSnapshotPayload(
                 buffer.readBoolean(),
                 readModuleSettings(buffer),
                 readAdminAccess(buffer),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
@@ -191,10 +197,12 @@ public record SsuMenuSnapshotPayload(
         buffer.writeUtf(settings.treecapitatorActivation(), 16);
         buffer.writeInt(settings.treecapitatorOutlineColor());
         buffer.writeVarInt(settings.treecapitatorOutlineBrightness());
+        buffer.writeBoolean(settings.treecapitatorInfoEnabled());
         buffer.writeBoolean(settings.veinminerEnabled());
         buffer.writeUtf(settings.veinminerActivation(), 16);
         buffer.writeInt(settings.veinminerOutlineColor());
         buffer.writeVarInt(settings.veinminerOutlineBrightness());
+        buffer.writeBoolean(settings.veinminerInfoEnabled());
     }
 
     private static UiSettingsSummary readUiSettings(RegistryFriendlyByteBuf buffer) {
@@ -227,9 +235,11 @@ public record SsuMenuSnapshotPayload(
                 buffer.readInt(),
                 buffer.readVarInt(),
                 buffer.readBoolean(),
+                buffer.readBoolean(),
                 buffer.readUtf(16),
                 buffer.readInt(),
-                buffer.readVarInt()
+                buffer.readVarInt(),
+                buffer.readBoolean()
         );
     }
 
@@ -512,10 +522,12 @@ public record SsuMenuSnapshotPayload(
             String treecapitatorActivation,
             int treecapitatorOutlineColor,
             int treecapitatorOutlineBrightness,
+            boolean treecapitatorInfoEnabled,
             boolean veinminerEnabled,
             String veinminerActivation,
             int veinminerOutlineColor,
-            int veinminerOutlineBrightness
+            int veinminerOutlineBrightness,
+            boolean veinminerInfoEnabled
     ) {
         public UiSettingsSummary {
             minimapSize = Math.max(64, Math.min(256, minimapSize));
@@ -537,8 +549,8 @@ public record SsuMenuSnapshotPayload(
                     8,
                     true, false, false,
                     false, false, false,
-                    false, "SNEAK", 0xFF55FF77, 85,
-                    false, "SNEAK", 0xFF55AAFF, 85
+                    false, "SNEAK", 0xFF55FF77, 85, true,
+                    false, "SNEAK", 0xFF55AAFF, 85, true
             );
         }
     }

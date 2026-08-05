@@ -1,0 +1,9 @@
+Simple Server Utilities 1.9.0-dev2.6.1 validation
+
+Compile hotfix validation:
+- Mod version: 1.9.0-dev2.6.1
+- Network protocol: 79 (unchanged)
+- Minigame definition schema: 11 (unchanged)
+- Minigame recovery schema: 3 (unchanged)
+- Fixed Integer.toString(double) compile errors in both CTF and Domination minigame editor screens.
+- Verified both minimum-spacing fields now render the normalized double as a rounded integer, matching the existing integer-only parser.

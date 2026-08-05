@@ -1,0 +1,27 @@
+Simple Server Utilities 1.9.0-dev2.9.1 validation
+
+Scope
+- Targeted hotfix for Minigame Setup Tool -> Edit arena blocks.
+- Base: SSU 1.9.0-dev2.9.
+
+Validated behavior/structure
+- RightClickBlock recognizes held BlockItem during an authorized arena edit session.
+- The clicked block use path is denied with TriState.FALSE, preventing containers, buttons, doors and similar block interactions.
+- The held item path remains available with TriState.DEFAULT so normal BlockItem placement can continue.
+- EntityPlaceEvent remains authoritative for arena bounds and active-runtime checks.
+- Existing break/place build-session authorization remains unchanged.
+
+Checks
+- Targeted ClaimProtectionEvents.java compile against minimal Java/API stubs: passed with javac 21.
+- NeoForge port/26.2 PlayerInteractEvent API checked for RightClickBlock#setUseBlock(TriState) and #setUseItem(TriState).
+- Java delimiter/structure scan: passed.
+- Resource JSON parse validation: passed.
+- Version constants: passed.
+- Full Gradle compilation unavailable: Gradle 9.2.1 is not cached and services.gradle.org cannot be reached from this environment; local runtime is Java 21 while the project targets Java 25.
+
+Version state
+- Mod version: 1.9.0-dev2.9.1
+- Network protocol: 83
+- Minigame definition schema: 13
+- Minigame recovery schema: 4
+- Player UI preference schema: 9

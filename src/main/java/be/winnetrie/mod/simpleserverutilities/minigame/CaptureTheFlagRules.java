@@ -18,6 +18,8 @@ public final class CaptureTheFlagRules {
     public String team2FlagBlock = "minecraft:blue_banner";
     public int team1Color = 0xE53935;
     public int team2Color = 0x1E88E5;
+    public MinigameBoostRules boosts = new MinigameBoostRules();
+    public MinigameRoleRules roles = new MinigameRoleRules();
 
     public void normalize() {
         scoreToWin = Math.max(1, Math.min(100, scoreToWin));
@@ -33,6 +35,10 @@ public final class CaptureTheFlagRules {
         team2Color &= 0x00FFFFFF;
         if (team1Color == 0) team1Color = 0xE53935;
         if (team2Color == 0) team2Color = 0x1E88E5;
+        if (boosts == null) boosts = new MinigameBoostRules();
+        boosts.normalize();
+        if (roles == null) roles = new MinigameRoleRules();
+        roles.normalize();
     }
 
     public String teamName(int team) { return team == 2 ? team2Name : team1Name; }

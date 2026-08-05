@@ -18,6 +18,8 @@ public record UtilityMiningPreviewPayload(
         String dimension,
         int outlineColor,
         int brightness,
+        boolean showInfo,
+        String blockName,
         List<Long> blocks
 ) implements CustomPacketPayload {
 
@@ -32,6 +34,7 @@ public record UtilityMiningPreviewPayload(
         miningType = miningType == null ? UtilityMiningType.NONE : miningType;
         dimension = dimension == null ? "" : dimension;
         brightness = Math.max(10, Math.min(100, brightness));
+        blockName = blockName == null ? "" : blockName.trim();
         blocks = blocks == null ? List.of() : List.copyOf(blocks);
         if (blocks.size() > UtilityMiningResolver.HARD_MAX_BLOCKS) {
             throw new IllegalArgumentException("Too many utility-mining preview blocks: " + blocks.size());
@@ -39,7 +42,7 @@ public record UtilityMiningPreviewPayload(
     }
 
     public static UtilityMiningPreviewPayload clear() {
-        return new UtilityMiningPreviewPayload(UtilityMiningType.NONE, "", 0, 10, List.of());
+        return new UtilityMiningPreviewPayload(UtilityMiningType.NONE, "", 0, 10, false, "", List.of());
     }
 
     public static UtilityMiningPreviewPayload of(
@@ -47,10 +50,13 @@ public record UtilityMiningPreviewPayload(
             String dimension,
             int outlineColor,
             int brightness,
+            boolean showInfo,
+            String blockName,
             List<BlockPos> positions
     ) {
         List<Long> packed = positions.stream().map(BlockPos::asLong).toList();
-        return new UtilityMiningPreviewPayload(type, dimension, outlineColor, brightness, packed);
+        return new UtilityMiningPreviewPayload(type, dimension, outlineColor, brightness,
+                showInfo, blockName, packed);
     }
 
     private static void encode(RegistryFriendlyByteBuf buffer, UtilityMiningPreviewPayload payload) {
@@ -58,6 +64,8 @@ public record UtilityMiningPreviewPayload(
         buffer.writeUtf(payload.dimension(), 256);
         buffer.writeInt(payload.outlineColor());
         buffer.writeVarInt(payload.brightness());
+        buffer.writeBoolean(payload.showInfo());
+        buffer.writeUtf(payload.blockName(), 128);
         buffer.writeVarInt(payload.blocks().size());
         for (long block : payload.blocks()) {
             buffer.writeLong(block);
@@ -69,6 +77,8 @@ public record UtilityMiningPreviewPayload(
         String dimension = buffer.readUtf(256);
         int color = buffer.readInt();
         int brightness = buffer.readVarInt();
+        boolean showInfo = buffer.readBoolean();
+        String blockName = buffer.readUtf(128);
         int count = buffer.readVarInt();
         if (count < 0 || count > UtilityMiningResolver.HARD_MAX_BLOCKS) {
             throw new IllegalArgumentException("Invalid utility-mining preview block count: " + count);
@@ -77,7 +87,7 @@ public record UtilityMiningPreviewPayload(
         for (int i = 0; i < count; i++) {
             blocks.add(buffer.readLong());
         }
-        return new UtilityMiningPreviewPayload(type, dimension, color, brightness, blocks);
+        return new UtilityMiningPreviewPayload(type, dimension, color, brightness, showInfo, blockName, blocks);
     }
 
     @Override

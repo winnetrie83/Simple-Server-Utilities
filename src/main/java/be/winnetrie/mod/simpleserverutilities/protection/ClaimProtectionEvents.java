@@ -1,10 +1,13 @@
 package be.winnetrie.mod.simpleserverutilities.protection;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.minigame.MinigameSetupToolService;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.TriState;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.level.block.SignBlock;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
@@ -54,6 +57,18 @@ public class ClaimProtectionEvents {
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        // Placing a block begins with RightClickBlock before EntityPlaceEvent fires.
+        // In Minigame Setup Tool edit mode, deny the clicked block's own interaction
+        // (containers, buttons, doors, etc.) while still allowing the held BlockItem
+        // to run its placement logic. The later EntityPlaceEvent remains the final
+        // boundary check and only permits positions inside the selected idle arena.
+        if (player.getItemInHand(event.getHand()).getItem() instanceof BlockItem
+                && MinigameSetupToolService.canEditBlock(player, event.getPos())) {
+            event.setUseBlock(TriState.FALSE);
+            event.setUseItem(TriState.DEFAULT);
             return;
         }
 

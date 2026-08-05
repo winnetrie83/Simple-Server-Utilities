@@ -45,13 +45,20 @@ import be.winnetrie.mod.simpleserverutilities.network.MinigameDominationVisualPa
 import be.winnetrie.mod.simpleserverutilities.network.MinigameCtfVisualPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.BorderVisualizationPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameScoreActionPayload;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
+import be.winnetrie.mod.simpleserverutilities.visualization.BorderCategory;
+import be.winnetrie.mod.simpleserverutilities.visualization.BorderLayer;
+import be.winnetrie.mod.simpleserverutilities.visualization.BorderVisualizationSettings;
+import be.winnetrie.mod.simpleserverutilities.visualization.PlayerBorderPreferences;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -68,12 +75,21 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.entity.projectile.FireworkRocketEntity;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.DyedItemColor;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.item.component.FireworkExplosion;
 import net.minecraft.world.item.component.Fireworks;
 import net.minecraft.world.level.GameType;
@@ -91,6 +107,10 @@ import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.scores.Scoreboard;
 import net.minecraft.world.scores.TeamColor;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.network.PacketDistributor;
 import it.unimi.dsi.fastutil.ints.IntList;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -100,19 +120,45 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * It deliberately contains no NPC, quest or dungeon dependency.
  */
 public final class MinigameManager {
-    public static final int DEFINITION_SCHEMA_VERSION = 10;
-    public static final int RECOVERY_SCHEMA_VERSION = 2;
+    public static final int DEFINITION_SCHEMA_VERSION = 15;
+    public static final int RECOVERY_SCHEMA_VERSION = 4;
     public static final int MAX_DEFINITIONS = 256;
     public static final int MAX_SERIALIZED_CHARACTERS = 65_535;
     public static final int MAX_QUEUE_SIZE = 2_048;
     private static final Duration CRITICAL_RECOVERY_FLUSH_TIMEOUT = Duration.ofSeconds(5);
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final String BOOST_ENTITY_TAG = "ssu_minigame_boost";
+    /** Hunger stays visually full while LivingHealEvent blocks hunger-based healing. */
+    private static final int COMBAT_FOOD_LEVEL = 20;
+    private static final String ROLE_DPS_SWORD = "DPS Sword";
+    private static final String ROLE_DPS_BOW = "DPS Bow";
+    private static final String ROLE_DPS_ARROW = "DPS Role Arrow";
+    private static final String ROLE_TANK_SWORD = "Tank Sword";
+    private static final String ROLE_HEALER_SWORD = "Healer Sword";
+    private static final String ROLE_TEAM_HELMET = "Team Helmet";
+    private static final String ROLE_TEAM_CHESTPLATE = "Team Chestplate";
+    private static final String ROLE_TEAM_LEGGINGS = "Team Leggings";
+    private static final String ROLE_TEAM_BOOTS = "Team Boots";
+    private static final String ROLE_TANK_FIELD = "Tank Defensive Field";
+    private static final String ROLE_TANK_SHIELD = "Team Tank Shield";
+    private static final String ROLE_HEAL_SINGLE = "Healer Single Heal";
+    private static final String ROLE_HEAL_AOE = "Healer AOE Heal";
+    private static final String ROLE_HEAL_SELF = "Healer Self Heal";
+    private static final Set<String> ROLE_LOCKED_NAMES = Set.of(
+            ROLE_DPS_SWORD, ROLE_DPS_BOW, ROLE_DPS_ARROW,
+            ROLE_TANK_SWORD, ROLE_TANK_FIELD, ROLE_TANK_SHIELD,
+            ROLE_HEALER_SWORD, ROLE_HEAL_SINGLE, ROLE_HEAL_AOE, ROLE_HEAL_SELF,
+            ROLE_TEAM_HELMET, ROLE_TEAM_CHESTPLATE, ROLE_TEAM_LEGGINGS, ROLE_TEAM_BOOTS);
+    private static final float MINIGAME_GAME_BORDER_WIDTH = 3.75F;
+    private static final float MINIGAME_SPECTATOR_BORDER_WIDTH = 3.25F;
 
     private final Map<String, MinigameDefinition> definitions = new LinkedHashMap<>();
     private final Map<String, LinkedHashMap<UUID, Long>> queues = new LinkedHashMap<>();
     private final Map<UUID, MinigameMatch> matches = new LinkedHashMap<>();
     private final Map<UUID, UUID> playerMatches = new HashMap<>();
     private final Map<UUID, String> playerQueues = new HashMap<>();
+    /** Queue-time preference only; final assignment is composed per team at match start. */
+    private final Map<UUID, MinigameRole> playerRolePreferences = new HashMap<>();
     private final Map<String, UUID> arenaReservations = new HashMap<>();
     private final Set<String> resettingArenas = new LinkedHashSet<>();
     private final Set<String> blockedArenas = new LinkedHashSet<>();
@@ -120,6 +166,8 @@ public final class MinigameManager {
     private final Set<String> unsafeArenas = new LinkedHashSet<>();
     private final Map<UUID, MinigameRecoveryData.Entry> recoveries = new LinkedHashMap<>();
     private final Map<UUID, Long> lastRequests = new HashMap<>();
+    /** Last effective runtime-border state sent to each player. */
+    private final Map<UUID, RuntimeBorderSyncState> runtimeBorderSyncStates = new HashMap<>();
     private final DirtyJsonRecordStore definitionStore = new DirtyJsonRecordStore();
     private final DirtyJsonRecordStore recoveryStore = new DirtyJsonRecordStore();
 
@@ -134,6 +182,7 @@ public final class MinigameManager {
         clearRuntime(false);
         this.server = server;
         removeOrphanCtfBackFlags();
+        removeOrphanMinigameBoosts();
         Path root = StoragePaths.minigames(StoragePaths.root(server));
         definitionFolder = StoragePaths.minigameDefinitions(StoragePaths.root(server));
         recoveryFile = StoragePaths.minigameRecovery(StoragePaths.root(server));
@@ -457,6 +506,23 @@ public final class MinigameManager {
                 }
             }
         }
+        MinigameRoleRules roleRules = roleRules(definition);
+        if (roleRules != null && roleRules.enabled) {
+            int smallestTeamAtMinimum = definition.minPlayers / 2;
+            int largestTeamAtMaximum = (definition.maxPlayers + 1) / 2;
+            if (roleRules.minimumTotalPerTeam() > smallestTeamAtMinimum) {
+                throw new IllegalArgumentException("Role minima require at least "
+                        + (roleRules.minimumTotalPerTeam() * 2) + " players so both teams can be composed.");
+            }
+            if (roleRules.maximumTotalPerTeam() < largestTeamAtMaximum) {
+                throw new IllegalArgumentException("Role maxima cannot hold the configured maximum team size of "
+                        + largestTeamAtMaximum + ".");
+            }
+            Identifier effectId = Identifier.parse(roleRules.dpsArrowEffect);
+            if (BuiltInRegistries.MOB_EFFECT.getOptional(effectId).isEmpty()) {
+                throw new IllegalArgumentException("Unknown DPS arrow effect: " + roleRules.dpsArrowEffect);
+            }
+        }
         if (definition.arenas.isEmpty()) throw new IllegalArgumentException("A minigame needs at least one arena.");
         LinkedHashSet<String> arenaIds = new LinkedHashSet<>();
         LinkedHashSet<String> arenaRegions = new LinkedHashSet<>();
@@ -490,6 +556,25 @@ public final class MinigameManager {
                 BlockPos blue = blockPos(arena.flagForTeam(2).location);
                 if (red.equals(blue) && arena.flagForTeam(1).location.dimension.equals(arena.flagForTeam(2).location.dimension)) {
                     throw new IllegalArgumentException("Capture the Flag bases must use different blocks.");
+                }
+            }
+            if (gameType == MinigameGameType.CAPTURE_THE_FLAG || gameType == MinigameGameType.DOMINATION) {
+                LinkedHashSet<String> boostBlocks = new LinkedHashSet<>();
+                for (MinigameLocation boostSpawn : arena.boostSpawns) {
+                    validateLocation(boostSpawn, "Boost spawn");
+                    String cell = boostSpawn.dimension + ":" + blockPos(boostSpawn).asLong();
+                    if (!boostBlocks.add(cell)) {
+                        throw new IllegalArgumentException("Boost spawn points must occupy different blocks.");
+                    }
+                }
+                MinigameBoostRules boostRules = gameType == MinigameGameType.CAPTURE_THE_FLAG
+                        ? definition.captureTheFlag.boosts : definition.domination.boosts;
+                if (boostRules.enabled && boostRules.enabledTypes().isEmpty()) {
+                    throw new IllegalArgumentException("At least one boost type must be enabled.");
+                }
+                if (boostRules.enabled && !boostRules.automatic() && arena.boostSpawns.isEmpty()) {
+                    throw new IllegalArgumentException("Manual boost placement requires at least one boost spawn in arena '"
+                            + arena.id + "'.");
                 }
             }
             if (gameType == MinigameGameType.DOMINATION) {
@@ -568,6 +653,14 @@ public final class MinigameManager {
                 }
                 if (!SimpleServerUtilities.REGION_SNAPSHOTS.hasSnapshot(region.getName())) {
                     throw new IllegalArgumentException("No saved snapshot exists for region '" + region.getName() + "'.");
+                }
+                if (gameType == MinigameGameType.CAPTURE_THE_FLAG || gameType == MinigameGameType.DOMINATION) {
+                    for (MinigameLocation boostSpawn : arena.boostSpawns) {
+                        if (!locationInsideRegion(boostSpawn, region, 2.0D)) {
+                            throw new IllegalArgumentException("Boost spawn points for arena '" + arena.id
+                                    + "' must be inside the arena region.");
+                        }
+                    }
                 }
                 if (gameType == MinigameGameType.SPLEEF) {
                     String regionDimension = region.getDimension().identifier().toString();
@@ -757,7 +850,7 @@ public final class MinigameManager {
             switch (action) {
                 case "open", "refresh" -> { }
                 case "open_admin", "refresh_admin" -> requireAdmin(player);
-                case "join" -> notice = joinQueue(player, payload.minigameId());
+                case "join" -> notice = joinQueue(player, payload.minigameId(), payload.preferredRole());
                 case "leave" -> notice = leave(player, true);
                 case "force_start" -> {
                     requireAdmin(player);
@@ -806,6 +899,10 @@ public final class MinigameManager {
     }
 
     public String joinQueue(ServerPlayer player, String rawId) {
+        return joinQueue(player, rawId, MinigameRole.DPS.id());
+    }
+
+    public String joinQueue(ServerPlayer player, String rawId, String rawPreferredRole) {
         if (!active()) throw new IllegalArgumentException("The Minigame Framework is disabled.");
         if (!ContentAccessPolicy.canJoinMinigameQueue(player)) {
             throw new IllegalArgumentException("You do not have permission to join minigame queues.");
@@ -820,27 +917,129 @@ public final class MinigameManager {
                 throw new IllegalArgumentException(
                         "You still have a pending minigame recovery. Reconnect or contact an administrator before joining again.");
             }
-            if (playerQueues.containsKey(player.getUUID())) throw new IllegalArgumentException("You are already queued for a minigame.");
-            if (playerMatches.containsKey(player.getUUID())) throw new IllegalArgumentException("You are already in a minigame match.");
+            UUID playerId = player.getUUID();
+            String concreteQueue = null;
+            for (Map.Entry<String, LinkedHashMap<UUID, Long>> queueEntry : queues.entrySet()) {
+                if (!queueEntry.getValue().containsKey(playerId)) continue;
+                if (concreteQueue == null) concreteQueue = queueEntry.getKey();
+                else queueEntry.getValue().remove(playerId);
+            }
+            if (concreteQueue != null) {
+                playerQueues.put(playerId, concreteQueue);
+                throw new IllegalArgumentException("You are already queued for a minigame.");
+            }
+            if (playerQueues.containsKey(playerId)) throw new IllegalArgumentException("You are already queued for a minigame.");
+            if (playerMatches.containsKey(playerId)) throw new IllegalArgumentException("You are already in a minigame match.");
             MinigameDefinition definition = definitions.get(id);
             if (definition == null || !definition.enabled) throw new IllegalArgumentException("That minigame is unavailable.");
+            MinigameRoleRules roleRules = roleRules(definition);
+            MinigameRole preferredRole = roleRules != null && roleRules.enabled
+                    ? MinigameRole.parse(rawPreferredRole) : MinigameRole.DPS;
             var condition = SimpleServerUtilities.CONTENT_CONDITIONS.evaluate(definition.prerequisites,
                     new ContentConditionContext(server, player, "minigames", definition.id,
                             Map.of("minigame", definition.id)));
             if (!condition.matched()) throw new IllegalArgumentException(condition.reason());
-            if (definition.allowLateJoin && tryLateJoin(player, definition)) {
-                return "Joined the running match for " + definition.displayName + ".";
+            if (tryCountdownJoin(player, definition, preferredRole)) {
+                return "Joined the preparing match for " + definition.displayName + ".";
             }
             LinkedHashMap<UUID, Long> queue = queues.computeIfAbsent(id, ignored -> new LinkedHashMap<>());
             if (queue.size() >= MAX_QUEUE_SIZE) throw new IllegalArgumentException("This minigame queue is full.");
             queue.put(player.getUUID(), System.currentTimeMillis());
             playerQueues.put(player.getUUID(), id);
+            playerRolePreferences.put(player.getUUID(), preferredRole);
         }
         publish(player, ContentEventTypes.MINIGAME_QUEUE_JOINED, id, 1L, Map.of());
-        return "Joined the queue for " + displayName(id) + ".";
+        MinigameDefinition queuedDefinition;
+        synchronized (this) { queuedDefinition = definitions.get(id); }
+        MinigameRoleRules queuedRoleRules = roleRules(queuedDefinition);
+        MinigameRole preferred = queuedRoleRules != null && queuedRoleRules.enabled
+                ? MinigameRole.parse(rawPreferredRole) : MinigameRole.DPS;
+        return "Joined the queue for " + displayName(id)
+                + (queuedRoleRules != null && queuedRoleRules.enabled
+                ? " with preferred role " + preferred.label() + "." : ".");
     }
 
-    private boolean tryLateJoin(ServerPlayer player, MinigameDefinition definition) {
+    /**
+     * Countdown is an open preparation stage rather than a closed match. New players
+     * may fill remaining slots until RUNNING begins; role composition is recomputed
+     * before their recovery-safe lobby teleport.
+     */
+    private boolean tryCountdownJoin(ServerPlayer player, MinigameDefinition definition,
+                                     MinigameRole preferredRole) {
+        if (player == null || player.isDeadOrDying()) return false;
+        MinigameMatch target = null;
+        MinigameArenaDefinition arena = null;
+        for (MinigameMatch candidate : matches.values()) {
+            if (!candidate.minigameId.equals(definition.id)
+                    || candidate.state != MinigameMatchState.COUNTDOWN
+                    || candidate.teams.size() >= definition.maxPlayers) continue;
+            MinigameArenaDefinition candidateArena = arena(definition, candidate.arenaId);
+            if (candidateArena == null || !locationsResolvable(definition, candidateArena)) continue;
+            target = candidate;
+            arena = candidateArena;
+            break;
+        }
+        if (target == null || arena == null) return false;
+
+        UUID playerId = player.getUUID();
+        int selectedTeam = leastPopulatedTeam(target, definition.teamCount);
+        MinigameRole normalizedPreference = preferredRole == null ? MinigameRole.DPS : preferredRole;
+        player.closeContainer();
+        MinigamePlayerState state = MinigamePlayerState.capture(player);
+        MinigameLocation returnLocation = MinigameLocation.of(player);
+        Map<UUID, MinigameRole> previousRoles = new LinkedHashMap<>(target.roles);
+
+        target.teams.put(playerId, selectedTeam);
+        target.preferredRoles.put(playerId, normalizedPreference);
+        target.scores.put(playerId, 0L);
+        target.joinOrder.add(playerId);
+        target.playerStates.put(playerId, state);
+        target.returnLocations.put(playerId, returnLocation);
+        target.roles.clear();
+        if (!assignMatchRoles(target, definition, false)) {
+            target.teams.remove(playerId);
+            target.preferredRoles.remove(playerId);
+            target.scores.remove(playerId);
+            target.joinOrder.remove(playerId);
+            target.playerStates.remove(playerId);
+            target.returnLocations.remove(playerId);
+            target.roles.clear();
+            target.roles.putAll(previousRoles);
+            return false;
+        }
+
+        recoveries.put(playerId, new MinigameRecoveryData.Entry(playerId, definition.id,
+                target.id.toString(), returnLocation.copy(), state));
+        playerMatches.put(playerId, target.id);
+        if (!saveRecoveryDurably("countdown join " + target.id + " for " + playerId)) {
+            target.teams.remove(playerId);
+            target.preferredRoles.remove(playerId);
+            target.roles.clear();
+            target.roles.putAll(previousRoles);
+            target.roleCooldowns.remove(playerId);
+            target.scores.remove(playerId);
+            target.joinOrder.remove(playerId);
+            target.playerStates.remove(playerId);
+            target.returnLocations.remove(playerId);
+            target.eliminated.remove(playerId);
+            playerMatches.remove(playerId);
+            throw new IllegalArgumentException(
+                    "The minigame could not safely store your recovery data. No inventory or gamemode changes were made.");
+        }
+
+        prepareCountdownPlayer(player, definition, arena, target);
+        long elapsed = Math.max(0L, (serverTicks - target.stateStartedTick) / 20L);
+        long remaining = Math.max(0L, definition.countdownSeconds - elapsed);
+        player.sendSystemMessage(Component.literal("Joined " + definition.displayName
+                + " during preparation on team " + selectedTeam + ". Starts in " + remaining + " seconds."));
+        publish(player, ContentEventTypes.MINIGAME_STARTED, definition.id, 1L,
+                Map.of("match", target.id.toString(), "arena", target.arenaId,
+                        "team", Integer.toString(selectedTeam), "phase", "countdown_join"));
+        return true;
+    }
+
+    private boolean tryLateJoin(ServerPlayer player, MinigameDefinition definition,
+                                MinigameRole preferredRole) {
         if (player == null || player.isDeadOrDying()) return false;
         MinigameMatch target = null;
         MinigameArenaDefinition arena = null;
@@ -855,6 +1054,14 @@ public final class MinigameManager {
         }
         if (target == null || arena == null) return false;
         int selectedTeam = leastPopulatedTeam(target, definition.teamCount);
+        MinigameRoleRules activeRoleRules = roleRules(definition);
+        MinigameRole normalizedPreference = preferredRole == null ? MinigameRole.DPS : preferredRole;
+        MinigameRole assignedRole = activeRoleRules != null && activeRoleRules.enabled
+                ? selectLateJoinRole(target, activeRoleRules, selectedTeam, normalizedPreference)
+                : MinigameRole.DPS;
+        // A full role composition should not turn Join queue into an error. Simply
+        // skip late joining and let the caller enqueue the player normally.
+        if (assignedRole == null) return false;
         UUID playerId = player.getUUID();
         player.closeContainer();
         // Capture before mutating the live match. An unserializable inventory must
@@ -862,6 +1069,8 @@ public final class MinigameManager {
         MinigamePlayerState state = MinigamePlayerState.capture(player);
         MinigameLocation returnLocation = MinigameLocation.of(player);
         target.teams.put(playerId, selectedTeam);
+        target.preferredRoles.put(playerId, normalizedPreference);
+        target.roles.put(playerId, assignedRole);
         target.scores.put(playerId, 0L);
         target.joinOrder.add(playerId);
         target.playerStates.put(playerId, state);
@@ -872,6 +1081,9 @@ public final class MinigameManager {
         playerMatches.put(playerId, target.id);
         if (!saveRecoveryDurably("late join " + target.id + " for " + playerId)) {
             target.teams.remove(playerId);
+            target.preferredRoles.remove(playerId);
+            target.roles.remove(playerId);
+            target.roleCooldowns.remove(playerId);
             target.scores.remove(playerId);
             target.joinOrder.remove(playerId);
             target.playerStates.remove(playerId);
@@ -885,11 +1097,36 @@ public final class MinigameManager {
                     "The minigame could not safely store your recovery data. No inventory or gamemode changes were made.");
         }
         beginParticipant(player, definition, arena, target);
-        player.sendSystemMessage(Component.literal("Joined " + definition.displayName + " on team " + selectedTeam + "."));
+        player.sendSystemMessage(Component.literal("Joined " + definition.displayName + " on team " + selectedTeam
+                + (activeRoleRules != null && activeRoleRules.enabled
+                ? " as " + assignedRole.label() + "." : ".")));
         publish(player, ContentEventTypes.MINIGAME_STARTED, definition.id, 1L,
                 Map.of("match", target.id.toString(), "arena", target.arenaId,
                         "team", Integer.toString(selectedTeam), "phase", "late_join"));
         return true;
+    }
+
+    private static MinigameRole selectLateJoinRole(MinigameMatch match, MinigameRoleRules rules,
+                                                    int team, MinigameRole preferred) {
+        Map<MinigameRole, Integer> counts = new LinkedHashMap<>();
+        for (MinigameRole role : MinigameRole.values()) counts.put(role, 0);
+        for (Map.Entry<UUID, MinigameRole> entry : match.roles.entrySet()) {
+            if (match.team(entry.getKey()) == team) {
+                counts.put(entry.getValue(), counts.getOrDefault(entry.getValue(), 0) + 1);
+            }
+        }
+        MinigameRole normalized = preferred == null ? MinigameRole.DPS : preferred;
+        if (counts.get(normalized) < rules.maximum(normalized)) return normalized;
+        MinigameRole selected = null;
+        int smallestCount = Integer.MAX_VALUE;
+        for (MinigameRole role : MinigameRole.values()) {
+            int count = counts.get(role);
+            if (count < rules.maximum(role) && count < smallestCount) {
+                selected = role;
+                smallestCount = count;
+            }
+        }
+        return selected;
     }
 
     private static int leastPopulatedTeam(MinigameMatch match, int teamCount) {
@@ -925,6 +1162,7 @@ public final class MinigameManager {
             if (queued != null) {
                 LinkedHashMap<UUID, Long> queue = queues.get(queued);
                 if (queue != null) queue.remove(playerId);
+                playerRolePreferences.remove(playerId);
             }
         }
         if (queued != null) {
@@ -979,9 +1217,18 @@ public final class MinigameManager {
             playerState = match.playerStates.remove(playerId);
             match.joinOrder.remove(playerId);
             match.teams.remove(playerId);
+            match.preferredRoles.remove(playerId);
+            match.roles.remove(playerId);
+            match.roleCooldowns.remove(playerId);
             match.scores.remove(playerId);
             match.eliminated.remove(playerId);
+            match.pendingRespawns.remove(playerId);
+            match.boostRegenerationExpires.remove(playerId);
+            match.boostRegenerationNextHeal.remove(playerId);
+            match.boostArmorExpires.remove(playerId);
+            match.boostOriginalArmorBase.remove(playerId);
             playerMatches.remove(playerId);
+            runtimeBorderSyncStates.remove(playerId);
         }
         ServerPlayer player = server == null ? null : server.getPlayerList().getPlayer(playerId);
         boolean stateRestored = player == null;
@@ -1010,10 +1257,16 @@ public final class MinigameManager {
         }
         if (player != null) player.sendSystemMessage(Component.literal(reason));
         if (match.state == MinigameMatchState.COUNTDOWN) {
-            if (definition == null || match.teams.size() < definition.minPlayers) {
-                cancelCountdown(match, definition, "Countdown cancelled because too few players remain.");
+            boolean compositionAvailable = definition != null && match.teams.size() >= definition.minPlayers;
+            if (compositionAvailable) {
+                match.roles.clear();
+                compositionAvailable = assignMatchRoles(match, definition, !match.rewardsEnabled);
+            }
+            if (!compositionAvailable) {
+                cancelCountdown(match, definition, "Countdown cancelled because the required team composition is no longer available.");
             } else {
-                announce(match, "A player left. " + match.teams.size() + " player(s) remain in the countdown.");
+                announce(match, "A player left. Roles were rebalanced for the remaining "
+                        + match.teams.size() + " player(s).");
             }
         } else if (match.teams.isEmpty()) {
             finish(match, "All players left the match.");
@@ -1037,6 +1290,7 @@ public final class MinigameManager {
     private void cancelCountdown(MinigameMatch match, MinigameDefinition definition, String reason) {
         if (match == null || match.state != MinigameMatchState.COUNTDOWN) return;
         ArrayList<UUID> requeue = new ArrayList<>(match.teams.keySet());
+        Map<UUID, MinigameRole> requeuePreferences = new LinkedHashMap<>(match.preferredRoles);
         match.rewardsDelivered = true;
         match.rewardsEnabled = false;
         announce(match, reason);
@@ -1050,7 +1304,8 @@ public final class MinigameManager {
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
             if (player == null || player.isDeadOrDying()) continue;
             try {
-                joinQueue(player, definition.id);
+                joinQueue(player, definition.id,
+                        requeuePreferences.getOrDefault(playerId, MinigameRole.DPS).id());
                 player.sendSystemMessage(Component.literal("You were returned to the queue for " + definition.displayName + "."));
             } catch (RuntimeException exception) {
                 player.sendSystemMessage(Component.literal("The cancelled match could not return you to the queue: " + exception.getMessage()));
@@ -1091,9 +1346,80 @@ public final class MinigameManager {
             MinigameArenaDefinition arena = arena(definition, match.arenaId);
             if (arena == null) continue;
             MinigameGameType type = MinigameGameType.parse(definition.gameType);
+            if (type == MinigameGameType.DOMINATION || type == MinigameGameType.CAPTURE_THE_FLAG) {
+                enforceRespawnModeNeeds(match);
+                tickPendingRespawns(match, definition, arena);
+            }
             if (type == MinigameGameType.DOMINATION) tickDominationRealtime(match, definition, arena);
             else if (type == MinigameGameType.CAPTURE_THE_FLAG) tickCtfRealtime(match, definition, arena);
+            if (type == MinigameGameType.DOMINATION || type == MinigameGameType.CAPTURE_THE_FLAG) {
+                tickBoosts(match, definition, arena);
+                tickRoleRuntime(match, definition);
+            }
         }
+    }
+
+    private void enforceRespawnModeNeeds(MinigameMatch match) {
+        if (match == null) return;
+        for (UUID playerId : match.teams.keySet()) {
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player != null) setCombatNeeds(player);
+        }
+    }
+
+    private void tickPendingRespawns(MinigameMatch match, MinigameDefinition definition,
+                                     MinigameArenaDefinition arena) {
+        if (match == null || definition == null || arena == null) return;
+        for (Map.Entry<UUID, MinigameMatch.PendingRespawn> entry
+                : List.copyOf(match.pendingRespawns.entrySet())) {
+            UUID playerId = entry.getKey();
+            MinigameMatch.PendingRespawn pending = entry.getValue();
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null) continue;
+
+            setCombatNeeds(player);
+            if (serverTicks < pending.completesTick) {
+                if (!player.isSpectator()) player.setGameMode(GameType.SPECTATOR);
+                long seconds = Math.max(1L, (pending.completesTick - serverTicks + 19L) / 20L);
+                if (pending.lastDisplayedSecond != seconds) {
+                    pending.lastDisplayedSecond = seconds;
+                    showRespawnCountdown(player, seconds);
+                }
+                continue;
+            }
+
+            match.pendingRespawns.remove(playerId);
+            clearRespawnTitle(player);
+            player.stopUsingItem();
+            player.setGameMode(GameType.SURVIVAL);
+            player.removeAllEffects();
+            player.setAbsorptionAmount(0.0F);
+            player.setRemainingFireTicks(0);
+            player.setHealth(player.getMaxHealth());
+            setCombatNeeds(player);
+            teleport(player, pending.destination);
+            player.sendSystemMessage(Component.literal("Respawned."), true);
+        }
+    }
+
+    private static void setCombatNeeds(ServerPlayer player) {
+        if (player == null) return;
+        player.getFoodData().setFoodLevel(COMBAT_FOOD_LEVEL);
+        player.getFoodData().setSaturation(0.0F);
+    }
+
+    private static void showRespawnCountdown(ServerPlayer player, long seconds) {
+        if (player == null) return;
+        player.connection.send(new ClientboundSetTitlesAnimationPacket(0, 25, 0));
+        player.connection.send(new ClientboundSetTitleTextPacket(
+                Component.literal(Long.toString(Math.max(1L, seconds)))));
+        player.connection.send(new ClientboundSetSubtitleTextPacket(Component.literal("Respawning")));
+    }
+
+    private static void clearRespawnTitle(ServerPlayer player) {
+        if (player == null) return;
+        player.connection.send(new ClientboundSetTitleTextPacket(Component.empty()));
+        player.connection.send(new ClientboundSetSubtitleTextPacket(Component.empty()));
     }
 
     private void tickDominationRealtime(MinigameMatch match, MinigameDefinition definition,
@@ -1106,6 +1432,10 @@ public final class MinigameManager {
             MinigameControlPoint point = controlPoint(arena, cast.pointId());
             if (player == null || point == null || !match.active(playerId)) {
                 interruptDominationCast(match, playerId, "Capture interrupted.");
+                continue;
+            }
+            if (player.isUsingItem()) {
+                interruptDominationCast(match, playerId, "Capture interrupted because you used an item.");
                 continue;
             }
             double dx = player.getX() - cast.startX();
@@ -1171,6 +1501,10 @@ public final class MinigameManager {
             MinigameFlagPoint point = arena.flagForTeam(cast.flagTeam());
             if (player == null || point == null || !match.active(playerId)) {
                 interruptCtfCast(match, playerId, "Flag capture interrupted.");
+                continue;
+            }
+            if (player.isUsingItem()) {
+                interruptCtfCast(match, playerId, "Flag capture interrupted because you used an item.");
                 continue;
             }
             double dx = player.getX() - cast.startX();
@@ -1240,6 +1574,7 @@ public final class MinigameManager {
             LinkedHashMap<UUID, Long> queue = queues.get(entry.getValue());
             if (queue != null) queue.remove(entry.getKey());
             playerQueues.remove(entry.getKey());
+            playerRolePreferences.remove(entry.getKey());
         }
     }
 
@@ -1292,6 +1627,8 @@ public final class MinigameManager {
         for (ServerPlayer player : candidates) {
             UUID playerId = player.getUUID();
             match.teams.put(playerId, team);
+            match.preferredRoles.put(playerId,
+                    playerRolePreferences.getOrDefault(playerId, MinigameRole.DPS));
             match.scores.put(playerId, 0L);
             match.joinOrder.add(playerId);
             MinigamePlayerState state = capturedStates.get(playerId);
@@ -1302,6 +1639,14 @@ public final class MinigameManager {
                     match.id.toString(), returnLocation.copy(), state));
             playerMatches.put(playerId, match.id);
             team = team % definition.teamCount + 1;
+        }
+        if (!assignMatchRoles(match, definition, forced)) {
+            for (ServerPlayer player : candidates) {
+                recoveries.remove(player.getUUID());
+                playerMatches.remove(player.getUUID());
+            }
+            MinigameSetupToolService.restorePhysicalSetupMarkers(server, definition, arena);
+            return null;
         }
         MinigameGameType startingType = MinigameGameType.parse(definition.gameType);
         if (startingType == MinigameGameType.CAPTURE_THE_FLAG) {
@@ -1331,6 +1676,7 @@ public final class MinigameManager {
         for (ServerPlayer player : candidates) {
             queue.remove(player.getUUID());
             playerQueues.remove(player.getUUID());
+            playerRolePreferences.remove(player.getUUID());
         }
         if (MinigameGameType.parse(definition.gameType) == MinigameGameType.SPLEEF) {
             clearArenaItemEntities(arena);
@@ -1341,6 +1687,66 @@ public final class MinigameManager {
                     + ". Match begins in " + definition.countdownSeconds + " seconds."));
         }
         return match;
+    }
+
+    private boolean assignMatchRoles(MinigameMatch match, MinigameDefinition definition, boolean forced) {
+        MinigameRoleRules rules = roleRules(definition);
+        if (rules == null || !rules.enabled) {
+            for (UUID playerId : match.joinOrder) match.roles.put(playerId, MinigameRole.DPS);
+            return true;
+        }
+        for (int team = 1; team <= definition.teamCount; team++) {
+            ArrayList<UUID> players = new ArrayList<>();
+            for (UUID playerId : match.joinOrder) if (match.team(playerId) == team) players.add(playerId);
+            if (!assignTeamRoles(match, players, rules, forced)) return false;
+        }
+        return true;
+    }
+
+    private static boolean assignTeamRoles(MinigameMatch match, List<UUID> players,
+                                           MinigameRoleRules rules, boolean ignoreMinimums) {
+        LinkedHashSet<UUID> unassigned = new LinkedHashSet<>(players);
+        Map<MinigameRole, Integer> counts = new LinkedHashMap<>();
+        for (MinigameRole role : MinigameRole.values()) counts.put(role, 0);
+
+        if (!ignoreMinimums) {
+            for (MinigameRole role : MinigameRole.values()) {
+                int required = rules.minimum(role);
+                for (int slot = 0; slot < required; slot++) {
+                    UUID selected = null;
+                    for (UUID playerId : unassigned) {
+                        if (match.preferredRoles.getOrDefault(playerId, MinigameRole.DPS) == role) {
+                            selected = playerId;
+                            break;
+                        }
+                    }
+                    if (selected == null && !unassigned.isEmpty()) selected = unassigned.iterator().next();
+                    if (selected == null) return false;
+                    match.roles.put(selected, role);
+                    counts.put(role, counts.get(role) + 1);
+                    unassigned.remove(selected);
+                }
+            }
+        }
+
+        for (UUID playerId : List.copyOf(unassigned)) {
+            MinigameRole preferred = match.preferredRoles.getOrDefault(playerId, MinigameRole.DPS);
+            MinigameRole selected = counts.get(preferred) < rules.maximum(preferred) ? preferred : null;
+            if (selected == null) {
+                int bestCount = Integer.MAX_VALUE;
+                for (MinigameRole role : MinigameRole.values()) {
+                    int count = counts.get(role);
+                    if (count < rules.maximum(role) && count < bestCount) {
+                        selected = role;
+                        bestCount = count;
+                    }
+                }
+            }
+            if (selected == null) return false;
+            match.roles.put(playerId, selected);
+            counts.put(selected, counts.get(selected) + 1);
+        }
+        return true;
     }
 
     private boolean locationsResolvable(MinigameDefinition definition, MinigameArenaDefinition arena) {
@@ -1412,6 +1818,9 @@ public final class MinigameManager {
                     for (UUID playerId : List.copyOf(match.teams.keySet())) {
                         ServerPlayer participant = server.getPlayerList().getPlayer(playerId);
                         if (participant != null) beginParticipant(participant, definition, arena, match);
+                    }
+                    if (startingType == MinigameGameType.CAPTURE_THE_FLAG || startingType == MinigameGameType.DOMINATION) {
+                        initializeBoosts(match, definition, arena);
                     }
                     announce(match, definition.displayName + " has started!");
                     publishMatch(match, ContentEventTypes.MINIGAME_STARTED, "started");
@@ -1629,6 +2038,9 @@ public final class MinigameManager {
             clearDominationCastBars(match);
             clearDominationVisuals(match);
             match.dominationClaims.clear();
+        }
+        if (finishingType == MinigameGameType.CAPTURE_THE_FLAG || finishingType == MinigameGameType.DOMINATION) {
+            clearBoosts(match);
         }
         celebrateWinners(match, definition);
         String winners = winnerAnnouncement(match, definition);
@@ -1903,6 +2315,10 @@ public final class MinigameManager {
 
     private record RewardedParticipant(ServerPlayer player, int team, boolean won) { }
 
+    private record RuntimeBorderSyncState(UUID matchId, String playerDimension, boolean gameVisible,
+                                          boolean spectatorVisible, long settingsRevision,
+                                          String gameDimension, String spectatorDimension) { }
+
     private boolean cleanup(MinigameMatch match, MinigameDefinition definition, MinigameArenaDefinition arena) {
         if (definition == null) definition = definition(match.minigameId);
         if (definition != null && arena == null) arena = arena(definition, match.arenaId);
@@ -1997,6 +2413,7 @@ public final class MinigameManager {
         MinigameLocation destination;
         synchronized (this) {
             playerMatches.remove(playerId);
+            runtimeBorderSyncStates.remove(playerId);
             destination = match.returnLocations.get(playerId);
         }
         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
@@ -2134,8 +2551,12 @@ public final class MinigameManager {
             player.setGameMode(GameType.ADVENTURE);
             clearMatchInventory(player);
             player.setHealth(player.getMaxHealth());
-            player.getFoodData().setFoodLevel(20);
-            player.getFoodData().setSaturation(20.0F);
+            if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION) {
+                setCombatNeeds(player);
+            } else {
+                player.getFoodData().setFoodLevel(20);
+                player.getFoodData().setSaturation(20.0F);
+            }
         }
         teleport(player, arena.lobby);
         updateHud(match, definition, 0L);
@@ -2148,21 +2569,144 @@ public final class MinigameManager {
                 || type == MinigameGameType.DOMINATION) {
             clearMatchInventory(player);
             player.setGameMode(GameType.SURVIVAL);
-            String itemId = type == MinigameGameType.SPLEEF
-                    ? definition.spleef.toolItem
-                    : type == MinigameGameType.DOMINATION
-                    ? definition.domination.weaponItem : definition.captureTheFlag.weaponItem;
-            ItemStack tool = BuiltInRegistries.ITEM.getOptional(Identifier.parse(itemId))
-                    .map(item -> new ItemStack(item)).orElse(ItemStack.EMPTY);
-            if (!tool.isEmpty()) player.getInventory().add(tool);
+            int team = match.team(player.getUUID());
+            if (type == MinigameGameType.SPLEEF) {
+                giveRegistryItem(player, definition.spleef.toolItem);
+            } else {
+                equipCosmeticTeamArmor(player, definition, team);
+                MinigameRoleRules roles = roleRules(definition);
+                if (roles != null && roles.enabled) {
+                    MinigameRole role = match.role(player.getUUID());
+                    applyRoleAttributes(player, roles.profile(role));
+                    giveRoleLoadout(player, definition, match, role, team);
+                    player.sendSystemMessage(Component.literal("Assigned role: " + role.label()
+                            + (match.preferredRoles.getOrDefault(player.getUUID(), MinigameRole.DPS) == role
+                            ? " (preferred)" : " (team composition)")), true);
+                } else {
+                    giveRegistryItem(player, type == MinigameGameType.DOMINATION
+                            ? definition.domination.weaponItem : definition.captureTheFlag.weaponItem);
+                }
+            }
             player.getInventory().setChanged();
             player.containerMenu.broadcastChanges();
             player.setHealth(player.getMaxHealth());
-            player.getFoodData().setFoodLevel(20);
-            player.getFoodData().setSaturation(20.0F);
+            if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION) {
+                setCombatNeeds(player);
+            } else {
+                player.getFoodData().setFoodLevel(20);
+                player.getFoodData().setSaturation(20.0F);
+            }
         }
         int team = match.team(player.getUUID());
         teleport(player, matchSpawn(definition, arena, match, player.getUUID(), team));
+    }
+
+    private static void giveRegistryItem(ServerPlayer player, String itemId) {
+        ItemStack tool = BuiltInRegistries.ITEM.getOptional(Identifier.parse(itemId))
+                .map(item -> new ItemStack(item)).orElse(ItemStack.EMPTY);
+        if (!tool.isEmpty()) player.getInventory().add(tool);
+    }
+
+    private static void applyRoleAttributes(ServerPlayer player, MinigameRoleProfile profile) {
+        setBaseAttribute(player, Attributes.MAX_HEALTH, profile.maxHealth);
+        setBaseAttribute(player, Attributes.ARMOR, profile.armor);
+        setBaseAttribute(player, Attributes.ARMOR_TOUGHNESS, profile.armorToughness);
+    }
+
+    private static void setBaseAttribute(ServerPlayer player,
+                                         Holder<net.minecraft.world.entity.ai.attributes.Attribute> attribute,
+                                         double value) {
+        AttributeInstance instance = player.getAttribute(attribute);
+        if (instance != null) instance.setBaseValue(value);
+    }
+
+    private void giveRoleLoadout(ServerPlayer player, MinigameDefinition definition,
+                                 MinigameMatch match, MinigameRole role, int team) {
+        switch (role) {
+            case DPS -> {
+                player.getInventory().setItem(0, durableRoleItem(Items.DIAMOND_SWORD, ROLE_DPS_SWORD));
+                player.getInventory().setItem(1, durableRoleItem(Items.BOW, ROLE_DPS_BOW));
+                player.getInventory().setItem(2, namedMatchItem(Items.ARROW, 1, ROLE_DPS_ARROW));
+            }
+            case TANK -> {
+                player.getInventory().setItem(0, durableRoleItem(Items.STONE_SWORD, ROLE_TANK_SWORD));
+                player.getInventory().setItem(1, abilityMatchItem(Items.HEART_OF_THE_SEA, ROLE_TANK_FIELD));
+                player.setItemSlot(EquipmentSlot.OFFHAND, teamShield(player, definition, team));
+            }
+            case HEALER -> {
+                player.getInventory().setItem(0, durableRoleItem(Items.STONE_SWORD, ROLE_HEALER_SWORD));
+                player.getInventory().setItem(1, abilityMatchItem(Items.AMETHYST_SHARD, ROLE_HEAL_SINGLE));
+                player.getInventory().setItem(2, abilityMatchItem(Items.GLISTERING_MELON_SLICE, ROLE_HEAL_AOE));
+                player.getInventory().setItem(3, abilityMatchItem(Items.GHAST_TEAR, ROLE_HEAL_SELF));
+            }
+        }
+        syncInventory(player);
+    }
+
+    private static ItemStack durableRoleItem(net.minecraft.world.item.Item item, String name) {
+        ItemStack stack = namedMatchItem(item, 1, name);
+        stack.remove(DataComponents.MAX_DAMAGE);
+        stack.remove(DataComponents.DAMAGE);
+        return stack;
+    }
+
+    private static ItemStack namedMatchItem(net.minecraft.world.item.Item item, int count, String name) {
+        ItemStack stack = new ItemStack(item, Math.max(1, count));
+        stack.set(DataComponents.CUSTOM_NAME, Component.literal(name));
+        return stack;
+    }
+
+    private static ItemStack abilityMatchItem(net.minecraft.world.item.Item item, String name) {
+        ItemStack stack = namedMatchItem(item, 1, name);
+        stack.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
+        return stack;
+    }
+
+    private static void equipCosmeticTeamArmor(ServerPlayer player, MinigameDefinition definition, int team) {
+        int color = switch (MinigameGameType.parse(definition.gameType)) {
+            case CAPTURE_THE_FLAG -> definition.captureTheFlag.color(team);
+            case DOMINATION -> definition.domination.color(team);
+            default -> 0xA06540;
+        };
+        player.setItemSlot(EquipmentSlot.HEAD, cosmeticLeather(Items.LEATHER_HELMET, color, ROLE_TEAM_HELMET));
+        player.setItemSlot(EquipmentSlot.CHEST, cosmeticLeather(Items.LEATHER_CHESTPLATE, color, ROLE_TEAM_CHESTPLATE));
+        player.setItemSlot(EquipmentSlot.LEGS, cosmeticLeather(Items.LEATHER_LEGGINGS, color, ROLE_TEAM_LEGGINGS));
+        player.setItemSlot(EquipmentSlot.FEET, cosmeticLeather(Items.LEATHER_BOOTS, color, ROLE_TEAM_BOOTS));
+    }
+
+    private static ItemStack cosmeticLeather(net.minecraft.world.item.Item item, int color, String name) {
+        ItemStack stack = namedMatchItem(item, 1, name);
+        stack.set(DataComponents.DYED_COLOR, new DyedItemColor(color & 0x00FFFFFF));
+        stack.set(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY);
+        stack.remove(DataComponents.MAX_DAMAGE);
+        stack.remove(DataComponents.DAMAGE);
+        return stack;
+    }
+
+    private static ItemStack teamShield(ServerPlayer player, MinigameDefinition definition, int team) {
+        ItemStack shield = new ItemStack(Items.SHIELD);
+        DyeColor base = teamDyeColor(definition, team);
+        shield.set(DataComponents.BASE_COLOR, base);
+        Holder<BannerPattern> logo = player.level().registryAccess()
+                .lookupOrThrow(Registries.BANNER_PATTERN)
+                .getOrThrow(BannerPatterns.RHOMBUS_MIDDLE);
+        shield.set(DataComponents.BANNER_PATTERNS, new BannerPatternLayers.Builder()
+                .add(logo, base == DyeColor.WHITE ? DyeColor.BLACK : DyeColor.WHITE)
+                .build());
+        shield.set(DataComponents.CUSTOM_NAME, Component.literal(ROLE_TANK_SHIELD));
+        shield.remove(DataComponents.MAX_DAMAGE);
+        shield.remove(DataComponents.DAMAGE);
+        return shield;
+    }
+
+    private static DyeColor teamDyeColor(MinigameDefinition definition, int team) {
+        String blockId = switch (MinigameGameType.parse(definition.gameType)) {
+            case CAPTURE_THE_FLAG -> definition.captureTheFlag.flagBlock(team);
+            case DOMINATION -> definition.domination.bannerBlock(team);
+            default -> "minecraft:white_banner";
+        };
+        Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(blockId)).orElse(null);
+        return block instanceof AbstractBannerBlock banner ? banner.getColor() : DyeColor.WHITE;
     }
 
     private static int teamSpawnOrdinal(MinigameMatch match, UUID playerId, int team) {
@@ -2261,7 +2805,9 @@ public final class MinigameManager {
         if (arena == null || arena.regionId == null || arena.regionId.isBlank()) return;
         Region region = SimpleServerUtilities.REGIONS.get(arena.regionId);
         if (region == null) return;
-        for (UUID playerId : List.copyOf(match.eliminated)) {
+        LinkedHashSet<UUID> spectators = new LinkedHashSet<>(match.eliminated);
+        spectators.addAll(match.pendingRespawns.keySet());
+        for (UUID playerId : spectators) {
             ServerPlayer spectator = server.getPlayerList().getPlayer(playerId);
             if (spectator == null) continue;
             MinigameLocation current = MinigameLocation.of(spectator);
@@ -2400,7 +2946,7 @@ public final class MinigameManager {
         }
         for (UUID playerId : List.copyOf(match.teams.keySet())) {
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-            if (player == null) continue;
+            if (player == null || !match.active(playerId)) continue;
             if (!locationInsideRegion(MinigameLocation.of(player), region, 12.0D)) {
                 interruptDominationCast(match, playerId, "Capture interrupted because you left the arena.");
                 int team = match.team(playerId);
@@ -2409,8 +2955,7 @@ public final class MinigameManager {
                 player.removeAllEffects();
                 player.setAbsorptionAmount(0.0F);
                 player.setRemainingFireTicks(0);
-                player.getFoodData().setFoodLevel(20);
-                player.getFoodData().setSaturation(20.0F);
+                setCombatNeeds(player);
                 player.sendSystemMessage(Component.literal("You were returned to your team spawn."), true);
             }
         }
@@ -2560,7 +3105,7 @@ public final class MinigameManager {
         }
         String flagName = definition.captureTheFlag.teamName(flagTeam);
         player.sendSystemMessage(Component.literal("Taking the " + flagName
-                + " flag. Do not move and do not take damage."), true);
+                + " flag. Do not move, attack, use items, or take damage."), true);
         sendCtfCastBar(player, flagName, definition.captureTheFlag.color(playerTeam), 0.0F);
         return true;
     }
@@ -2664,7 +3209,7 @@ public final class MinigameManager {
                     player.getX(), player.getY(), player.getZ()));
         }
         player.sendSystemMessage(Component.literal("Claiming " + point.displayName
-                + ". Do not move and do not take damage."), true);
+                + ". Do not move, attack, use items, or take damage."), true);
         sendDominationCastBar(player, point.displayName, definition.domination.teamName(team),
                 definition.domination.color(team), 0.0F);
         return true;
@@ -2679,15 +3224,14 @@ public final class MinigameManager {
         }
         for (UUID playerId : List.copyOf(match.teams.keySet())) {
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-            if (player == null) continue;
+            if (player == null || !match.active(playerId)) continue;
             if (!locationInsideRegion(MinigameLocation.of(player), region, 12.0D)) {
                 interruptCtfCast(match, playerId, "Flag capture interrupted because you left the arena.");
                 returnFlagsCarriedBy(match, definition, arena, playerId, "The flag returned because its carrier left the arena.");
                 int team = match.team(playerId);
                 teleport(player, randomTeamSpawn(arena, match, team));
                 player.setHealth(player.getMaxHealth());
-                player.getFoodData().setFoodLevel(20);
-                player.getFoodData().setSaturation(20.0F);
+                setCombatNeeds(player);
                 player.sendSystemMessage(Component.literal("You were returned to your team spawn."), true);
             }
         }
@@ -2851,6 +3395,60 @@ public final class MinigameManager {
         clearCtfVisuals(match);
     }
 
+    /** Returns whether this player is currently channeling a CTF flag or Domination objective. */
+    public boolean hasActiveObjectiveCast(ServerPlayer player) {
+        if (player == null) return false;
+        synchronized (this) {
+            MinigameMatch match = matchFor(player.getUUID());
+            return match != null && (match.ctfCasts.containsKey(player.getUUID())
+                    || match.dominationCasts.containsKey(player.getUUID()));
+        }
+    }
+
+    /**
+     * True only during the server tick in which the objective interaction created the cast.
+     * NeoForge can continue the same right-click through the other hand/item stages; those
+     * follow-up stages must be consumed rather than interpreted as a new interrupting action.
+     */
+    public boolean objectiveCastStartedThisTick(ServerPlayer player) {
+        if (player == null) return false;
+        synchronized (this) {
+            MinigameMatch match = matchFor(player.getUUID());
+            if (match == null) return false;
+            MinigameMatch.CtfCast ctf = match.ctfCasts.get(player.getUUID());
+            if (ctf != null && ctf.startedTick() == serverTicks) return true;
+            MinigameMatch.DominationCast domination = match.dominationCasts.get(player.getUUID());
+            return domination != null && domination.startedTick() == serverTicks;
+        }
+    }
+
+    /**
+     * Cancels an active objective cast before the attempted gameplay action is processed.
+     * The caller should cancel the triggering event when this returns true so the action
+     * cannot both interrupt the cast and still affect the match world or another player.
+     */
+    public boolean interruptActiveCastForAction(ServerPlayer player, String action) {
+        if (player == null) return false;
+        MinigameMatch match;
+        boolean domination;
+        boolean ctf;
+        synchronized (this) {
+            match = matchFor(player.getUUID());
+            if (match == null) return false;
+            domination = match.dominationCasts.containsKey(player.getUUID());
+            ctf = match.ctfCasts.containsKey(player.getUUID());
+        }
+        if (!domination && !ctf) return false;
+        String detail = action == null || action.isBlank() ? "performed another action" : action.trim();
+        if (domination) {
+            interruptDominationCast(match, player.getUUID(), "Capture interrupted because you " + detail + ".");
+        }
+        if (ctf) {
+            interruptCtfCast(match, player.getUUID(), "Flag capture interrupted because you " + detail + ".");
+        }
+        return true;
+    }
+
     public void onPlayerDamaged(ServerPlayer player) {
         if (player == null) return;
         MinigameMatch match;
@@ -2945,6 +3543,16 @@ public final class MinigameManager {
                     player.getX(), player.getY(), player.getZ(),
                     16.0F, 1.0F,
                     serverTicks ^ player.getUUID().getMostSignificantBits()));
+        }
+    }
+
+    private void removeOrphanMinigameBoosts() {
+        if (server == null) return;
+        for (ServerLevel level : server.getAllLevels()) {
+            for (Entity entity : level.getAllEntities()) {
+                Component customName = entity.getCustomName();
+                if (customName != null && BOOST_ENTITY_TAG.equals(customName.getString())) entity.discard();
+            }
         }
     }
 
@@ -3210,30 +3818,1131 @@ public final class MinigameManager {
         if (match == null || definition == null || arena == null
                 || (type != MinigameGameType.CAPTURE_THE_FLAG && type != MinigameGameType.DOMINATION)
                 || match.state != MinigameMatchState.RUNNING) return false;
+        if (match.pendingRespawns.containsKey(player.getUUID())) return true;
+
         MinigameLocation deathLocation = MinigameLocation.of(player);
+        int team = match.team(player.getUUID());
+        MinigameLocation destination = type == MinigameGameType.DOMINATION
+                ? dominationRespawn(match, arena, team, deathLocation)
+                : randomTeamSpawn(arena, match, team);
+
         if (type == MinigameGameType.CAPTURE_THE_FLAG) {
             interruptCtfCast(match, player.getUUID(), "Flag capture interrupted because you were defeated.");
             dropFlagsCarriedBy(match, definition, arena, player.getUUID(), deathLocation,
                     player.getName().getString() + " dropped the carried flag.");
+        } else {
+            interruptDominationCast(match, player.getUUID(), "Capture interrupted because you were defeated.");
         }
+
+        long delayTicks = Math.max(20L, definition.respawnDelaySeconds * 20L);
+        MinigameMatch.PendingRespawn pending = new MinigameMatch.PendingRespawn(
+                destination, safeAdd(serverTicks, delayTicks));
+        match.pendingRespawns.put(player.getUUID(), pending);
+        match.boostRegenerationExpires.remove(player.getUUID());
+        match.boostRegenerationNextHeal.remove(player.getUUID());
+
+        player.stopUsingItem();
         player.setHealth(player.getMaxHealth());
         player.removeAllEffects();
         player.setAbsorptionAmount(0.0F);
         player.setRemainingFireTicks(0);
-        player.getFoodData().setFoodLevel(20);
-        player.getFoodData().setSaturation(20.0F);
-        int team = match.team(player.getUUID());
-        if (type == MinigameGameType.DOMINATION) {
-            teleport(player, dominationRespawn(match, arena, team, deathLocation));
-            player.sendSystemMessage(Component.literal("You were defeated and respawned at the nearest controlled location."), true);
-        } else {
-            teleport(player, randomTeamSpawn(arena, match, team));
-            player.sendSystemMessage(Component.literal("You were defeated and returned to a team spawn."), true);
-        }
+        setCombatNeeds(player);
+        player.setGameMode(GameType.SPECTATOR);
+        teleport(player, arena.spectator);
+        showRespawnCountdown(player, definition.respawnDelaySeconds);
+        pending.lastDisplayedSecond = definition.respawnDelaySeconds;
+        player.sendSystemMessage(Component.literal("You were defeated. Respawning in "
+                + definition.respawnDelaySeconds + " seconds."), true);
         return true;
     }
 
+    private void initializeBoosts(MinigameMatch match, MinigameDefinition definition,
+                                  MinigameArenaDefinition arena) {
+        clearBoosts(match);
+        MinigameBoostRules rules = boostRules(definition);
+        if (rules == null || !rules.enabled) return;
+        Region region = SimpleServerUtilities.REGIONS.get(arena.regionId);
+        if (region == null) return;
+        if (rules.automatic()) buildAutomaticBoostCandidates(match, definition, arena, region);
+        else {
+            for (MinigameLocation raw : arena.boostSpawns) {
+                MinigameLocation safe = safeManualBoostLocation(raw, region);
+                if (safe != null) addBoostCandidate(match, safe, 1.0D);
+            }
+        }
+        if (match.boostCandidateLocations.isEmpty()) {
+            announce(match, rules.automatic()
+                    ? "No safe automatic boost positions were found; this match will continue without boosts."
+                    : "Boosts are enabled, but this arena has no manual boost spawn points.");
+            return;
+        }
+        match.boostsInitialized = true;
+        long first = safeAdd(serverTicks, rules.initialSpawnDelaySeconds * 20L);
+        for (int index = 0; index < rules.maximumActive; index++) {
+            match.boostSpawnSchedule.add(safeAdd(first, index * 10L));
+        }
+    }
+
+    private MinigameLocation safeManualBoostLocation(MinigameLocation raw, Region region) {
+        if (raw == null || region == null || !locationInsideRegion(raw, region, 4.0D)) return null;
+        ServerLevel level = resolveLevel(raw.dimension);
+        if (level == null) return null;
+        BlockPos feet = BlockPos.containing(raw.x, raw.y, raw.z);
+        BlockState feetState = level.getBlockState(feet);
+        BlockState headState = level.getBlockState(feet.above());
+        BlockState floorState = level.getBlockState(feet.below());
+        if (!feetState.getCollisionShape(level, feet).isEmpty()
+                || !headState.getCollisionShape(level, feet.above()).isEmpty()
+                || !feetState.getFluidState().isEmpty()
+                || !headState.getFluidState().isEmpty()
+                || !floorState.isFaceSturdy(level, feet.below(), Direction.UP)) return null;
+        return new MinigameLocation(raw.dimension, feet.getX() + 0.5D, feet.getY() + 0.15D,
+                feet.getZ() + 0.5D, raw.yaw, raw.pitch);
+    }
+
+    private void buildAutomaticBoostCandidates(MinigameMatch match, MinigameDefinition definition,
+                                               MinigameArenaDefinition arena, Region region) {
+        MinigameGameType type = MinigameGameType.parse(definition.gameType);
+        ServerLevel level = server.getLevel(region.getDimension());
+        if (level == null) return;
+        int salt = 0;
+        if (type == MinigameGameType.DOMINATION) {
+            for (MinigameControlPoint point : arena.controlPoints) {
+                if (point == null || point.location == null) continue;
+                MinigameLocation center = point.respawn == null ? point.location : point.respawn;
+                int centerX = (int) Math.floor(center.x);
+                int centerZ = (int) Math.floor(center.z);
+                int preferredY = (int) Math.floor(center.y);
+                for (int attempt = 0; attempt < 12; attempt++) {
+                    double angle = Math.PI * 2.0D * randomUnit(match, ++salt);
+                    int radius = 2 + randomInt(match, 0, 5, ++salt);
+                    int x = centerX + (int) Math.round(Math.cos(angle) * radius);
+                    int z = centerZ + (int) Math.round(Math.sin(angle) * radius);
+                    MinigameLocation found = findBoostGround(level, region, x, z, preferredY);
+                    if (found != null) addBoostCandidate(match, found, 2.0D);
+                }
+            }
+        } else {
+            int width = Math.max(1, region.getMaxX() - region.getMinX() + 1);
+            int depth = Math.max(1, region.getMaxZ() - region.getMinZ() + 1);
+            for (int attempt = 0; attempt < 96 && match.boostCandidateLocations.size() < 48; attempt++) {
+                int x = region.getMinX() + randomInt(match, 0, width - 1, ++salt);
+                int z = region.getMinZ() + randomInt(match, 0, depth - 1, ++salt);
+                MinigameLocation found = findBoostGround(level, region, x, z, region.getMaxY());
+                if (found != null) addBoostCandidate(match, found, 3.0D);
+            }
+        }
+    }
+
+    private MinigameLocation findBoostGround(ServerLevel level, Region region, int x, int z, int preferredY) {
+        if (level == null || region == null || x < region.getMinX() || x > region.getMaxX()
+                || z < region.getMinZ() || z > region.getMaxZ()) return null;
+        int top = Math.min(region.getMaxY() + 1, Math.max(region.getMinY() + 1, preferredY + 6));
+        for (int y = top; y >= region.getMinY() + 1; y--) {
+            BlockPos feet = new BlockPos(x, y, z);
+            if (!level.getBlockState(feet).isAir() || !level.getBlockState(feet.above()).isAir()) continue;
+            BlockState ground = level.getBlockState(feet.below());
+            if (!level.getBlockState(feet).getFluidState().isEmpty()
+                    || !level.getBlockState(feet.above()).getFluidState().isEmpty()
+                    || !ground.isFaceSturdy(level, feet.below(), Direction.UP)) continue;
+            return new MinigameLocation(region.getDimension().identifier().toString(),
+                    x + 0.5D, y + 0.15D, z + 0.5D, 0.0F, 0.0F);
+        }
+        return null;
+    }
+
+    private static void addBoostCandidate(MinigameMatch match, MinigameLocation candidate, double minimumDistance) {
+        if (match == null || candidate == null) return;
+        double minimumSquared = minimumDistance * minimumDistance;
+        for (MinigameLocation existing : match.boostCandidateLocations) {
+            if (!existing.dimension.equals(candidate.dimension)) continue;
+            double dx = existing.x - candidate.x, dy = existing.y - candidate.y, dz = existing.z - candidate.z;
+            if (dx * dx + dy * dy + dz * dz < minimumSquared) return;
+        }
+        match.boostCandidateLocations.add(candidate);
+    }
+
+    private void tickBoosts(MinigameMatch match, MinigameDefinition definition,
+                            MinigameArenaDefinition arena) {
+        tickRegenerationBoosts(match);
+        MinigameBoostRules rules = boostRules(definition);
+        if (rules == null || !rules.enabled || !match.boostsInitialized) return;
+        expireArmorBoosts(match);
+        if (!match.boostSpawnSchedule.isEmpty()) {
+            for (Long due : List.copyOf(match.boostSpawnSchedule)) {
+                if (due == null || due > serverTicks || match.activeBoosts.size() >= rules.maximumActive) continue;
+                match.boostSpawnSchedule.remove(due);
+                if (!spawnRandomBoost(match, rules)) {
+                    match.boostSpawnSchedule.add(safeAdd(serverTicks, 100L));
+                }
+            }
+        }
+        for (MinigameMatch.ActiveBoost boost : List.copyOf(match.activeBoosts.values())) {
+            ServerLevel level = resolveLevel(boost.location.dimension);
+            if (level == null) {
+                consumeBoost(match, boost, rules, null);
+                continue;
+            }
+            Entity visual = boost.entityId == null ? null : level.getEntity(boost.entityId);
+            if (!(visual instanceof ItemEntity) || !visual.isAlive()) spawnBoostVisual(level, boost);
+            if ((serverTicks & 1L) == 0L) emitBoostMist(level, boost, rules.color(boost.type));
+            ServerPlayer collector = nearestBoostCollector(match, boost);
+            if (collector != null) consumeBoost(match, boost, rules, collector);
+        }
+    }
+
+    private boolean spawnRandomBoost(MinigameMatch match, MinigameBoostRules rules) {
+        List<MinigameBoostType> types = rules.enabledTypes();
+        if (types.isEmpty() || match.boostCandidateLocations.isEmpty()) return false;
+        ArrayList<MinigameLocation> available = new ArrayList<>();
+        double minimumSquared = rules.minimumSpacing * rules.minimumSpacing;
+        for (MinigameLocation candidate : match.boostCandidateLocations) {
+            boolean close = false;
+            for (MinigameMatch.ActiveBoost active : match.activeBoosts.values()) {
+                if (!candidate.dimension.equals(active.location.dimension)) continue;
+                double dx = candidate.x - active.location.x;
+                double dy = candidate.y - active.location.y;
+                double dz = candidate.z - active.location.z;
+                if (dx * dx + dy * dy + dz * dz < minimumSquared) { close = true; break; }
+            }
+            if (!close) available.add(candidate);
+        }
+        if (available.isEmpty()) return false;
+        int locationIndex = randomInt(match, 0, available.size() - 1,
+                match.activeBoosts.size() * 31 + match.boostSpawnSchedule.size() * 17 + 7);
+        int typeIndex = randomInt(match, 0, types.size() - 1,
+                match.activeBoosts.size() * 43 + match.boostSpawnSchedule.size() * 13 + 11);
+        MinigameMatch.ActiveBoost boost = new MinigameMatch.ActiveBoost(UUID.randomUUID(), types.get(typeIndex),
+                available.get(locationIndex).copy(), null);
+        match.activeBoosts.put(boost.id, boost);
+        ServerLevel level = resolveLevel(boost.location.dimension);
+        if (level != null) spawnBoostVisual(level, boost);
+        return true;
+    }
+
+    private void spawnBoostVisual(ServerLevel level, MinigameMatch.ActiveBoost boost) {
+        ItemStack icon = BuiltInRegistries.ITEM.getOptional(Identifier.parse(boost.type.itemId()))
+                .map(ItemStack::new).orElse(ItemStack.EMPTY);
+        if (icon.isEmpty()) return;
+        icon.set(DataComponents.CUSTOM_NAME, Component.literal(boost.type.label() + " Boost"));
+        ItemEntity entity = new ItemEntity(level, boost.location.x, boost.location.y + 0.45D, boost.location.z, icon);
+        entity.setNoGravity(true);
+        entity.setInvulnerable(true);
+        entity.setPickUpDelay(Integer.MAX_VALUE);
+        entity.setDeltaMovement(0.0D, 0.0D, 0.0D);
+        entity.setCustomName(Component.literal(BOOST_ENTITY_TAG));
+        entity.setCustomNameVisible(false);
+        level.addFreshEntity(entity);
+        boost.entityId = entity.getUUID();
+    }
+
+    private static void emitBoostMist(ServerLevel level, MinigameMatch.ActiveBoost boost, int color) {
+        DustParticleOptions dust = new DustParticleOptions(color & 0x00FFFFFF, 1.15F);
+        level.sendParticles(dust, boost.location.x, boost.location.y + 0.55D, boost.location.z,
+                5, 0.36D, 0.22D, 0.36D, 0.0D);
+    }
+
+    private ServerPlayer nearestBoostCollector(MinigameMatch match, MinigameMatch.ActiveBoost boost) {
+        ServerPlayer best = null;
+        double bestDistance = 2.25D;
+        for (UUID playerId : match.teams.keySet()) {
+            if (!match.active(playerId)) continue;
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null || !player.level().dimension().identifier().toString().equals(boost.location.dimension)) continue;
+            double dx = player.getX() - boost.location.x;
+            double dy = player.getY() + 0.5D - boost.location.y;
+            double dz = player.getZ() - boost.location.z;
+            double distance = dx * dx + dy * dy + dz * dz;
+            if (distance <= bestDistance) { bestDistance = distance; best = player; }
+        }
+        return best;
+    }
+
+    private void consumeBoost(MinigameMatch match, MinigameMatch.ActiveBoost boost,
+                              MinigameBoostRules rules, ServerPlayer player) {
+        if (boost == null || match.activeBoosts.remove(boost.id) == null) return;
+        ServerLevel level = resolveLevel(boost.location.dimension);
+        if (level != null && boost.entityId != null) {
+            Entity visual = level.getEntity(boost.entityId);
+            if (visual != null) visual.discard();
+        }
+        if (player != null) {
+            applyBoost(match, player, boost.type, rules);
+            playBoostPickupSound(match, player, boost.type);
+            player.sendSystemMessage(Component.literal(boost.type.label() + " boost activated for "
+                    + rules.durationSeconds(boost.type) + " seconds."), true);
+        }
+        int delay = randomInt(match, rules.respawnMinSeconds, rules.respawnMaxSeconds,
+                boost.id.hashCode() ^ (int) serverTicks);
+        match.boostSpawnSchedule.add(safeAdd(serverTicks, delay * 20L));
+    }
+
+    private void playBoostPickupSound(MinigameMatch match, ServerPlayer collector,
+                                      MinigameBoostType type) {
+        if (match == null || collector == null || type == null) return;
+        SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(
+                Identifier.parse(type.soundId())).orElse(null);
+        if (sound == null) return;
+        for (UUID playerId : match.teams.keySet()) {
+            if (!match.active(playerId)) continue;
+            ServerPlayer listener = server.getPlayerList().getPlayer(playerId);
+            if (listener == null || listener.level() != collector.level()) continue;
+            listener.connection.send(new ClientboundSoundPacket(
+                    BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound),
+                    SoundSource.PLAYERS,
+                    collector.getX(), collector.getY(), collector.getZ(),
+                    type.soundVolume(), type.soundPitch(),
+                    serverTicks ^ collector.getUUID().getMostSignificantBits()
+                            ^ listener.getUUID().getLeastSignificantBits()));
+        }
+    }
+
+    private void applyBoost(MinigameMatch match, ServerPlayer player, MinigameBoostType type,
+                            MinigameBoostRules rules) {
+        int durationTicks = rules.durationSeconds(type) * 20;
+        if (type == MinigameBoostType.ARMOR) {
+            AttributeInstance armor = player.getAttribute(Attributes.ARMOR);
+            if (armor == null) return;
+            double original = match.boostOriginalArmorBase.computeIfAbsent(player.getUUID(), ignored -> armor.getBaseValue());
+            armor.setBaseValue(original + rules.armorPoints);
+            match.boostArmorExpires.put(player.getUUID(), safeAdd(serverTicks, durationTicks));
+            return;
+        }
+        if (type == MinigameBoostType.REGENERATION) {
+            match.boostRegenerationExpires.put(player.getUUID(), safeAdd(serverTicks, durationTicks));
+            match.boostRegenerationNextHeal.put(player.getUUID(), safeAdd(serverTicks, 50L));
+        }
+        String effectId = switch (type) {
+            case SPEED -> "minecraft:speed";
+            case REGENERATION -> "minecraft:regeneration";
+            case JUMP -> "minecraft:jump_boost";
+            case ARMOR -> "";
+        };
+        MobEffect effect = BuiltInRegistries.MOB_EFFECT.getOptional(Identifier.parse(effectId)).orElse(null);
+        if (effect == null) return;
+        int amplifier = type == MinigameBoostType.REGENERATION ? 0 : 1;
+        player.addEffect(new MobEffectInstance(BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect),
+                durationTicks, amplifier, false, true, true));
+    }
+
+    private void tickRegenerationBoosts(MinigameMatch match) {
+        if (match == null || match.boostRegenerationExpires.isEmpty()) return;
+        for (Map.Entry<UUID, Long> entry : List.copyOf(match.boostRegenerationExpires.entrySet())) {
+            UUID playerId = entry.getKey();
+            long expires = entry.getValue();
+            if (expires <= serverTicks) {
+                match.boostRegenerationExpires.remove(playerId);
+                match.boostRegenerationNextHeal.remove(playerId);
+                continue;
+            }
+            long next = match.boostRegenerationNextHeal.getOrDefault(playerId, serverTicks);
+            if (next > serverTicks) continue;
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player != null && match.active(playerId)) healPlayer(player, 1.0D);
+            match.boostRegenerationNextHeal.put(playerId, safeAdd(serverTicks, 50L));
+        }
+    }
+
+    private void expireArmorBoosts(MinigameMatch match) {
+        for (Map.Entry<UUID, Long> entry : List.copyOf(match.boostArmorExpires.entrySet())) {
+            if (entry.getValue() > serverTicks) continue;
+            UUID playerId = entry.getKey();
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            Double original = match.boostOriginalArmorBase.remove(playerId);
+            match.boostArmorExpires.remove(playerId);
+            if (player != null && original != null) {
+                AttributeInstance armor = player.getAttribute(Attributes.ARMOR);
+                if (armor != null) armor.setBaseValue(original);
+            }
+        }
+    }
+
+    private void clearBoosts(MinigameMatch match) {
+        if (match == null) return;
+        for (MinigameMatch.ActiveBoost boost : List.copyOf(match.activeBoosts.values())) {
+            ServerLevel level = resolveLevel(boost.location.dimension);
+            if (level != null && boost.entityId != null) {
+                Entity visual = level.getEntity(boost.entityId);
+                if (visual != null) visual.discard();
+            }
+        }
+        for (Map.Entry<UUID, Double> entry : List.copyOf(match.boostOriginalArmorBase.entrySet())) {
+            ServerPlayer player = server == null ? null : server.getPlayerList().getPlayer(entry.getKey());
+            if (player == null) continue;
+            AttributeInstance armor = player.getAttribute(Attributes.ARMOR);
+            if (armor != null) armor.setBaseValue(entry.getValue());
+        }
+        match.activeBoosts.clear();
+        match.boostCandidateLocations.clear();
+        match.boostSpawnSchedule.clear();
+        match.boostOriginalArmorBase.clear();
+        match.boostArmorExpires.clear();
+        match.boostRegenerationExpires.clear();
+        match.boostRegenerationNextHeal.clear();
+        match.boostsInitialized = false;
+    }
+
+    private static MinigameBoostRules boostRules(MinigameDefinition definition) {
+        if (definition == null) return null;
+        return switch (MinigameGameType.parse(definition.gameType)) {
+            case CAPTURE_THE_FLAG -> definition.captureTheFlag.boosts;
+            case DOMINATION -> definition.domination.boosts;
+            default -> null;
+        };
+    }
+
+    private static MinigameRoleRules roleRules(MinigameDefinition definition) {
+        if (definition == null) return null;
+        return switch (MinigameGameType.parse(definition.gameType)) {
+            case CAPTURE_THE_FLAG -> definition.captureTheFlag.roles;
+            case DOMINATION -> definition.domination.roles;
+            default -> null;
+        };
+    }
+
+    private static int randomInt(MinigameMatch match, int minimum, int maximum, int salt) {
+        if (maximum <= minimum) return minimum;
+        long value = match.id.getMostSignificantBits() ^ Long.rotateLeft(match.id.getLeastSignificantBits(), 21)
+                ^ Long.rotateLeft(match.stateStartedTick, 9) ^ ((long) salt * 0x9E3779B97F4A7C15L)
+                ^ System.nanoTime();
+        value ^= value >>> 30; value *= 0xBF58476D1CE4E5B9L;
+        value ^= value >>> 27; value *= 0x94D049BB133111EBL;
+        value ^= value >>> 31;
+        return minimum + (int) Math.floorMod(value, (long) maximum - minimum + 1L);
+    }
+
+    private static double randomUnit(MinigameMatch match, int salt) {
+        return randomInt(match, 0, 1_000_000, salt) / 1_000_000.0D;
+    }
+
+    private void tickRoleRuntime(MinigameMatch match, MinigameDefinition definition) {
+        MinigameRoleRules rules = roleRules(definition);
+        if (rules == null || !rules.enabled) return;
+        for (UUID playerId : match.teams.keySet()) {
+            if (!match.active(playerId)) continue;
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null) continue;
+            enforceRoleInventory(player, definition, match, match.role(playerId), match.team(playerId));
+        }
+    }
+
+    /**
+     * Match equipment is server-owned. Players may open their inventory, but moving a
+     * role weapon, ability, cosmetic armor piece or Tank shield is corrected on the
+     * next server tick without duplicating the temporary stack.
+     */
+    private void enforceRoleInventory(ServerPlayer player, MinigameDefinition definition,
+                                      MinigameMatch match, MinigameRole role, int team) {
+        boolean carryingFlag = match.flagCarriers.containsValue(player.getUUID());
+        if (roleInventoryCorrect(player, role, carryingFlag)) return;
+
+        Map<String, ItemStack> preserved = new LinkedHashMap<>();
+        for (int slot = 0; slot < 36; slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            String name = roleLockedName(stack);
+            if (name.isBlank()) continue;
+            preserved.putIfAbsent(name, stack.copy());
+            player.getInventory().setItem(slot, ItemStack.EMPTY);
+        }
+        for (EquipmentSlot slot : List.of(EquipmentSlot.HEAD, EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.OFFHAND)) {
+            if (carryingFlag && slot == EquipmentSlot.HEAD) continue;
+            ItemStack stack = player.getItemBySlot(slot);
+            String name = roleLockedName(stack);
+            if (name.isBlank()) continue;
+            preserved.putIfAbsent(name, stack.copy());
+            player.setItemSlot(slot, ItemStack.EMPTY);
+        }
+
+        int color = switch (MinigameGameType.parse(definition.gameType)) {
+            case CAPTURE_THE_FLAG -> definition.captureTheFlag.color(team);
+            case DOMINATION -> definition.domination.color(team);
+            default -> 0xA06540;
+        };
+        if (!carryingFlag) player.setItemSlot(EquipmentSlot.HEAD,
+                preservedOr(preserved, ROLE_TEAM_HELMET,
+                        cosmeticLeather(Items.LEATHER_HELMET, color, ROLE_TEAM_HELMET)));
+        player.setItemSlot(EquipmentSlot.CHEST,
+                preservedOr(preserved, ROLE_TEAM_CHESTPLATE,
+                        cosmeticLeather(Items.LEATHER_CHESTPLATE, color, ROLE_TEAM_CHESTPLATE)));
+        player.setItemSlot(EquipmentSlot.LEGS,
+                preservedOr(preserved, ROLE_TEAM_LEGGINGS,
+                        cosmeticLeather(Items.LEATHER_LEGGINGS, color, ROLE_TEAM_LEGGINGS)));
+        player.setItemSlot(EquipmentSlot.FEET,
+                preservedOr(preserved, ROLE_TEAM_BOOTS,
+                        cosmeticLeather(Items.LEATHER_BOOTS, color, ROLE_TEAM_BOOTS)));
+
+        switch (role) {
+            case DPS -> {
+                player.getInventory().setItem(0, preservedOr(preserved, ROLE_DPS_SWORD,
+                        durableRoleItem(Items.DIAMOND_SWORD, ROLE_DPS_SWORD)));
+                player.getInventory().setItem(1, preservedOr(preserved, ROLE_DPS_BOW,
+                        durableRoleItem(Items.BOW, ROLE_DPS_BOW)));
+                ItemStack arrow = preservedOr(preserved, ROLE_DPS_ARROW,
+                        namedMatchItem(Items.ARROW, 1, ROLE_DPS_ARROW));
+                arrow.setCount(1);
+                player.getInventory().setItem(2, arrow);
+                player.setItemSlot(EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+            }
+            case TANK -> {
+                player.getInventory().setItem(0, preservedOr(preserved, ROLE_TANK_SWORD,
+                        durableRoleItem(Items.STONE_SWORD, ROLE_TANK_SWORD)));
+                player.getInventory().setItem(1, preservedOr(preserved, ROLE_TANK_FIELD,
+                        abilityMatchItem(Items.HEART_OF_THE_SEA, ROLE_TANK_FIELD)));
+                player.setItemSlot(EquipmentSlot.OFFHAND, preservedOr(preserved, ROLE_TANK_SHIELD,
+                        teamShield(player, definition, team)));
+            }
+            case HEALER -> {
+                player.getInventory().setItem(0, preservedOr(preserved, ROLE_HEALER_SWORD,
+                        durableRoleItem(Items.STONE_SWORD, ROLE_HEALER_SWORD)));
+                player.getInventory().setItem(1, preservedOr(preserved, ROLE_HEAL_SINGLE,
+                        abilityMatchItem(Items.AMETHYST_SHARD, ROLE_HEAL_SINGLE)));
+                player.getInventory().setItem(2, preservedOr(preserved, ROLE_HEAL_AOE,
+                        abilityMatchItem(Items.GLISTERING_MELON_SLICE, ROLE_HEAL_AOE)));
+                player.getInventory().setItem(3, preservedOr(preserved, ROLE_HEAL_SELF,
+                        abilityMatchItem(Items.GHAST_TEAR, ROLE_HEAL_SELF)));
+                player.setItemSlot(EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+            }
+        }
+        syncInventory(player);
+    }
+
+    private static ItemStack preservedOr(Map<String, ItemStack> preserved, String name, ItemStack fallback) {
+        ItemStack value = preserved.get(name);
+        return value == null || value.isEmpty() ? fallback : value;
+    }
+
+    private static boolean roleInventoryCorrect(ServerPlayer player, MinigameRole role, boolean carryingFlag) {
+        if (!carryingFlag && !isNamedMatchItem(player.getItemBySlot(EquipmentSlot.HEAD),
+                Items.LEATHER_HELMET, ROLE_TEAM_HELMET)) return false;
+        if (!isNamedMatchItem(player.getItemBySlot(EquipmentSlot.CHEST),
+                Items.LEATHER_CHESTPLATE, ROLE_TEAM_CHESTPLATE)
+                || !isNamedMatchItem(player.getItemBySlot(EquipmentSlot.LEGS),
+                Items.LEATHER_LEGGINGS, ROLE_TEAM_LEGGINGS)
+                || !isNamedMatchItem(player.getItemBySlot(EquipmentSlot.FEET),
+                Items.LEATHER_BOOTS, ROLE_TEAM_BOOTS)) return false;
+        boolean expected = switch (role) {
+            case DPS -> isNamedMatchItem(player.getInventory().getItem(0), Items.DIAMOND_SWORD, ROLE_DPS_SWORD)
+                    && isNamedMatchItem(player.getInventory().getItem(1), Items.BOW, ROLE_DPS_BOW)
+                    && isNamedMatchItem(player.getInventory().getItem(2), Items.ARROW, ROLE_DPS_ARROW)
+                    && player.getInventory().getItem(2).getCount() == 1
+                    && player.getOffhandItem().isEmpty();
+            case TANK -> isNamedMatchItem(player.getInventory().getItem(0), Items.STONE_SWORD, ROLE_TANK_SWORD)
+                    && isNamedMatchItem(player.getInventory().getItem(1), Items.HEART_OF_THE_SEA, ROLE_TANK_FIELD)
+                    && isNamedMatchItem(player.getOffhandItem(), Items.SHIELD, ROLE_TANK_SHIELD);
+            case HEALER -> isNamedMatchItem(player.getInventory().getItem(0), Items.STONE_SWORD, ROLE_HEALER_SWORD)
+                    && isNamedMatchItem(player.getInventory().getItem(1), Items.AMETHYST_SHARD, ROLE_HEAL_SINGLE)
+                    && isNamedMatchItem(player.getInventory().getItem(2), Items.GLISTERING_MELON_SLICE, ROLE_HEAL_AOE)
+                    && isNamedMatchItem(player.getInventory().getItem(3), Items.GHAST_TEAR, ROLE_HEAL_SELF)
+                    && player.getOffhandItem().isEmpty();
+        };
+        if (!expected) return false;
+        Map<String, Integer> occurrences = new HashMap<>();
+        for (int slot = 0; slot < 36; slot++) {
+            String name = roleLockedName(player.getInventory().getItem(slot));
+            if (!name.isBlank()) occurrences.merge(name, 1, Integer::sum);
+        }
+        for (EquipmentSlot slot : List.of(EquipmentSlot.HEAD, EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.OFFHAND)) {
+            if (carryingFlag && slot == EquipmentSlot.HEAD) continue;
+            String name = roleLockedName(player.getItemBySlot(slot));
+            if (!name.isBlank()) occurrences.merge(name, 1, Integer::sum);
+        }
+        for (int count : occurrences.values()) if (count > 1) return false;
+        return true;
+    }
+
+    private static String roleLockedName(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return "";
+        Component name = stack.get(DataComponents.CUSTOM_NAME);
+        if (name == null) return "";
+        String value = name.getString();
+        return ROLE_LOCKED_NAMES.contains(value) ? value : "";
+    }
+
+    /** Handles server-authoritative role ability items and their visible vanilla cooldown overlay. */
+    public boolean handleRoleAbility(ServerPlayer player, InteractionHand hand) {
+        if (player == null || hand == null) return false;
+        MinigameMatch match;
+        MinigameDefinition definition;
+        synchronized (this) {
+            match = matchFor(player.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+        }
+        MinigameRoleRules rules = roleRules(definition);
+        if (match == null || definition == null || rules == null || !rules.enabled
+                || match.state != MinigameMatchState.RUNNING || !match.active(player.getUUID())) return false;
+        ItemStack held = player.getItemInHand(hand);
+        if (held.isEmpty()) return false;
+        String ability = roleAbilityId(held);
+        if (ability.isBlank()) return false;
+        MinigameRole role = match.role(player.getUUID());
+        if (!abilityAllowedForRole(ability, role)) {
+            player.sendSystemMessage(Component.literal("That ability does not belong to your assigned role."), true);
+            return true;
+        }
+        if (!roleAbilityReady(match, player, held, ability)) return true;
+
+        boolean used = switch (ability) {
+            case "tank_slow" -> useTankSlow(match, rules, player);
+            case "healer_single" -> useHealerSingle(match, rules, player);
+            case "healer_aoe" -> useHealerAoe(match, rules, player);
+            case "healer_self" -> useHealerSelf(match, rules, player);
+            default -> false;
+        };
+        if (!used) return true;
+        int cooldownSeconds = switch (ability) {
+            case "tank_slow" -> rules.tankSlowCooldownSeconds;
+            case "healer_single" -> rules.healerSingleHealCooldownSeconds;
+            case "healer_aoe" -> rules.healerAoeHealCooldownSeconds;
+            case "healer_self" -> rules.healerSelfHealCooldownSeconds;
+            default -> 1;
+        };
+        startRoleCooldown(match, player, held, ability, cooldownSeconds);
+        return true;
+    }
+
+    private static String roleAbilityId(ItemStack stack) {
+        if (isNamedMatchItem(stack, Items.HEART_OF_THE_SEA, ROLE_TANK_FIELD)) return "tank_slow";
+        if (isNamedMatchItem(stack, Items.AMETHYST_SHARD, ROLE_HEAL_SINGLE)) return "healer_single";
+        if (isNamedMatchItem(stack, Items.GLISTERING_MELON_SLICE, ROLE_HEAL_AOE)) return "healer_aoe";
+        if (isNamedMatchItem(stack, Items.GHAST_TEAR, ROLE_HEAL_SELF)) return "healer_self";
+        return "";
+    }
+
+    private static boolean abilityAllowedForRole(String ability, MinigameRole role) {
+        return ability.startsWith("tank_") ? role == MinigameRole.TANK
+                : ability.startsWith("healer_") && role == MinigameRole.HEALER;
+    }
+
+    private boolean roleAbilityReady(MinigameMatch match, ServerPlayer player, ItemStack held, String ability) {
+        long available = match.roleCooldowns
+                .computeIfAbsent(player.getUUID(), ignored -> new LinkedHashMap<>())
+                .getOrDefault(ability, 0L);
+        if (serverTicks >= available) return true;
+        int remaining = (int) Math.max(1L, Math.min(Integer.MAX_VALUE, available - serverTicks));
+        player.getCooldowns().addCooldown(held, remaining);
+        player.sendSystemMessage(Component.literal("Ability cooldown: "
+                + String.format(Locale.ROOT, "%.1f", remaining / 20.0D) + "s"), true);
+        return false;
+    }
+
+    private void startRoleCooldown(MinigameMatch match, ServerPlayer player, ItemStack held,
+                                   String ability, int seconds) {
+        int ticks = Math.max(1, seconds * 20);
+        match.roleCooldowns.computeIfAbsent(player.getUUID(), ignored -> new LinkedHashMap<>())
+                .put(ability, safeAdd(serverTicks, ticks));
+        player.getCooldowns().addCooldown(held, ticks);
+    }
+
+    private boolean useTankSlow(MinigameMatch match, MinigameRoleRules rules, ServerPlayer tank) {
+        ArrayList<ServerPlayer> targets = new ArrayList<>();
+        int team = match.team(tank.getUUID());
+        double radius = rules.tankSlowRadius;
+        double radiusSqr = radius * radius;
+        for (ServerPlayer candidate : tank.level().getEntitiesOfClass(ServerPlayer.class,
+                tank.getBoundingBox().inflate(radius))) {
+            if (candidate == tank || !match.active(candidate.getUUID())
+                    || match.team(candidate.getUUID()) == team
+                    || candidate.distanceToSqr(tank) > radiusSqr) continue;
+            targets.add(candidate);
+        }
+        MobEffect slow = BuiltInRegistries.MOB_EFFECT.getOptional(Identifier.parse("minecraft:slowness")).orElse(null);
+        for (ServerPlayer target : targets) {
+            if (slow != null) {
+                target.addEffect(new MobEffectInstance(BuiltInRegistries.MOB_EFFECT.wrapAsHolder(slow),
+                        rules.tankSlowDurationSeconds * 20, 0, false, true, true));
+            }
+            if (rules.tankKnockbackStrength > 0.0D) {
+                double x = tank.getX() - target.getX();
+                double z = tank.getZ() - target.getZ();
+                if (x * x + z * z < 1.0E-6D) {
+                    Vec3 look = tank.getLookAngle();
+                    x = -look.x;
+                    z = -look.z;
+                }
+                target.knockback(rules.tankKnockbackStrength, x, z, tank.damageSources().playerAttack(tank), 0.0F);
+            }
+        }
+        roleBurst(tank, 0x5DADE2, radius);
+        roleVerticalBurst(tank, 0xA7D8FF, radius);
+        playRoleSound(match, tank, "minecraft:block.beacon.activate", 1.35F, 0.72F);
+        tank.sendSystemMessage(Component.literal(targets.isEmpty()
+                ? "Defensive field activated, but no enemy was inside the AOE."
+                : "Defensive field slowed and pushed " + targets.size() + " enemy player(s)."), true);
+        return true;
+    }
+
+    private boolean useHealerSingle(MinigameMatch match, MinigameRoleRules rules, ServerPlayer healer) {
+        ServerPlayer target = raycastFriendlyPlayer(match, healer, 8.0D);
+        Vec3 beamEnd = target == null
+                ? healer.getEyePosition().add(healer.getLookAngle().normalize().scale(8.0D))
+                : target.getBoundingBox().getCenter();
+        roleBeam(healer, beamEnd, 0x5CFF8A);
+        roleImpact(healer, beamEnd, 0xD4FFE0);
+        playRoleSound(match, healer, "minecraft:block.amethyst_block.chime", 1.2F, 1.3F);
+        if (target == null) {
+            healer.sendSystemMessage(Component.literal("Healing beam missed; cooldown consumed."), true);
+            return true;
+        }
+        boolean healed = healPlayer(target, rules.healerSingleHealAmount);
+        healer.sendSystemMessage(Component.literal(healed
+                ? "Healed " + target.getName().getString() + " for up to "
+                    + formatHealth(rules.healerSingleHealAmount) + " hearts."
+                : "The healing beam hit " + target.getName().getString()
+                    + ", but they were already at full health."), true);
+        return true;
+    }
+
+    private boolean useHealerAoe(MinigameMatch match, MinigameRoleRules rules, ServerPlayer healer) {
+        int team = match.team(healer.getUUID());
+        int healed = 0;
+        double radius = rules.healerAoeHealRadius;
+        double radiusSqr = radius * radius;
+        for (ServerPlayer candidate : healer.level().getEntitiesOfClass(ServerPlayer.class,
+                healer.getBoundingBox().inflate(radius))) {
+            if (!match.active(candidate.getUUID())
+                    || match.team(candidate.getUUID()) != team
+                    || candidate.distanceToSqr(healer) > radiusSqr) continue;
+            if (healPlayer(candidate, rules.healerAoeHealAmount)) healed++;
+        }
+        roleBurst(healer, 0x5CFF8A, radius);
+        roleVerticalBurst(healer, 0xC7FFD8, radius);
+        playRoleSound(match, healer, "minecraft:block.beacon.power_select", 1.25F, 1.18F);
+        healer.sendSystemMessage(Component.literal(healed == 0
+                ? "AOE heal activated, but no injured ally was inside the AOE."
+                : "AOE healed " + healed + " allied player(s) for up to "
+                    + formatHealth(rules.healerAoeHealAmount) + " hearts each."), true);
+        return true;
+    }
+
+    private boolean useHealerSelf(MinigameMatch match, MinigameRoleRules rules, ServerPlayer healer) {
+        double amount = healer.getMaxHealth() * 0.25D;
+        boolean healed = healPlayer(healer, amount);
+        roleBurst(healer, 0xFFF176, 1.5D);
+        roleVerticalBurst(healer, 0xFFF9B0, 1.25D);
+        playRoleSound(match, healer, "minecraft:entity.player.levelup", 1.05F, 1.35F);
+        healer.sendSystemMessage(Component.literal(healed
+                ? "Self heal restored 25% of your maximum health."
+                : "Self heal activated at full health; cooldown consumed."), true);
+        return true;
+    }
+
+    private static boolean healPlayer(ServerPlayer player, double amount) {
+        float before = player.getHealth();
+        float after = Math.min(player.getMaxHealth(), before + (float) Math.max(0.0D, amount));
+        if (after <= before) return false;
+        player.setHealth(after);
+        return true;
+    }
+
+    private static String formatHealth(double healthPoints) {
+        return String.format(Locale.ROOT, "%.1f", Math.max(0.0D, healthPoints) / 2.0D);
+    }
+
+    private ServerPlayer raycastFriendlyPlayer(MinigameMatch match, ServerPlayer healer, double range) {
+        Vec3 start = healer.getEyePosition();
+        Vec3 look = healer.getLookAngle().normalize();
+        int team = match.team(healer.getUUID());
+        ServerPlayer selected = null;
+        double selectedDistance = Double.MAX_VALUE;
+        for (UUID playerId : match.teams.keySet()) {
+            if (playerId.equals(healer.getUUID()) || !match.active(playerId)
+                    || match.team(playerId) != team) continue;
+            ServerPlayer candidate = server.getPlayerList().getPlayer(playerId);
+            if (candidate == null || candidate.level() != healer.level() || !healer.hasLineOfSight(candidate)) continue;
+            Vec3 center = candidate.getBoundingBox().getCenter();
+            Vec3 offset = center.subtract(start);
+            double along = offset.dot(look);
+            if (along < 0.0D || along > range || along >= selectedDistance) continue;
+            Vec3 closest = start.add(look.scale(along));
+            double hitRadius = Math.max(0.75D, candidate.getBbWidth() * 0.75D);
+            if (center.distanceToSqr(closest) > hitRadius * hitRadius) continue;
+            selected = candidate;
+            selectedDistance = along;
+        }
+        return selected;
+    }
+
+    private static void roleBeam(ServerPlayer source, Vec3 end, int color) {
+        if (!(source.level() instanceof ServerLevel level) || end == null) return;
+        Vec3 start = source.getEyePosition();
+        Vec3 delta = end.subtract(start);
+        int steps = Math.max(4, (int) Math.ceil(delta.length() * 7.0D));
+        DustParticleOptions core = new DustParticleOptions(color & 0x00FFFFFF, 1.15F);
+        DustParticleOptions glow = new DustParticleOptions(0xE8FFF0, 0.65F);
+        for (int step = 0; step <= steps; step++) {
+            Vec3 point = start.add(delta.scale(step / (double) steps));
+            level.sendParticles(core, point.x, point.y, point.z, 1, 0.008D, 0.008D, 0.008D, 0.0D);
+            if (step % 3 == 0) level.sendParticles(glow, point.x, point.y, point.z,
+                    1, 0.025D, 0.025D, 0.025D, 0.0D);
+        }
+    }
+
+    private static void roleImpact(ServerPlayer source, Vec3 point, int color) {
+        if (!(source.level() instanceof ServerLevel level) || point == null) return;
+        DustParticleOptions dust = new DustParticleOptions(color & 0x00FFFFFF, 1.0F);
+        level.sendParticles(dust, point.x, point.y, point.z, 18, 0.22D, 0.22D, 0.22D, 0.01D);
+    }
+
+    private static void roleBurst(ServerPlayer source, int color, double radius) {
+        if (!(source.level() instanceof ServerLevel level)) return;
+        DustParticleOptions dust = new DustParticleOptions(color & 0x00FFFFFF, 1.15F);
+        int particles = Math.max(32, (int) Math.ceil(radius * 18.0D));
+        for (int index = 0; index < particles; index++) {
+            double angle = Math.PI * 2.0D * index / particles;
+            double x = source.getX() + Math.cos(angle) * radius;
+            double z = source.getZ() + Math.sin(angle) * radius;
+            level.sendParticles(dust, x, source.getY() + 0.8D, z, 1, 0.03D, 0.10D, 0.03D, 0.0D);
+        }
+    }
+
+    private static void roleVerticalBurst(ServerPlayer source, int color, double radius) {
+        if (!(source.level() instanceof ServerLevel level)) return;
+        DustParticleOptions dust = new DustParticleOptions(color & 0x00FFFFFF, 0.85F);
+        int columns = 12;
+        for (int index = 0; index < columns; index++) {
+            double angle = Math.PI * 2.0D * index / columns;
+            double distance = radius * (0.35D + 0.65D * (index % 3) / 2.0D);
+            double x = source.getX() + Math.cos(angle) * distance;
+            double z = source.getZ() + Math.sin(angle) * distance;
+            level.sendParticles(dust, x, source.getY() + 0.3D, z, 5,
+                    0.04D, 0.55D, 0.04D, 0.02D);
+        }
+    }
+
+    private void playRoleSound(MinigameMatch match, ServerPlayer source, String soundId,
+                               float volume, float pitch) {
+        SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(Identifier.parse(soundId)).orElse(null);
+        if (sound == null) return;
+        for (UUID playerId : match.teams.keySet()) {
+            ServerPlayer listener = server.getPlayerList().getPlayer(playerId);
+            if (listener == null || listener.level() != source.level()) continue;
+            listener.connection.send(new ClientboundSoundPacket(
+                    BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound), SoundSource.PLAYERS,
+                    source.getX(), source.getY(), source.getZ(), volume, pitch,
+                    serverTicks ^ source.getUUID().getLeastSignificantBits()
+                            ^ listener.getUUID().getMostSignificantBits()));
+        }
+    }
+
+    /** Adds the configured DPS arrow effect only when an assigned DPS hits an enemy player. */
+    public void handleRoleProjectileImpact(Projectile projectile, HitResult hitResult) {
+        if (!(projectile instanceof AbstractArrow) || !(hitResult instanceof EntityHitResult entityHit)
+                || !(projectile.getOwner() instanceof ServerPlayer attacker)
+                || !(entityHit.getEntity() instanceof ServerPlayer victim)) return;
+        MinigameMatch match;
+        MinigameDefinition definition;
+        synchronized (this) {
+            match = matchFor(attacker.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+        }
+        MinigameRoleRules rules = roleRules(definition);
+        if (match == null || definition == null || rules == null || !rules.enabled
+                || match.state != MinigameMatchState.RUNNING
+                || match.role(attacker.getUUID()) != MinigameRole.DPS
+                || !match.active(attacker.getUUID()) || !match.active(victim.getUUID())
+                || match.team(attacker.getUUID()) == match.team(victim.getUUID())) return;
+        MobEffect effect = BuiltInRegistries.MOB_EFFECT.getOptional(
+                Identifier.parse(rules.dpsArrowEffect)).orElse(null);
+        if (effect == null) return;
+        victim.addEffect(new MobEffectInstance(BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect),
+                rules.dpsArrowEffectDurationSeconds * 20, rules.dpsArrowEffectAmplifier,
+                false, true, true));
+    }
+
+    private void tickSpleefProjectiles(MinigameMatch match, MinigameDefinition definition) {
+        SpleefRules rules = definition.spleef;
+        long elapsedSeconds = Math.max(0L, (serverTicks - match.stateStartedTick) / 20L);
+        if (rules.standardProjectileEnabled && !match.spleefStandardProjectileUnlocked
+                && elapsedSeconds >= rules.standardProjectileUnlockSeconds) {
+            match.spleefStandardProjectileUnlocked = true;
+            announce(match, "The infinite Spleef projectile is now available. It breaks one floor block and has a cooldown.");
+        }
+        if (match.spleefStandardProjectileUnlocked) {
+            for (UUID playerId : match.teams.keySet()) {
+                if (!match.active(playerId)) continue;
+                ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                if (player == null) continue;
+                int standardCount = countNamedMatchItem(player, Items.SNOWBALL, "Infinite Spleef Projectile");
+                if (standardCount <= 0) {
+                    giveNamedMatchItem(player, Items.SNOWBALL, 1, "Infinite Spleef Projectile");
+                } else if (standardCount > 1) {
+                    trimNamedMatchItemCount(player, Items.SNOWBALL, "Infinite Spleef Projectile", 1);
+                }
+            }
+        }
+        if (!rules.burstProjectileEnabled) return;
+        if (!match.spleefBurstScheduleStarted && elapsedSeconds >= rules.burstProjectileStartSeconds) {
+            match.spleefBurstScheduleStarted = true;
+            match.spleefNextBurstGrantTick = safeAdd(serverTicks,
+                    randomInt(match, rules.burstProjectileMinIntervalSeconds,
+                            rules.burstProjectileMaxIntervalSeconds, 901) * 20L);
+            announce(match, "Power projectiles have entered the match and will be awarded to random players.");
+        }
+        if (!match.spleefBurstScheduleStarted || serverTicks < match.spleefNextBurstGrantTick) return;
+        ArrayList<ServerPlayer> eligible = new ArrayList<>();
+        for (UUID playerId : match.teams.keySet()) {
+            if (!match.active(playerId)) continue;
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player != null && countNamedMatchItem(player, Items.EGG, "Power Spleef Projectile") < rules.burstProjectileMaximumStack) eligible.add(player);
+        }
+        if (!eligible.isEmpty()) {
+            ServerPlayer recipient = eligible.get(randomInt(match, 0, eligible.size() - 1, (int) serverTicks));
+            if (giveNamedMatchItem(recipient, Items.EGG, 1, "Power Spleef Projectile")) {
+                recipient.sendSystemMessage(Component.literal("You received a Power Spleef Projectile. It breaks a five-block cross."), true);
+            }
+        }
+        match.spleefNextBurstGrantTick = safeAdd(serverTicks,
+                randomInt(match, rules.burstProjectileMinIntervalSeconds,
+                        rules.burstProjectileMaxIntervalSeconds, (int) (serverTicks ^ 0x51EAF00DL)) * 20L);
+    }
+
+    private static int countNamedMatchItem(ServerPlayer player, net.minecraft.world.item.Item item,
+                                           String expectedName) {
+        int count = 0;
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (isNamedMatchItem(stack, item, expectedName)) count += stack.getCount();
+        }
+        return count;
+    }
+
+    private static boolean isNamedMatchItem(ItemStack stack, net.minecraft.world.item.Item item,
+                                            String expectedName) {
+        if (stack == null || stack.isEmpty() || stack.getItem() != item) return false;
+        Component customName = stack.get(DataComponents.CUSTOM_NAME);
+        return customName != null && expectedName.equals(customName.getString());
+    }
+
+    private static ItemStack findNamedMatchItem(ServerPlayer player, net.minecraft.world.item.Item item,
+                                                String expectedName) {
+        if (player == null) return ItemStack.EMPTY;
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (isNamedMatchItem(stack, item, expectedName)) return stack;
+        }
+        return ItemStack.EMPTY;
+    }
+
+    /** Keeps a temporary match item at an exact upper bound after vanilla use processing. */
+    private static void trimNamedMatchItemCount(ServerPlayer player, net.minecraft.world.item.Item item,
+                                                String expectedName, int maximum) {
+        if (player == null) return;
+        int remaining = Math.max(0, maximum);
+        boolean changed = false;
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (!isNamedMatchItem(stack, item, expectedName)) continue;
+            int keep = Math.min(stack.getCount(), remaining);
+            if (keep <= 0) {
+                player.getInventory().setItem(slot, ItemStack.EMPTY);
+                changed = true;
+            } else {
+                if (stack.getCount() != keep) {
+                    stack.setCount(keep);
+                    changed = true;
+                }
+                remaining -= keep;
+            }
+        }
+        if (changed) syncInventory(player);
+    }
+
+    private static boolean giveNamedMatchItem(ServerPlayer player, net.minecraft.world.item.Item item,
+                                              int count, String name) {
+        ItemStack stack = namedMatchItem(item, count, name);
+        boolean added = player.getInventory().add(stack);
+        if (added) {
+            player.getInventory().setChanged();
+            player.containerMenu.broadcastChanges();
+        }
+        return added;
+    }
+
+    /** Raises the Tank's offhand shield without allowing the targeted block/entity to be used. */
+    public boolean handleRoleShieldUse(ServerPlayer player) {
+        if (player == null) return false;
+        MinigameMatch match;
+        MinigameDefinition definition;
+        synchronized (this) {
+            match = matchFor(player.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+        }
+        MinigameRoleRules rules = roleRules(definition);
+        if (match == null || definition == null || rules == null || !rules.enabled
+                || match.state != MinigameMatchState.RUNNING || !match.active(player.getUUID())
+                || match.role(player.getUUID()) != MinigameRole.TANK
+                || !isNamedMatchItem(player.getOffhandItem(), Items.SHIELD, ROLE_TANK_SHIELD)) return false;
+        player.startUsingItem(InteractionHand.OFF_HAND);
+        return true;
+    }
+
+    /** Starts the DPS bow even when the crosshair is on a protected block or entity. */
+    public boolean handleRoleBowUse(ServerPlayer player, InteractionHand hand) {
+        if (player == null || hand == null) return false;
+        MinigameMatch match;
+        MinigameDefinition definition;
+        synchronized (this) {
+            match = matchFor(player.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+        }
+        MinigameRoleRules rules = roleRules(definition);
+        ItemStack held = player.getItemInHand(hand);
+        if (match == null || definition == null || rules == null || !rules.enabled
+                || match.state != MinigameMatchState.RUNNING || !match.active(player.getUUID())
+                || match.role(player.getUUID()) != MinigameRole.DPS
+                || !isNamedMatchItem(held, Items.BOW, ROLE_DPS_BOW)) return false;
+        player.startUsingItem(hand);
+        return true;
+    }
+
+    /** Allows only the two controlled Spleef projectile items to use vanilla throwing behavior. */
+    public boolean allowRightClickItem(ServerPlayer player, InteractionHand hand) {
+        if (player == null || hand == null) return false;
+        MinigameMatch match;
+        MinigameDefinition definition;
+        synchronized (this) {
+            match = matchFor(player.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+        }
+        if (match == null || definition == null || match.state != MinigameMatchState.RUNNING
+                || !match.active(player.getUUID())) return false;
+        MinigameRoleRules activeRoleRules = roleRules(definition);
+        ItemStack held = player.getItemInHand(hand);
+        if (activeRoleRules != null && activeRoleRules.enabled) {
+            MinigameRole role = match.role(player.getUUID());
+            if (role == MinigameRole.DPS && isNamedMatchItem(held, Items.BOW, ROLE_DPS_BOW)) return true;
+            if (role == MinigameRole.TANK && hand == InteractionHand.OFF_HAND
+                    && isNamedMatchItem(held, Items.SHIELD, ROLE_TANK_SHIELD)) return true;
+        }
+        if (MinigameGameType.parse(definition.gameType) != MinigameGameType.SPLEEF) return false;
+        if (held.isEmpty()) return false;
+        if (isNamedMatchItem(held, Items.SNOWBALL, "Infinite Spleef Projectile")
+                && definition.spleef.standardProjectileEnabled && match.spleefStandardProjectileUnlocked) {
+            long availableTick = match.spleefStandardProjectileCooldowns.getOrDefault(player.getUUID(), 0L);
+            if (serverTicks < availableTick || player.getCooldowns().isOnCooldown(held)) {
+                int remainingTicks = (int) Math.max(1L, Math.min(Integer.MAX_VALUE, availableTick - serverTicks));
+                if (remainingTicks > 0) player.getCooldowns().addCooldown(held, remainingTicks);
+                long tenths = Math.max(1L, (Math.max(1L, availableTick - serverTicks) + 1L) / 2L);
+                player.sendSystemMessage(Component.literal("Projectile cooldown: " + (tenths / 10.0D) + "s"), true);
+                syncInventory(player);
+                return false;
+            }
+            int cooldownTicks = Math.max(1, definition.spleef.standardProjectileCooldownSeconds * 20);
+            match.spleefStandardProjectileCooldowns.put(player.getUUID(), safeAdd(serverTicks, cooldownTicks));
+            // Keep one visible infinite projectile after vanilla consumes the thrown copy.
+            if (held.getCount() == 1) held.grow(1);
+            syncInventory(player);
+            return true;
+        }
+        return isNamedMatchItem(held, Items.EGG, "Power Spleef Projectile")
+                && definition.spleef.burstProjectileEnabled;
+    }
+
+    public boolean isControlledSpleefProjectile(ServerPlayer player, InteractionHand hand) {
+        if (player == null || hand == null) return false;
+        MinigameMatch match;
+        MinigameDefinition definition;
+        synchronized (this) {
+            match = matchFor(player.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+        }
+        if (match == null || definition == null || match.state != MinigameMatchState.RUNNING
+                || MinigameGameType.parse(definition.gameType) != MinigameGameType.SPLEEF) return false;
+        ItemStack held = player.getItemInHand(hand);
+        return isNamedMatchItem(held, Items.SNOWBALL, "Infinite Spleef Projectile")
+                || isNamedMatchItem(held, Items.EGG, "Power Spleef Projectile");
+    }
+
+    private static void syncInventory(ServerPlayer player) {
+        if (player == null) return;
+        player.getInventory().setChanged();
+        player.containerMenu.broadcastChanges();
+    }
+
+    /** Converts SSU Spleef throws into fast, gravity-free, zero-spread projectiles. */
+    public void prepareSpleefProjectile(Projectile projectile) {
+        if (projectile == null || !(projectile.getOwner() instanceof ServerPlayer player)) return;
+        MinigameMatch match;
+        MinigameDefinition definition;
+        synchronized (this) {
+            match = matchFor(player.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+        }
+        if (match == null || definition == null || match.state != MinigameMatchState.RUNNING
+                || !match.active(player.getUUID())
+                || MinigameGameType.parse(definition.gameType) != MinigameGameType.SPLEEF) return;
+        String projectileId = BuiltInRegistries.ENTITY_TYPE.getKey(projectile.getType()).toString();
+        boolean standard = "minecraft:snowball".equals(projectileId)
+                && definition.spleef.standardProjectileEnabled && match.spleefStandardProjectileUnlocked;
+        boolean burst = "minecraft:egg".equals(projectileId) && definition.spleef.burstProjectileEnabled;
+        if (!standard && !burst) return;
+        Vec3 direction = player.getLookAngle();
+        if (direction.lengthSqr() < 1.0E-8D) return;
+        direction = direction.normalize();
+        projectile.setNoGravity(true);
+        projectile.setDeltaMovement(direction.scale(standard ? 2.65D : 2.35D));
+        projectile.setYRot(player.getYRot());
+        projectile.setXRot(player.getXRot());
+        if (standard) {
+            ItemStack cooldownStack = findNamedMatchItem(player, Items.SNOWBALL, "Infinite Spleef Projectile");
+            if (!cooldownStack.isEmpty()) {
+                int cooldownTicks = Math.max(1, definition.spleef.standardProjectileCooldownSeconds * 20);
+                player.getCooldowns().addCooldown(cooldownStack, cooldownTicks);
+                syncInventory(player);
+            }
+        }
+    }
+
+    /** Breaks only configured Spleef floor blocks when one of SSU's temporary projectiles impacts. */
+    public boolean handleSpleefProjectileImpact(Projectile projectile, HitResult hitResult) {
+        if (projectile == null || !(projectile.getOwner() instanceof ServerPlayer player)) return false;
+        MinigameMatch match;
+        MinigameDefinition definition;
+        MinigameArenaDefinition arena;
+        synchronized (this) {
+            match = matchFor(player.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+            arena = definition == null || match == null ? null : arena(definition, match.arenaId);
+        }
+        if (match == null || definition == null || arena == null
+                || match.state != MinigameMatchState.RUNNING || !match.active(player.getUUID())
+                || MinigameGameType.parse(definition.gameType) != MinigameGameType.SPLEEF) return false;
+        String projectileId = BuiltInRegistries.ENTITY_TYPE.getKey(projectile.getType()).toString();
+        boolean standard = "minecraft:snowball".equals(projectileId);
+        boolean burst = "minecraft:egg".equals(projectileId);
+        if ((!standard || !definition.spleef.standardProjectileEnabled)
+                && (!burst || !definition.spleef.burstProjectileEnabled)) return false;
+        if (hitResult instanceof BlockHitResult blockHit) {
+            if (standard) breakSpleefProjectileBlock(player, arena, definition, blockHit.getBlockPos());
+            else {
+                BlockPos center = blockHit.getBlockPos();
+                breakSpleefProjectileBlock(player, arena, definition, center);
+                for (Direction direction : new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST}) {
+                    breakSpleefProjectileBlock(player, arena, definition, center.relative(direction));
+                }
+            }
+        }
+        projectile.discard();
+        return true;
+    }
+
+    private void breakSpleefProjectileBlock(ServerPlayer player, MinigameArenaDefinition arena,
+                                            MinigameDefinition definition, BlockPos pos) {
+        if (!(player.level() instanceof ServerLevel level)) return;
+        Region region = SimpleServerUtilities.REGIONS.get(arena.regionId);
+        if (region == null || !region.contains(level.dimension(), pos)) return;
+        if (arena.playFloor != null && arena.playFloor.configured()
+                && !arena.playFloor.contains(level.dimension(), pos)) return;
+        BlockState state = level.getBlockState(pos);
+        String blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+        if (!definition.spleef.canBreak(blockId)) return;
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+    }
+
     private void tickSpleef(MinigameMatch match, MinigameDefinition definition, MinigameArenaDefinition arena) {
+        tickSpleefProjectiles(match, definition);
         Region region = SimpleServerUtilities.REGIONS.get(arena.regionId);
         if (region == null) {
             finish(match, "Arena region became unavailable.");
@@ -3360,6 +5069,20 @@ public final class MinigameManager {
         }
     }
 
+    /** Blocks vanilla hunger, potion and other automatic healing in live respawn modes.
+     * Healer abilities and SSU regeneration boosts use controlled direct health updates. */
+    public boolean shouldCancelAutomaticHealing(ServerPlayer player) {
+        if (player == null) return false;
+        synchronized (this) {
+            MinigameMatch match = matchFor(player.getUUID());
+            if (match == null || match.state != MinigameMatchState.RUNNING) return false;
+            MinigameDefinition definition = definitions.get(match.minigameId);
+            if (definition == null) return false;
+            MinigameGameType type = MinigameGameType.parse(definition.gameType);
+            return type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION;
+        }
+    }
+
     public boolean shouldCancelDamage(ServerPlayer victim, ServerPlayer attacker) {
         if (victim == null) return false;
         MinigameMatch victimMatch;
@@ -3369,7 +5092,7 @@ public final class MinigameManager {
             victimMatch = matchFor(victim.getUUID());
             attackerMatch = attacker == null ? null : matchFor(attacker.getUUID());
             if (victimMatch == null) return attackerMatch != null;
-            if (victimMatch.state != MinigameMatchState.RUNNING || victimMatch.eliminated.contains(victim.getUUID())) return true;
+            if (victimMatch.state != MinigameMatchState.RUNNING || !victimMatch.active(victim.getUUID())) return true;
             if (attacker == null) return false;
             if (attackerMatch != victimMatch) return true;
             definition = definitions.get(victimMatch.minigameId);
@@ -3388,6 +5111,93 @@ public final class MinigameManager {
         return false;
     }
 
+    /** Immediately refreshes this player's in-match game and spectator border overlays. */
+    public void syncRuntimeBorders(ServerPlayer player) {
+        syncRuntimeBorders(player, true);
+    }
+
+    private void syncRuntimeBorders(ServerPlayer player, boolean force) {
+        if (player == null) return;
+        MinigameMatch match;
+        MinigameDefinition definition;
+        MinigameArenaDefinition arena;
+        synchronized (this) {
+            match = matchFor(player.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+            arena = definition == null || match == null ? null : arena(definition, match.arenaId);
+        }
+
+        PlayerBorderPreferences preferences = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID());
+        BorderVisualizationSettings settings = SimpleServerUtilities.BORDER_SETTINGS.settings();
+        Region gameRegion = arena == null ? null : SimpleServerUtilities.REGIONS.get(arena.regionId);
+        boolean showGame = match != null && arena != null && gameRegion != null
+                && preferences.isMinigameGameBorderVisible();
+        boolean showSpectator = match != null && arena != null && arena.spectatorBounds.configured()
+                && preferences.isMinigameSpectatorBorderVisible();
+        String playerDimension = player.level().dimension().identifier().toString();
+        RuntimeBorderSyncState next = new RuntimeBorderSyncState(
+                match == null ? null : match.id, playerDimension, showGame, showSpectator,
+                SimpleServerUtilities.BORDER_SETTINGS.revision(),
+                showGame ? gameRegion.getDimension().identifier().toString() : "",
+                showSpectator ? arena.spectatorBounds.dimension : ""
+        );
+        RuntimeBorderSyncState previous;
+        synchronized (this) { previous = runtimeBorderSyncStates.get(player.getUUID()); }
+        if (!force && next.equals(previous)) return;
+
+        if (showGame) {
+            BorderVisualizationPayload.Entry entry = new BorderVisualizationPayload.Entry(
+                    BorderCategory.MINIGAME_GAME_AREA,
+                    definition.displayName + " game border",
+                    settings.getStrokeArgb(BorderCategory.MINIGAME_GAME_AREA),
+                    0,
+                    MINIGAME_GAME_BORDER_WIDTH,
+                    true,
+                    List.of(new BorderVisualizationPayload.Box(
+                            gameRegion.getMinX(), gameRegion.getMinY(), gameRegion.getMinZ(),
+                            gameRegion.getMaxX(), gameRegion.getMaxY(), gameRegion.getMaxZ()
+                    )),
+                    List.of()
+            );
+            PacketDistributor.sendToPlayer(player, new BorderVisualizationPayload(
+                    BorderLayer.MINIGAME_GAME, true, gameRegion.getDimension().identifier().toString(),
+                    settings.getClaimVerticalRange(), settings.getRegionRenderDistanceBlocks(), List.of(entry)
+            ));
+        } else {
+            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.MINIGAME_GAME));
+        }
+
+        if (showSpectator) {
+            MinigameAreaBounds bounds = arena.spectatorBounds;
+            BorderVisualizationPayload.Entry entry = new BorderVisualizationPayload.Entry(
+                    BorderCategory.MINIGAME_SPECTATOR_AREA,
+                    definition.displayName + " spectator border",
+                    settings.getStrokeArgb(BorderCategory.MINIGAME_SPECTATOR_AREA),
+                    0,
+                    MINIGAME_SPECTATOR_BORDER_WIDTH,
+                    true,
+                    List.of(new BorderVisualizationPayload.Box(
+                            bounds.minX, bounds.minY, bounds.minZ, bounds.maxX, bounds.maxY, bounds.maxZ
+                    )),
+                    List.of()
+            );
+            PacketDistributor.sendToPlayer(player, new BorderVisualizationPayload(
+                    BorderLayer.MINIGAME_SPECTATOR, true, bounds.dimension,
+                    settings.getClaimVerticalRange(), settings.getRegionRenderDistanceBlocks(), List.of(entry)
+            ));
+        } else {
+            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.MINIGAME_SPECTATOR));
+        }
+        synchronized (this) { runtimeBorderSyncStates.put(player.getUUID(), next); }
+    }
+
+    private void clearRuntimeBorders(ServerPlayer player) {
+        if (player == null) return;
+        PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.MINIGAME_GAME));
+        PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(BorderLayer.MINIGAME_SPECTATOR));
+        synchronized (this) { runtimeBorderSyncStates.remove(player.getUUID()); }
+    }
+
     private void updateHud(MinigameMatch match, MinigameDefinition definition, long elapsedSeconds) {
         int alive = 0;
         for (UUID playerId : match.teams.keySet()) if (match.active(playerId)) alive++;
@@ -3404,6 +5214,15 @@ public final class MinigameManager {
             ArrayList<String> lines = new ArrayList<>();
             lines.add("Mode: " + type.label());
             lines.add("State: " + match.state.name().toLowerCase(Locale.ROOT).replace('_', ' '));
+            MinigameRoleRules activeRoleRules = roleRules(definition);
+            if (activeRoleRules != null && activeRoleRules.enabled)
+                lines.add("Role: " + match.role(playerId).label());
+            MinigameMatch.PendingRespawn pendingRespawn = match.pendingRespawns.get(playerId);
+            if (pendingRespawn != null) {
+                long respawnSeconds = Math.max(1L,
+                        (pendingRespawn.completesTick - serverTicks + 19L) / 20L);
+                lines.add("Respawning in: " + respawnSeconds + "s");
+            }
             if (remaining >= 0L) lines.add((match.state == MinigameMatchState.COUNTDOWN ? "Starts in: " : "Time: ") + formatSeconds(remaining));
             if (type == MinigameGameType.CAPTURE_THE_FLAG) {
                 int team = match.team(playerId);
@@ -3457,6 +5276,7 @@ public final class MinigameManager {
                 lines.add(match.eliminated.contains(playerId) ? "You are spectating" : "Position: active");
             }
             PacketDistributor.sendToPlayer(player, new MinigameHudPayload(true, definition.displayName, lines));
+            syncRuntimeBorders(player, false);
         }
     }
 
@@ -3465,9 +5285,11 @@ public final class MinigameManager {
         return String.format(Locale.ROOT, "%d:%02d", safe / 60L, safe % 60L);
     }
 
-    private static void clearHud(ServerPlayer player) {
+    private void clearHud(ServerPlayer player) {
         PacketDistributor.sendToPlayer(player, MinigameHudPayload.clear());
         PacketDistributor.sendToPlayer(player, MinigameCastBarPayload.clear());
+        clearRespawnTitle(player);
+        clearRuntimeBorders(player);
     }
 
     public enum BlockBreakDecision { PASS, ALLOW, ALLOW_NO_DROPS, DENY }
@@ -3568,10 +5390,15 @@ public final class MinigameManager {
                 int running = (int) matches.values().stream().filter(match -> match.minigameId.equals(definition.id)).count();
                 boolean inThisQueue = definition.id.equals(queued);
                 boolean inThisMatch = ownMatch != null && definition.id.equals(ownMatch.minigameId);
+                MinigameRoleRules listedRoleRules = roleRules(definition);
+                boolean rolesEnabled = listedRoleRules != null && listedRoleRules.enabled;
                 entries.add(new MinigameLobbyDataPayload.GameEntry(definition.id, definition.displayName,
                         definition.description, definition.iconItem, definition.gameType, definition.enabled, definition.minPlayers,
                         definition.maxPlayers, definition.teamCount, queueSize(definition.id), running, free, blocked,
                         definition.victoryMode, availability.matched(), availability.reason(), inThisQueue, inThisMatch,
+                        rolesEnabled,
+                        inThisQueue && rolesEnabled ? playerRolePreferences.getOrDefault(player.getUUID(), MinigameRole.DPS).id() : "",
+                        inThisMatch && rolesEnabled ? ownMatch.role(player.getUUID()).id() : "",
                         inThisMatch ? ownMatch.state.name().toLowerCase(Locale.ROOT) : "",
                         inThisMatch ? ownMatch.team(player.getUUID()) : 0,
                         inThisMatch ? ownMatch.score(player.getUUID()) : 0L));
@@ -3648,10 +5475,12 @@ public final class MinigameManager {
         matches.clear();
         playerMatches.clear();
         playerQueues.clear();
+        playerRolePreferences.clear();
         arenaReservations.clear();
         resettingArenas.clear();
         blockedArenas.clear();
         lastRequests.clear();
+        runtimeBorderSyncStates.clear();
         serverTicks = 0L;
         if (!keepServer) server = null;
     }

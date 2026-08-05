@@ -12,6 +12,8 @@ import com.mojang.serialization.JsonOps;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 
@@ -33,6 +35,10 @@ public final class MinigamePlayerState {
     public int remainingFireTicks;
     public boolean mayFly;
     public boolean flying;
+    /** Original base combat attributes. Nullable for older recovery schema migration. */
+    public Double maxHealthBaseValue;
+    public Double armorBaseValue;
+    public Double armorToughnessBaseValue;
 
     public static MinigamePlayerState capture(ServerPlayer player) {
         MinigamePlayerState state = new MinigamePlayerState();
@@ -66,6 +72,12 @@ public final class MinigamePlayerState {
         state.remainingFireTicks = player.getRemainingFireTicks();
         state.mayFly = ability(player, "mayfly", "mayFly");
         state.flying = ability(player, "flying");
+        AttributeInstance maxHealth = player.getAttribute(Attributes.MAX_HEALTH);
+        AttributeInstance armor = player.getAttribute(Attributes.ARMOR);
+        AttributeInstance toughness = player.getAttribute(Attributes.ARMOR_TOUGHNESS);
+        state.maxHealthBaseValue = maxHealth == null ? null : maxHealth.getBaseValue();
+        state.armorBaseValue = armor == null ? null : armor.getBaseValue();
+        state.armorToughnessBaseValue = toughness == null ? null : toughness.getBaseValue();
         return state;
     }
 
@@ -83,6 +95,9 @@ public final class MinigamePlayerState {
         experienceProgress = Float.isFinite(experienceProgress) ? Math.max(0.0F, Math.min(1.0F, experienceProgress)) : 0.0F;
         absorptionAmount = Float.isFinite(absorptionAmount) ? Math.max(0.0F, absorptionAmount) : 0.0F;
         airSupply = Math.max(0, airSupply);
+        if (maxHealthBaseValue != null && !Double.isFinite(maxHealthBaseValue)) maxHealthBaseValue = null;
+        if (armorBaseValue != null && !Double.isFinite(armorBaseValue)) armorBaseValue = null;
+        if (armorToughnessBaseValue != null && !Double.isFinite(armorToughnessBaseValue)) armorToughnessBaseValue = null;
     }
 
     public void restore(ServerPlayer player) {
@@ -115,10 +130,13 @@ public final class MinigamePlayerState {
         player.getInventory().setChanged();
         player.containerMenu.broadcastChanges();
         player.setGameMode(GameType.byName(gameMode, GameType.SURVIVAL));
+        restoreBaseAttribute(player, Attributes.MAX_HEALTH, maxHealthBaseValue);
+        restoreBaseAttribute(player, Attributes.ARMOR, armorBaseValue);
+        restoreBaseAttribute(player, Attributes.ARMOR_TOUGHNESS, armorToughnessBaseValue);
         player.removeAllEffects();
         for (MobEffectInstance effect : decodedEffects) player.addEffect(effect);
-        // Restore effects before health because Health Boost and similar effects change
-        // the legal maximum health of the player.
+        // Restore attributes and effects before health because both can change the
+        // legal maximum health of the player.
         player.setHealth(Math.min(player.getMaxHealth(), health));
         player.getFoodData().setFoodLevel(foodLevel);
         player.getFoodData().setSaturation(saturation);
@@ -131,6 +149,14 @@ public final class MinigamePlayerState {
         setAbility(player, mayFly, "mayfly", "mayFly");
         setAbility(player, flying, "flying");
         updateAbilities(player);
+    }
+
+    private static void restoreBaseAttribute(ServerPlayer player,
+                                             net.minecraft.core.Holder<net.minecraft.world.entity.ai.attributes.Attribute> attribute,
+                                             Double value) {
+        if (value == null) return;
+        AttributeInstance instance = player.getAttribute(attribute);
+        if (instance != null) instance.setBaseValue(value);
     }
 
     private static boolean ability(ServerPlayer player, String... names) {

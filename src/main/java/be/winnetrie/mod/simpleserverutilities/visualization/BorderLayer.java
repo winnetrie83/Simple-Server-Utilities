@@ -5,5 +5,7 @@ public enum BorderLayer {
     REGION,
     SELECTION,
     CLAIM_FOCUS,
-    REGION_FOCUS
+    REGION_FOCUS,
+    MINIGAME_GAME,
+    MINIGAME_SPECTATOR
 }

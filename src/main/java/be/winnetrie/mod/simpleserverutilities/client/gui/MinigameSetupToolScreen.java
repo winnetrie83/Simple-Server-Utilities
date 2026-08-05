@@ -42,8 +42,11 @@ public final class MinigameSetupToolScreen extends Screen {
         if (action == MinigameSetupAction.TEAM_SPAWN || action == MinigameSetupAction.CTF_FLAG) {
             addCycle(x + 18, y + 174, 144, "Team", () -> changeTeam(-1), () -> changeTeam(1), teamLabel());
         }
-        if (action == MinigameSetupAction.TEAM_SPAWN || action == MinigameSetupAction.DOMINATION_NODE || action == MinigameSetupAction.DOMINATION_NODE_SPAWN) {
-            addCycle(x + 174, y + 174, 144, (action == MinigameSetupAction.DOMINATION_NODE || action == MinigameSetupAction.DOMINATION_NODE_SPAWN) ? "Node" : "Spawn slot",
+        if (action == MinigameSetupAction.TEAM_SPAWN || action == MinigameSetupAction.DOMINATION_NODE
+                || action == MinigameSetupAction.DOMINATION_NODE_SPAWN || action == MinigameSetupAction.BOOST_SPAWN) {
+            String indexLabel = action == MinigameSetupAction.BOOST_SPAWN ? "Boost slot"
+                    : (action == MinigameSetupAction.DOMINATION_NODE || action == MinigameSetupAction.DOMINATION_NODE_SPAWN) ? "Node" : "Spawn slot";
+            addCycle(x + 174, y + 174, 144, indexLabel,
                     () -> changeIndex(-1), () -> changeIndex(1), Integer.toString(data.index() + 1));
         }
 
@@ -185,8 +188,12 @@ public final class MinigameSetupToolScreen extends Screen {
             g.text(font, actionLines.get(i), x + 330, y + 54 + i * 11, ACCENT, false);
         if (action == MinigameSetupAction.TEAM_SPAWN || action == MinigameSetupAction.CTF_FLAG)
             g.text(font, "Team", x + 18, y + 163, MUTED, false);
-        if (action == MinigameSetupAction.TEAM_SPAWN || action == MinigameSetupAction.DOMINATION_NODE || action == MinigameSetupAction.DOMINATION_NODE_SPAWN)
-            g.text(font, (action == MinigameSetupAction.DOMINATION_NODE || action == MinigameSetupAction.DOMINATION_NODE_SPAWN) ? "Node" : "Spawn slot", x + 174, y + 163, MUTED, false);
+        if (action == MinigameSetupAction.TEAM_SPAWN || action == MinigameSetupAction.DOMINATION_NODE
+                || action == MinigameSetupAction.DOMINATION_NODE_SPAWN || action == MinigameSetupAction.BOOST_SPAWN) {
+            String indexLabel = action == MinigameSetupAction.BOOST_SPAWN ? "Boost slot"
+                    : (action == MinigameSetupAction.DOMINATION_NODE || action == MinigameSetupAction.DOMINATION_NODE_SPAWN) ? "Node" : "Spawn slot";
+            g.text(font, indexLabel, x + 174, y + 163, MUTED, false);
+        }
 
         var arena = arena();
         int infoY = y + 216;

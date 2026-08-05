@@ -1,0 +1,10 @@
+Simple Server Utilities 1.9.0-dev2.6.2 validation
+
+Remaining boost editor compile hotfix validation:
+- Mod version: 1.9.0-dev2.6.2
+- Network protocol: 79 (unchanged)
+- Minigame definition schema: 11 (unchanged)
+- Minigame recovery schema: 3 (unchanged)
+- Fixed Integer.toString(double) for armorPoints in both CTF and Domination minigame editor screens.
+- Verified minimumSpacing and armorPoints are the only double fields rendered by these boost editor forms, and both are explicitly rounded before Integer.toString.
+- Audited all other Integer.toString calls in both files; their arguments are integer fields or integer expressions.

@@ -13,7 +13,7 @@ public class ModNetworking {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("79");
+        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("84");
 
         registrar.playToClient(
                 ClaimMapDataPayload.TYPE,

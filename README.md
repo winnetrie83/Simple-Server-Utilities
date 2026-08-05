@@ -1,4 +1,141 @@
-## Current development build: 1.9.0-dev2.5.3
+## Current development build: 1.9.0-dev2.9.3.1
+
+### Minecraft 26.2 Tank knockback compile hotfix (1.9.0-dev2.9.3.1)
+
+- Tank Defensive Field now calls Minecraft 26.2's required five-argument knockback API.
+- The Tank is supplied as the player-attack source while the knockback itself deals zero damage.
+- Enemy-only radial push strength, Slowness, role cooldowns and knockback resistance remain unchanged.
+
+Version state:
+
+- Network protocol: `84`
+- Minigame definition schema: `15`
+- Minigame recovery schema: `4`
+- Player UI preference schema: `9`
+
+## Current development build: 1.9.0-dev2.9.3
+
+### Delayed respawns and controlled minigame healing (1.9.0-dev2.9.3)
+
+- Capture the Flag and Domination now use an administrator-configurable respawn delay from `1` to `300` seconds; the default is `5` seconds.
+- A defeated player waits in spectator mode at the arena spectator location and sees a large center-screen countdown before returning to the selected team respawn.
+- Respawning players are excluded from combat, role abilities, objectives and boost collection until the delay finishes.
+- The food bar remains visually full, but hunger-based natural regeneration is canceled throughout active CTF and Domination matches.
+- Normal food use remains blocked by the server-owned minigame loadout and interaction policy.
+- Healer abilities remain authoritative direct heals. Regeneration boosts use controlled SSU healing ticks, so these are the only intended sources of restored health during combat.
+- Death while carrying a CTF flag still drops the flag before the respawn wait begins.
+
+Version state:
+
+- Network protocol: `84`
+- Minigame definition schema: `15`
+- Minigame recovery schema: `4`
+- Player UI preference schema: `9`
+
+## Current development build: 1.9.0-dev2.9.2
+
+### Single queue action and Tank knockback (1.9.0-dev2.9.2)
+
+- The Minigame Lobby now has one primary queue/match control: **Join queue**, **Leave queue**, or **Leave match**, based on the player's global minigame state.
+- The selected game only determines the destination of a new queue join. A player cannot queue for another game until the current queue or match has been left.
+- The server also checks every concrete queue map before accepting a join, preventing duplicate queue membership if state ever becomes inconsistent.
+- Tank Defensive Field still slows enemies inside its configured AOE and now also pushes them radially away from the Tank.
+- CTF and Domination administrators can configure Tank knockback strength from `0.0` to `5.0`; the default is `1.0` and zero disables knockback.
+
+Version state:
+
+- Network protocol: `83`
+- Minigame definition schema: `14`
+- Minigame recovery schema: `4`
+- Player UI preference schema: `9`
+
+## Current development build: 1.9.0-dev2.9.1
+
+### Minigame arena block-placement hotfix (1.9.0-dev2.9.1)
+
+- **Edit arena blocks** now permits normal block placement inside the selected idle arena.
+- The preliminary right-click no longer gets rejected by managed-region interaction protection.
+- The clicked block's own interaction is denied while the held block item is allowed to place, preventing accidental container, button, door or other block activation.
+- The actual placement event still enforces arena bounds and active-runtime safety.
+- Network protocol remains 83; Minigame definition schema remains 13; Minigame recovery schema remains 4; Player UI preference schema remains 9.
+
+### Open preparation matches, role polish, mining HUD and compact Auction House (1.9.0-dev2.9)
+
+- Tactical role abilities in CTF and Domination always activate when ready and consume their cooldown even on a miss or with no valid targets.
+- Tank slow AOE and Healer healing AOE each have an admin-configurable radius, defaulting to 3 blocks.
+- The DPS bow is supported by the minigame interaction guard and retains its replenished configurable effect arrow.
+- Players may join an existing match while it is in COUNTDOWN/preparation, up to the configured player maximum. Joining remains disabled after RUNNING begins.
+- A global Leave queue / Leave match control is available from the lobby regardless of the selected minigame.
+- The active match scoreboard can be shown or hidden with the configurable keybind that defaults to `L`.
+- Role ability presentation is more visible and audible, while temporary role equipment is restored to its intended server-owned slots.
+- Treecapitator and Veinminer can independently show an outline-colored, two-line block/count panel below the crosshair.
+- The Auction House main browser is shorter and narrower, remains centered, uses aligned lower frames and no longer shows the Sale tax footer label.
+
+Version state:
+
+- Network protocol: `83`
+- Minigame definition schema: `13`
+- Minigame recovery schema: `4`
+- Player UI preference schema: `9`
+
+## Current development build: 1.9.0-dev2.8.2
+
+### Runtime objective labels and minigame borders (1.9.0-dev2.8.2)
+
+- Live Domination objective labels now use the same fitted semi-transparent black billboard background as setup labels, with text and background locked to the same camera-facing plane.
+- Active matches can show the arena game border and configured spectator border through the existing claim/region border renderer, including distance clipping and translucent-safe world rendering.
+- Players can independently toggle **Minigame border** and **Spectator border** under Settings → Borders. Existing player preference files migrate both options to enabled.
+- Adds dedicated server-configurable colors for minigame game and spectator areas.
+- Network protocol is 82; Minigame definition schema remains 12; Minigame recovery schema remains 4; player border preference schema is 4.
+
+### Role compile and objective-cast hotfix (1.9.0-dev2.8.1)
+
+- Corrects the Minecraft 26.2 `DyedItemColor` component, relocated arrow-entity package and missing white-banner constant used by the first tactical-role build.
+- CTF flag and Domination node casts no longer cancel themselves because NeoForge continues one right-click through main-hand, offhand and item interaction stages.
+- Only continuation stages from the exact server tick that created the cast are absorbed; every genuinely new gameplay action still interrupts the cast.
+- Network protocol remains 81; Minigame definition schema remains 12; Minigame recovery schema remains 4.
+
+### Optional CTF and Domination tactical roles (1.9.0-dev2.8)
+
+- Capture the Flag and Domination can optionally use server-composed DPS, Tank and Healer teams. Players choose a preferred role before joining, but the final assignment follows each role's configured per-team minimum and maximum.
+- Every role has configurable maximum health, armor and armor toughness. Full team-colored leather armor is cosmetic only; role attributes provide the actual defense and health.
+- DPS uses a Diamond Sword, Bow and replenished configurable effect arrow, defaulting to Poison I.
+- Tank uses a Stone Sword, team-colored logo Shield and an enemy-only two-block AOE slow with configurable duration and cooldown.
+- Healer uses a Stone Sword, an eight-block straight single-target heal, a weaker nearby-team AOE heal and a 25% maximum-health self-heal, each with configurable balancing values and cooldowns.
+- Role ability items display Minecraft's normal cooldown overlay. Server-side checks protect team targeting, distance, match state and arena interactions; temporary role equipment does not wear down during a match.
+- Network protocol is 81; Minigame definition schema is 12; Minigame recovery schema is 4.
+
+### Setup area overlays and action-locked objective casts (1.9.0-dev2.7.2)
+
+- Holding the Minigame Setup Tool now shows the selected game/arena border in cyan, spectator bounds in purple and the configured Spleef floor in amber, independently of the normal Region border switch.
+- Every configured area uses a large labeled outline; spectator bounds and the Spleef floor also use a subtle translucent fill for an immediate layout overview.
+- CTF flag-take and Domination node-claim casts now cancel immediately when the caster attacks, breaks or places blocks, uses an item, interacts with a block/entity or attempts to drop an item; the triggering action is canceled as well.
+- Movement, leaving the objective and incoming damage remain interrupt conditions.
+- Network protocol is 80; Minigame definition schema remains 11; Minigame recovery schema remains 3.
+
+### Enlarged setup labels (1.9.0-dev2.7.1)
+
+- All Minigame Setup Tool labels are approximately 3.6 times larger and sit slightly higher above their physical marker.
+- Lobby, spectator, spawn, flag, node and boost labels now receive a fitted semi-transparent black billboard background for much stronger contrast.
+- Text and background share the same camera-facing orientation and visual layer; a minimal depth bias prevents z-fighting.
+- Network protocol remains 79; Minigame definition schema remains 11; Minigame recovery schema remains 3.
+
+### Boost presentation, Spleef projectile polish and setup markers (1.9.0-dev2.7)
+
+- Boost visuals now use Golden Boots for Speed, a Golden Apple for Regeneration, a Diamond Chestplate for temporary Armor and the existing Rabbit Foot for Jump.
+- Boost pickup sounds use the firework launch, beacon power-select, diamond armor-equip and wind-charge throw sounds respectively.
+- The infinite Spleef Snowball now uses Minecraft's visible item cooldown overlay, remains visibly present after a valid throw and resynchronizes safely when clicked too early.
+- Both Spleef projectiles are converted to fast, gravity-free, zero-spread shots that travel in the exact look direction.
+- Manual CTF and Domination boost positions are shown by temporary upright End Rods during arena setup. They are removed before matches and snapshot capture just like the existing setup banners.
+- Network protocol remains 79; Minigame definition schema remains 11; Minigame recovery schema remains 3.
+
+### Spleef projectiles and match boosts (1.9.0-dev2.6.2)
+
+- Spleef now supports a delayed infinite single-block Snowball with cooldown and delayed random awards of finite stackable five-block Power Eggs.
+- Capture the Flag and Domination now share configurable floating Speed, Regeneration, temporary Armor and Jump pickups with colored mist, manual or automatic placement, active limits, spacing and random respawn timers.
+- The Spleef, CTF and Domination editors expose the new settings; the Minigame Setup Tool registers up to 64 manual boost spawn slots.
+- Boost visuals and temporary armor are cleaned and recovered safely across match finish, logout, restart and crash recovery.
+- Network protocol remains 79; Minigame definition schema is 11; Minigame recovery schema is 3.
 
 ### Captain-style equipped CTF carrier flag (1.9.0-dev2.5.3)
 

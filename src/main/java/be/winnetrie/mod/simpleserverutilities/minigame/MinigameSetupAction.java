@@ -16,6 +16,7 @@ public enum MinigameSetupAction {
     TEAM_SPAWN("team_spawn", "Set team/player spawn", "Choose a team and slot, then left-click the spawn block.", true, false),
     SPLEEF_FLOOR("spleef_floor", "Set Spleef playfloor", "Left-click two corners of the floor volume. Only blocks inside this area may be broken.", true, true),
     CTF_FLAG("ctf_flag", "Set team flag", "Choose red or blue, then left-click the physical flag block position.", true, false),
+    BOOST_SPAWN("boost_spawn", "Set boost spawn", "Choose a boost slot, then left-click the block above which a boost may appear in manual placement mode.", true, false),
     DOMINATION_NODE("domination_node", "Set Domination node", "Choose a node, then left-click its physical capture-banner position.", true, false),
     DOMINATION_NODE_SPAWN("domination_node_spawn", "Set Domination node spawn", "Choose a node, then left-click the linked respawn location used while your team controls it.", true, false);
 
@@ -44,6 +45,7 @@ public enum MinigameSetupAction {
             case NEW_ARENA_BOUNDS -> true;
             case SPLEEF_FLOOR -> type == MinigameGameType.SPLEEF;
             case CTF_FLAG -> type == MinigameGameType.CAPTURE_THE_FLAG;
+            case BOOST_SPAWN -> type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION;
             case DOMINATION_NODE, DOMINATION_NODE_SPAWN -> type == MinigameGameType.DOMINATION;
             default -> type != null && type.implemented() && type != MinigameGameType.GENERIC;
         };

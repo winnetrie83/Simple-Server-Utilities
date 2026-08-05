@@ -6,7 +6,7 @@ import java.util.UUID;
 
 /** Persisted return points protect players after disconnects or server crashes. */
 public final class MinigameRecoveryData {
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 4;
     public int schemaVersion = SCHEMA_VERSION;
     public List<Entry> players = new ArrayList<>();
     /** Arena keys that require a successful reset or explicit administrator release after interruption. */

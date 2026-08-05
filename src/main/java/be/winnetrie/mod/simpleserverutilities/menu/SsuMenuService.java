@@ -155,10 +155,12 @@ public final class SsuMenuService {
                         uiPreferences.getTreecapitatorActivation().name(),
                         uiPreferences.getTreecapitatorOutlineColor(),
                         uiPreferences.getTreecapitatorOutlineBrightness(),
+                        uiPreferences.isTreecapitatorInfoEnabled(),
                         uiPreferences.isVeinminerEnabled(),
                         uiPreferences.getVeinminerActivation().name(),
                         uiPreferences.getVeinminerOutlineColor(),
-                        uiPreferences.getVeinminerOutlineBrightness()
+                        uiPreferences.getVeinminerOutlineBrightness(),
+                        uiPreferences.isVeinminerInfoEnabled()
                 ),
                 administrator,
                 Config.ENABLE_CROPS_HARVESTING.get(),
@@ -195,6 +197,7 @@ public final class SsuMenuService {
                         SpawnPolicy.canAdmin(player)
                 ),
                 preferences.isClaimBordersVisible(), preferences.isShowOtherClaims(), preferences.isRegionBordersVisible(),
+                preferences.isMinigameGameBorderVisible(), preferences.isMinigameSpectatorBorderVisible(),
                 Config.ENABLE_PLAYER_CLAIMS.get()
                         && PermissionService.getBooleanWithoutOperatorBypass(player, PermissionKeys.BORDER_CLAIMS_VIEW, true),
                 Config.ENABLE_ADMIN_REGIONS.get()
@@ -1824,6 +1827,7 @@ public final class SsuMenuService {
                 case "treecapitator_activation" -> prefs.setTreecapitatorActivation(MiningActivationMode.valueOf(value.toUpperCase(Locale.ROOT)));
                 case "treecapitator_color" -> prefs.setTreecapitatorOutlineColor(parseColor(value));
                 case "treecapitator_brightness" -> prefs.setTreecapitatorOutlineBrightness(Integer.parseInt(value));
+                case "treecapitator_info" -> prefs.setTreecapitatorInfoEnabled(strictBoolean(value));
                 case "veinminer_enabled" -> {
                     boolean enabled = strictBoolean(value);
                     if (enabled && !Config.ENABLE_VEINMINER.get()) {
@@ -1837,6 +1841,7 @@ public final class SsuMenuService {
                 case "veinminer_activation" -> prefs.setVeinminerActivation(MiningActivationMode.valueOf(value.toUpperCase(Locale.ROOT)));
                 case "veinminer_color" -> prefs.setVeinminerOutlineColor(parseColor(value));
                 case "veinminer_brightness" -> prefs.setVeinminerOutlineBrightness(Integer.parseInt(value));
+                case "veinminer_info" -> prefs.setVeinminerInfoEnabled(strictBoolean(value));
                 default -> { return ActionResult.fail("Unknown setting.", ""); }
             }
         } catch (Exception e) { return ActionResult.fail("Invalid setting value.", ""); }
@@ -1879,8 +1884,19 @@ public final class SsuMenuService {
                 return ActionResult.fail("Region borders are not allowed by the server.", "");
             }
             SimpleServerUtilities.BORDER_SETTINGS.setRegionsVisible(player.getUUID(), visible);
+        } else if ("minigame_game".equalsIgnoreCase(target)) {
+            if (!Config.ENABLE_MINIGAMES.get()) {
+                return ActionResult.fail("Minigames are disabled by the server.", "");
+            }
+            SimpleServerUtilities.BORDER_SETTINGS.setMinigameGameBorderVisible(player.getUUID(), visible);
+        } else if ("minigame_spectator".equalsIgnoreCase(target)) {
+            if (!Config.ENABLE_MINIGAMES.get()) {
+                return ActionResult.fail("Minigames are disabled by the server.", "");
+            }
+            SimpleServerUtilities.BORDER_SETTINGS.setMinigameSpectatorBorderVisible(player.getUUID(), visible);
         } else return ActionResult.fail("Unknown border layer.", "");
         SimpleServerUtilities.BORDER_VISUALIZATIONS.syncOverview(player, true);
+        SimpleServerUtilities.MINIGAMES.syncRuntimeBorders(player);
         return ActionResult.shell("Border visibility updated.");
     }
 

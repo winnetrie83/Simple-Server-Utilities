@@ -80,6 +80,9 @@ public record MinigameLobbyDataPayload(
             String requirementReason,
             boolean queuedHere,
             boolean activeHere,
+            boolean rolesEnabled,
+            String preferredRole,
+            String assignedRole,
             String matchState,
             int team,
             long score
@@ -99,6 +102,8 @@ public record MinigameLobbyDataPayload(
             blockedArenas = Math.max(0, blockedArenas);
             victoryMode = PayloadBounds.string(victoryMode, 32);
             requirementReason = PayloadBounds.string(requirementReason, 512);
+            preferredRole = PayloadBounds.string(preferredRole, 16);
+            assignedRole = PayloadBounds.string(assignedRole, 16);
             matchState = PayloadBounds.string(matchState, 32);
             team = Math.max(0, team);
         }
@@ -122,6 +127,9 @@ public record MinigameLobbyDataPayload(
             buffer.writeUtf(requirementReason, 512);
             buffer.writeBoolean(queuedHere);
             buffer.writeBoolean(activeHere);
+            buffer.writeBoolean(rolesEnabled);
+            buffer.writeUtf(preferredRole, 16);
+            buffer.writeUtf(assignedRole, 16);
             buffer.writeUtf(matchState, 32);
             buffer.writeVarInt(team);
             buffer.writeVarLong(score);
@@ -132,8 +140,8 @@ public record MinigameLobbyDataPayload(
                     buffer.readUtf(128), buffer.readUtf(32), buffer.readBoolean(), buffer.readVarInt(), buffer.readVarInt(),
                     buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt(),
                     buffer.readVarInt(), buffer.readUtf(32), buffer.readBoolean(), buffer.readUtf(512),
-                    buffer.readBoolean(), buffer.readBoolean(), buffer.readUtf(32), buffer.readVarInt(),
-                    buffer.readVarLong());
+                    buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readUtf(16),
+                    buffer.readUtf(16), buffer.readUtf(32), buffer.readVarInt(), buffer.readVarLong());
         }
     }
 

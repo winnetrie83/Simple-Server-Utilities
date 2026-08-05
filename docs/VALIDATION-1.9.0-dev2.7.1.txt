@@ -1,0 +1,26 @@
+Simple Server Utilities 1.9.0-dev2.7.1 validation
+Date: 2026-08-05
+
+Versioning
+- Mod version: 1.9.0-dev2.7.1
+- Network protocol: 79 (unchanged)
+- Minigame definition schema: 11 (unchanged)
+- Minigame recovery schema: 3 (unchanged)
+
+Implemented checks
+- The central Minigame Setup Tool label scale increases from 0.11 to 0.40, approximately 3.6 times the former size.
+- The shared renderer covers every setup visual payload entry, including lobby, spectator, team/player spawns, CTF flags, Domination nodes and boost spawns.
+- Each label receives one fitted semi-transparent black rectangle based on the current Minecraft font width.
+- The background uses the same camera-facing horizontal/up basis as the TextGizmo billboard.
+- A minimal 0.008-block depth bias places the background immediately behind the text without visible layer separation or z-fighting.
+- Label centers move from 2.65 to 3.00 blocks above their stored setup position so enlarged labels remain above physical markers.
+
+Static validation
+- All 581 Java source files passed delimiter, comment and string-balance scanning.
+- Both resource JSON files parsed successfully.
+- Version, scale, camera-basis, background, centralized-renderer and height invariants passed.
+- Final ZIP archive integrity passed.
+
+Build limitation
+- A complete Gradle compile could not run because Gradle 9.2.1 is not installed locally and the wrapper cannot resolve services.gradle.org in this container.
+- Compile and exact in-game size/placement still require confirmation in the normal Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25 development environment.

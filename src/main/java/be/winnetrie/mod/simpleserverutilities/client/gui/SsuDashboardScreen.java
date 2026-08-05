@@ -1637,6 +1637,12 @@ public final class SsuDashboardScreen extends Screen {
                 addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
                         "Vein glow: " + s.veinminerOutlineBrightness() + "%",
                         "veinminer_brightness", nextBrightness(s.veinminerOutlineBrightness()));
+                row += twoColumns ? 27 : 54;
+                addSetting(x, y + row, w, "Tree mining info: " + onOff(s.treecapitatorInfoEnabled()),
+                        "treecapitator_info", !s.treecapitatorInfoEnabled());
+                addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
+                        "Vein mining info: " + onOff(s.veinminerInfoEnabled()),
+                        "veinminer_info", !s.veinminerInfoEnabled());
             }
             case BORDERS -> {
                 Button claims = Button.builder(Component.literal("Enable claim borders: " + onOff(snapshot.claimBordersVisible())), ignored ->
@@ -1655,6 +1661,16 @@ public final class SsuDashboardScreen extends Screen {
                         .bounds(x, y + regionRow, w, 20).build();
                 regions.active = snapshot.canViewRegionBorders();
                 addRenderableWidget(regions);
+                Button gameBorder = Button.builder(Component.literal("Minigame border: " + onOff(snapshot.minigameGameBorderVisible())), ignored ->
+                                action("border", "minigame_game", "", Boolean.toString(!snapshot.minigameGameBorderVisible())))
+                        .bounds(twoColumns ? secondX : x, y + (twoColumns ? 27 : 81), w, 20).build();
+                gameBorder.active = snapshot.moduleSettings().minigames();
+                addRenderableWidget(gameBorder);
+                Button spectatorBorder = Button.builder(Component.literal("Spectator border: " + onOff(snapshot.minigameSpectatorBorderVisible())), ignored ->
+                                action("border", "minigame_spectator", "", Boolean.toString(!snapshot.minigameSpectatorBorderVisible())))
+                        .bounds(x, y + (twoColumns ? 54 : 108), w, 20).build();
+                spectatorBorder.active = snapshot.moduleSettings().minigames();
+                addRenderableWidget(spectatorBorder);
             }
             case MAIL -> {
                 addSettingWithTooltip(x, y, w,

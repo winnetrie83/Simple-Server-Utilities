@@ -41,6 +41,7 @@ public final class MinigameSetupToolService {
     private static final String SPECTATOR_SETUP_BANNER = "minecraft:purple_banner";
     private static final String PLAYER_SETUP_BANNER = "minecraft:yellow_banner";
     private static final String NODE_RESPAWN_SETUP_BANNER = "minecraft:orange_banner";
+    private static final String BOOST_SETUP_BLOCK = "minecraft:end_rod";
 
     private MinigameSetupToolService() {
     }
@@ -161,6 +162,7 @@ public final class MinigameSetupToolService {
                 case TEAM_SPAWN -> setTeamSpawn(player, session, definition, arena, clicked.above());
                 case SPLEEF_FLOOR -> selectAreaCorner(player, session, definition, arena, clicked, true);
                 case CTF_FLAG -> setFlag(player, session, definition, arena, clicked.above());
+                case BOOST_SPAWN -> setBoostSpawn(player, session, definition, arena, clicked.above());
                 case DOMINATION_NODE -> setNode(player, session, definition, arena, clicked.above());
                 case DOMINATION_NODE_SPAWN -> setNodeSpawn(player, session, definition, arena, clicked.above());
                 default -> throw new IllegalArgumentException("Choose a setup action first.");
@@ -260,6 +262,37 @@ public final class MinigameSetupToolService {
         saveTarget(definition);
         player.sendSystemMessage(Component.literal((MinigameGameType.parse(definition.gameType) == MinigameGameType.SPLEEF
                 ? "Player spawn " + team : "Team " + team + " spawn " + (ordinal + 1))
+                + " set to " + compact(position) + "."), true);
+    }
+
+    private static void setBoostSpawn(ServerPlayer player, MinigameSetupToolManager.Session session,
+                                      MinigameDefinition definition, MinigameArenaDefinition arena,
+                                      BlockPos position) {
+        MinigameGameType type = MinigameGameType.parse(definition.gameType);
+        if (type != MinigameGameType.CAPTURE_THE_FLAG && type != MinigameGameType.DOMINATION) {
+            throw new IllegalArgumentException("Boost spawn points are only available for Capture the Flag and Domination.");
+        }
+        Region region = requireRegion(arena);
+        if (position.getX() < region.getMinX() || position.getX() > region.getMaxX()
+                || position.getY() < region.getMinY() || position.getY() > region.getMaxY() + 2
+                || position.getZ() < region.getMinZ() || position.getZ() > region.getMaxZ()) {
+            throw new IllegalArgumentException("The boost spawn must be inside the arena region.");
+        }
+        int requestedIndex = Math.max(0, Math.min(MinigameArenaDefinition.MAX_BOOST_SPAWNS - 1, session.index));
+        MinigameLocation location = location(player, position);
+        int storedIndex;
+        if (requestedIndex < arena.boostSpawns.size()) {
+            MinigameLocation previous = arena.boostSpawns.get(requestedIndex);
+            removePhysicalBoostMarker(player.level().getServer(), previous);
+            arena.boostSpawns.set(requestedIndex, location);
+            storedIndex = requestedIndex;
+        } else {
+            arena.boostSpawns.add(location);
+            storedIndex = arena.boostSpawns.size() - 1;
+        }
+        arena.normalize();
+        saveTarget(definition);
+        player.sendSystemMessage(Component.literal("Boost spawn " + (storedIndex + 1)
                 + " set to " + compact(position) + "."), true);
     }
 
@@ -675,11 +708,42 @@ public final class MinigameSetupToolService {
                         MinigameSetupVisualPayload.Entry.NODE_SPAWN);
             }
         }
-        PacketDistributor.sendToPlayer(player, new MinigameSetupVisualPayload(true, markers));
+        if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION) {
+            int boostIndex = 0;
+            for (MinigameLocation boostSpawn : arena.boostSpawns) {
+                if (boostSpawn == null) continue;
+                boostIndex++;
+                addMarker(markers, boostSpawn, "Boost spawn " + boostIndex, 0x26C6DA,
+                        MinigameSetupVisualPayload.Entry.BOOST);
+            }
+        }
+
+        ArrayList<MinigameSetupVisualPayload.Bounds> bounds = new ArrayList<>();
+        Region region = SimpleServerUtilities.REGIONS.get(arena.regionId);
+        if (region != null) {
+            bounds.add(new MinigameSetupVisualPayload.Bounds(
+                    region.getDimension().identifier().toString(), region.getMinX(), region.getMinY(), region.getMinZ(),
+                    region.getMaxX(), region.getMaxY(), region.getMaxZ(), "Game border", 0x00BCD4,
+                    MinigameSetupVisualPayload.Bounds.GAME));
+        }
+        addBounds(bounds, arena.spectatorBounds, "Spectator border", 0xAB47BC,
+                MinigameSetupVisualPayload.Bounds.SPECTATOR);
+        if (type == MinigameGameType.SPLEEF) {
+            addBounds(bounds, arena.playFloor, "Spleef floor", 0xFFB300,
+                    MinigameSetupVisualPayload.Bounds.SPLEEF_FLOOR);
+        }
+        PacketDistributor.sendToPlayer(player, new MinigameSetupVisualPayload(true, markers, bounds));
     }
 
 
-    /** Places temporary physical setup banners. They are deliberately excluded from arena snapshots and matches. */
+    private static void addBounds(List<MinigameSetupVisualPayload.Bounds> bounds, MinigameAreaBounds area,
+                                  String label, int color, byte kind) {
+        if (bounds == null || area == null || !area.configured()) return;
+        bounds.add(new MinigameSetupVisualPayload.Bounds(area.dimension, area.minX, area.minY, area.minZ,
+                area.maxX, area.maxY, area.maxZ, label, color, kind));
+    }
+
+    /** Places temporary physical setup banners and end-rod boost markers outside snapshots and matches. */
     private static void ensurePhysicalSetupMarkers(MinecraftServer server, MinigameDefinition definition,
                                                    MinigameArenaDefinition arena) {
         if (server == null || definition == null || arena == null) return;
@@ -700,6 +764,11 @@ public final class MinigameSetupToolService {
                 if (point != null) placeSetupBanner(server, definition, arena, point.respawn, NODE_RESPAWN_SETUP_BANNER);
             }
         }
+        if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION) {
+            for (MinigameLocation boostSpawn : arena.boostSpawns) {
+                placePhysicalBoostMarker(server, arena, boostSpawn);
+            }
+        }
     }
 
     public static void restorePhysicalSetupMarkers(MinecraftServer server, MinigameDefinition definition,
@@ -709,7 +778,7 @@ public final class MinigameSetupToolService {
         ensurePhysicalSetupMarkers(server, definition, arena);
     }
 
-    /** Removes every temporary lobby/spectator/spawn banner while preserving actual CTF flags and Domination nodes. */
+    /** Removes temporary setup banners and boost end rods while preserving actual CTF flags and Domination nodes. */
     public static void removePhysicalSetupMarkers(MinecraftServer server, MinigameDefinition definition,
                                                   MinigameArenaDefinition arena) {
         if (server == null || definition == null || arena == null) return;
@@ -722,6 +791,9 @@ public final class MinigameSetupToolService {
             for (MinigameControlPoint point : arena.controlPoints) {
                 if (point != null) removePhysicalSetupMarker(server, definition, arena, point.respawn);
             }
+        }
+        for (MinigameLocation boostSpawn : arena.boostSpawns) {
+            removePhysicalBoostMarker(server, boostSpawn);
         }
     }
 
@@ -747,6 +819,27 @@ public final class MinigameSetupToolService {
         Block current = level.getBlockState(pos).getBlock();
         if (!level.getBlockState(pos).isAir() && !(current instanceof AbstractBannerBlock)) return;
         if (current != block) level.setBlockAndUpdate(pos, block.defaultBlockState());
+    }
+
+    private static void placePhysicalBoostMarker(MinecraftServer server, MinigameArenaDefinition arena,
+                                                 MinigameLocation location) {
+        if (server == null || location == null) return;
+        ServerLevel level = level(server, location.dimension);
+        BlockPos pos = blockPos(location);
+        if (level == null || pos == null || isPhysicalGameMarkerPosition(arena, pos)) return;
+        Block marker = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(BOOST_SETUP_BLOCK)).orElse(Blocks.END_ROD);
+        Block current = level.getBlockState(pos).getBlock();
+        if (!level.getBlockState(pos).isAir() && current != marker) return;
+        if (current != marker) level.setBlockAndUpdate(pos, marker.defaultBlockState());
+    }
+
+    private static void removePhysicalBoostMarker(MinecraftServer server, MinigameLocation location) {
+        if (server == null || location == null) return;
+        ServerLevel level = level(server, location.dimension);
+        BlockPos pos = blockPos(location);
+        if (level != null && pos != null && level.getBlockState(pos).is(Blocks.END_ROD)) {
+            level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
+        }
     }
 
     private static void removePhysicalSetupMarker(MinecraftServer server, MinigameDefinition definition,
@@ -850,6 +943,7 @@ public final class MinigameSetupToolService {
         for (MinigameSpawnPoint spawn : arena.teamSpawns) clamp(spawn.location, region, 1);
         for (MinigameFlagPoint flag : arena.flagPoints) clamp(flag.location, region, 0);
         for (MinigameControlPoint point : arena.controlPoints) { clamp(point.location, region, 0); clamp(point.respawn, region, 1); }
+        for (MinigameLocation boostSpawn : arena.boostSpawns) clamp(boostSpawn, region, 2);
         if (!near(arena.spectator, region, 24, 32)) {
             arena.spectator = new MinigameLocation(region.getDimension().identifier().toString(),
                     (region.getMinX() + region.getMaxX() + 1.0D) / 2.0D, region.getMaxY() + 2.0D,
