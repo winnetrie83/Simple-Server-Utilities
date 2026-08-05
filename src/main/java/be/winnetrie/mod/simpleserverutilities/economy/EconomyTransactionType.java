@@ -8,6 +8,10 @@ public enum EconomyTransactionType {
     STARTING_BALANCE,
     RECOVERY,
 
+    CLAIM_TAX,
+    WARP_RENT,
+    WARP_RENEW,
+
     REGION_RENT,
     REGION_RENEW,
     REGION_OWNER_PAYOUT,

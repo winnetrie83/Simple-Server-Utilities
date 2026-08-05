@@ -20,6 +20,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.block.SignBlock;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
@@ -33,6 +34,7 @@ public class RegionInteractionEvents {
 
     public static void clearRuntimeState() {
         LAST_REGION.clear();
+        RegionSelectionSchematicManager.clearRuntimeState();
         nextEnterLeaveTick = 0L;
     }
 
@@ -52,9 +54,9 @@ public class RegionInteractionEvents {
                 return;
             }
 
-            if (!RegionEditorService.open(player)) {
+            if (!RegionSelectionToolService.open(player)) {
                 player.sendSystemMessage(Component.literal(
-                        "Set both region points with left-click first, then right-click to configure the region."
+                        "Set both region points with left-click first, then right-click to open selection actions."
                 ), true);
             }
             event.setCanceled(true);
@@ -97,9 +99,9 @@ public class RegionInteractionEvents {
                 || !RegionPolicy.canUseSelectionTool(player)) {
             return;
         }
-        if (!RegionEditorService.open(player)) {
+        if (!RegionSelectionToolService.open(player)) {
             player.sendSystemMessage(Component.literal(
-                    "Set both region points with left-click first, then right-click to configure the region."
+                    "Set both region points with left-click first, then right-click to open selection actions."
             ), true);
         }
         event.setCanceled(true);
@@ -135,11 +137,19 @@ public class RegionInteractionEvents {
         } else {
             manager.setPoint2(player, event.getPos());
             player.sendSystemMessage(Component.literal(
-                    "Region point 2 set to " + formatPos(event.getPos()) + ". Right-click to configure."
+                    "Region point 2 set to " + formatPos(event.getPos()) + ". Right-click to choose an action."
             ), true);
         }
         SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, manager.getSelection(player));
         event.setCanceled(true);
+    }
+
+    @SubscribeEvent
+    public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        RegionCommands.getSelectionManager().clear(player);
+        RegionSelectionSchematicManager.clearClipboard(player.getUUID());
+        LAST_REGION.remove(player.getUUID());
     }
 
     @SubscribeEvent

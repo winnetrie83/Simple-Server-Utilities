@@ -1,5 +1,8 @@
 {
   "player": "00000000-0000-0000-0000-000000000000",
   "maxChunks": 128,
-  "maxClaimGroups": 8
+  "maxClaimGroups": 8,
+  "maxChunksOverride": false,
+  "maxClaimGroupsOverride": false,
+  "confiscatedChunkPenalties": {}
 }

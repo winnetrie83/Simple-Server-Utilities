@@ -10,7 +10,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentId;
 
 /** Data-driven minigame definition. Actual game rules can build on this lifecycle. */
 public final class MinigameDefinition {
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 10;
     public static final int MAX_ARENAS = 32;
     public static final int MAX_REWARDS = 64;
 
@@ -19,6 +19,7 @@ public final class MinigameDefinition {
     public String displayName = "New Minigame";
     public String description = "A new SSU minigame.";
     public String iconItem = "minecraft:diamond_sword";
+    public String gameType = MinigameGameType.GENERIC.id();
     public boolean enabled = true;
     public int minPlayers = 2;
     public int maxPlayers = 8;
@@ -30,9 +31,15 @@ public final class MinigameDefinition {
     public boolean allowLateJoin;
     public String victoryMode = "highest_score";
     public ContentCondition prerequisites = new ContentCondition();
+    /** Legacy dev1 action lists. They migrate into the structured reward sets on load. */
     public List<ContentAction> participationRewards = new ArrayList<>();
     public List<ContentAction> winnerRewards = new ArrayList<>();
+    public MinigameRewardSet participationReward = new MinigameRewardSet();
+    public MinigameRewardSet winnerReward = new MinigameRewardSet();
     public List<MinigameArenaDefinition> arenas = new ArrayList<>();
+    public SpleefRules spleef = new SpleefRules();
+    public CaptureTheFlagRules captureTheFlag = new CaptureTheFlagRules();
+    public DominationRules domination = new DominationRules();
 
     public MinigameDefinition() {
         arenas.add(new MinigameArenaDefinition());
@@ -44,17 +51,48 @@ public final class MinigameDefinition {
         displayName = bound(displayName, 128, id);
         description = bound(description, 8_192, "");
         iconItem = bound(iconItem, 128, "minecraft:diamond_sword").toLowerCase(Locale.ROOT);
+        MinigameGameType type = MinigameGameType.parse(gameType);
+        gameType = type.id();
         minPlayers = Math.max(1, Math.min(64, minPlayers));
         maxPlayers = Math.max(minPlayers, Math.min(128, maxPlayers));
         teamCount = Math.max(1, Math.min(16, teamCount));
+        if (type == MinigameGameType.SPLEEF) {
+            maxPlayers = Math.min(16, Math.max(2, maxPlayers));
+            minPlayers = Math.min(maxPlayers, Math.max(2, minPlayers));
+            teamCount = maxPlayers;
+            victoryMode = "last_team_standing";
+            allowLateJoin = false;
+        } else if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION) {
+            maxPlayers = Math.min(64, Math.max(2, maxPlayers));
+            minPlayers = Math.min(maxPlayers, Math.max(2, minPlayers));
+            teamCount = 2;
+            victoryMode = "highest_score";
+            allowLateJoin = false;
+        }
         countdownSeconds = Math.max(0, Math.min(600, countdownSeconds));
         matchDurationSeconds = Math.max(0, Math.min(86_400, matchDurationSeconds));
         postGameSeconds = Math.max(0, Math.min(600, postGameSeconds));
         victoryMode = normalizeVictoryMode(victoryMode);
+        if (spleef == null) spleef = new SpleefRules();
+        spleef.normalize();
+        if (captureTheFlag == null) captureTheFlag = new CaptureTheFlagRules();
+        captureTheFlag.normalize();
+        if (domination == null) domination = new DominationRules();
+        domination.normalize();
         if (prerequisites == null) prerequisites = new ContentCondition();
         prerequisites.normalize();
         participationRewards = normalizeActions(participationRewards);
         winnerRewards = normalizeActions(winnerRewards);
+        if (participationReward == null) participationReward = new MinigameRewardSet();
+        if (winnerReward == null) winnerReward = new MinigameRewardSet();
+        // dev1 stored every reward as a raw ContentAction. Preserve those definitions
+        // by migrating them to the immediate-action part of the new mail-backed package.
+        if (!participationRewards.isEmpty()) participationReward.directActions.addAll(participationRewards);
+        if (!winnerRewards.isEmpty()) winnerReward.directActions.addAll(winnerRewards);
+        participationRewards = new ArrayList<>();
+        winnerRewards = new ArrayList<>();
+        participationReward.normalize();
+        winnerReward.normalize();
         ArrayList<MinigameArenaDefinition> normalizedArenas = new ArrayList<>();
         if (arenas != null) {
             for (MinigameArenaDefinition arena : arenas) {

@@ -1,0 +1,14 @@
+Simple Server Utilities 1.9.0-dev2.5.1 validation
+
+- Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25 target.
+- Network protocol: 79.
+- Minigame definition schema: 10.
+- Minigame recovery schema: 2.
+- Domination editor inherits a defined shared ACCENT color.
+- CTF live state distinguishes base, carrier and physical dropped-banner states.
+- Death and crouch-drop remove carrier visuals/glow before placing the real configured banner.
+- Enemy teammates pick dropped flags up instantly; the owning team returns them instantly.
+- Captures are blocked while the carrier's own flag is dropped or carried.
+- Dropped banners are removed during finish/reload/shutdown cleanup.
+- Java parse/delimiter checks, JSON validation and archive integrity are required before publication.
+- Full Gradle compilation must be confirmed locally with Java 25.

@@ -219,6 +219,10 @@ public final class StoragePaths {
         return regions(root).resolve("entries");
     }
 
+    public static Path regionSelectionTemplates(Path root) {
+        return regions(root).resolve("selection_templates");
+    }
+
     public static Path regionRentTransactions(Path root) {
         return regions(root).resolve("rent_transactions");
     }

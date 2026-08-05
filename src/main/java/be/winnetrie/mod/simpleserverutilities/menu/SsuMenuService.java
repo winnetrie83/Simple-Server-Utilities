@@ -1,6 +1,9 @@
 package be.winnetrie.mod.simpleserverutilities.menu;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -212,6 +215,7 @@ public final class SsuMenuService {
                 case "homes" -> homesPage(player, payload);
                 case "travel" -> travelPage(player, payload);
                 case "travel_admin" -> adminTravelPage(player, payload);
+                case "player_warps" -> playerWarpsPage(player, payload);
                 case "admin_claims" -> adminClaimsPage(player, payload);
                 case "regions" -> regionsPage(player, payload);
                 case "region_admin" -> regionAdminPage(player, payload);
@@ -219,6 +223,7 @@ public final class SsuMenuService {
                 case "transactions" -> transactionsPage(player, payload);
                 case "auction_tax" -> auctionTaxPage(player, payload);
                 case "claim_tax" -> claimTaxPage(player, payload);
+                case "warp_rental" -> warpRentalPage(player, payload);
                 case "accounts" -> accountsPage(player, payload);
                 case "jobs" -> jobsPage(player, payload);
                 case "rent_operations" -> rentOperationsPage(player, payload);
@@ -300,6 +305,11 @@ public final class SsuMenuService {
             case "home_delete" -> deleteHome(player, payload.target(), payload.secondary());
             case "warp_set" -> setWarp(player, payload.target(), payload.secondary());
             case "warp_delete" -> deleteWarp(player, payload.target(), payload.secondary());
+            case "player_warp_set" -> setPlayerWarp(player, payload.target(), payload.requestId());
+            case "player_warp_move" -> movePlayerWarp(player, payload.target());
+            case "player_warp_delete" -> deletePlayerWarp(player, payload.target());
+            case "player_warp_visibility" -> setPlayerWarpVisibility(player, payload.target(), payload.value());
+            case "warp_rental_settings" -> warpRentalSettings(player, payload.target(), payload.value());
             case "teleport_cancel" -> cancelTeleport(player, payload.target());
             case "admin_claim_teleport" -> adminClaimTeleport(player, payload.target());
             case "admin_claim_delete" -> adminClaimDelete(player, payload.target());
@@ -329,6 +339,10 @@ public final class SsuMenuService {
             case "spawn_set" -> setServerSpawn(player, payload.secondary());
             case "spawn_clear" -> clearServerSpawn(player, payload.secondary());
             case "auction_tax_set" -> auctionTaxSet(player, payload.value());
+            case "claim_tax_settings" -> claimTaxSettings(player, payload.target(), payload.secondary(), payload.value());
+            case "claim_tax_toggle" -> claimTaxToggle(player, payload.value());
+            case "claim_tax_dimension" -> claimTaxDimension(player, payload.target(), payload.value());
+            case "claim_tax_dimension_remove" -> claimTaxDimensionRemove(player, payload.target());
             case "economy_give" -> economyAdminMutation(player, payload.target(), payload.value(), "give");
             case "economy_take" -> economyAdminMutation(player, payload.target(), payload.value(), "take");
             case "economy_set" -> economyAdminMutation(player, payload.target(), payload.value(), "set");
@@ -728,7 +742,7 @@ public final class SsuMenuService {
                     yield ActionResult.fail("You do not have permission to use the region selection tool.", "");
                 }
                 AdminToolService.giveRegionTool(player);
-                yield ActionResult.ok("Region Tool added to your inventory.", "");
+                yield ActionResult.ok("Region Tool added. Left-click point 1 and point 2, then right-click to open selection actions.", "");
             }
             case "hologram" -> {
                 if (!Config.ENABLE_HOLOGRAMS.get()
@@ -777,8 +791,10 @@ public final class SsuMenuService {
                         || !PermissionService.getBoolean(player, PermissionKeys.MINIGAMES_ADMIN, false)) {
                     yield ActionResult.fail("The minigame module is disabled or you lack its admin permission.", "");
                 }
-                be.winnetrie.mod.simpleserverutilities.minigame.MinigameEditorService.open(player, "");
-                yield ActionResult.ok("Opening Minigame Editor.", "");
+                SimpleServerUtilities.MINIGAME_SETUP_TOOLS.giveTool(player);
+                be.winnetrie.mod.simpleserverutilities.minigame.MinigameSetupToolService.open(player,
+                        "Minigame Setup Tool added. Right-click it to choose a game, arena and action.", false, 0L);
+                yield ActionResult.ok("Minigame Setup Tool added.", "");
             }
             case "dungeon" -> {
                 if (!Config.ENABLE_DUNGEONS.get()
@@ -845,7 +861,7 @@ public final class SsuMenuService {
         }
 
         if (WarpPolicy.canTeleportWarp(player, context)) {
-            SimpleServerUtilities.WARPS.getWarps().forEach(warp -> all.add(location("warp", warp)));
+            SimpleServerUtilities.WARPS.getAccessibleWarps(player).forEach(warp -> all.add(location("warp", warp)));
         }
 
         if (HomePolicy.canTeleportHome(player, context)) {
@@ -906,6 +922,42 @@ public final class SsuMenuService {
                 List.of(), List.of(), List.of(), capabilities);
     }
 
+    private SsuMenuPageDataPayload playerWarpsPage(ServerPlayer player, SsuMenuPageRequestPayload request) {
+        PermissionContext currentContext = PermissionContext.at(player, player.blockPosition());
+        boolean canRent = WarpPolicy.canRentWarp(player, currentContext);
+        int maximum = WarpPolicy.getMaxRentedWarps(player, currentContext);
+        List<Warp> all = new ArrayList<>(SimpleServerUtilities.WARPS.getPlayerWarps(player.getUUID()));
+        all = filter(all, request.query(), warp -> warp.getDisplayName() + " " + warp.getDimension());
+        List<Warp> visiblePage = page(all, request);
+        List<SsuMenuPageDataPayload.LocationEntry> locations = visiblePage.stream()
+                .map(warp -> location(warp.isPublicWarp() ? "public" : "private", warp)).toList();
+        List<SsuMenuPageDataPayload.PermissionEntry> metadata = new ArrayList<>();
+        metadata.add(new SsuMenuPageDataPayload.PermissionEntry("player_warps", "capability", "can_rent",
+                Boolean.toString(canRent), "Permission ssu.warps.rent controls rental access."));
+        metadata.add(new SsuMenuPageDataPayload.PermissionEntry("player_warps", "capability", "can_use",
+                Boolean.toString(WarpPolicy.canTeleportWarp(player, currentContext)),
+                "Effective warp-use and teleport permission at the player's current location."));
+        metadata.add(new SsuMenuPageDataPayload.PermissionEntry("player_warps", "capability", "economy_enabled",
+                Boolean.toString(SimpleServerUtilities.ECONOMY.settings().isEnabled()),
+                "Prepaid rentals require the Economy module."));
+        metadata.add(new SsuMenuPageDataPayload.PermissionEntry("player_warps", "capability", "maximum",
+                Integer.toString(maximum), "Maximum rented warps from ssu.warps.rent.max."));
+        metadata.add(new SsuMenuPageDataPayload.PermissionEntry("player_warps", "status", "count",
+                Integer.toString(SimpleServerUtilities.WARPS.countPlayerWarps(player.getUUID())), "Current rented warp count."));
+        metadata.add(new SsuMenuPageDataPayload.PermissionEntry("player_warps", "setting", "price",
+                SimpleServerUtilities.ECONOMY.format(SimpleServerUtilities.WARPS.rentalSettings().getPriceMinor()),
+                "Charged in advance for each rental period."));
+        metadata.add(new SsuMenuPageDataPayload.PermissionEntry("player_warps", "setting", "period",
+                durationText(SimpleServerUtilities.WARPS.rentalSettings().getPeriodMillis()),
+                "Length of one prepaid rental period."));
+        for (Warp warp : visiblePage) {
+            metadata.add(new SsuMenuPageDataPayload.PermissionEntry(warp.getDisplayName(), "warp", "paid_until",
+                    Long.toString(warp.getPaidUntil()), warp.isPublicWarp() ? "public" : "private"));
+        }
+        return data(request, all.size(), List.of(), locations, List.of(), List.of(),
+                List.of(), List.of(), List.of(), metadata);
+    }
+
     private SsuMenuPageDataPayload adminClaimsPage(ServerPlayer player, SsuMenuPageRequestPayload request) {
         if (!ClaimPolicy.hasAdminBypass(player)) return denied(request);
         MinecraftServer server = player.level().getServer();
@@ -928,7 +980,9 @@ public final class SsuMenuService {
 
     private SsuMenuPageDataPayload regionsPage(ServerPlayer player, SsuMenuPageRequestPayload request) {
         boolean administrator = isAdministrator(player);
-        List<Region> all = filter(visibleRegions(player, administrator), request.query(), Region::getName);
+        List<Region> all = filter(visibleRegions(player, administrator).stream()
+                .filter(region -> !SimpleServerUtilities.MINIGAMES.isManagedArenaRegion(region.getName())).toList(),
+                request.query(), Region::getName);
         List<Region> visiblePage = page(all, request);
         List<SsuMenuPageDataPayload.RegionEntry> entries = visiblePage.stream()
                 .map(region -> regionEntry(player, region, administrator)).toList();
@@ -937,7 +991,9 @@ public final class SsuMenuService {
 
     private SsuMenuPageDataPayload regionAdminPage(ServerPlayer player, SsuMenuPageRequestPayload request) {
         if (!RegionPolicy.canEditRegion(player) && !RegionPolicy.canDeleteRegion(player)) return denied(request);
-        List<Region> all = new ArrayList<>(SimpleServerUtilities.REGIONS.getAll());
+        List<Region> all = SimpleServerUtilities.REGIONS.getAll().stream()
+                .filter(region -> !SimpleServerUtilities.MINIGAMES.isManagedArenaRegion(region.getName()))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         all.sort(Comparator.comparing(Region::getName, String.CASE_INSENSITIVE_ORDER));
         all = filter(all, request.query(), region -> region.getName() + " " + region.getDimension().identifier());
         List<SsuMenuPageDataPayload.RegionEntry> entries = page(all, request).stream()
@@ -1009,9 +1065,43 @@ public final class SsuMenuService {
 
     private SsuMenuPageDataPayload claimTaxPage(ServerPlayer player, SsuMenuPageRequestPayload request) {
         if (!canEconomyAdmin(player)) return denied(request);
+        var settings = SimpleServerUtilities.CLAIM_TAX.settings();
+        List<SsuMenuPageDataPayload.PermissionEntry> entries = new ArrayList<>();
+        entries.add(new SsuMenuPageDataPayload.PermissionEntry("claim_tax", "setting", "enabled",
+                Boolean.toString(settings.isEnabled()), "Enable recurring automatic claim taxation."));
+        entries.add(new SsuMenuPageDataPayload.PermissionEntry("claim_tax", "setting", "rate",
+                majorPlain(settings.getRateMinorPerChunk()), "Base amount charged per claimed chunk."));
+        entries.add(new SsuMenuPageDataPayload.PermissionEntry("claim_tax", "setting", "interval_hours",
+                decimalPlain(settings.getIntervalMillis() / 3_600_000D), "Hours between automatic tax cycles."));
+        entries.add(new SsuMenuPageDataPayload.PermissionEntry("claim_tax", "setting", "reminder_hours",
+                decimalPlain(settings.getReminderLeadMillis() / 3_600_000D), "Hours before charging that reminder mail is sent."));
+        entries.add(new SsuMenuPageDataPayload.PermissionEntry("claim_tax", "status", "next_charge",
+                Long.toString(SimpleServerUtilities.CLAIM_TAX.nextDueAt()), "Earliest scheduled per-claim tax payment."));
+        entries.add(new SsuMenuPageDataPayload.PermissionEntry("claim_tax", "status", "safety_halt",
+                Boolean.toString(SimpleServerUtilities.CLAIM_TAX.isSafetyHalted()),
+                "When true, all claim mutation and destructive tax processing is fail-closed."));
+        List<SsuMenuPageDataPayload.PermissionEntry> dimensions = SimpleServerUtilities.CLAIM_TAX.dimensionMultipliers().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> new SsuMenuPageDataPayload.PermissionEntry(
+                        "claim_tax", "dimension", entry.getKey(), decimalPlain(entry.getValue()),
+                        "Multiplier applied to claimed chunks in this dimension."))
+                .toList();
+        entries.addAll(page(dimensions, request));
+        return data(request, dimensions.size(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), entries);
+    }
+
+    private SsuMenuPageDataPayload warpRentalPage(ServerPlayer player, SsuMenuPageRequestPayload request) {
+        if (!canEconomyAdmin(player)) return denied(request);
+        var settings = SimpleServerUtilities.WARPS.rentalSettings();
         List<SsuMenuPageDataPayload.PermissionEntry> entries = List.of(
-                new SsuMenuPageDataPayload.PermissionEntry("economics", "status", "player_claim_tax",
-                        "Not configured", "Player Claims currently have no purchase price or recurring tax system.")
+                new SsuMenuPageDataPayload.PermissionEntry("warp_rental", "setting", "price",
+                        majorPlain(settings.getPriceMinor()), "Amount charged in advance for each rental period."),
+                new SsuMenuPageDataPayload.PermissionEntry("warp_rental", "setting", "days",
+                        decimalPlain(settings.getPeriodMillis() / 86_400_000D), "Length of one prepaid rental period in days."),
+                new SsuMenuPageDataPayload.PermissionEntry("warp_rental", "status", "active",
+                        Long.toString(SimpleServerUtilities.WARPS.getWarps().stream().filter(Warp::isPlayerRental).count()),
+                        "Current number of player-rented warps.")
         );
         return data(request, entries.size(), List.of(), List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), entries);
@@ -2096,6 +2186,9 @@ public final class SsuMenuService {
     }
 
     private ActionResult setHome(ServerPlayer player, String rawName, String claimName) {
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(player.getUUID())) {
+            return ActionResult.fail("Homes cannot be created or moved while a claim-tax settlement is in progress.", "homes");
+        }
         String name = rawName == null ? "" : rawName.trim();
         if (name.isBlank()) return ActionResult.fail("Enter a home name.", "homes");
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
@@ -2132,7 +2225,11 @@ public final class SsuMenuService {
         if (!WarpPolicy.canSetWarp(player, context)) return ActionResult.fail("Warp administration denied at this location.", page);
         String name = rawName == null ? "" : rawName.trim();
         if (name.isBlank()) return ActionResult.fail("Enter a warp name.", page);
-        boolean existed = SimpleServerUtilities.WARPS.getWarp(name) != null;
+        Warp existingWarp = SimpleServerUtilities.WARPS.getWarp(name);
+        if (existingWarp != null && existingWarp.isPlayerRental()) {
+            return ActionResult.fail("That name belongs to a player-rented warp. Delete it or choose another name.", page);
+        }
+        boolean existed = existingWarp != null;
         boolean success;
         try { success = SimpleServerUtilities.WARPS.setWarp(player, name); }
         catch (IllegalArgumentException exception) { return ActionResult.fail(exception.getMessage(), page); }
@@ -2148,6 +2245,67 @@ public final class SsuMenuService {
         try { removed = SimpleServerUtilities.WARPS.deleteWarp(name); }
         catch (IllegalArgumentException exception) { return ActionResult.fail(exception.getMessage(), page); }
         return removed ? ActionResult.shellPage("Warp deleted.", page) : ActionResult.fail("Warp not found.", page);
+    }
+
+    private ActionResult setPlayerWarp(ServerPlayer player, String rawName, long requestId) {
+        PermissionContext context = PermissionContext.at(player, player.blockPosition());
+        if (!WarpPolicy.canRentWarp(player, context)) {
+            return ActionResult.fail("You do not have permission to rent player warps at this location.", "player_warps");
+        }
+        try {
+            var result = SimpleServerUtilities.WARPS.setPlayerRentalWarp(player, rawName, requestId);
+            return result.successful() ? ActionResult.shellPage(result.message(), "player_warps")
+                    : ActionResult.fail(result.message(), "player_warps");
+        } catch (IllegalArgumentException exception) {
+            return ActionResult.fail(exception.getMessage(), "player_warps");
+        }
+    }
+
+    private ActionResult movePlayerWarp(ServerPlayer player, String name) {
+        try {
+            var result = SimpleServerUtilities.WARPS.movePlayerRentalWarp(player, name);
+            return result.successful() ? ActionResult.shellPage(result.message(), "player_warps")
+                    : ActionResult.fail(result.message(), "player_warps");
+        } catch (IllegalArgumentException exception) {
+            return ActionResult.fail(exception.getMessage(), "player_warps");
+        }
+    }
+
+    private ActionResult deletePlayerWarp(ServerPlayer player, String name) {
+        boolean removed;
+        try { removed = SimpleServerUtilities.WARPS.deletePlayerWarp(player.getUUID(), name); }
+        catch (IllegalArgumentException exception) { return ActionResult.fail(exception.getMessage(), "player_warps"); }
+        return removed ? ActionResult.shellPage("Your rented warp was deleted and its name is available again.", "player_warps")
+                : ActionResult.fail("That rented warp was not found.", "player_warps");
+    }
+
+    private ActionResult setPlayerWarpVisibility(ServerPlayer player, String name, String rawVisible) {
+        boolean visible = Boolean.parseBoolean(rawVisible);
+        boolean updated;
+        try { updated = SimpleServerUtilities.WARPS.setPlayerWarpVisibility(player.getUUID(), name, visible); }
+        catch (IllegalArgumentException exception) { return ActionResult.fail(exception.getMessage(), "player_warps"); }
+        return updated ? ActionResult.ok("Warp is now " + (visible ? "public" : "private") + ".", "player_warps")
+                : ActionResult.fail("That rented warp was not found.", "player_warps");
+    }
+
+    private ActionResult warpRentalSettings(ServerPlayer player, String rawPrice, String rawDays) {
+        if (!canEconomyAdmin(player)) {
+            return ActionResult.fail("Economy administration permission is required.", "warp_rental");
+        }
+        try {
+            long price = MoneyFormat.parseMinor(rawPrice, SimpleServerUtilities.ECONOMY.settings());
+            if (price < 0L) throw new IllegalArgumentException("Rental price cannot be negative.");
+            BigDecimal days = new BigDecimal(rawDays == null ? "" : rawDays.trim().replace(',', '.'));
+            long period = days.multiply(BigDecimal.valueOf(86_400_000L)).setScale(0, RoundingMode.UNNECESSARY).longValueExact();
+            if (period < Duration.ofHours(1).toMillis() || period > Duration.ofDays(3650).toMillis()) {
+                throw new IllegalArgumentException("Rental period must be between 1 hour and 3650 days.");
+            }
+            SimpleServerUtilities.WARPS.configureRental(price, period);
+            return ActionResult.ok("Player-warp rental price and period updated.", "warp_rental");
+        } catch (Exception exception) {
+            String message = exception.getMessage();
+            return ActionResult.fail(message == null || message.isBlank() ? "Enter a valid rental price and number of days." : message, "warp_rental");
+        }
     }
 
     private ActionResult cancelTeleport(ServerPlayer player, String refreshPage) {
@@ -2184,6 +2342,9 @@ public final class SsuMenuService {
         if (!ClaimPolicy.hasAdminBypass(player)) return ActionResult.fail("Player-claim administration permission is required.", "admin_claims");
         PlayerClaim claim = findClaim(claimId);
         if (claim == null) return ActionResult.fail("Claim not found.", "admin_claims");
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(claim.getOwner())) {
+            return ActionResult.fail("This player's claims are locked by a claim-tax settlement or safety halt.", "admin_claims");
+        }
         boolean removed = SimpleServerUtilities.PLAYER_CLAIMS.deleteClaimGroup(claim.getOwner(), claim.getName(), true);
         if (removed) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
         return removed ? ActionResult.shellPage("Claim and its linked homes were deleted administratively.", "admin_claims")
@@ -2232,15 +2393,19 @@ public final class SsuMenuService {
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
         if (!WarpPolicy.canTeleportWarp(player, context)) return ActionResult.fail(TeleportPolicy.denialMessage(TeleportType.WARP, context), page);
         Warp warp = SimpleServerUtilities.WARPS.getWarp(name);
-        if (warp == null) return ActionResult.fail("Warp not found.", page);
+        if (warp == null || !SimpleServerUtilities.WARPS.canAccess(player, warp)) return ActionResult.fail("Warp not found or not accessible.", page);
         ServerLevel level = level(player.level().getServer(), warp.getDimension());
         if (level == null) return ActionResult.fail("Warp dimension is not loaded.", page);
         TeleportOptions options = TeleportPolicy.resolve(player, TeleportType.WARP, context);
         int result = SimpleServerUtilities.TELEPORTS.requestTeleport(
                 player, "warps", "warp '" + warp.getDisplayName() + "'",
                 options, level, warp.getX(), warp.getY(), warp.getZ(), warp.getYaw(), warp.getPitch(),
-                candidate -> WarpPolicy.canTeleportWarp(candidate,
-                        PermissionContext.at(candidate, candidate.blockPosition())),
+                candidate -> {
+                    Warp current = SimpleServerUtilities.WARPS.getWarp(name);
+                    return current != null
+                            && SimpleServerUtilities.WARPS.canAccess(candidate, current)
+                            && WarpPolicy.canTeleportWarp(candidate, PermissionContext.at(candidate, candidate.blockPosition()));
+                },
                 candidate -> TeleportPolicy.denialMessage(TeleportType.WARP,
                         PermissionContext.at(candidate, candidate.blockPosition())));
         return result > 0 ? ActionResult.ok("Warp teleport requested.", page) : ActionResult.fail("Warp teleport failed.", page);
@@ -2269,7 +2434,9 @@ public final class SsuMenuService {
     }
 
     private static String travelRefreshPage(String requested) {
-        return "travel_admin".equals(requested) ? "travel_admin" : "travel";
+        if ("travel_admin".equals(requested)) return "travel_admin";
+        if ("player_warps".equals(requested)) return "player_warps";
+        return "travel";
     }
 
     private ActionResult auctionTaxSet(ServerPlayer player, String rawPercentage) {
@@ -2290,6 +2457,90 @@ public final class SsuMenuService {
             return ActionResult.fail(message == null || message.isBlank()
                     ? "Enter a valid tax percentage." : message, "auction_tax");
         }
+    }
+
+    private ActionResult claimTaxSettings(ServerPlayer player, String rawRate, String rawIntervalHours, String rawReminderHours) {
+        if (!canEconomyAdmin(player)) return ActionResult.fail("Economy administration denied.", "claim_tax");
+        try {
+            long rate = MoneyFormat.parseMinor(rawRate, SimpleServerUtilities.ECONOMY.settings());
+            if (rate < 0L) throw new IllegalArgumentException("Claim tax cannot be negative.");
+            if (rate > SimpleServerUtilities.ECONOMY.settings().getMaximumBalanceMinor()) {
+                throw new IllegalArgumentException("The per-chunk rate cannot exceed the Economy maximum balance.");
+            }
+            long interval = hoursMillis(rawIntervalHours, "Billing interval", false);
+            long reminder = hoursMillis(rawReminderHours, "Reminder time", false);
+            if (reminder >= interval) throw new IllegalArgumentException("Reminder time must be shorter than the billing interval.");
+            if (SimpleServerUtilities.CLAIM_TAX.settings().isEnabled() && rate <= 0L) {
+                throw new IllegalArgumentException("Disable Player Claim tax before setting its rate to zero.");
+            }
+            SimpleServerUtilities.CLAIM_TAX.configure(SimpleServerUtilities.CLAIM_TAX.settings().isEnabled(), rate, interval, reminder);
+            return ActionResult.ok("Player Claim tax settings updated.", "claim_tax");
+        } catch (Exception exception) {
+            String message = exception.getMessage();
+            return ActionResult.fail(message == null || message.isBlank() ? "Enter valid tax settings." : message, "claim_tax");
+        }
+    }
+
+    private ActionResult claimTaxToggle(ServerPlayer player, String rawEnabled) {
+        if (!canEconomyAdmin(player)) return ActionResult.fail("Economy administration denied.", "claim_tax");
+        var settings = SimpleServerUtilities.CLAIM_TAX.settings();
+        boolean enabled = Boolean.parseBoolean(rawEnabled);
+        if (enabled && !Config.ENABLE_MAIL.get()) {
+            return ActionResult.fail("Enable the Mail module before enabling destructive claim taxation so reminders can be delivered.", "claim_tax");
+        }
+        if (enabled && !SimpleServerUtilities.ECONOMY.settings().isEnabled()) {
+            return ActionResult.fail("Enable the Economy before enabling Player Claim tax.", "claim_tax");
+        }
+        if (enabled && settings.getRateMinorPerChunk() <= 0L) {
+            return ActionResult.fail("Set a positive tax rate before enabling Player Claim tax.", "claim_tax");
+        }
+        if (enabled && settings.getReminderLeadMillis() <= 0L) {
+            return ActionResult.fail("Set a reminder time before enabling Player Claim tax.", "claim_tax");
+        }
+        SimpleServerUtilities.CLAIM_TAX.configure(enabled, settings.getRateMinorPerChunk(),
+                settings.getIntervalMillis(), settings.getReminderLeadMillis());
+        return ActionResult.ok("Player Claim tax is now " + (enabled ? "enabled" : "disabled") + ".", "claim_tax");
+    }
+
+    private ActionResult claimTaxDimension(ServerPlayer player, String dimension, String rawMultiplier) {
+        if (!canEconomyAdmin(player)) return ActionResult.fail("Economy administration denied.", "claim_tax");
+        try {
+            double multiplier = Double.parseDouble(rawMultiplier == null ? "" : rawMultiplier.trim().replace(',', '.'));
+            if (!Double.isFinite(multiplier) || multiplier < 0D || multiplier > 1000D) {
+                throw new IllegalArgumentException("Dimension multiplier must be between 0 and 1000.");
+            }
+            SimpleServerUtilities.CLAIM_TAX.setDimensionMultiplier(dimension, multiplier);
+            return ActionResult.ok("Dimension tax multiplier updated.", "claim_tax");
+        } catch (Exception exception) {
+            String message = exception.getMessage();
+            return ActionResult.fail(message == null || message.isBlank() ? "Enter a valid dimension id and multiplier." : message, "claim_tax");
+        }
+    }
+
+    private ActionResult claimTaxDimensionRemove(ServerPlayer player, String dimension) {
+        if (!canEconomyAdmin(player)) return ActionResult.fail("Economy administration denied.", "claim_tax");
+        try {
+            SimpleServerUtilities.CLAIM_TAX.removeDimensionMultiplier(dimension);
+            return ActionResult.ok("Custom dimension multiplier removed.", "claim_tax");
+        } catch (Exception exception) {
+            return ActionResult.fail(exception.getMessage(), "claim_tax");
+        }
+    }
+
+    private static long hoursMillis(String raw, String label, boolean allowZero) {
+        String field = label == null || label.isBlank() ? "Hours" : label;
+        BigDecimal hours = new BigDecimal(raw == null ? "" : raw.trim().replace(',', '.'));
+        if (hours.signum() < 0 || (!allowZero && hours.signum() == 0)) {
+            throw new IllegalArgumentException(allowZero ? field + " cannot be negative." : field + " must be greater than zero.");
+        }
+        long millis = hours.multiply(BigDecimal.valueOf(3_600_000L)).setScale(0, RoundingMode.UNNECESSARY).longValueExact();
+        if (!allowZero && millis < Duration.ofHours(1).toMillis()) {
+            throw new IllegalArgumentException(field + " must be at least 1 hour.");
+        }
+        if (millis > Duration.ofDays(3650).toMillis()) {
+            throw new IllegalArgumentException(field + " cannot exceed 3650 days.");
+        }
+        return millis;
     }
 
     private ActionResult economyHistoryLimit(ServerPlayer actor, String rawLimit) {
@@ -2686,6 +2937,25 @@ public final class SsuMenuService {
     private static String transactionSearch(EconomyTransactionRecord record) {
         return (record.getType() + " " + record.getStatus() + " " + record.getSourceName() + " "
                 + record.getDestinationName() + " " + record.getActorName() + " " + record.getReason()).toLowerCase(Locale.ROOT);
+    }
+
+    private static String majorPlain(long minor) {
+        return BigDecimal.valueOf(minor, SimpleServerUtilities.ECONOMY.settings().getDecimalPlaces())
+                .stripTrailingZeros().toPlainString();
+    }
+
+    private static String decimalPlain(double value) {
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+    }
+
+    private static String durationText(long millis) {
+        long minutes = Math.max(1L, Duration.ofMillis(Math.max(0L, millis)).toMinutes());
+        long days = minutes / 1440L;
+        long hours = (minutes % 1440L) / 60L;
+        long rest = minutes % 60L;
+        if (days > 0L) return days + " day(s) " + hours + " hour(s)";
+        if (hours > 0L) return hours + " hour(s) " + rest + " minute(s)";
+        return rest + " minute(s)";
     }
 
     private static TravelQuery parseTravelQuery(String rawQuery, Set<String> allowedFilters) {

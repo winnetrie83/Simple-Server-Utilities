@@ -43,6 +43,8 @@ public final class PermissionKeys {
     public static final String WARPS_DELETE = "ssu.warps.delete";
     public static final String WARPS_INFO = "ssu.warps.info";
     public static final String WARPS_MAX = "ssu.warps.max";
+    public static final String WARPS_RENT = "ssu.warps.rent";
+    public static final String WARPS_RENT_MAX = "ssu.warps.rent.max";
     public static final String WARPS_TELEPORT_DELAY = "ssu.warps.teleport.delay";
     public static final String WARPS_TELEPORT_COOLDOWN = "ssu.warps.teleport.cooldown";
 
@@ -218,6 +220,8 @@ public final class PermissionKeys {
             WARPS_DELETE,
             WARPS_INFO,
             WARPS_MAX,
+            WARPS_RENT,
+            WARPS_RENT_MAX,
             WARPS_TELEPORT_DELAY,
             WARPS_TELEPORT_COOLDOWN,
 

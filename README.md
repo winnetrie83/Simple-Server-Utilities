@@ -1,4 +1,151 @@
-## Current development build: 1.8.0-dev18.3.1
+## Current development build: 1.9.0-dev2.5.3
+
+### Captain-style equipped CTF carrier flag (1.9.0-dev2.5.3)
+
+- The carried CTF banner is now equipped directly on the player in the same vanilla head slot used by pillager captains.
+- It no longer uses a follower armor stand, so the banner stays perfectly attached to the carrier during movement and turning.
+- Temporary head equipment is restored when the carrier drops or loses the flag.
+- Network protocol remains 79; Minigame definition schema remains 10; Minigame recovery schema remains 2.
+
+
+### Physical temporary setup banners (1.9.0-dev2.5.2)
+
+- Lobby, spectator, team/player-spawn and linked Domination-respawn setup points now use real temporary standing banners rather than holographic cloth rectangles.
+- Those setup banners are removed before a match and before reset snapshots, so they cannot block gameplay or become part of arena restoration. The stored coordinates remain active.
+- Actual CTF flags and Domination node banners are never removed by setup-marker cleanup.
+- Network protocol remains 79; Minigame definition schema remains 10; Minigame recovery schema remains 2.
+
+### Domination compile fix and dropped CTF flags (1.9.0-dev2.5.1)
+
+- Fixes the missing `ACCENT` GUI constant in the Domination editor.
+- CTF flags now drop as their real configured banner when a carrier dies or deliberately crouches.
+- Enemy-team players can instantly pick up a dropped flag by right-clicking it; the flag's own team instantly returns it to base.
+- The HUD distinguishes flags at base, carried and dropped, and a capture only scores while the carrier's own flag is back at base.
+- Network protocol remains 79; Minigame definition schema remains 10; Minigame recovery schema remains 2.
+
+
+### CTF Minecraft 26.2 compile hotfix (1.9.0-dev2.4.1)
+
+- Temporary back-banner entities now use a hidden custom-name marker for orphan cleanup instead of the unavailable `Entity#getTags()` call.
+- Carrier glow colors now use Minecraft 26.2 `Optional<TeamColor>` values and retain nearest-color matching.
+- Network protocol remains 78; Minigame definition schema remains 9; Minigame recovery schema remains 2.
+
+
+### Physical CTF flags and interruptible pickup (1.9.0-dev2.4)
+
+- New and existing CTF setup now shows the actual configured banner blocks at both bases, including after an older snapshot reset. Lobby, spectator and spawn previews use clean cross/vertical guides instead of custom square cloth markers.
+- Taking the enemy flag requires a configurable right-click cast. Movement, leaving the flag/arena or incoming damage interrupts the castbar.
+- Successful pickup plays Sing to the carrier's team and Seek to the opposing team.
+- The carrier now has the real configured banner following directly behind their back, with no upward beam, plus a team-colored glowing outline visible to every player.
+- Temporary banner entities, glow/team state and castbars are restored safely on score, death, disconnect, match finish, reload or shutdown.
+- The accidental arena-edit `INTERACT` bypass from dev2.3.3 is removed; normal BREAK and PLACE behavior is unchanged.
+- Network protocol 78; Minigame definition schema 9; Minigame recovery schema 2.
+
+
+### Physical Domination banners and final capture sounds (1.9.0-dev2.3.2)
+
+- Active assaults now recolor the actual physical banner with a claimant-colored upper half and previous-owner/neutral lower half; the old crossed cuboid overlay is removed.
+- Base labels are ten times larger and centered above the banner.
+- Final capture plays beacon activation to the capturing team; a previous owner that definitively loses the base hears beacon deactivation.
+- Network protocol remains 76; Minigame definition schema remains 8; Minigame recovery schema remains 2.
+
+
+
+### Compile hotfix (1.9.0-dev2.3.1)
+
+- Replaces the removed `ServerPlayer#playNotifySound(...)` call with a targeted `ClientboundSoundPacket`, compatible with Minecraft 26.2.
+- Domination Sing/Seek horns remain audible only to the intended team/player recipients.
+- Network protocol remains 76; Minigame definition schema remains 8; Minigame recovery schema remains 2.
+
+### Interruptible Domination base claims (1.9.0-dev2.3)
+- Domination nodes are now claimed by right-clicking the physical banner and completing a configurable stationary cast. Movement, leaving the flag/arena or incoming damage interrupts the cast.
+- A successful cast starts a second configurable, globally visible capture-delay timer. The base gives no points during this period and changes owner only when the timer completes.
+- Assaulted flags show the claimant color on top and the old owner/neutral color below; a colored base label and timer float above every node.
+- The former owner can right-click an assaulted base to defend it immediately. Sing plays to the claiming/defending team and Seek to the opposing team.
+- Network protocol 76; Minigame definition schema 8; Minigame recovery schema 2.
+
+
+### Dedicated minigame administration and in-world setup (1.9.0-dev2.2)
+- The player Minigame Lobby now contains information and Join/Leave controls only. All configuration and live administrator operations live under **Admin Center → Minigames**.
+- The old generic Create Minigame button is removed. Supported games are created from actual selected arena bounds with the dedicated Minigame Setup Tool.
+- Right-click the Setup Tool to select a game, arena and action; left-click in the world to resize the arena, set lobby/spectator areas, place spawns, define a Spleef playfloor, place CTF flags or Domination nodes, or recapture the arena snapshot.
+- Protected physical editing is available only in explicit arena edit mode. The game remains disabled until the changed arena has a newly verified reset snapshot.
+- Network protocol 75; Minigame definition schema 7; Minigame recovery schema 2.
+
+### Compact lobby, focused rewards and Domination foundation (1.9.0-dev2.1)
+- The Minigame Lobby is exactly 25% smaller and its player/admin controls no longer overlap.
+- Direct reward selection now shows only player unlocks, reputation, permissions and personal claim-capacity bonuses. Items and money stay in their dedicated Mail-backed reward fields.
+- `add_claim_chunks` is available as a direct reward; for example `amount=5` adds five permanent personal claim chunks.
+- Domination is runnable with a dedicated six-tab editor, two teams, 3–9 physical banner nodes, capture/neutralization progress, configurable resource scoring, respawns, HUD, winner effects and verified arena reset.
+- Selection Tool creation can generate a five-node, Arathi Basin-inspired battlefield from a selected region of at least 15×15 blocks.
+- Network protocol 74; Minigame definition schema 6; Minigame recovery schema 2.
+
+### Capture the Flag foundation and winner effects (1.9.0-dev2)
+- Reward ghost copies are released by right-clicking outside the inventory and reward slots, and direct reward actions use a cycle selector populated from the server's registered Content Core action types.
+- Every participant receives a large winner title; winning players receive colored star fireworks.
+- Spleef floor blocks disappear directly without ever creating item drops.
+- Capture the Flag is now runnable with a dedicated five-tab editor, two balanced teams, physical banner flags, right-click pickup, team scoring, respawns, HUD and snapshot reset.
+- A carried enemy flag is shown on the player's back with an upward beam in the configured flag color; death, disconnect or leaving the arena returns it to base.
+- Network protocol 73; Minigame definition schema 5; Minigame recovery schema 2.
+
+
+### Compact Spleef editor and inventory-style reward placement (1.9.0-dev1.1.1)
+- The full five-tab Spleef editor is about 25% smaller and uses bounded wrapped help text so labels and explanations no longer overlap.
+- Reward items now use a visible ghost cursor: select a real inventory stack, left-click a mail slot to copy the whole stack, or right-click to add one matching item. The real inventory is never consumed.
+- All nine mail slots retain their exact positions, including intentional empty gaps, and item placement is validated against the administrator inventory on the server.
+- Network protocol 72; Minigame definition schema 4; Minigame recovery schema 2.
+
+
+### Dedicated Spleef administration and safe reward mail (1.9.0-dev1.1)
+- Spleef now has its own clear five-tab editor with labeled fields, short coordinate values, player-spawn terminology and mode-specific guidance.
+- Participation and winner rewards support exact inventory-selected item stacks, normal Economy amounts and immediate Content Core actions.
+- Items and money arrive through SSU Mail with a clear reason; direct permissions/unlocks/keys apply immediately and are also described in the mail.
+- Eliminated spectators are server-confined to the arena vicinity and returned to the configured spectator point if they leave it.
+- Network protocol 71; Minigame definition schema 3; Minigame recovery schema 2.
+
+
+### Minigame Core expansion and first playable Spleef mode (1.9.0-dev1)
+- Adds a concrete game-type layer to the existing queue, arena and match framework. Spleef is the first fully implemented mode; King of the Hill, Capture the Flag, Domination, Team Deathmatch, Parkour Race and Prop Hunt are reserved for later builds.
+- The Region Tool right-click menu can create a managed Spleef arena from the current selection. SSU creates a protected hidden region, captures a verified reset snapshot and saves the minigame as a disabled draft for administrator review.
+- Spleef supports configurable breakable blocks, tool requirement, PvP, drop cleanup, elimination depth, per-player spawns, countdown lobby, spectator spawn, last-player-standing victory and automatic arena restoration.
+- Adds server-authoritative match HUD scoreboards with mode, state, timer and alive-player information.
+- Captures inventory, armor/offhand slots, gamemode, health, hunger, experience and flight state before a match. State is restored before rewards and persisted for disconnect/crash recovery; legacy schema-1 recovery entries never clear a live inventory.
+- The exact recovery file is synchronously flushed and verified before countdown or late-join state replacement. A failed critical write leaves the player untouched and pauses new starts instead of risking inventory loss.
+- Generic item and money rewards are registered by Content Core, so Minigame rewards do not depend on the Quest module being enabled.
+- Match participants cannot use normal SSU teleports or ordinary block/item/entity interactions to escape or contaminate temporary match state. Configured same-match PvP remains available. Arena block breaking is allowed only for an active Spleef participant using the configured tool on an allowed block; idle arenas and outsiders remain protected.
+- Forced administrator test matches never grant rewards. Countdown cancellation safely restores players and requeues them, while failed arena resets block the arena until a real snapshot restoration succeeds.
+- Managed arena ownership is server-only metadata. Client editor payloads cannot claim, retarget or silently remove a selection-created region, and one physical region cannot be assigned to multiple minigames.
+- Network protocol is 70. Minigame definition and recovery schemas are 2; all unrelated SSU storage schemas remain unchanged.
+
+
+### Crash-safe per-claim taxation and permanent claim-capacity collateral (dev18.6)
+- Every player claim now owns an independent cycle beginning at claim creation. Its taxable peak is the highest chunk count reached in that cycle and can never be lower than the current claim size.
+- Reminder mail is deliberately an estimate: expansion may increase the final bill and collateral, while shrinking a claim never lowers the current cycle peak.
+- Deleting a taxable claim requires the Claim Map GUI choice **Pay tax & delete** or **Forfeit capacity & delete**, followed by a second confirmation. Final-chunk and command paths cannot bypass this settlement.
+- Simultaneously due claims are charged in one idempotent Economy transaction. Only an explicit insufficient-balance result can start confiscation; every technical or storage failure fails closed without destructive action.
+- Confirmed non-payment removes all current claims and linked Homes without restoring world blocks, then permanently subtracts exactly the due/taxed claim peaks from the player's effective claim capacity.
+- Permanent confiscations are stored separately from ranks and keyed by settlement UUID, so they survive rank changes and cannot be applied twice during recovery.
+- The schema-2 settlement ledger journals payment, claim removal, Home cleanup and penalty application. Exact on-disk records are verified before advancing each destructive phase.
+- Ambiguous or damaged recovery data creates a restart-persistent `tax_safety_halt.json` marker. Tax enforcement and claim mutation remain fail-closed until an administrator repairs the data and deliberately removes the marker.
+- Network protocol is 69. Player Claim storage, Claim-tax settings and the settlement ledger use schema 2; warp storage remains schema 2 and unrelated schemas are unchanged.
+
+### Selection transforms, claim-tax foundation and player-warp rentals (dev18.5)
+- Fill Mix accepts normal blocks, water/lava buckets and an automatic air remainder when configured percentages total less than 100%.
+- The selection editor can rotate 90°/180°, mirror horizontally and flip vertically while transforming compatible block states.
+- Economics contains disabled-by-default Player Claim-tax configuration with per-chunk rates, cycle/reminder timing and per-dimension multipliers.
+- Players with explicit permissions can prepay and manage public/private rented warps entirely through GUI menus; automatic renewal removes an unpaid expired warp.
+- Warp storage is schema 2 and network protocol remains 68.
+
+### GUI-first Region Tool and selection editor (dev18.4)
+- Select point 1 and point 2 with the Region Tool, then right-click to choose between creating a server region, editing the selected blocks or clearing the selection.
+- Region creation now asks only for the unique name. Existing region flags, priority, messages and rental configuration remain under **Admin Center → Regions → Settings**.
+- The selection editor provides a temporary clipboard, paste-at-point-1, clear, weighted inventory-block fill mixes and reusable server/client templates.
+- Fill mixes accept only block items currently present in the administrator's inventory, do not consume those items and must total exactly 100%.
+- Templates save block states only; inventories, block-entity data and entities are never copied. GUI block replacement discards destination container contents without drops.
+- Server templates are stored below the SSU regions storage folder. Client templates are stored under `.minecraft/simpleserverutilities/region_templates` and are validated server-side before use.
+- The Admin Center no longer exposes the overlapping Region Maintenance tile or rental-action buttons inside its Regions list.
+- Network protocol is 68. Existing SSU storage schemas remain unchanged; `.ssusel` selection templates use their own new internal format version 1.
+
 
 ### Auction House maintenance compile hotfix (dev18.3.1)
 - Restores the accidentally removed Auction House maintenance lifecycle without changing the Economics GUI migration.
@@ -60,6 +207,9 @@ Simple Server Utilities (SSU) is a modular NeoForge server utility mod for Minec
 - Three-dimensional server-owned admin regions with priorities, nesting, managers, members, renting and versioned, recoverable snapshots
 - Configurable default rank plus rank permissions and higher-priority personal permissions, with a compact paged editor, per-key default/effective tooltips and direct player/rank selection
 - Homes, global warps, a persistent server spawn and delayed teleports with cooldowns
+- Permission-gated prepaid player-warp rentals with private/public visibility, automatic renewal and GUI-only management through My Warps and Travel
+- Optional per-claim recurring taxation with monotonic cycle peaks, configurable dimension multipliers, estimated reminder mail, idempotent Economy settlement, crash-safe claim/Home removal and permanent permission-independent claim-capacity confiscation on confirmed non-payment
+- GUI region-selection fill mixes with block items, water/lava buckets and automatic air remainder, plus rotation, horizontal mirrors and vertical flipping
 - Protection for blocks, entities, PvP, explosions, pistons, fluids, hoppers, fire and redstone
 - A Bedrock-inspired, page-driven player dashboard and permission-aware Admin Center opened with `U` or `/ssu menu`, using bounded server queries and typed actions
 - An interactive, server-authoritative chunk claim map for creating, expanding, shrinking and safely deleting connected claim groups

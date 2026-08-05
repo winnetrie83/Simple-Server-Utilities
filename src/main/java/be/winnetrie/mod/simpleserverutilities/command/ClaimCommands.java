@@ -246,6 +246,16 @@ public class ClaimCommands {
         }
 
         boolean adminBypass = ClaimPolicy.hasAdminBypass(player);
+        PlayerClaim selected = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), name);
+        if (!adminBypass && selected != null && SimpleServerUtilities.CLAIM_TAX.requiresDeleteSettlement(selected)) {
+            player.sendSystemMessage(Component.literal(
+                    "This claim has an active tax cycle. Delete it from Claims & Land to pay its tax or permanently forfeit its taxable peak capacity."));
+            return 0;
+        }
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(player.getUUID())) {
+            player.sendSystemMessage(Component.literal("A claim-tax settlement is currently in progress. Try again after it completes."));
+            return 0;
+        }
 
         boolean success = SimpleServerUtilities.PLAYER_CLAIMS.deleteClaimGroup(
                 player.getUUID(),
@@ -603,6 +613,11 @@ public class ClaimCommands {
             return 0;
         }
 
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(targetUuid.get())) {
+            executor.sendSystemMessage(Component.literal("That player's claims are locked by a claim-tax settlement or safety halt."));
+            return 0;
+        }
+
         boolean success = SimpleServerUtilities.PLAYER_CLAIMS.deleteClaimGroup(
                 targetUuid.get(),
                 claimName,
@@ -840,6 +855,12 @@ public class ClaimCommands {
 
             case NOT_OWNER ->
                     player.sendSystemMessage(Component.literal("You are not the owner of this claim: " + result.getDetails()));
+
+            case CLAIM_DELETE_SETTLEMENT_REQUIRED ->
+                    player.sendSystemMessage(Component.literal("This claim must be settled from Claims & Land before it can be deleted. " + result.getDetails()));
+
+            case TAX_SETTLEMENT_IN_PROGRESS ->
+                    player.sendSystemMessage(Component.literal("A claim-tax settlement is currently in progress. " + result.getDetails()));
 
             case SUCCESS ->
                     player.sendSystemMessage(Component.literal("Operation completed successfully."));

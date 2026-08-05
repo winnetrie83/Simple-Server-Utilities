@@ -96,16 +96,12 @@ public class WarpCommands {
             return 0;
         }
 
-        Collection<Warp> warps = SimpleServerUtilities.WARPS.getWarps();
+        Collection<Warp> warps = SimpleServerUtilities.WARPS.getAccessibleWarps(player).stream()
+                .filter(warp -> !warp.isPlayerRental())
+                .toList();
 
-        int count = SimpleServerUtilities.WARPS.countWarps();
-        int max = WarpPolicy.getMaxWarps(player);
-
-        if (max > 0) {
-            player.sendSystemMessage(Component.literal("Warps: " + count + " / " + max));
-        } else {
-            player.sendSystemMessage(Component.literal("Warps: " + count));
-        }
+        int count = warps.size();
+        player.sendSystemMessage(Component.literal("Available legacy server warps: " + count));
 
         if (warps.isEmpty()) {
             player.sendSystemMessage(Component.literal("There are no warps yet."));
@@ -132,8 +128,8 @@ public class WarpCommands {
 
         Warp warp = SimpleServerUtilities.WARPS.getWarp(warpName);
 
-        if (warp == null) {
-            player.sendSystemMessage(Component.literal("Warp not found: " + warpName));
+        if (warp == null || warp.isPlayerRental() || !SimpleServerUtilities.WARPS.canAccess(player, warp)) {
+            player.sendSystemMessage(Component.literal("Server warp not found. Player-rented warps are used through Dashboard > Travel."));
             return 0;
         }
 
@@ -157,8 +153,14 @@ public class WarpCommands {
                 warp.getZ(),
                 warp.getYaw(),
                 warp.getPitch(),
-                candidate -> WarpPolicy.canTeleportWarp(candidate,
-                        PermissionContext.at(candidate, candidate.blockPosition())),
+                candidate -> {
+                    PermissionContext current = PermissionContext.at(candidate, candidate.blockPosition());
+                    Warp currentWarp = SimpleServerUtilities.WARPS.getWarp(warpName);
+                    return WarpPolicy.canTeleportWarp(candidate, current)
+                            && currentWarp != null
+                            && !currentWarp.isPlayerRental()
+                            && SimpleServerUtilities.WARPS.canAccess(candidate, currentWarp);
+                },
                 candidate -> TeleportPolicy.denialMessage(TeleportType.WARP,
                         PermissionContext.at(candidate, candidate.blockPosition()))
         );
@@ -174,11 +176,16 @@ public class WarpCommands {
             return 0;
         }
 
+        Warp existing = SimpleServerUtilities.WARPS.getWarp(warpName);
+        if (existing != null && existing.isPlayerRental()) {
+            player.sendSystemMessage(Component.literal("That name belongs to a player-rented warp and can only be managed through the GUI."));
+            return 0;
+        }
         boolean success = SimpleServerUtilities.WARPS.setWarp(player, warpName);
 
         if (!success) {
             int max = WarpPolicy.getMaxWarps(player);
-            player.sendSystemMessage(Component.literal("You reached the maximum amount of warps: " + max));
+            player.sendSystemMessage(Component.literal("You reached the maximum amount of server warps: " + max));
             return 0;
         }
 
@@ -196,10 +203,15 @@ public class WarpCommands {
             return 0;
         }
 
+        Warp warp = SimpleServerUtilities.WARPS.getWarp(warpName);
+        if (warp != null && warp.isPlayerRental()) {
+            player.sendSystemMessage(Component.literal("Player-rented warps can only be deleted through the player or administrator GUI."));
+            return 0;
+        }
         boolean success = SimpleServerUtilities.WARPS.deleteWarp(warpName);
 
         if (!success) {
-            player.sendSystemMessage(Component.literal("Warp not found: " + warpName));
+            player.sendSystemMessage(Component.literal("Server warp not found: " + warpName));
             return 0;
         }
 
@@ -221,6 +233,10 @@ public class WarpCommands {
 
         if (warp == null) {
             player.sendSystemMessage(Component.literal("Warp not found: " + warpName));
+            return 0;
+        }
+        if (warp.isPlayerRental()) {
+            player.sendSystemMessage(Component.literal("Player-rented warp information is available through Dashboard > My Warps or Travel."));
             return 0;
         }
 

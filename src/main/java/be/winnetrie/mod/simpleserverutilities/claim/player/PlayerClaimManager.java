@@ -46,6 +46,8 @@ public class PlayerClaimManager {
     private final Map<UUID, PlayerClaim> claims = new HashMap<>();
     private final Map<String, UUID> chunkIndex = new HashMap<>();
     private final Map<UUID, PlayerClaimLimits> limits = new HashMap<>();
+    /** Last known split-storage path for each claim, retained until deletion is durable. */
+    private final Map<UUID, Path> claimFilesById = new HashMap<>();
     private final DirtyJsonRecordStore claimRecordStore = new DirtyJsonRecordStore();
     private final DirtyJsonRecordStore limitRecordStore = new DirtyJsonRecordStore();
     private final DirtyJsonRecordStore indexRecordStore = new DirtyJsonRecordStore();
@@ -64,6 +66,7 @@ public class PlayerClaimManager {
         claims.clear();
         chunkIndex.clear();
         limits.clear();
+        claimFilesById.clear();
         claimRecordStore.reset();
         limitRecordStore.reset();
         indexRecordStore.reset();
@@ -121,6 +124,7 @@ public class PlayerClaimManager {
         claims.clear();
         chunkIndex.clear();
         limits.clear();
+        claimFilesById.clear();
         claimRecordStore.reset();
         limitRecordStore.reset();
         indexRecordStore.reset();
@@ -147,6 +151,10 @@ public class PlayerClaimManager {
         }
 
         UUID owner = player.getUUID();
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(owner)) {
+            return ClaimOperationResult.fail(ClaimOperationResult.Type.TAX_SETTLEMENT_IN_PROGRESS,
+                    "A claim-tax settlement is currently in progress.");
+        }
 
         if (getClaimGroup(owner, name) != null) {
             return ClaimOperationResult.fail(
@@ -175,6 +183,7 @@ public class PlayerClaimManager {
         );
 
         claims.put(claim.getId(), claim);
+        SimpleServerUtilities.CLAIM_TAX.initializeClaimCycle(claim, now);
         save();
 
         return ClaimOperationResult.success();
@@ -186,6 +195,11 @@ public class PlayerClaimManager {
                     ClaimOperationResult.Type.PLAYER_CLAIMS_DISABLED,
                     ""
             );
+        }
+
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(owner)) {
+            return ClaimOperationResult.fail(ClaimOperationResult.Type.TAX_SETTLEMENT_IN_PROGRESS,
+                    "A claim-tax settlement is currently in progress.");
         }
 
         if (getClaimGroup(owner, name) != null) {
@@ -212,6 +226,7 @@ public class PlayerClaimManager {
         );
 
         claims.put(claim.getId(), claim);
+        SimpleServerUtilities.CLAIM_TAX.initializeClaimCycle(claim, now);
         save();
 
         return ClaimOperationResult.success();
@@ -219,21 +234,22 @@ public class PlayerClaimManager {
 
     public boolean deleteClaimGroup(UUID owner, String name, boolean adminBypass) {
         PlayerClaim claim = getClaimGroup(owner, name);
+        if (claim == null) return false;
 
-        if (claim == null) {
-            return false;
-        }
+        // Even administrators must not race a persisted tax settlement. The
+        // tax engine has a separate, settlement-id-verified deletion route.
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(owner)) return false;
+        if (!adminBypass && !claim.isOwner(owner)) return false;
+        if (!adminBypass && SimpleServerUtilities.CLAIM_TAX.requiresDeleteSettlement(claim)) return false;
+        return deleteClaimUnchecked(claim);
+    }
 
-        if (!adminBypass && !claim.isOwner(owner)) {
-            return false;
-        }
-
+    private boolean deleteClaimUnchecked(PlayerClaim claim) {
+        if (claim == null) return false;
         int removedHomes = SimpleServerUtilities.HOMES.deleteHomesInClaim(claim.getOwner(), claim);
-
         for (ClaimChunk chunk : claim.getChunks()) {
             chunkIndex.remove(createKey(claim.getDimension(), chunk.getX(), chunk.getZ()));
         }
-
         claims.remove(claim.getId());
         save();
         if (removedHomes > 0) {
@@ -262,6 +278,10 @@ public class PlayerClaimManager {
 
         Level level = player.level();
         UUID owner = player.getUUID();
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(owner)) {
+            return ClaimOperationResult.fail(ClaimOperationResult.Type.TAX_SETTLEMENT_IN_PROGRESS,
+                    "A claim-tax settlement is currently in progress.");
+        }
         PlayerClaim claim = getClaimGroup(owner, claimName);
 
         if (claim == null) {
@@ -352,6 +372,11 @@ public class PlayerClaimManager {
                     ClaimOperationResult.Type.PLAYER_CLAIMS_DISABLED,
                     ""
             );
+        }
+
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(owner)) {
+            return ClaimOperationResult.fail(ClaimOperationResult.Type.TAX_SETTLEMENT_IN_PROGRESS,
+                    "A claim-tax settlement is currently in progress.");
         }
 
         PlayerClaim claim = getClaimGroup(owner, claimName);
@@ -483,6 +508,11 @@ public class PlayerClaimManager {
         }
 
         UUID owner = player.getUUID();
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(owner)) {
+            return ClaimMapBatchResult.failure(ClaimOperationResult.fail(
+                    ClaimOperationResult.Type.TAX_SETTLEMENT_IN_PROGRESS,
+                    "A claim-tax settlement is currently in progress."));
+        }
         String dimension = getDimensionId(player.level());
         PlayerClaim claim = getClaimGroup(owner, claimName);
 
@@ -593,6 +623,9 @@ public class PlayerClaimManager {
                 claim.addChunk(chunkPos.x(), chunkPos.z(), now);
                 chunkIndex.put(createKey(dimension, chunkPos.x(), chunkPos.z()), claim.getId());
             }
+            if (operation == ClaimMapOperation.CREATE) {
+                SimpleServerUtilities.CLAIM_TAX.initializeClaimCycle(claim, now);
+            }
             save();
             return ClaimMapBatchResult.success(chunks.size());
         }
@@ -610,6 +643,11 @@ public class PlayerClaimManager {
         Set<ClaimChunk> remaining = new HashSet<>(claim.getChunks());
         for (ChunkPos chunkPos : chunks) {
             remaining.remove(new ClaimChunk(chunkPos.x(), chunkPos.z()));
+        }
+        if (remaining.isEmpty() && SimpleServerUtilities.CLAIM_TAX.requiresDeleteSettlement(claim)) {
+            return ClaimMapBatchResult.failure(ClaimOperationResult.fail(
+                    ClaimOperationResult.Type.CLAIM_DELETE_SETTLEMENT_REQUIRED,
+                    "Use Delete to pay the current claim tax or forfeit the taxable claim capacity."));
         }
         if (!ClaimShapeValidator.isConnected(remaining)) {
             return ClaimMapBatchResult.failure(ClaimOperationResult.fail(
@@ -694,11 +732,23 @@ public class PlayerClaimManager {
             );
         }
 
+        // Administrators may bypass normal ownership/tax settlement choices,
+        // but must never race an already journaled settlement for the owner.
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(claim.getOwner())) {
+            return ClaimOperationResult.fail(ClaimOperationResult.Type.TAX_SETTLEMENT_IN_PROGRESS,
+                    "A claim-tax settlement is currently in progress.");
+        }
+
         if (!adminBypass && !claim.isOwner(playerUuid)) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.NOT_OWNER,
                     claim.getDisplayName()
             );
+        }
+
+        if (!adminBypass && claim.getChunkCount() == 1 && SimpleServerUtilities.CLAIM_TAX.requiresDeleteSettlement(claim)) {
+            return ClaimOperationResult.fail(ClaimOperationResult.Type.CLAIM_DELETE_SETTLEMENT_REQUIRED,
+                    "Use the Claims GUI to pay the tax or forfeit claim capacity before deleting the final chunk.");
         }
 
         if (wouldDisconnectClaim(claim, chunkPos.x(), chunkPos.z())) {
@@ -727,6 +777,121 @@ public class PlayerClaimManager {
         }
 
         return ClaimOperationResult.success();
+    }
+
+    /** Permanently removes every claim owned by one player, including all linked homes. */
+    public ClaimDeletionSummary deleteAllClaims(UUID owner) {
+        if (owner == null) return new ClaimDeletionSummary(0, 0, 0);
+        List<PlayerClaim> owned = claims.values().stream().filter(claim -> claim.isOwner(owner)).toList();
+        int claimCount = 0;
+        int chunkCount = 0;
+        int homeCount = 0;
+        for (PlayerClaim claim : owned) {
+            claimCount++;
+            chunkCount += claim.getChunkCount();
+            homeCount += SimpleServerUtilities.HOMES.deleteHomesInClaim(owner, claim);
+            for (ClaimChunk chunk : claim.getChunks()) {
+                chunkIndex.remove(createKey(claim.getDimension(), chunk.getX(), chunk.getZ()));
+            }
+            claims.remove(claim.getId());
+        }
+        if (claimCount > 0) save();
+        SimpleServerUtilities.LOGGER.warn("Permanently removed {} claim(s), {} chunk(s) and {} linked home(s) for {}.",
+                claimCount, chunkCount, homeCount, owner);
+        return new ClaimDeletionSummary(claimCount, chunkCount, homeCount);
+    }
+
+    public record ClaimDeletionSummary(int claims, int chunks, int homes) {}
+
+    public PlayerClaim getClaimById(UUID claimId) {
+        return claimId == null ? null : claims.get(claimId);
+    }
+
+    /** Returns true only when the newest live claim snapshot is durable on disk. */
+    public boolean isClaimStorageDurable(UUID claimId) {
+        PlayerClaim claim = getClaimById(claimId);
+        if (claim == null || claimsFolder == null) return false;
+        Path file = claimFilesById.computeIfAbsent(claimId, ignored ->
+                StoragePaths.jsonFile(claimsFolder, createClaimFileName(claim)).toAbsolutePath().normalize());
+        if (SimpleServerUtilities.STORAGE.hasPending(file)
+                || SimpleServerUtilities.STORAGE.requiresRetry(file)
+                || !Files.isRegularFile(file)) {
+            return false;
+        }
+        try {
+            return GSON.toJson(claim).equals(Files.readString(file));
+        } catch (IOException exception) {
+            SimpleServerUtilities.LOGGER.error("Could not verify durable claim data for {}.", claimId, exception);
+            return false;
+        }
+    }
+
+    /**
+     * Verifies that a removed claim can no longer reappear after a crash. The
+     * check is path-specific, so an unrelated failed storage write does not
+     * incorrectly advance or permanently stall a tax settlement.
+     */
+    public boolean isClaimDeletionDurable(UUID claimId) {
+        if (claimId == null || claimsFolder == null || claims.containsKey(claimId)) return false;
+        Path file = claimFilesById.get(claimId);
+        if (file == null) {
+            try {
+                file = findClaimFile(claimId);
+            } catch (IOException exception) {
+                SimpleServerUtilities.LOGGER.error("Could not verify durable deletion of claim {}.", claimId, exception);
+                return false;
+            }
+        }
+        if (file != null) {
+            if (SimpleServerUtilities.STORAGE.hasPending(file)
+                    || SimpleServerUtilities.STORAGE.requiresRetry(file)
+                    || Files.exists(file)) {
+                return false;
+            }
+            claimFilesById.remove(claimId);
+        }
+        Path index = rootFolder == null ? null : rootFolder.resolve("player_claims").resolve("player_index.json");
+        return index == null || (!SimpleServerUtilities.STORAGE.hasPending(index)
+                && !SimpleServerUtilities.STORAGE.requiresRetry(index));
+    }
+
+    /** Verifies that the owner-specific permanent limit/penalty record is durable. */
+    public boolean isClaimLimitDurable(UUID owner) {
+        if (owner == null || limitsFolder == null) return false;
+        Path file = StoragePaths.jsonFile(limitsFolder, owner.toString());
+        if (SimpleServerUtilities.STORAGE.hasPending(file)
+                || SimpleServerUtilities.STORAGE.requiresRetry(file)) {
+            return false;
+        }
+        PlayerClaimLimits limit = limits.get(owner);
+        if (limit == null || !limit.hasAnyData()) return !Files.exists(file);
+        if (!Files.isRegularFile(file)) return false;
+        try {
+            return GSON.toJson(limit).equals(Files.readString(file));
+        } catch (IOException exception) {
+            SimpleServerUtilities.LOGGER.error("Could not verify durable claim-capacity data for {}.", owner, exception);
+            return false;
+        }
+    }
+
+    private Path findClaimFile(UUID claimId) throws IOException {
+        if (claimId == null || claimsFolder == null) return null;
+        if (!Files.exists(claimsFolder)) return null;
+        if (!Files.isDirectory(claimsFolder)) throw new IOException("Claim storage path is not a directory: " + claimsFolder);
+        String suffix = "_" + claimId + ".json";
+        try (var files = Files.list(claimsFolder)) {
+            return files.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(suffix))
+                    .findFirst().map(path -> path.toAbsolutePath().normalize()).orElse(null);
+        }
+    }
+
+    public boolean deleteClaimForTaxSettlement(UUID owner, UUID claimId, UUID settlementId) {
+        PlayerClaim claim = getClaimById(claimId);
+        if (claim == null) return true;
+        if (owner == null || !claim.isOwner(owner)) return false;
+        if (!SimpleServerUtilities.CLAIM_TAX.allowsSettlementClaimDeletion(owner, claimId, settlementId)) return false;
+        return deleteClaimUnchecked(claim);
     }
 
     public PlayerClaim getClaim(Level level, ChunkPos chunkPos) {
@@ -785,9 +950,42 @@ public class PlayerClaimManager {
 
     public int getMaxChunks(UUID player) {
         PlayerClaimLimits limit = limits.get(player);
-        return limit != null && limit.hasMaxChunksOverride()
+        int base = limit != null && limit.hasMaxChunksOverride()
                 ? limit.getMaxChunks()
                 : Config.MAX_PLAYER_CLAIM_CHUNKS.get();
+        return effectiveMaxChunks(player, base);
+    }
+
+    public int effectiveMaxChunks(UUID player, int baseLimit) {
+        long safeBase = Math.max(0L, (long) baseLimit);
+        long effective = safeBase - getConfiscatedChunks(player);
+        return effective <= 0L ? 0 : (int) Math.min(Integer.MAX_VALUE, effective);
+    }
+
+    public int getConfiscatedChunks(UUID player) {
+        PlayerClaimLimits limit = limits.get(player);
+        return limit == null ? 0 : limit.getConfiscatedChunks();
+    }
+
+    public int getClaimChunkConfiscation(UUID player, String settlementId) {
+        PlayerClaimLimits limit = limits.get(player);
+        return limit == null ? 0 : limit.getConfiscationAmount(settlementId);
+    }
+
+    public boolean applyClaimChunkConfiscation(UUID player, String settlementId, int amount) {
+        if (player == null || amount <= 0) return false;
+        PlayerClaimLimits limit = getLimits(player);
+        boolean applied = limit.applyConfiscation(settlementId, amount);
+        if (applied) save();
+        return applied;
+    }
+
+    public boolean removeClaimChunkConfiscation(UUID player, String settlementId) {
+        PlayerClaimLimits limit = limits.get(player);
+        if (limit == null || !limit.removeConfiscation(settlementId)) return false;
+        removeEmptyLimitRecord(player, limit);
+        save();
+        return true;
     }
 
     public void setMaxChunks(UUID player, int amount) {
@@ -866,10 +1064,19 @@ public class PlayerClaimManager {
 
     /** Removes the old claim-specific override storage after successful migration. */
     public void clearLegacyLimitOverrides() {
-        if (limits.isEmpty()) {
-            return;
+        if (limits.isEmpty()) return;
+        List<UUID> remove = new ArrayList<>();
+        for (Map.Entry<UUID, PlayerClaimLimits> entry : limits.entrySet()) {
+            PlayerClaimLimits limit = entry.getValue();
+            if (limit == null) {
+                remove.add(entry.getKey());
+                continue;
+            }
+            limit.clearMaxChunksOverride(Config.MAX_PLAYER_CLAIM_CHUNKS.get());
+            limit.clearMaxClaimGroupsOverride(Config.MAX_PLAYER_CLAIM_GROUPS.get());
+            if (!limit.hasAnyData()) remove.add(entry.getKey());
         }
-        limits.clear();
+        remove.forEach(limits::remove);
         save();
     }
 
@@ -886,6 +1093,7 @@ public class PlayerClaimManager {
                 }
 
                 claims.put(claim.getId(), claim);
+                claimFilesById.put(claim.getId(), file.toAbsolutePath().normalize());
             } catch (Exception e) {
                 Path archived = JsonStorage.archiveBrokenFile(file);
                 SimpleServerUtilities.LOGGER.error("Failed to load player claim file. Broken file archived as: {}", archived, e);
@@ -904,7 +1112,7 @@ public class PlayerClaimManager {
                         Config.MAX_PLAYER_CLAIM_CHUNKS.get(),
                         Config.MAX_PLAYER_CLAIM_GROUPS.get()
                 );
-                if (limit.hasAnyOverride()) {
+                if (limit.hasAnyData()) {
                     limits.put(limit.getPlayer(), limit);
                 }
             } catch (Exception e) {
@@ -942,7 +1150,7 @@ public class PlayerClaimManager {
                         Config.MAX_PLAYER_CLAIM_CHUNKS.get(),
                         Config.MAX_PLAYER_CLAIM_GROUPS.get()
                 );
-                if (limit.hasAnyOverride()) {
+                if (limit.hasAnyData()) {
                     limits.put(limit.getPlayer(), limit);
                 }
                 }
@@ -961,6 +1169,7 @@ public class PlayerClaimManager {
 
         for (PlayerClaim claim : claims.values()) {
             Path file = StoragePaths.jsonFile(claimsFolder, createClaimFileName(claim));
+            claimFilesById.put(claim.getId(), file.toAbsolutePath().normalize());
             claimRecordStore.queueJson(GSON, file, claim);
             keptClaimFiles.add(file);
         }
@@ -1076,7 +1285,7 @@ public class PlayerClaimManager {
     }
 
     private void removeEmptyLimitRecord(UUID player, PlayerClaimLimits limit) {
-        if (!limit.hasAnyOverride()) {
+        if (!limit.hasAnyData()) {
             limits.remove(player);
         }
     }
@@ -1230,6 +1439,11 @@ public class PlayerClaimManager {
                 selectedClaim == null ? 0 : selectedClaim.getChunkCount(),
                 ClaimPolicy.getMaxChunksPerClaim(player, context),
                 ClaimPolicy.canCreateClaim(player, context),
+                selectedClaim != null && SimpleServerUtilities.CLAIM_TAX.requiresDeleteSettlement(selectedClaim),
+                selectedClaim == null ? "" : SimpleServerUtilities.ECONOMY.format(SimpleServerUtilities.CLAIM_TAX.claimTax(selectedClaim)),
+                selectedClaim == null ? 0 : selectedClaim.getTaxPeakChunks(),
+                selectedClaim == null ? 0L : selectedClaim.getTaxDueAt(),
+                SimpleServerUtilities.PLAYER_CLAIMS.getConfiscatedChunks(player.getUUID()),
                 notice,
                 error
         );

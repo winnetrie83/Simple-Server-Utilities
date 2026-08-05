@@ -38,6 +38,7 @@ public final class ContentCoreModule implements SsuModule {
         services.register(ContentActionEngine.class, actions);
         services.register(ContentEventBus.class, events);
         services.register(ContentDependencyValidator.class, dependencies);
+        ContentRewardHandlers.register(actions);
     }
 
     @Override public void onServerStarting(MinecraftServer server) { progression.load(server); }

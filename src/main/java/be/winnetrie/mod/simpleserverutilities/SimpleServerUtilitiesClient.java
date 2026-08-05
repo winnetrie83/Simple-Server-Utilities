@@ -14,6 +14,9 @@ import be.winnetrie.mod.simpleserverutilities.client.gui.PropertySettingsScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.TrustedPlayersScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.RegionPermissionScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.RegionEditorScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.RegionSelectionToolScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.RegionSelectionEditScreen;
+import be.winnetrie.mod.simpleserverutilities.client.region.RegionSelectionClientStorage;
 import be.winnetrie.mod.simpleserverutilities.client.gui.WorldMapScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.MailScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.MailComposeScreen;
@@ -33,7 +36,18 @@ import be.winnetrie.mod.simpleserverutilities.client.gui.NpcItemPriceCatalogScre
 import be.winnetrie.mod.simpleserverutilities.client.gui.QuestBookScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.QuestEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.MinigameLobbyScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.MinigameAdminScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.MinigameSetupToolScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.MinigameSetupCreateScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.MinigameEditorScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.MinigameSelectionCreateScreen;
+import be.winnetrie.mod.simpleserverutilities.client.minigame.MinigameHudClientState;
+import be.winnetrie.mod.simpleserverutilities.client.minigame.CaptureTheFlagClientState;
+import be.winnetrie.mod.simpleserverutilities.client.minigame.DominationClientState;
+import be.winnetrie.mod.simpleserverutilities.client.minigame.DominationRenderer;
+import be.winnetrie.mod.simpleserverutilities.client.minigame.MinigameCastBarClientState;
+import be.winnetrie.mod.simpleserverutilities.client.minigame.MinigameSetupVisualClientState;
+import be.winnetrie.mod.simpleserverutilities.client.minigame.MinigameSetupVisualRenderer;
 import be.winnetrie.mod.simpleserverutilities.client.gui.DungeonLobbyScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.DungeonEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.StatisticEditorScreen;
@@ -74,11 +88,21 @@ import be.winnetrie.mod.simpleserverutilities.network.QuestEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameHudPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameCastBarPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameDominationVisualPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameCtfVisualPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameSelectionCreateResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupToolOpenPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupVisualPayload;
 import be.winnetrie.mod.simpleserverutilities.network.DungeonLobbyDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.DungeonEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.DungeonEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionEditorResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionToolOpenPayload;
+import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionActionResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionClientTemplatePayload;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinimapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailDataPayload;
@@ -189,6 +213,14 @@ public class SimpleServerUtilitiesClient {
         event.registerAboveAll(
                 Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "block_information"),
                 BlockInformationClientState::render
+        );
+        event.registerAboveAll(
+                Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_hud"),
+                MinigameHudClientState::render
+        );
+        event.registerAboveAll(
+                Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_cast_bar"),
+                MinigameCastBarClientState::render
         );
     }
 
@@ -595,7 +627,13 @@ public class SimpleServerUtilitiesClient {
         event.register(MinigameLobbyDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof MinigameLobbyScreen screen) {
+                    if (payload.adminView()) {
+                        if (minecraft.gui.screen() instanceof MinigameAdminScreen screen) {
+                            screen.accept(payload);
+                        } else {
+                            minecraft.setScreenAndShow(new MinigameAdminScreen(payload, minecraft.gui.screen()));
+                        }
+                    } else if (minecraft.gui.screen() instanceof MinigameLobbyScreen screen) {
                         screen.accept(payload);
                     } else {
                         minecraft.setScreenAndShow(new MinigameLobbyScreen(payload, minecraft.gui.screen()));
@@ -606,7 +644,11 @@ public class SimpleServerUtilitiesClient {
         event.register(MinigameEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new MinigameEditorScreen(payload, minecraft.gui.screen()));
+                    if (minecraft.gui.screen() instanceof MinigameEditorScreen screen) {
+                        screen.acceptOpen(payload);
+                    } else {
+                        minecraft.setScreenAndShow(MinigameEditorScreen.create(payload, minecraft.gui.screen()));
+                    }
                 })
         );
 
@@ -614,6 +656,45 @@ public class SimpleServerUtilitiesClient {
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
                     if (minecraft.gui.screen() instanceof MinigameEditorScreen screen) screen.accept(payload);
+                })
+        );
+
+        event.register(MinigameHudPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> MinigameHudClientState.apply(payload))
+        );
+
+        event.register(MinigameCastBarPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> MinigameCastBarClientState.apply(payload))
+        );
+
+        event.register(MinigameDominationVisualPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> DominationClientState.apply(payload))
+        );
+
+        event.register(MinigameCtfVisualPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> CaptureTheFlagClientState.apply(payload))
+        );
+
+        event.register(MinigameSelectionCreateResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof MinigameSelectionCreateScreen screen) screen.accept(payload);
+                    else if (minecraft.gui.screen() instanceof MinigameSetupCreateScreen screen) screen.accept(payload);
+                })
+        );
+
+        event.register(MinigameSetupVisualPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> MinigameSetupVisualClientState.apply(payload))
+        );
+
+        event.register(MinigameSetupToolOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof MinigameSetupToolScreen screen) {
+                        screen.accept(payload);
+                    } else {
+                        minecraft.setScreenAndShow(new MinigameSetupToolScreen(payload));
+                    }
                 })
         );
 
@@ -651,6 +732,37 @@ public class SimpleServerUtilitiesClient {
                     }
                 })
         );
+
+
+        event.register(RegionSelectionToolOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> Minecraft.getInstance().setScreenAndShow(new RegionSelectionToolScreen(payload)))
+        );
+
+        event.register(RegionSelectionActionResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof RegionSelectionEditScreen screen) screen.acceptResult(payload);
+                    else if (minecraft.gui.screen() instanceof RegionSelectionToolScreen screen) screen.acceptResult(payload);
+                })
+        );
+
+        event.register(RegionSelectionClientTemplatePayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof RegionSelectionEditScreen screen) {
+                        screen.acceptClientTemplate(payload.name(), payload.data(), payload.requestId());
+                        return;
+                    }
+                    try {
+                        RegionSelectionClientStorage.save(payload.name(), payload.data());
+                        if (minecraft.player != null) minecraft.player.sendSystemMessage(
+                                net.minecraft.network.chat.Component.literal("Saved client region template '" + payload.name() + "'."));
+                    } catch (java.io.IOException | IllegalArgumentException exception) {
+                        if (minecraft.player != null) minecraft.player.sendSystemMessage(
+                                net.minecraft.network.chat.Component.literal("Client region template could not be saved: " + exception.getMessage()));
+                    }
+                })
+        );
     }
 
     @SubscribeEvent
@@ -666,6 +778,8 @@ public class SimpleServerUtilitiesClient {
         event.register(HologramRenderer::new);
         event.register(NpcLabelRenderer::new);
         event.register(MapMarkerRenderer::new);
+        event.register(DominationRenderer::new);
+        event.register(MinigameSetupVisualRenderer::new);
     }
 
     private static void onClientTick(ClientTickEvent.Post event) {
@@ -698,6 +812,10 @@ public class SimpleServerUtilitiesClient {
         HologramClientState.clear();
         NpcLabelClientState.clear();
         MapMarkerClientState.clear();
+        MinigameHudClientState.clear();
+        CaptureTheFlagClientState.clear();
+        DominationClientState.clear();
+        MinigameCastBarClientState.clear();
         utilityMiningTick = 0;
         lastTreeHeld = false;
         lastVeinHeld = false;

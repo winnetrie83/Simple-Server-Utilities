@@ -1,0 +1,12 @@
+Simple Server Utilities 1.9.0-dev2.5 validation
+
+- Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25 target.
+- Network protocol: 79.
+- Minigame definition schema: 10.
+- Minigame recovery schema: 2.
+- Lobby/spectator/spawn/node-respawn visual marker payload supports six bounded marker kinds.
+- Capture the Flag and Domination generated arenas contain one required spawn per team; optional additional spawns remain supported.
+- Every Domination control point normalizes a linked respawn and older definitions migrate automatically.
+- Domination death selection considers only team base spawns and fully owned node respawns and chooses the nearest candidate to the death position.
+- Java delimiter/lexical scan, JSON parse validation and archive integrity are required before publication.
+- Full Gradle compilation must be confirmed locally with Java 25.

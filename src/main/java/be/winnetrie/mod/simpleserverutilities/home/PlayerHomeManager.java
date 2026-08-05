@@ -43,8 +43,10 @@ public class PlayerHomeManager {
     private Path rootFolder;
     private Path playersFolder;
     private Path legacySaveFile;
+    private MinecraftServer loadedServer;
 
-    public void load(MinecraftServer server) {
+    public synchronized void load(MinecraftServer server) {
+        this.loadedServer = server;
         this.rootFolder = StoragePaths.root(server);
         this.playersFolder = StoragePaths.homePlayers(rootFolder);
         this.legacySaveFile = rootFolder.resolve("homes.json");
@@ -83,6 +85,45 @@ public class PlayerHomeManager {
                     knownOwnerFiles.size() + loadedOwners.size());
         } catch (Exception e) {
             SimpleServerUtilities.LOGGER.error("Failed to load player homes.", e);
+        }
+    }
+
+    /**
+     * Makes the persistent home store available for claim cleanup even when the
+     * player-facing Homes module is currently disabled. This is intentionally
+     * idempotent and may be called by crash recovery before deleting claims.
+     */
+    public synchronized boolean ensureStorageReady(MinecraftServer server) {
+        if (server == null) return false;
+        Path expectedPlayersFolder = StoragePaths.homePlayers(StoragePaths.root(server));
+        if (loadedServer == server && playersFolder != null && playersFolder.equals(expectedPlayersFolder)) return true;
+        load(server);
+        return playersFolder != null && playersFolder.equals(expectedPlayersFolder);
+    }
+
+    /** Returns true only after the newest owner-home snapshot is durable on disk. */
+    public synchronized boolean isOwnerStorageDurable(UUID owner) {
+        if (owner == null || playersFolder == null) return false;
+        Path file = StoragePaths.jsonFile(playersFolder, owner.toString());
+        if (SimpleServerUtilities.STORAGE.hasPending(file)
+                || SimpleServerUtilities.STORAGE.requiresRetry(file)) {
+            return false;
+        }
+        Map<String, PlayerHome> ownerHomes = loadedOwners.contains(owner)
+                ? homesByOwner.getOrDefault(owner, Map.of())
+                : null;
+        if (ownerHomes == null) return true;
+        if (ownerHomes.isEmpty()) return !Files.exists(file);
+        if (!Files.isRegularFile(file)) return false;
+        HomePlayerSaveData expected = new HomePlayerSaveData();
+        expected.player = owner.toString();
+        expected.homes = new ArrayList<>(ownerHomes.values());
+        expected.homes.sort(Comparator.comparing(PlayerHome::getDisplayName, String::compareToIgnoreCase));
+        try {
+            return GSON.toJson(expected).equals(Files.readString(file));
+        } catch (IOException exception) {
+            SimpleServerUtilities.LOGGER.error("Could not verify durable home cleanup for {}.", owner, exception);
+            return false;
         }
     }
 
@@ -125,11 +166,13 @@ public class PlayerHomeManager {
         rootFolder = null;
         playersFolder = null;
         legacySaveFile = null;
+        loadedServer = null;
     }
 
     public boolean setHome(ServerPlayer player, String rawName) {
         String name = sanitizeName(rawName);
         UUID owner = player.getUUID();
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(owner)) return false;
 
         Map<String, PlayerHome> ownerHomes = ensureOwnerLoaded(owner);
         String normalizedName = normalizeName(name);
@@ -192,6 +235,18 @@ public class PlayerHomeManager {
         dirtyOwners.add(owner);
         save();
         return true;
+    }
+
+    /** Returns a stable, sorted list of home names physically linked to a claim. */
+    public synchronized java.util.List<String> homeNamesInClaim(UUID owner, PlayerClaim claim) {
+        if (owner == null || claim == null) return java.util.List.of();
+        Map<String, PlayerHome> ownerHomes = ensureOwnerLoaded(owner);
+        return ownerHomes.values().stream()
+                .filter(home -> home != null && ClaimHomeSupport.contains(claim, home))
+                .map(PlayerHome::getName)
+                .filter(name -> name != null && !name.isBlank())
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
     }
 
     /**

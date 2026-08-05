@@ -13,24 +13,36 @@ public final class RegionMutationGuard {
     }
 
     public static Check delete(Region region) {
-        return check(region, true, true, true);
+        Check ownership = rejectManagedArena(region);
+        return ownership.allowed() ? check(region, true, true, true) : ownership;
     }
 
     public static Check redefine(Region region) {
-        return check(region, true, true, true);
+        Check ownership = rejectManagedArena(region);
+        return ownership.allowed() ? check(region, true, true, true) : ownership;
     }
 
     public static Check saveSnapshot(Region region) {
-        return check(region, true, true, true);
+        Check ownership = rejectManagedArena(region);
+        return ownership.allowed() ? check(region, true, true, true) : ownership;
     }
 
     public static Check clearRegion(Region region) {
-        return check(region, true, true, true);
+        Check ownership = rejectManagedArena(region);
+        return ownership.allowed() ? check(region, true, true, true) : ownership;
     }
 
     /** A fresh verified reset is the recovery path for an interrupted reset. */
     public static Check resetFromSnapshot(Region region) {
         return check(region, true, true, false);
+    }
+
+    private static Check rejectManagedArena(Region region) {
+        if (region != null && SimpleServerUtilities.MINIGAMES.isManagedArenaRegion(region.getName())) {
+            return Check.deny("Region '" + region.getName()
+                    + "' is owned by a minigame. Manage or delete it through Admin Center > Minigames.");
+        }
+        return Check.permit();
     }
 
     private static Check check(

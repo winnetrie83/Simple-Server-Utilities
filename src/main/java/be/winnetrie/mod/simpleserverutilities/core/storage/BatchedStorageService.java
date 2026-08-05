@@ -214,6 +214,54 @@ public final class BatchedStorageService {
         return false;
     }
 
+    /**
+     * Waits until the newest queued write/delete for one exact path has reached
+     * durable storage, without forcing unrelated SSU storage records to finish.
+     *
+     * <p>This is intended for narrow safety barriers such as persisting a player
+     * recovery record before live inventory state is replaced. A path that has
+     * exhausted its retries is never reported as successfully flushed.</p>
+     */
+    public boolean flushPath(Path rawFile, Duration timeout) {
+        if (rawFile == null) return true;
+        Path file = rawFile.toAbsolutePath().normalize();
+        ExecutorService current = executor;
+        if (current == null) {
+            return !hasPending(file) && !requiresRetry(file);
+        }
+
+        long deadline = System.nanoTime() + Math.max(1L, timeout.toNanos());
+        try {
+            while (System.nanoTime() < deadline) {
+                scheduleDrain();
+                Future<?> barrier = current.submit(() -> {
+                });
+                long remainingNanos = Math.max(1L, deadline - System.nanoTime());
+                barrier.get(remainingNanos, TimeUnit.NANOSECONDS);
+
+                if (requiresRetry(file)) {
+                    SimpleServerUtilities.LOGGER.error(
+                            "Failed to flush critical SSU storage path because it requires retry: {}", file);
+                    return false;
+                }
+                if (!hasPending(file)) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            SimpleServerUtilities.LOGGER.error("Failed while flushing critical SSU storage path {}.", file, e);
+            return false;
+        }
+
+        SimpleServerUtilities.LOGGER.error(
+                "Timed out while flushing critical SSU storage path {} (pending={}, retryRequired={}).",
+                file,
+                hasPending(file),
+                requiresRetry(file)
+        );
+        return false;
+    }
+
     public synchronized void stop(Duration timeout) {
         ExecutorService current = executor;
         if (current == null) {

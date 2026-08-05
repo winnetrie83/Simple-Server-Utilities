@@ -3,6 +3,7 @@ package be.winnetrie.mod.simpleserverutilities.permission.policy;
 import java.util.Locale;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
@@ -68,6 +69,9 @@ public final class TeleportPolicy {
      * region layer, after which dimension/rank/personal policy is still checked.
      */
     public static boolean canTeleport(ServerPlayer player, TeleportType type, PermissionContext context) {
+        // Match participants must leave through the Minigame GUI so their inventory,
+        // gamemode and return location are restored transactionally.
+        if (player != null && SimpleServerUtilities.MINIGAMES.matchView(player.getUUID()) != null) return false;
         if (!Config.ENABLE_PERMISSION_SYSTEM.get()) {
             return true;
         }

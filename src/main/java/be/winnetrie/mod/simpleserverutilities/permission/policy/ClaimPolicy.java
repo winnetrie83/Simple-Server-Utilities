@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.permission.policy;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
@@ -69,12 +70,13 @@ public class ClaimPolicy {
     }
 
     public static int getMaxClaimChunks(ServerPlayer player, PermissionContext context) {
-        return PermissionService.getInt(
+        int base = PermissionService.getInt(
                 player,
                 PermissionKeys.CLAIMS_MAX_CHUNKS,
                 Config.MAX_PLAYER_CLAIM_CHUNKS.get(),
                 context
         );
+        return SimpleServerUtilities.PLAYER_CLAIMS.effectiveMaxChunks(player.getUUID(), base);
     }
 
     public static int getMaxClaimGroups(ServerPlayer player) {

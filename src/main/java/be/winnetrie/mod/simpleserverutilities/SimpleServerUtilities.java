@@ -9,6 +9,8 @@ import be.winnetrie.mod.simpleserverutilities.auction.AuctionHouseManager;
 import be.winnetrie.mod.simpleserverutilities.auction.AuctionHouseModule;
 import be.winnetrie.mod.simpleserverutilities.auction.ModAuctionMenus;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaimManager;
+import be.winnetrie.mod.simpleserverutilities.claim.tax.PlayerClaimTaxEvents;
+import be.winnetrie.mod.simpleserverutilities.claim.tax.PlayerClaimTaxManager;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimModule;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimPresenceEvents;
 import be.winnetrie.mod.simpleserverutilities.blockinfo.BlockInformationEvents;
@@ -67,6 +69,8 @@ import be.winnetrie.mod.simpleserverutilities.quest.QuestManager;
 import be.winnetrie.mod.simpleserverutilities.quest.QuestModule;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameEvents;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameManager;
+import be.winnetrie.mod.simpleserverutilities.minigame.MinigameSetupToolEvents;
+import be.winnetrie.mod.simpleserverutilities.minigame.MinigameSetupToolManager;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameModule;
 import be.winnetrie.mod.simpleserverutilities.dungeon.DungeonEvents;
 import be.winnetrie.mod.simpleserverutilities.dungeon.DungeonManager;
@@ -115,6 +119,7 @@ import be.winnetrie.mod.simpleserverutilities.visualization.VisualizationModule;
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderVisualizationService;
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderVisualizationSettingsManager;
 import be.winnetrie.mod.simpleserverutilities.warp.WarpManager;
+import be.winnetrie.mod.simpleserverutilities.warp.WarpRentalEvents;
 import be.winnetrie.mod.simpleserverutilities.warp.WarpModule;
 import be.winnetrie.mod.simpleserverutilities.utilitymining.UtilityMiningEvents;
 import be.winnetrie.mod.simpleserverutilities.utilitymining.UtilityMiningManager;
@@ -147,6 +152,7 @@ public class SimpleServerUtilities {
     public static final AuctionHouseManager AUCTION_HOUSE = new AuctionHouseManager();
 
     public static final PlayerClaimManager PLAYER_CLAIMS = new PlayerClaimManager();
+    public static final PlayerClaimTaxManager CLAIM_TAX = new PlayerClaimTaxManager();
     public static final ManagedDimensionManager DIMENSIONS = new ManagedDimensionManager();
     public static final RegionManager REGIONS = new RegionManager();
     public static final RegionRentJournalManager REGION_RENT_JOURNAL = new RegionRentJournalManager();
@@ -176,6 +182,7 @@ public class SimpleServerUtilities {
     public static final NpcShopManager NPC_SHOPS = new NpcShopManager();
     public static final QuestManager QUESTS = new QuestManager();
     public static final MinigameManager MINIGAMES = new MinigameManager();
+    public static final MinigameSetupToolManager MINIGAME_SETUP_TOOLS = new MinigameSetupToolManager();
     public static final DungeonManager DUNGEONS = new DungeonManager();
 
     public SimpleServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
@@ -189,7 +196,7 @@ public class SimpleServerUtilities {
         CORE.modules().register(new ContentCoreModule(
                 CONTENT_PROGRESS, CONTENT_CONDITIONS, CONTENT_ACTIONS, CONTENT_EVENTS, CONTENT_DEPENDENCIES));
         CORE.modules().register(new EconomyModule(ECONOMY));
-        CORE.modules().register(new ClaimModule(PLAYER_CLAIMS));
+        CORE.modules().register(new ClaimModule(PLAYER_CLAIMS, CLAIM_TAX));
         CORE.modules().register(new PermissionModule(PERMISSIONS));
         CORE.modules().register(new DimensionModule(DIMENSIONS));
         CORE.modules().register(new MailModule(MAIL));
@@ -220,6 +227,8 @@ public class SimpleServerUtilities {
 
         NeoForge.EVENT_BUS.register(ClaimProtectionEvents.class);
         NeoForge.EVENT_BUS.register(ClaimPresenceEvents.class);
+        NeoForge.EVENT_BUS.register(PlayerClaimTaxEvents.class);
+        NeoForge.EVENT_BUS.register(WarpRentalEvents.class);
         NeoForge.EVENT_BUS.register(PistonProtectionEvents.class);
         NeoForge.EVENT_BUS.register(RedstoneProtectionEvents.class);
         NeoForge.EVENT_BUS.register(ExplosionProtectionEvents.class);
@@ -245,6 +254,7 @@ public class SimpleServerUtilities {
         NeoForge.EVENT_BUS.register(NpcEvents.class);
         NeoForge.EVENT_BUS.register(QuestGameplayEvents.class);
         NeoForge.EVENT_BUS.register(MinigameEvents.class);
+        NeoForge.EVENT_BUS.register(MinigameSetupToolEvents.class);
         NeoForge.EVENT_BUS.register(DungeonEvents.class);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);

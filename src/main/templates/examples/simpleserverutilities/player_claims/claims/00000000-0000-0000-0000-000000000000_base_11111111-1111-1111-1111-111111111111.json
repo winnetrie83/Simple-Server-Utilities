@@ -1,10 +1,20 @@
 {
+  "schemaVersion": 2,
   "id": "11111111-1111-1111-1111-111111111111",
   "name": "base",
   "dimension": "minecraft:overworld",
   "owner": "00000000-0000-0000-0000-000000000000",
   "createdAt": 1720000000000,
   "lastChunkChangeAt": 1720000000000,
+  "taxCycleStartedAt": 1720000000000,
+  "taxDueAt": 1720604800000,
+  "taxPeakChunks": 2,
+  "taxReminderSentForDueAt": 0,
+  "taxRateMinorPerChunkSnapshot": 100,
+  "taxIntervalMillisSnapshot": 604800000,
+  "taxReminderLeadMillisSnapshot": 86400000,
+  "taxDimensionMultiplierBasisPointsSnapshot": 10000,
+  "lastTaxSettlementId": "",
   "welcomeMessage": "Welcome to my base!",
   "chunks": [
     {

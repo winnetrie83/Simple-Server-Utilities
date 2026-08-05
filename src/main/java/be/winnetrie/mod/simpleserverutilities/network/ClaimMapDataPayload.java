@@ -27,6 +27,11 @@ public record ClaimMapDataPayload(
         int selectedClaimChunks,
         int maxChunksPerClaim,
         boolean canCreateClaims,
+        boolean selectedClaimTaxSettlementRequired,
+        String selectedClaimTaxEstimate,
+        int selectedClaimTaxPeakChunks,
+        long selectedClaimTaxDueAt,
+        int confiscatedChunks,
         int ownClaimColor,
         int otherClaimColor,
         int regionColor,
@@ -49,6 +54,7 @@ public record ClaimMapDataPayload(
     public ClaimMapDataPayload {
         selectedClaimGroup = selectedClaimGroup == null ? "" : selectedClaimGroup;
         ownedClaimGroups = ownedClaimGroups == null ? List.of() : List.copyOf(ownedClaimGroups);
+        selectedClaimTaxEstimate = selectedClaimTaxEstimate == null ? "" : selectedClaimTaxEstimate;
         notice = notice == null ? "" : notice;
         chunks = chunks == null ? List.of() : List.copyOf(chunks);
         if (chunks.size() > MAX_CHUNKS || ownedClaimGroups.size() > MAX_CLAIMS) {
@@ -85,6 +91,11 @@ public record ClaimMapDataPayload(
                 data.getSelectedClaimChunks(),
                 data.getMaxChunksPerClaim(),
                 data.canCreateClaims(),
+                data.isSelectedClaimTaxSettlementRequired(),
+                data.getSelectedClaimTaxEstimate(),
+                data.getSelectedClaimTaxPeakChunks(),
+                data.getSelectedClaimTaxDueAt(),
+                data.getConfiscatedChunks(),
                 borderSettings.getStrokeArgb(BorderCategory.OWN_CLAIM),
                 borderSettings.getStrokeArgb(BorderCategory.OTHER_CLAIM),
                 borderSettings.getStrokeArgb(BorderCategory.SERVER_REGION),
@@ -113,6 +124,11 @@ public record ClaimMapDataPayload(
         buffer.writeVarInt(payload.selectedClaimChunks);
         buffer.writeVarInt(payload.maxChunksPerClaim);
         buffer.writeBoolean(payload.canCreateClaims);
+        buffer.writeBoolean(payload.selectedClaimTaxSettlementRequired);
+        buffer.writeUtf(payload.selectedClaimTaxEstimate, 64);
+        buffer.writeVarInt(payload.selectedClaimTaxPeakChunks);
+        buffer.writeVarLong(payload.selectedClaimTaxDueAt);
+        buffer.writeVarInt(payload.confiscatedChunks);
         buffer.writeInt(payload.ownClaimColor);
         buffer.writeInt(payload.otherClaimColor);
         buffer.writeInt(payload.regionColor);
@@ -155,6 +171,11 @@ public record ClaimMapDataPayload(
         int selectedClaimChunks = buffer.readVarInt();
         int maxChunksPerClaim = buffer.readVarInt();
         boolean canCreateClaims = buffer.readBoolean();
+        boolean selectedClaimTaxSettlementRequired = buffer.readBoolean();
+        String selectedClaimTaxEstimate = buffer.readUtf(64);
+        int selectedClaimTaxPeakChunks = buffer.readVarInt();
+        long selectedClaimTaxDueAt = buffer.readVarLong();
+        int confiscatedChunks = buffer.readVarInt();
         int ownClaimColor = buffer.readInt();
         int otherClaimColor = buffer.readInt();
         int regionColor = buffer.readInt();
@@ -195,6 +216,11 @@ public record ClaimMapDataPayload(
                 selectedClaimChunks,
                 maxChunksPerClaim,
                 canCreateClaims,
+                selectedClaimTaxSettlementRequired,
+                selectedClaimTaxEstimate,
+                selectedClaimTaxPeakChunks,
+                selectedClaimTaxDueAt,
+                confiscatedChunks,
                 ownClaimColor,
                 otherClaimColor,
                 regionColor,
