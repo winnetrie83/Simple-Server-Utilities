@@ -28,5 +28,6 @@
   "simpleserverutilities.configuration.enableHolograms": "Enable Holograms",
   "simpleserverutilities.configuration.allowRemoteHologramImages": "Allow Remote Hologram Images",
   "key.simpleserverutilities.activate_treecapitator": "Activate Treecapitator",
-  "key.simpleserverutilities.activate_veinminer": "Activate Veinminer"
+  "key.simpleserverutilities.activate_veinminer": "Activate Veinminer",
+  "key.simpleserverutilities.toggle_minigame_hud": "Show/hide minigame scoreboard"
 }

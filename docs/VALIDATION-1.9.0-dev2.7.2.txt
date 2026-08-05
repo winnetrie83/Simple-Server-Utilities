@@ -1,0 +1,37 @@
+Simple Server Utilities 1.9.0-dev2.7.2 validation
+Date: 2026-08-05
+
+Versioning
+- Mod version: 1.9.0-dev2.7.2
+- Network protocol: 80 (increased from 79 because the setup-visual payload now transports area bounds)
+- Minigame definition schema: 11 (unchanged)
+- Minigame recovery schema: 3 (unchanged)
+
+Implemented checks: setup area overlays
+- The selected arena region is sent as an independent cyan Game border, regardless of the ordinary Region border visibility setting.
+- Configured spectator bounds are sent as a purple Spectator border.
+- Configured Spleef playfloor bounds are sent as an amber Spleef floor overlay.
+- The bounded setup payload accepts at most three normalized cuboids and validates its decoded marker/bounds counts.
+- Every cuboid uses the inclusive block maximum plus one render coordinate, producing an exact block-volume outline.
+- All twelve cuboid edges are rendered always-on-top; spectator bounds and the Spleef floor additionally receive low-alpha fills.
+- Area labels reuse the enlarged camera-facing text/background renderer introduced in dev2.7.1.
+- Client state clears marker and bounds snapshots together.
+
+Implemented checks: objective-cast action lock
+- CTF flag-take and Domination node-claim casts are interrupted before outgoing entity attacks execute.
+- Left-clicking/attacking blocks, block breaking, block placement, right-click item use, block/entity interaction and item dropping interrupt the active cast.
+- Events that caused the interruption are canceled so the attempted action cannot also affect the game world or another player.
+- The runtime cast loop additionally interrupts players that enter an active item-use state.
+- Existing movement, objective-distance, dimension, arena-leave, incoming-damage, defeat and match-leave interruption paths remain active.
+- Player-facing cast-start messages now state that movement, attacks, item use and damage are prohibited.
+
+Static validation
+- All 581 Java source files passed delimiter, comment, string and character-literal balance scanning.
+- The six directly changed Java files were passed through javac parsing; diagnostics contained no syntax, incompatible-type, duplicate-definition or method-application errors before dependency resolution.
+- Both resource JSON files parsed successfully.
+- Version, schema, payload-constructor, bounds-kind, color, renderer, event-hook and cast-interruption invariants passed.
+- No obsolete two-argument setup-visual payload construction or old client-state snapshot call remains.
+
+Build limitation
+- A complete Gradle compile could not run because Gradle 9.2.1 is not installed locally and the wrapper cannot resolve services.gradle.org in this container.
+- Compilation and exact in-game rendering still require confirmation in the normal Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25 development environment.

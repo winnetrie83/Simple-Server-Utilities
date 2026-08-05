@@ -22,6 +22,7 @@ public final class MinigameLobbyScreen extends Screen {
     private MinigameLobbyDataPayload data;
     private final Screen parent;
     private String selectedId = "";
+    private String preferredRole = "dps";
     private long nextRequestId = 1L;
     private boolean awaiting;
     private String localNotice = "";
@@ -34,6 +35,8 @@ public final class MinigameLobbyScreen extends Screen {
         this.nextRequestId = Math.max(1L, data.requestId() + 1L);
         if (!data.queuedMinigameId().isBlank()) selectedId = data.queuedMinigameId();
         else if (!data.games().isEmpty()) selectedId = data.games().getFirst().id();
+        MinigameLobbyDataPayload.GameEntry selected = selected();
+        if (selected != null && !selected.preferredRole().isBlank()) preferredRole = selected.preferredRole();
     }
 
     @Override
@@ -54,21 +57,24 @@ public final class MinigameLobbyScreen extends Screen {
                 .bounds(x + 12, y + H - 27, 62, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Close"), ignored -> onClose())
                 .bounds(x + 80, y + H - 27, 50, 20).build());
-
         MinigameLobbyDataPayload.GameEntry selected = selected();
         if (selected != null) {
             int bx = x + LEFT + 12;
             int actionY = y + H - 27;
-            String primaryLabel = selected.activeHere() ? "Leave match"
-                    : selected.queuedHere() ? "Leave queue" : "Join queue";
+            boolean activeMatch = !data.activeMatchId().isBlank();
+            boolean queued = !data.queuedMinigameId().isBlank();
+            if (selected.rolesEnabled() && !activeMatch && !queued) {
+                roleButton(bx, actionY - 25, 64, "DPS", "dps");
+                roleButton(bx + 70, actionY - 25, 64, "Tank", "tank");
+                roleButton(bx + 140, actionY - 25, 64, "Healer", "healer");
+            }
+            String primaryLabel = activeMatch ? "Leave match" : queued ? "Leave queue" : "Join queue";
             Button primary = addRenderableWidget(Button.builder(Component.literal(primaryLabel), ignored -> {
-                if (selected.queuedHere() || selected.activeHere()) request("leave", selected.id());
+                if (activeMatch || queued) request("leave", "");
                 else request("join", selected.id());
-            }).bounds(bx, actionY, 78, 20).build());
-            primary.active = !awaiting && (selected.queuedHere() || selected.activeHere()
+            }).bounds(bx, actionY, 96, 20).build());
+            primary.active = !awaiting && (activeMatch || queued
                     || selected.enabled() && selected.requirementsMet());
-
-
         }
     }
 
@@ -80,7 +86,7 @@ public final class MinigameLobbyScreen extends Screen {
     private void request(String action, String id) {
         if (awaiting) return;
         awaiting = true;
-        ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, id, nextRequestId++));
+        ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, id, preferredRole, nextRequestId++));
         rebuildWidgets();
     }
 
@@ -93,6 +99,8 @@ public final class MinigameLobbyScreen extends Screen {
         boolean present = false;
         for (var game : data.games()) if (game.id().equals(selectedId)) { present = true; break; }
         if (!present) selectedId = data.games().isEmpty() ? "" : data.games().getFirst().id();
+        MinigameLobbyDataPayload.GameEntry selected = selected();
+        if (selected != null && !selected.preferredRole().isBlank()) preferredRole = selected.preferredRole();
         rebuildWidgets();
     }
 
@@ -159,12 +167,36 @@ public final class MinigameLobbyScreen extends Screen {
         g.text(font, "Requirements", x, ry, ACCENT, true);
         g.text(font, trim(game.requirementsMet() ? "Available" : game.requirementReason(), 48), x, ry + 14,
                 game.requirementsMet() ? GOOD : ERROR, false);
+        if (game.rolesEnabled() && !game.activeHere()) {
+            g.text(font, game.queuedHere()
+                    ? "Preferred role: " + roleLabel(game.preferredRole()) + " (assignment not guaranteed)"
+                    : "Choose a preferred role below; SSU balances the final team composition.",
+                    x, ry + 30, game.queuedHere() ? GOOD : MUTED, false);
+        }
         if (game.activeHere()) {
             int my = ry + 38;
             g.text(font, "Your match", x, my, ACCENT, true);
+            String role = game.assignedRole().isBlank() ? "" : " • Role " + roleLabel(game.assignedRole());
             g.text(font, "State: " + game.matchState().replace('_', ' ') + " • Team " + game.team()
-                    + " • Score " + game.score(), x, my + 14, GOOD, false);
+                    + role + " • Score " + game.score(), x, my + 14, GOOD, false);
         }
+    }
+
+    private void roleButton(int x, int y, int width, String label, String role) {
+        Button button = addRenderableWidget(Button.builder(Component.literal(label), ignored -> {
+            preferredRole = role;
+            rebuildWidgets();
+        }).bounds(x, y, width, 20).build());
+        button.active = !role.equals(preferredRole);
+    }
+
+    private static String roleLabel(String raw) {
+        if (raw == null || raw.isBlank()) return "DPS";
+        return switch (raw.toLowerCase(java.util.Locale.ROOT)) {
+            case "tank" -> "Tank";
+            case "healer" -> "Healer";
+            default -> "DPS";
+        };
     }
 
     private int px() { return (width - W) / 2; }

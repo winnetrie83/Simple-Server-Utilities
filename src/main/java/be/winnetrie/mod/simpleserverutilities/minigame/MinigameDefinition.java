@@ -10,7 +10,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentId;
 
 /** Data-driven minigame definition. Actual game rules can build on this lifecycle. */
 public final class MinigameDefinition {
-    public static final int SCHEMA_VERSION = 10;
+    public static final int SCHEMA_VERSION = 15;
     public static final int MAX_ARENAS = 32;
     public static final int MAX_REWARDS = 64;
 
@@ -27,6 +27,8 @@ public final class MinigameDefinition {
     public int countdownSeconds = 10;
     public int matchDurationSeconds = 300;
     public int postGameSeconds = 8;
+    /** Delay before CTF/Domination players return after being defeated. */
+    public int respawnDelaySeconds = 5;
     public boolean automaticStart = true;
     public boolean allowLateJoin;
     public String victoryMode = "highest_score";
@@ -72,6 +74,7 @@ public final class MinigameDefinition {
         countdownSeconds = Math.max(0, Math.min(600, countdownSeconds));
         matchDurationSeconds = Math.max(0, Math.min(86_400, matchDurationSeconds));
         postGameSeconds = Math.max(0, Math.min(600, postGameSeconds));
+        respawnDelaySeconds = Math.max(1, Math.min(300, respawnDelaySeconds));
         victoryMode = normalizeVictoryMode(victoryMode);
         if (spleef == null) spleef = new SpleefRules();
         spleef.normalize();

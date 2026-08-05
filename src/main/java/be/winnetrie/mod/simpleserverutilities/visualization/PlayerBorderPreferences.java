@@ -7,11 +7,13 @@ import java.util.UUID;
 
 public final class PlayerBorderPreferences {
 
-    private int schemaVersion = 3;
+    private int schemaVersion = 4;
     private UUID player;
     private boolean claimBordersVisible;
     private boolean showOtherClaims;
     private boolean regionBordersVisible;
+    private boolean minigameGameBorderVisible = true;
+    private boolean minigameSpectatorBorderVisible = true;
     private Set<String> visibleClaims = new LinkedHashSet<>();
     private Set<String> pinnedRegions = new LinkedHashSet<>();
 
@@ -73,6 +75,22 @@ public final class PlayerBorderPreferences {
         this.regionBordersVisible = regionBordersVisible;
     }
 
+    public boolean isMinigameGameBorderVisible() {
+        return minigameGameBorderVisible;
+    }
+
+    public void setMinigameGameBorderVisible(boolean visible) {
+        this.minigameGameBorderVisible = visible;
+    }
+
+    public boolean isMinigameSpectatorBorderVisible() {
+        return minigameSpectatorBorderVisible;
+    }
+
+    public void setMinigameSpectatorBorderVisible(boolean visible) {
+        this.minigameSpectatorBorderVisible = visible;
+    }
+
     public Set<String> getPinnedRegions() {
         ensureCollections();
         return Set.copyOf(pinnedRegions);
@@ -104,7 +122,11 @@ public final class PlayerBorderPreferences {
 
     public void ensureDefaults() {
         ensureCollections();
-        schemaVersion = Math.max(schemaVersion, 3);
+        if (schemaVersion < 4) {
+            minigameGameBorderVisible = true;
+            minigameSpectatorBorderVisible = true;
+        }
+        schemaVersion = Math.max(schemaVersion, 4);
     }
 
     public int getSchemaVersion() {

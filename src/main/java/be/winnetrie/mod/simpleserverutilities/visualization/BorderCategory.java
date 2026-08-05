@@ -14,7 +14,9 @@ public enum BorderCategory {
     ALLIED_TERRITORY("allied_territory", 0x45D9FF),
     SAFE_ZONE("safe_zone", 0x38D9A9),
     QUEST_AREA("quest_area", 0xFF9F43),
-    MINIGAME_AREA("minigame_area", 0xE056FD);
+    MINIGAME_AREA("minigame_area", 0xE056FD),
+    MINIGAME_GAME_AREA("minigame_game_area", 0x00BCD4),
+    MINIGAME_SPECTATOR_AREA("minigame_spectator_area", 0xAB47BC);
 
     private final String serializedName;
     private final int defaultRgb;

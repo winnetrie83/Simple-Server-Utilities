@@ -115,6 +115,20 @@ public final class BorderVisualizationSettingsManager {
         revision++;
     }
 
+    public void setMinigameGameBorderVisible(UUID player, boolean visible) {
+        PlayerBorderPreferences preference = preferences(player);
+        preference.setMinigameGameBorderVisible(visible);
+        queuePreferenceSave(preference);
+        revision++;
+    }
+
+    public void setMinigameSpectatorBorderVisible(UUID player, boolean visible) {
+        PlayerBorderPreferences preference = preferences(player);
+        preference.setMinigameSpectatorBorderVisible(visible);
+        queuePreferenceSave(preference);
+        revision++;
+    }
+
 
     public boolean pinRegion(UUID player, String regionName) {
         PlayerBorderPreferences preference = preferences(player);

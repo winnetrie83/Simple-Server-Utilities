@@ -8,6 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentId;
 /** Reusable arena slot owned by one minigame definition. */
 public final class MinigameArenaDefinition {
     public static final int MAX_TEAM_SPAWNS = 64;
+    public static final int MAX_BOOST_SPAWNS = 64;
 
     public String id = "arena_1";
     public String displayName = "Arena 1";
@@ -25,6 +26,8 @@ public final class MinigameArenaDefinition {
     public List<MinigameSpawnPoint> teamSpawns = new ArrayList<>();
     public List<MinigameFlagPoint> flagPoints = new ArrayList<>();
     public List<MinigameControlPoint> controlPoints = new ArrayList<>();
+    /** Administrator-authored possible boost locations used by manual placement mode. */
+    public List<MinigameLocation> boostSpawns = new ArrayList<>();
 
     public MinigameArenaDefinition() {
         teamSpawns.add(new MinigameSpawnPoint(1, new MinigameLocation()));
@@ -75,6 +78,16 @@ public final class MinigameArenaDefinition {
             }
         }
         controlPoints = normalizedControlPoints;
+        ArrayList<MinigameLocation> normalizedBoostSpawns = new ArrayList<>();
+        if (boostSpawns != null) {
+            for (MinigameLocation location : boostSpawns) {
+                if (location == null) continue;
+                location.normalize();
+                normalizedBoostSpawns.add(location);
+                if (normalizedBoostSpawns.size() >= MAX_BOOST_SPAWNS) break;
+            }
+        }
+        boostSpawns = normalizedBoostSpawns;
         normalizeControlPointRespawns();
     }
 

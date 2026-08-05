@@ -30,8 +30,8 @@ import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
     private static final int W = 645, H = 352;
     private static final int TAB_Y = 10;
-    private static final String[] TABS = {"General", "Arena", "Player spawns", "Rewards", "Spleef rules"};
-    private static final int[] TAB_WIDTHS = {86, 72, 112, 76, 98};
+    private static final String[] TABS = {"General", "Arena", "Player spawns", "Rewards", "Spleef rules", "Projectiles"};
+    private static final int[] TAB_WIDTHS = {78, 64, 104, 70, 92, 92};
 
     private int page;
     private int arenaIndex;
@@ -69,6 +69,11 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
     private boolean requireTool, allowPvp, removeDrops;
     private Button requireToolButton, pvpButton, dropsButton;
 
+    // Projectiles
+    private EditBox standardUnlock, standardCooldown, burstStart, burstMinInterval, burstMaxInterval, burstMaxStack;
+    private boolean standardProjectileEnabled, burstProjectileEnabled;
+    private Button standardProjectileButton, burstProjectileButton;
+
     SpleefMinigameEditorScreen(MinigameEditorOpenPayload initial, Screen parent) {
         super(initial, parent, "Spleef Editor");
         afterDraftReloaded();
@@ -105,7 +110,8 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
         else if (page == 1) initArena(left, top);
         else if (page == 2) initSpawns(left, top);
         else if (page == 3) initRewards(left, top);
-        else initRules(left, top);
+        else if (page == 4) initRules(left, top);
+        else initProjectiles(left, top);
 
         addRenderableWidget(Button.builder(Component.literal("Cancel"), ignored -> onClose())
                 .bounds(left + 14, top + H - 30, 78, 20).build());
@@ -235,6 +241,25 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
         updateLabels();
     }
 
+    private void initProjectiles(int left, int top) {
+        SpleefRules rules = draft.spleef;
+        standardProjectileEnabled = rules.standardProjectileEnabled;
+        burstProjectileEnabled = rules.burstProjectileEnabled;
+        standardProjectileButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> {
+            standardProjectileEnabled = !standardProjectileEnabled; updateLabels();
+        }).bounds(left + 14, top + 52, 286, 20).build());
+        burstProjectileButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> {
+            burstProjectileEnabled = !burstProjectileEnabled; updateLabels();
+        }).bounds(left + 314, top + 52, 317, 20).build());
+        standardUnlock = field(left + 14, top + 108, 180, 6, "Unlock after (seconds)", Integer.toString(rules.standardProjectileUnlockSeconds));
+        standardCooldown = field(left + 208, top + 108, 180, 6, "Shot cooldown (seconds)", Integer.toString(rules.standardProjectileCooldownSeconds));
+        burstStart = field(left + 14, top + 188, 180, 6, "Power shot starts after", Integer.toString(rules.burstProjectileStartSeconds));
+        burstMinInterval = field(left + 208, top + 188, 180, 6, "Minimum award interval", Integer.toString(rules.burstProjectileMinIntervalSeconds));
+        burstMaxInterval = field(left + 402, top + 188, 180, 6, "Maximum award interval", Integer.toString(rules.burstProjectileMaxIntervalSeconds));
+        burstMaxStack = field(left + 14, top + 268, 180, 3, "Maximum saved power shots", Integer.toString(rules.burstProjectileMaximumStack));
+        updateLabels();
+    }
+
     private boolean saveCurrentPage() {
         try {
             if (page == 0 && id != null) saveGeneral();
@@ -242,6 +267,7 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
             else if (page == 2 && spawnDimension != null) saveSpawn();
             else if (page == 3 && rewardMoney != null) saveRewards();
             else if (page == 4 && toolItem != null) saveRules();
+            else if (page == 5 && standardUnlock != null) saveProjectiles();
             return true;
         } catch (RuntimeException exception) {
             setNotice(exception.getMessage() == null ? "A field contains an invalid value." : exception.getMessage(), true);
@@ -299,6 +325,20 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
         draft.spleef.requireConfiguredTool = requireTool;
         draft.spleef.allowPvp = allowPvp;
         draft.spleef.removeBlockDrops = true;
+    }
+
+    private void saveProjectiles() {
+        SpleefRules rules = draft.spleef;
+        rules.standardProjectileEnabled = standardProjectileEnabled;
+        rules.standardProjectileUnlockSeconds = parseInt(standardUnlock, "Standard projectile unlock", 0, 3_600);
+        rules.standardProjectileCooldownSeconds = parseInt(standardCooldown, "Standard projectile cooldown", 1, 300);
+        rules.burstProjectileEnabled = burstProjectileEnabled;
+        rules.burstProjectileStartSeconds = parseInt(burstStart, "Power projectile start", 0, 3_600);
+        rules.burstProjectileMinIntervalSeconds = parseInt(burstMinInterval, "Minimum power projectile interval", 1, 3_600);
+        rules.burstProjectileMaxIntervalSeconds = parseInt(burstMaxInterval, "Maximum power projectile interval",
+                rules.burstProjectileMinIntervalSeconds, 3_600);
+        rules.burstProjectileMaximumStack = parseInt(burstMaxStack, "Maximum power projectile stack", 1, 16);
+        rules.normalize();
     }
 
     private void saveAll() { if (saveCurrentPage()) submitDraft(); }
@@ -467,7 +507,8 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
         else if (page == 1) renderArena(g, left, top);
         else if (page == 2) renderSpawns(g, left, top);
         else if (page == 3) renderRewards(g, left, top, mouseX, mouseY);
-        else renderRules(g, left, top);
+        else if (page == 4) renderRules(g, left, top);
+        else renderProjectiles(g, left, top);
         if (!notice.isBlank()) g.text(font, trim(notice, 68), left + 102, top + H - 24, noticeError ? ERROR : GOOD, false);
         super.extractRenderState(g, mouseX, mouseY, partialTick);
         if (page == 3 && carriedInventorySlot >= 0) renderGhostCursor(g, mouseX, mouseY);
@@ -560,6 +601,21 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
                 left + 14, top + 286, 617, GOOD, 2);
     }
 
+    private void renderProjectiles(GuiGraphicsExtractor g, int left, int top) {
+        wrapped(g, "The standard Snowball is infinite: SSU automatically restores one after use, but the server enforces the configured cooldown.",
+                left + 14, top + 78, 617, MUTED, 2);
+        fieldInfo(g, left + 14, top + 92, "Standard unlock", "Seconds after match start.", 180);
+        fieldInfo(g, left + 208, top + 92, "Standard cooldown", "Minimum seconds between valid shots.", 180);
+        wrapped(g, "The Power Egg removes the hit floor block plus the four directly adjoining floor blocks. Awards begin later and go to one random active player.",
+                left + 14, top + 148, 617, GOOD, 3);
+        fieldInfo(g, left + 14, top + 172, "Power start", "Seconds before awards begin.", 180);
+        fieldInfo(g, left + 208, top + 172, "Minimum interval", "Shortest random award delay.", 180);
+        fieldInfo(g, left + 402, top + 172, "Maximum interval", "Longest random award delay.", 180);
+        fieldInfo(g, left + 14, top + 252, "Maximum stack", "Players can save this many Power Eggs.", 180);
+        wrapped(g, "If every active player already holds the maximum, that award cycle is skipped safely and a new random interval begins.",
+                left + 208, top + 268, 423, MUTED, 2);
+    }
+
     private void renderRewardSlots(GuiGraphicsExtractor g, int startX, int startY, int mouseX, int mouseY) {
         for (int slot = 0; slot < MinigameRewardSet.MAX_ITEM_STACKS; slot++) {
             int x = startX + (slot % 3) * 34, y = startY + (slot / 3) * 34;
@@ -633,6 +689,10 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
         if (requireToolButton != null) requireToolButton.setMessage(Component.literal("Require configured tool: " + yes(requireTool)));
         if (pvpButton != null) pvpButton.setMessage(Component.literal("Player damage: " + yes(allowPvp)));
         if (dropsButton != null) dropsButton.setMessage(Component.literal("Block drops: Never"));
+        if (standardProjectileButton != null) standardProjectileButton.setMessage(Component.literal(
+                "Infinite Snowball projectile: " + yes(standardProjectileEnabled)));
+        if (burstProjectileButton != null) burstProjectileButton.setMessage(Component.literal(
+                "Stackable Power Egg projectile: " + yes(burstProjectileEnabled)));
     }
 
     private void fillCurrent(EditBox dimension, EditBox x, EditBox y, EditBox z, EditBox yaw, EditBox pitch) {

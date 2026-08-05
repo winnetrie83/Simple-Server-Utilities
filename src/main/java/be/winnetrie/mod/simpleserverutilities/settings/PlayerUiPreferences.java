@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.utilitymining.MiningActivationMode
 /** Persistent player-side UI choices, validated by the server. */
 public final class PlayerUiPreferences {
 
-    public static final int CURRENT_SCHEMA = 8;
+    public static final int CURRENT_SCHEMA = 9;
 
     private int schema = CURRENT_SCHEMA;
     private String uuid = "";
@@ -38,10 +38,12 @@ public final class PlayerUiPreferences {
     private MiningActivationMode treecapitatorActivation = MiningActivationMode.SNEAK;
     private int treecapitatorOutlineColor = 0xFF55FF77;
     private int treecapitatorOutlineBrightness = 85;
+    private boolean treecapitatorInfoEnabled = true;
     private boolean veinminerEnabled;
     private MiningActivationMode veinminerActivation = MiningActivationMode.SNEAK;
     private int veinminerOutlineColor = 0xFF55AAFF;
     private int veinminerOutlineBrightness = 85;
+    private boolean veinminerInfoEnabled = true;
 
     public PlayerUiPreferences() {
         // Required for Gson.
@@ -87,6 +89,11 @@ public final class PlayerUiPreferences {
         if (previousSchema < 8) {
             // The day/time HUD line is optional and remains off for existing players.
             minimapShowCalendar = false;
+        }
+        if (previousSchema < 9) {
+            // Mining target information is visible by default and may be disabled per helper.
+            treecapitatorInfoEnabled = true;
+            veinminerInfoEnabled = true;
         }
         schema = CURRENT_SCHEMA;
         minimapSize = Math.max(64, Math.min(256, minimapSize));
@@ -341,6 +348,14 @@ public final class PlayerUiPreferences {
         treecapitatorOutlineBrightness = clampPercent(value);
     }
 
+    public boolean isTreecapitatorInfoEnabled() {
+        return treecapitatorInfoEnabled;
+    }
+
+    public void setTreecapitatorInfoEnabled(boolean value) {
+        treecapitatorInfoEnabled = value;
+    }
+
     public boolean isVeinminerEnabled() {
         return veinminerEnabled;
     }
@@ -371,6 +386,14 @@ public final class PlayerUiPreferences {
 
     public void setVeinminerOutlineBrightness(int value) {
         veinminerOutlineBrightness = clampPercent(value);
+    }
+
+    public boolean isVeinminerInfoEnabled() {
+        return veinminerInfoEnabled;
+    }
+
+    public void setVeinminerInfoEnabled(boolean value) {
+        veinminerInfoEnabled = value;
     }
 
     private static int clampPercent(int value) {

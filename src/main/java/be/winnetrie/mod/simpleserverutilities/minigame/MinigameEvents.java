@@ -11,9 +11,12 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
 import net.neoforged.neoforge.event.entity.item.ItemTossEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingHealEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -35,6 +38,10 @@ public final class MinigameEvents {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onBlockBreak(BreakBlockEvent event) {
         if (!active() || !(event.getPlayer() instanceof ServerPlayer player)) return;
+        if (interruptCastAction(player, "tried to break a block")) {
+            event.setCanceled(true);
+            return;
+        }
         MinigameManager.BlockBreakDecision decision = SimpleServerUtilities.MINIGAMES.blockBreakDecision(
                 player, event.getPos(), event.getState());
         if (decision == MinigameManager.BlockBreakDecision.DENY) {
@@ -47,8 +54,19 @@ public final class MinigameEvents {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
+        if (event.getAction() != PlayerInteractEvent.LeftClickBlock.Action.START
+                || !(event.getEntity() instanceof ServerPlayer player) || !active()) return;
+        if (interruptCastAction(player, "attacked a block")) event.setCanceled(true);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
         if (!active() || !(event.getEntity() instanceof ServerPlayer player)) return;
+        if (interruptCastAction(player, "tried to place a block")) {
+            event.setCanceled(true);
+            return;
+        }
         if (SimpleServerUtilities.MINIGAMES.shouldCancelBlockPlace(player, event.getPos())) {
             event.setCanceled(true);
             player.sendSystemMessage(Component.literal("Blocks cannot be placed during this minigame."), true);
@@ -58,43 +76,167 @@ public final class MinigameEvents {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || !active()) return;
+
+        // The main-hand objective click is the action that starts the cast. Handle it before
+        // generic cast interruption, but only when no cast was already running. A later
+        // deliberate right-click while channeling still interrupts normally.
         if (event.getHand() == InteractionHand.MAIN_HAND
+                && !SimpleServerUtilities.MINIGAMES.hasActiveObjectiveCast(player)
                 && SimpleServerUtilities.MINIGAMES.handleRightClickBlock(player, event.getPos())) {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.SUCCESS);
-        } else if (participant(player)) {
+            return;
+        }
+
+        // One physical right-click may continue through the offhand/item interaction stages.
+        // Do not let that same input immediately cancel the cast it just started.
+        if (SimpleServerUtilities.MINIGAMES.objectiveCastStartedThisTick(player)) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+
+        if (interruptCastAction(player, "interacted with a block")) {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.FAIL);
+            return;
         }
+        if (!participant(player)) return;
+        if (SimpleServerUtilities.MINIGAMES.handleRoleAbility(player, event.getHand())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (SimpleServerUtilities.MINIGAMES.handleRoleBowUse(player, event.getHand())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        // Start the offhand shield directly so the block itself remains protected
+        // from interaction while the Tank can still defend.
+        if (SimpleServerUtilities.MINIGAMES.handleRoleShieldUse(player)) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.FAIL);
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
-        if (participant(event.getEntity())) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || !participant(player)) return;
+        if (SimpleServerUtilities.MINIGAMES.objectiveCastStartedThisTick(player)) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (interruptCastAction(player, "used an item")) {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.FAIL);
+            return;
+        }
+        if (SimpleServerUtilities.MINIGAMES.handleRoleAbility(player, event.getHand())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (SimpleServerUtilities.MINIGAMES.handleRoleBowUse(player, event.getHand())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (SimpleServerUtilities.MINIGAMES.allowRightClickItem(player, event.getHand())) return;
+        boolean controlledProjectile = SimpleServerUtilities.MINIGAMES.isControlledSpleefProjectile(
+                player, event.getHand());
+        event.setCanceled(true);
+        event.setCancellationResult(controlledProjectile ? InteractionResult.SUCCESS : InteractionResult.FAIL);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
+        if (!active() || !(event.getEntity() instanceof Projectile projectile)) return;
+        SimpleServerUtilities.MINIGAMES.prepareSpleefProjectile(projectile);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onProjectileImpact(ProjectileImpactEvent event) {
+        if (!active() || !(event.getProjectile() instanceof Projectile projectile)) return;
+        SimpleServerUtilities.MINIGAMES.handleRoleProjectileImpact(projectile, event.getRayTraceResult());
+        if (SimpleServerUtilities.MINIGAMES.handleSpleefProjectileImpact(
+                projectile, event.getRayTraceResult())) {
+            event.setCanceled(true);
         }
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
-        if (participant(event.getEntity())) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || !participant(player)) return;
+        if (SimpleServerUtilities.MINIGAMES.objectiveCastStartedThisTick(player)) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (interruptCastAction(player, "interacted with an entity")) {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.FAIL);
+            return;
         }
+        if (SimpleServerUtilities.MINIGAMES.handleRoleAbility(player, event.getHand())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (SimpleServerUtilities.MINIGAMES.handleRoleBowUse(player, event.getHand())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (SimpleServerUtilities.MINIGAMES.handleRoleShieldUse(player)) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.FAIL);
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onEntityInteractSpecific(PlayerInteractEvent.EntityInteractSpecific event) {
-        if (participant(event.getEntity())) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || !participant(player)) return;
+        if (SimpleServerUtilities.MINIGAMES.objectiveCastStartedThisTick(player)) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (interruptCastAction(player, "interacted with an entity")) {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.FAIL);
+            return;
         }
+        if (SimpleServerUtilities.MINIGAMES.handleRoleAbility(player, event.getHand())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (SimpleServerUtilities.MINIGAMES.handleRoleBowUse(player, event.getHand())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (SimpleServerUtilities.MINIGAMES.handleRoleShieldUse(player)) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.FAIL);
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onItemToss(ItemTossEvent event) {
         if (!(event.getPlayer() instanceof ServerPlayer player) || !participant(player)) return;
+        interruptCastAction(player, "tried to drop an item");
         var stack = event.getEntity().getItem().copy();
         // NeoForge fires this after removing the stack from the inventory. Put the
         // exact temporary stack back before cancelling so Q/drop cannot leak match
@@ -118,6 +260,10 @@ public final class MinigameEvents {
     public static void onAttackEntity(AttackEntityEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer attacker)
                 || SimpleServerUtilities.MINIGAMES.matchView(attacker.getUUID()) == null) return;
+        if (interruptCastAction(attacker, "attacked")) {
+            event.setCanceled(true);
+            return;
+        }
         if (event.getTarget() instanceof ServerPlayer victim
                 && !SimpleServerUtilities.MINIGAMES.shouldCancelDamage(victim, attacker)) return;
         event.setCanceled(true);
@@ -133,6 +279,14 @@ public final class MinigameEvents {
         } else if (attacker != null && SimpleServerUtilities.MINIGAMES.matchView(attacker.getUUID()) != null) {
             // Temporary match state must never be used to farm or damage ordinary
             // world entities while a player is in the waiting lobby or arena.
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onHeal(LivingHealEvent event) {
+        if (active() && event.getEntity() instanceof ServerPlayer player
+                && SimpleServerUtilities.MINIGAMES.shouldCancelAutomaticHealing(player)) {
             event.setCanceled(true);
         }
     }
@@ -167,6 +321,11 @@ public final class MinigameEvents {
         if (active() && event.getEntity() instanceof ServerPlayer player) {
             SimpleServerUtilities.MINIGAMES.onLogout(player);
         }
+    }
+
+    private static boolean interruptCastAction(ServerPlayer player, String action) {
+        return player != null && active()
+                && SimpleServerUtilities.MINIGAMES.interruptActiveCastForAction(player, action);
     }
 
     private static boolean participant(Entity entity) {

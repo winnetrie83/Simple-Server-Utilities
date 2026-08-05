@@ -1,0 +1,31 @@
+Simple Server Utilities 1.9.0-dev2.7 validation
+Date: 2026-08-05
+
+Versioning
+- Mod version: 1.9.0-dev2.7
+- Network protocol: 79 (unchanged)
+- Minigame definition schema: 11 (unchanged)
+- Minigame recovery schema: 3 (unchanged)
+
+Implemented checks
+- Speed, Regeneration, Armor and Jump boost visuals resolve to Golden Boots, Golden Apple, Diamond Chestplate and Rabbit Foot.
+- Boost pickup sounds resolve to firework launch, beacon power-select, diamond armor equip and wind-charge throw.
+- Boost pickup sound packets are spatial and restricted to active players in the same match and dimension.
+- The infinite Spleef Snowball uses the native item cooldown manager and reapplies the remaining cooldown on an early click.
+- A valid infinite Snowball throw temporarily provides the vanilla use path with a second copy; normal use consumes that copy and the match tick enforces an exact maximum of one remaining visible projectile.
+- Denied early clicks return a successful cancelled interaction and explicitly resynchronize the inventory to prevent a client-side ghost-empty slot.
+- Snowball and Power Egg entities are normalized on entity join to the exact player look vector, with no gravity and no random spread.
+- Manual CTF and Domination boost locations receive temporary End Rod setup markers.
+- Moving a configured boost index removes its previous End Rod before the new marker is restored.
+- Match startup and snapshot capture call the shared physical setup-marker cleanup, which now removes boost End Rods as well as temporary banners.
+
+Static validation
+- All 581 Java source files passed delimiter, comment and string-balance scanning.
+- The four changed Java files produced no syntax-form diagnostics in a targeted javac check; dependency/type resolution could not complete without the Minecraft and NeoForge artifacts.
+- Both resource JSON files parsed successfully.
+- Version, protocol, schema, boost-item, sound-ID, cooldown, trajectory and setup-marker invariants passed.
+- The final ZIP passed archive-integrity testing.
+
+Build limitation
+- A complete Gradle compile could not run in this container because Gradle 9.2.1 is not installed locally and the wrapper cannot resolve services.gradle.org.
+- Compile and in-game behavior still require confirmation in the normal Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25 development environment.

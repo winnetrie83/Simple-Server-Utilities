@@ -22,6 +22,8 @@ public final class DominationRules {
     public String team2Name = "Blue Team";
     public int team1Color = 0xE53935;
     public int team2Color = 0x3F51B5;
+    public MinigameBoostRules boosts = new MinigameBoostRules();
+    public MinigameRoleRules roles = new MinigameRoleRules();
     public String neutralBannerBlock = "minecraft:white_banner";
     public String team1BannerBlock = "minecraft:red_banner";
     public String team2BannerBlock = "minecraft:blue_banner";
@@ -42,6 +44,10 @@ public final class DominationRules {
         team2Name = bound(team2Name, 32, "Blue Team");
         team1Color &= 0xFFFFFF;
         team2Color &= 0xFFFFFF;
+        if (boosts == null) boosts = new MinigameBoostRules();
+        boosts.normalize();
+        if (roles == null) roles = new MinigameRoleRules();
+        roles.normalize();
     }
 
     public String teamName(int team) { return team == 2 ? team2Name : team1Name; }

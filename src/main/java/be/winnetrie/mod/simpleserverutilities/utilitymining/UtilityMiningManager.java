@@ -75,12 +75,18 @@ public final class UtilityMiningManager {
         int brightness = target.type() == UtilityMiningType.TREECAPITATOR
                 ? preferences.getTreecapitatorOutlineBrightness()
                 : preferences.getVeinminerOutlineBrightness();
+        boolean showInfo = target.type() == UtilityMiningType.TREECAPITATOR
+                ? preferences.isTreecapitatorInfoEnabled()
+                : preferences.isVeinminerInfoEnabled();
+        String blockName = player.level().getBlockState(origin).getBlock().getName().getString();
 
         PacketDistributor.sendToPlayer(player, UtilityMiningPreviewPayload.of(
                 target.type(),
                 player.level().dimension().identifier().toString(),
                 color,
                 brightness,
+                showInfo,
+                blockName,
                 target.blocks()
         ));
     }
