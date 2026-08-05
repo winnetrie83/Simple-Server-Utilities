@@ -1,0 +1,43 @@
+Simple Server Utilities 1.8.0-dev18.5 static validation
+Date: 2026-08-03
+
+Scope
+- Source baseline: SSU 1.8.0-dev18.4
+- Target: Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+- Mod version: 1.8.0-dev18.5
+- Network protocol: 68
+- Warp storage schema: 2
+- Player Claim tax settings schema: 1
+- Existing unrelated schemas: unchanged
+
+Completed checks
+- 534 Java source files passed a comment/string-aware delimiter and unterminated-literal scan.
+- A Java 21 no-classpath javac source pass reported no parser, duplicate-declaration or effectively-final diagnostics. Expected missing Gson/Minecraft/NeoForge symbols remain because the container has no dependency classpath.
+- PlayerClaimTaxSettings compiled standalone and passed a runtime defaults/custom-dimension validation.
+- Warp and WorldPositionValues persistence models compiled together standalone.
+- 14 JSON resource/config files parsed successfully.
+- All 76 dashboard action literals have a matching SsuMenuService action handler.
+- Semantic assertions passed for version/protocol, schemas, bucket support, air remainder, six transforms, destructive tax cleanup, owner/dimension tax aggregation, multiplier-cycle reset, permission defaults, GUI-only rented-warps, explicit move action and rent confirmation.
+- No generated javac argument files, build directories or trailing whitespace are included.
+
+Safety observations validated statically
+- Fill mixes accept BlockItem, water bucket and lava bucket only; unused weight becomes air and total weight above 100 is rejected server-side.
+- Transform paste clears only positions inside the old or new footprint while locking their complete union bounds.
+- Selection templates/transforms copy block states only, not block-entity data, inventories or entities.
+- Claim tax is disabled by default and cannot be enabled from the GUI without positive rate, reminder lead, Economy and Mail.
+- Reminder amounts are snapshotted before collection; collection never exceeds the warned amount.
+- Tax totals aggregate chunks per owner and dimension before rounding, so claim grouping cannot alter the bill.
+- Rate/schedule/enabled/multiplier changes reset the cycle and create a new reminder window.
+- Insufficient claim-tax balance calls the central all-claims deletion path, which removes linked homes.
+- Player-warp rental permissions default to false/max 0, the first period is prepaid, existing warp movement is free, and renewal uses an idempotency key.
+- Public rented warps are filtered through effective warp-use permission in Travel; private warps remain owner/admin only.
+- Legacy warp commands intentionally exclude player-rented warps, which remain GUI-only.
+
+Not completed in this container
+- Full Gradle/NeoForge compilation: Gradle 9.2.1 is not cached and the container provides Java 21 instead of Java 25.
+- Dedicated-server/client runtime tests.
+
+Required local command
+  gradlew.bat clean build
+
+Use docs/TESTING-1.8.0-dev18.5.md for the in-game test plan.

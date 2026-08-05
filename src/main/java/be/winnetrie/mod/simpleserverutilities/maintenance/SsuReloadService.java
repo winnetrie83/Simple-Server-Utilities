@@ -58,7 +58,10 @@ public final class SsuReloadService {
         SimpleServerUtilities.TRANSACTIONS.clear();
         SimpleServerUtilities.CONTENT_PROGRESS.load(server);
         SimpleServerUtilities.ECONOMY.load(server);
-        if (Config.ENABLE_PLAYER_CLAIMS.get()) SimpleServerUtilities.PLAYER_CLAIMS.load(server);
+        if (Config.ENABLE_PLAYER_CLAIMS.get()) {
+            SimpleServerUtilities.PLAYER_CLAIMS.load(server);
+            SimpleServerUtilities.CLAIM_TAX.load(server);
+        }
         if (Config.ENABLE_PERMISSION_SYSTEM.get()) {
             SimpleServerUtilities.PERMISSIONS.load(server);
             SimpleServerUtilities.PERMISSIONS.migrateLegacyClaimLimitOverrides();

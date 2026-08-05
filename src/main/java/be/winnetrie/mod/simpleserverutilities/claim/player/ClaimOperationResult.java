@@ -24,6 +24,8 @@ public class ClaimOperationResult {
         EMPTY_SELECTION,
         INVALID_SELECTION,
         INVALID_CLAIM_NAME,
+        CLAIM_DELETE_SETTLEMENT_REQUIRED,
+        TAX_SETTLEMENT_IN_PROGRESS,
 
         NOT_OWNER
     }

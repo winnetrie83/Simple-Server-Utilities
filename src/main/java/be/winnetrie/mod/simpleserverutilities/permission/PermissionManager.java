@@ -1131,6 +1131,8 @@ public class PermissionManager {
         changed |= setDefaultPermission(rank, PermissionKeys.WARPS_DELETE, false);
         changed |= setDefaultPermission(rank, PermissionKeys.WARPS_INFO, false);
         changed |= setDefaultPermission(rank, PermissionKeys.WARPS_MAX, Config.MAX_WARPS.get());
+        changed |= setDefaultPermission(rank, PermissionKeys.WARPS_RENT, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.WARPS_RENT_MAX, 0);
 
         changed |= setDefaultPermission(rank, PermissionKeys.SPAWN_USE, true);
         changed |= setDefaultPermission(rank, PermissionKeys.SPAWN_ADMIN, false);

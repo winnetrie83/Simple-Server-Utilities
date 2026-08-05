@@ -89,6 +89,11 @@ public class HomeCommands {
     private static int setHome(CommandSourceStack source, String homeName) {
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
+        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(player.getUUID())) {
+            player.sendSystemMessage(Component.literal("Homes cannot be created or moved while a claim-tax settlement is in progress."));
+            return 0;
+        }
+
         if (!HomePolicy.canSetHomeAt(player, player.blockPosition())) {
             player.sendSystemMessage(Component.literal("Homes can only be set inside one of your own claims, with the required permission."));
             return 0;

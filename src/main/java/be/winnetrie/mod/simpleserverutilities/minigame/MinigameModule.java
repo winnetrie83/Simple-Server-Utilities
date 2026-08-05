@@ -56,13 +56,23 @@ public final class MinigameModule implements SsuModule {
         return player;
     }
 
-    @Override public void onServerStarting(MinecraftServer server) { manager.load(server); }
+    @Override public void onServerStarting(MinecraftServer server) {
+        MinigameSelectionService.clearPending();
+        MinigameSetupToolService.clearRuntime();
+        manager.load(server);
+        MinigameSetupToolService.removeAllPhysicalSetupMarkers(server);
+    }
 
     @Override
     public void beforeServerStopping(MinecraftServer server) {
+        MinigameSetupToolService.removeAllPhysicalSetupMarkers(server);
         manager.shutdownRuntime(true);
         manager.saveAll();
     }
 
-    @Override public void onServerStopping(MinecraftServer server) { manager.clear(); }
+    @Override public void onServerStopping(MinecraftServer server) {
+        MinigameSelectionService.clearPending();
+        MinigameSetupToolService.clearRuntime();
+        manager.clear();
+    }
 }

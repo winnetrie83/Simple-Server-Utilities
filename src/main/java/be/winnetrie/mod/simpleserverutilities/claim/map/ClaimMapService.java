@@ -9,6 +9,7 @@ import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimOperationResult;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.ClaimTaxDeleteActionPayload;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.ClaimPolicy;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
@@ -74,6 +75,12 @@ public final class ClaimMapService {
             }
             PlayerClaim deletedClaim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(
                     player.getUUID(), payload.claimName());
+            if (deletedClaim != null && !ClaimPolicy.hasAdminBypass(player)
+                    && SimpleServerUtilities.CLAIM_TAX.requiresDeleteSettlement(deletedClaim)) {
+                sendMap(player, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), payload.claimName(),
+                        "Choose Pay & delete or Forfeit capacity in the tax confirmation window.", true);
+                return;
+            }
             boolean deleted = SimpleServerUtilities.PLAYER_CLAIMS.deleteClaimGroup(
                     player.getUUID(), payload.claimName(), ClaimPolicy.hasAdminBypass(player));
             if (deleted) {
@@ -124,6 +131,32 @@ public final class ClaimMapService {
                 notice,
                 error
         );
+    }
+
+    public static void handleTaxDelete(ClaimTaxDeleteActionPayload payload, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player)) return;
+        if (!ClaimPolicy.canUseMap(player) || !ClaimPolicy.canDeleteClaim(player)) return;
+        if (!isSafeViewport(player, payload.centerChunkX(), payload.centerChunkZ(), payload.claimName(), payload.radius())) {
+            sendMap(player, player.chunkPosition().x(), player.chunkPosition().z(), payload.radius(), payload.claimName(),
+                    "Tax settlement rejected: view is too far from your claim.", true);
+            return;
+        }
+        PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), payload.claimName());
+        if (claim == null) {
+            sendMap(player, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), "",
+                    "Claim no longer exists.", true);
+            return;
+        }
+        var mode = payload.mode() == ClaimTaxDeleteActionPayload.Mode.FORFEIT_AND_DELETE
+                ? be.winnetrie.mod.simpleserverutilities.claim.tax.PlayerClaimTaxManager.VoluntaryDeleteMode.FORFEIT_AND_DELETE
+                : be.winnetrie.mod.simpleserverutilities.claim.tax.PlayerClaimTaxManager.VoluntaryDeleteMode.PAY_AND_DELETE;
+        var result = SimpleServerUtilities.CLAIM_TAX.settleVoluntaryDeletion(player, payload.claimName(), mode);
+        PlayerClaim remaining = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), payload.claimName());
+        if (result.successful() && remaining == null) {
+            SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player, claim);
+        }
+        sendMap(player, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(),
+                remaining == null ? "" : payload.claimName(), result.message(), !result.successful());
     }
 
     public static void open(ServerPlayer player, String selectedClaimGroup) {
@@ -251,6 +284,8 @@ public final class ClaimMapService {
             case CHUNK_OVERLAPS_REGION -> "A selected chunk overlaps a server region." + details;
             case EMPTY_SELECTION -> "Select at least one chunk.";
             case INVALID_CLAIM_NAME -> "Invalid claim name." + details;
+            case CLAIM_DELETE_SETTLEMENT_REQUIRED -> "This claim must be settled before it can be deleted." + details;
+            case TAX_SETTLEMENT_IN_PROGRESS -> "A claim-tax settlement is currently in progress." + details;
             case INVALID_SELECTION -> "The selected map operation is not allowed." + details;
             case NOT_OWNER -> "You are not the owner of this claim." + details;
             case SUCCESS -> "Operation completed.";

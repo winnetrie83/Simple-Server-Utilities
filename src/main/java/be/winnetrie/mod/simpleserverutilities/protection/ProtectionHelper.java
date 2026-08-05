@@ -39,9 +39,14 @@ public class ProtectionHelper {
 
 
     public static boolean canPlayerPvp(ServerPlayer attacker, Level level, BlockPos targetPos) {
+        if (SimpleServerUtilities.MINIGAMES.canBypassRegionPvp(attacker, targetPos)) return true;
         Region region = getRegionAt(level, targetPos);
 
         if (region != null) {
+            // Selection-created arenas are owned by the Minigame lifecycle. Even an
+            // administrator bypass may not turn an idle/foreign arena into an ad-hoc
+            // PvP zone; only the exact live match rule above can allow damage.
+            if (SimpleServerUtilities.MINIGAMES.isManagedArenaRegion(region.getName())) return false;
             return RegionPolicy.hasAdminBypass(attacker) || region.getSettings().isAllowPvp();
         }
 
@@ -234,9 +239,32 @@ public class ProtectionHelper {
     }
 
     public static boolean canPlayerPerform(ServerPlayer player, Level level, BlockPos pos, ActionType action) {
+        // A Minigame Setup Tool build session is the only administrator-authorized
+        // way to physically change a managed arena while it is idle. The first edit
+        // invalidates the old reset snapshot and disables the arena until recaptured.
+        if ((action == ActionType.BREAK || action == ActionType.PLACE)
+                && SimpleServerUtilities.MINIGAME_SETUP_TOOLS.existing(player) != null
+                && be.winnetrie.mod.simpleserverutilities.minigame.MinigameSetupToolService.canEditBlock(player, pos)) {
+            // Keep the bypass narrow: only actual block breaking and placement are allowed.
+            return true;
+        }
+        // Managed minigame arenas remain protected while idle. During a running Spleef
+        // match only the server-validated participant/tool/block combination bypasses
+        // the normal region break flag.
+        var minigameBreak = action == ActionType.BREAK
+                ? SimpleServerUtilities.MINIGAMES.blockBreakDecision(player, pos, level.getBlockState(pos))
+                : be.winnetrie.mod.simpleserverutilities.minigame.MinigameManager.BlockBreakDecision.PASS;
+        if (minigameBreak
+                == be.winnetrie.mod.simpleserverutilities.minigame.MinigameManager.BlockBreakDecision.ALLOW) {
+            return true;
+        }
         Region region = getRegionAt(level, pos);
 
         if (region != null) {
+            // Managed arena ownership outranks the normal region admin bypass. Editing
+            // the arena while idle or from another match would invalidate its reset
+            // snapshot and isolation guarantees. Delete the minigame first to release it.
+            if (SimpleServerUtilities.MINIGAMES.isManagedArenaRegion(region.getName())) return false;
             if (RegionPolicy.hasAdminBypass(player)) {
                 return true;
             }

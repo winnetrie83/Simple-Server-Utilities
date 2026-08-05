@@ -1,0 +1,39 @@
+Simple Server Utilities 1.9.0-dev1 static validation
+Date: 2026-08-04
+
+Scope
+- Source baseline: SSU 1.8.0-dev18.6
+- Target: Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+- Mod version: 1.9.0-dev1
+- Network protocol: 70
+- Minigame definition schema: 2
+- Minigame recovery schema: 2
+- All unrelated SSU storage/schema versions: unchanged
+
+Implemented scope
+- Explicit minigame game-type layer with Generic and Spleef runnable.
+- Selection Tool workflow for a server-owned managed Spleef arena and verified reset snapshot.
+- Spleef rules, per-player spawns, countdown lobby, spectator spawn, elimination, HUD, rewards and reset lifecycle.
+- Complete persisted player-state snapshots before temporary inventory/gamemode replacement.
+- Exact-path durable recovery flush and byte verification before countdown or late-join mutation.
+- Generic item/money reward handlers owned by Content Core rather than Quest.
+- Managed-arena ownership, mutation protection and blocked-reset recovery.
+
+Static checks completed
+- Java source files: 548.
+- Java delimiter/literal/comment scan: passed with 0 issues.
+- Java 21 no-classpath comparison against dev18.6: no new non-dependency diagnostics; unresolved external Gson, Minecraft and NeoForge symbols are expected in this container.
+- Targeted compile checks passed for the three new network payloads, minigame models, Content Core reward handlers and BatchedStorageService.
+- JSON resources/examples: 15 files parsed with 0 errors.
+- Version, protocol, schema, payload registration, GUI-handler, recovery-order and safety assertions: 28/28 passed.
+- Trailing-whitespace, generated-class and temporary-artifact checks: passed.
+- Final source archive integrity: passed with unzip -t; SHA-256 is reported alongside the distributed artifact.
+
+Not completed in this container
+- Full Gradle/NeoForge compilation: Gradle 9.2.1 is not cached and the container provides Java 21 instead of Java 25.
+- Dedicated-server/client runtime tests and controlled crash-injection tests.
+
+Required local command
+  gradlew.bat clean build
+
+Use docs/TESTING-1.9.0-dev1.md for the in-game and recovery test plan.

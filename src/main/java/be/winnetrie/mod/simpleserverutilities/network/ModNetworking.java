@@ -13,7 +13,7 @@ public class ModNetworking {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("67");
+        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("79");
 
         registrar.playToClient(
                 ClaimMapDataPayload.TYPE,
@@ -30,6 +30,12 @@ public class ModNetworking {
                 ClaimMapActionPayload.TYPE,
                 ClaimMapActionPayload.STREAM_CODEC,
                 ClaimMapService::handleAction
+        );
+
+        registrar.playToServer(
+                ClaimTaxDeleteActionPayload.TYPE,
+                ClaimTaxDeleteActionPayload.STREAM_CODEC,
+                ClaimMapService::handleTaxDelete
         );
 
         registrar.playToClient(
@@ -520,9 +526,62 @@ public class ModNetworking {
                 be.winnetrie.mod.simpleserverutilities.minigame.MinigameEditorService::handleSubmit
         );
 
+        registrar.playToServer(
+                MinigameRewardCapturePayload.TYPE,
+                MinigameRewardCapturePayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.minigame.MinigameEditorService::handleRewardCapture
+        );
+
         registrar.playToClient(
                 MinigameEditorResultPayload.TYPE,
                 MinigameEditorResultPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                MinigameHudPayload.TYPE,
+                MinigameHudPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                MinigameCastBarPayload.TYPE,
+                MinigameCastBarPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                MinigameDominationVisualPayload.TYPE,
+                MinigameDominationVisualPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                MinigameCtfVisualPayload.TYPE,
+                MinigameCtfVisualPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                MinigameSelectionCreatePayload.TYPE,
+                MinigameSelectionCreatePayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.minigame.MinigameSelectionService::handleCreate
+        );
+
+        registrar.playToClient(
+                MinigameSelectionCreateResultPayload.TYPE,
+                MinigameSelectionCreateResultPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                MinigameSetupToolConfigurePayload.TYPE,
+                MinigameSetupToolConfigurePayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.minigame.MinigameSetupToolService::handleConfigure
+        );
+
+        registrar.playToClient(
+                MinigameSetupToolOpenPayload.TYPE,
+                MinigameSetupToolOpenPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                MinigameSetupVisualPayload.TYPE,
+                MinigameSetupVisualPayload.STREAM_CODEC
         );
 
         registrar.playToServer(
@@ -572,6 +631,34 @@ public class ModNetworking {
         registrar.playToClient(
                 RegionEditorResultPayload.TYPE,
                 RegionEditorResultPayload.STREAM_CODEC
+        );
+
+
+        registrar.playToClient(
+                RegionSelectionToolOpenPayload.TYPE,
+                RegionSelectionToolOpenPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                RegionSelectionActionPayload.TYPE,
+                RegionSelectionActionPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.region.RegionSelectionToolService::handleAction
+        );
+
+        registrar.playToClient(
+                RegionSelectionActionResultPayload.TYPE,
+                RegionSelectionActionResultPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                RegionSelectionClientTemplatePayload.TYPE,
+                RegionSelectionClientTemplatePayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                RegionSelectionClientTemplateUploadPayload.TYPE,
+                RegionSelectionClientTemplateUploadPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.region.RegionSelectionToolService::handleClientTemplateUpload
         );
 
         registrar.playToClient(

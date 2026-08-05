@@ -1,0 +1,47 @@
+Simple Server Utilities 1.8.0-dev18.6 static validation
+Date: 2026-08-03
+
+Scope
+- Source baseline: SSU 1.8.0-dev18.5
+- Target: Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+- Mod version: 1.8.0-dev18.6
+- Network protocol: 69
+- Player Claim storage schema: 2
+- Player Claim-tax settings schema: 2
+- Claim-tax settlement ledger schema: 2
+- Warp storage schema: 2 (unchanged from dev18.5)
+- Other unrelated schemas: unchanged
+
+Completed checks
+- 538 Java source files passed a comment/string-aware delimiter and unterminated-literal scan.
+- A Java 21 no-classpath javac source pass reported no new parser, duplicate-declaration or effectively-final diagnostics. The same three no-classpath generic-inference diagnostics (two in SsuMenuService and one in TrustedPlayersService) are also present in the dev18.5 baseline; missing Gson/Minecraft/NeoForge symbols are expected without the dependency classpath.
+- ClaimChunk, ClaimSettings, PlayerClaim, PlayerClaimLimits, PlayerClaimTaxSettings, PlayerClaimTaxSettlement and PlayerClaimTaxLedger compiled together standalone.
+- The dev18.6 model harness passed monotonic/current peak invariants, cycle reset/idempotency, automatic and voluntary financial-snapshot validation, sorted linked-Home snapshots, retry-phase preservation, duplicate-confiscation prevention and duplicate-active-owner ledger detection.
+- 15 repository JSON resource/example files parsed successfully, including updated schema-2 claim/limit/tax examples.
+- All 76 dashboard action literals have a matching SsuMenuService handler.
+- Source assertions passed for version/protocol, payload registration, schema versions, final-chunk/batch/command settlement gates, effective-limit subtraction, technical-failure fail-safe handling, Economy idempotency, claim/Home durability checks, penalty conflict detection and persistent safety-halt marker handling.
+
+Safety observations validated statically
+- A claim peak is raised on every successful chunk addition and repaired to at least the current live size during load/access.
+- Removing chunks never lowers the current cycle peak.
+- Tax rate, interval, reminder lead and dimension multiplier are snapshotted per claim cycle.
+- Reminder text labels the amount as an estimate and explicitly documents expansion/shrink behavior and consequences.
+- Player deletion routes cannot remove the final taxable claim area without the GUI settlement payload.
+- Settlement totals are validated against immutable per-claim recovery snapshots before the ledger accepts them.
+- Economy debits use a settlement UUID idempotency key; only explicit `insufficient_funds` may enter automatic forfeiture.
+- Automatic non-payment snapshots all current claims/Homes for removal, while monetary amount and permanent penalty are derived from the claims actually due in that settlement.
+- Dimension multipliers affect tax money only; permanent collateral uses unweighted peak chunks.
+- Claims, Homes and permanent limit records are flushed and exact-path verified before journal progress advances.
+- Permanent capacity penalties are keyed by settlement UUID and checked for conflicting amounts before completion.
+- Completed penalty-bearing journals are retained and reconciled with limit records on startup.
+- Corrupt, ambiguous or non-durable recovery state enters a restart-persistent safety halt through `tax_safety_halt.json`.
+- Claim mutation and Home creation/movement are locked during an active owner settlement; unrelated players remain unaffected.
+
+Not completed in this container
+- Full Gradle/NeoForge compilation: Gradle 9.2.1 is not cached and the container provides Java 21 instead of Java 25.
+- Dedicated-server/client runtime tests and controlled crash-injection tests.
+
+Required local command
+  gradlew.bat clean build
+
+Use docs/TESTING-1.8.0-dev18.6.md for the in-game and recovery test plan.

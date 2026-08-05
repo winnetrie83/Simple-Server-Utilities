@@ -15,8 +15,10 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.Container;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
 public final class RegionWorldEditManager {
@@ -29,6 +31,16 @@ public final class RegionWorldEditManager {
             RegionSelection selection,
             String weightedBlockList,
             long maxVolume
+    ) {
+        return createFillJob(level, selection, weightedBlockList, maxVolume, false);
+    }
+
+    public static RegionFillJob createFillJob(
+            ServerLevel level,
+            RegionSelection selection,
+            String weightedBlockList,
+            long maxVolume,
+            boolean suppressContainerDrops
     ) {
         if (!selection.isComplete()) {
             throw new IllegalArgumentException("Selection is incomplete.");
@@ -46,7 +58,7 @@ public final class RegionWorldEditManager {
         int maxY = Math.max(selection.getPoint1().getY(), selection.getPoint2().getY());
         int maxZ = Math.max(selection.getPoint1().getZ(), selection.getPoint2().getZ());
 
-        long volume = (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
+        long volume = safeVolume(minX, minY, minZ, maxX, maxY, maxZ);
         if (volume > maxVolume) {
             throw new IllegalArgumentException("Selection is too large: " + volume + " blocks. Limit: " + maxVolume + ".");
         }
@@ -60,7 +72,8 @@ public final class RegionWorldEditManager {
                 maxY,
                 maxZ,
                 blocks,
-                operationLocks(level, minX, minY, minZ, maxX, maxY, maxZ)
+                operationLocks(level, minX, minY, minZ, maxX, maxY, maxZ),
+                suppressContainerDrops
         );
     }
 
@@ -75,14 +88,46 @@ public final class RegionWorldEditManager {
 
         return new RegionClearJob(
                 level,
-                region.getName(),
+                "region '" + region.getName() + "'",
                 region.getMinX(),
                 region.getMinY(),
                 region.getMinZ(),
                 region.getMaxX(),
                 region.getMaxY(),
-                region.getMaxZ()
+                region.getMaxZ(),
+                Set.of(SsuJobLocks.region(level.dimension(), region.getName())),
+                false
         );
+    }
+
+    public static RegionClearJob createClearJob(ServerLevel level, RegionSelection selection, long maxVolume) {
+        if (selection == null || !selection.isComplete()) {
+            throw new IllegalArgumentException("Selection is incomplete.");
+        }
+        int minX = Math.min(selection.getPoint1().getX(), selection.getPoint2().getX());
+        int minY = Math.min(selection.getPoint1().getY(), selection.getPoint2().getY());
+        int minZ = Math.min(selection.getPoint1().getZ(), selection.getPoint2().getZ());
+        int maxX = Math.max(selection.getPoint1().getX(), selection.getPoint2().getX());
+        int maxY = Math.max(selection.getPoint1().getY(), selection.getPoint2().getY());
+        int maxZ = Math.max(selection.getPoint1().getZ(), selection.getPoint2().getZ());
+        long volume = safeVolume(minX, minY, minZ, maxX, maxY, maxZ);
+        if (volume > maxVolume) {
+            throw new IllegalArgumentException("Selection is too large: " + volume + " blocks. Limit: " + maxVolume + ".");
+        }
+        return new RegionClearJob(level, "selection", minX, minY, minZ, maxX, maxY, maxZ,
+                operationLocks(level, minX, minY, minZ, maxX, maxY, maxZ), true);
+    }
+
+    private static long safeVolume(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+        long sizeX = (long) maxX - minX + 1L;
+        long sizeY = (long) maxY - minY + 1L;
+        long sizeZ = (long) maxZ - minZ + 1L;
+        if (sizeX <= 0L || sizeY <= 0L || sizeZ <= 0L) return Long.MAX_VALUE;
+        try {
+            return Math.multiplyExact(Math.multiplyExact(sizeX, sizeY), sizeZ);
+        } catch (ArithmeticException exception) {
+            return Long.MAX_VALUE;
+        }
     }
 
     private static Set<String> operationLocks(
@@ -105,6 +150,14 @@ public final class RegionWorldEditManager {
             }
         }
         return Set.copyOf(locks);
+    }
+
+    private static void clearContainerContents(ServerLevel level, BlockPos pos) {
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (blockEntity instanceof Container container) {
+            container.clearContent();
+            blockEntity.setChanged();
+        }
     }
 
     private static List<WeightedBlock> parseWeightedBlocks(String raw) {
@@ -168,6 +221,7 @@ public final class RegionWorldEditManager {
         private final int maxZ;
         private final List<WeightedBlock> blocks;
         private final Set<String> resourceLocks;
+        private final boolean suppressContainerDrops;
         private final int totalWeight;
         private final long total;
         private final Random random = new Random();
@@ -188,7 +242,8 @@ public final class RegionWorldEditManager {
                 int maxY,
                 int maxZ,
                 List<WeightedBlock> blocks,
-                Set<String> resourceLocks
+                Set<String> resourceLocks,
+                boolean suppressContainerDrops
         ) {
             this.level = level;
             this.minX = minX;
@@ -199,8 +254,9 @@ public final class RegionWorldEditManager {
             this.maxZ = maxZ;
             this.blocks = blocks;
             this.resourceLocks = resourceLocks;
+            this.suppressContainerDrops = suppressContainerDrops;
             this.totalWeight = blocks.stream().mapToInt(WeightedBlock::weight).sum();
-            this.total = (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
+            this.total = safeVolume(minX, minY, minZ, maxX, maxY, maxZ);
             this.x = minX;
             this.y = minY;
             this.z = minZ;
@@ -217,6 +273,7 @@ public final class RegionWorldEditManager {
             while (!complete && used < operationBudget) {
                 BlockState state = pickBlock(blocks, totalWeight, random).defaultBlockState();
                 mutablePos.set(x, y, z);
+                if (suppressContainerDrops) clearContainerContents(level, mutablePos);
                 level.setBlock(mutablePos, state, 3);
                 changed++;
                 used++;
@@ -269,7 +326,7 @@ public final class RegionWorldEditManager {
 
     public static final class RegionClearJob implements SsuJob {
         private final ServerLevel level;
-        private final String regionName;
+        private final String targetDescription;
         private final int minX;
         private final int minY;
         private final int minZ;
@@ -277,6 +334,8 @@ public final class RegionWorldEditManager {
         private final int maxY;
         private final int maxZ;
         private final long total;
+        private final Set<String> resourceLocks;
+        private final boolean suppressContainerDrops;
         private final BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
 
         private int x;
@@ -288,23 +347,27 @@ public final class RegionWorldEditManager {
 
         private RegionClearJob(
                 ServerLevel level,
-                String regionName,
+                String targetDescription,
                 int minX,
                 int minY,
                 int minZ,
                 int maxX,
                 int maxY,
-                int maxZ
+                int maxZ,
+                Set<String> resourceLocks,
+                boolean suppressContainerDrops
         ) {
             this.level = level;
-            this.regionName = regionName;
+            this.targetDescription = targetDescription;
             this.minX = minX;
             this.minY = minY;
             this.minZ = minZ;
             this.maxX = maxX;
             this.maxY = maxY;
             this.maxZ = maxZ;
-            this.total = (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
+            this.total = safeVolume(minX, minY, minZ, maxX, maxY, maxZ);
+            this.resourceLocks = resourceLocks;
+            this.suppressContainerDrops = suppressContainerDrops;
             this.x = minX;
             this.y = minY;
             this.z = minZ;
@@ -312,7 +375,7 @@ public final class RegionWorldEditManager {
 
         @Override
         public String description() {
-            return "Clear region '" + regionName + "' (" + total + " blocks)";
+            return "Clear " + targetDescription + " (" + total + " blocks)";
         }
 
         @Override
@@ -321,6 +384,7 @@ public final class RegionWorldEditManager {
             while (!complete && used < operationBudget) {
                 mutablePos.set(x, y, z);
                 if (!level.isEmptyBlock(mutablePos)) {
+                    if (suppressContainerDrops) clearContainerContents(level, mutablePos);
                     level.setBlock(mutablePos, Blocks.AIR.defaultBlockState(), 3);
                     changed++;
                 }
@@ -355,7 +419,7 @@ public final class RegionWorldEditManager {
 
         @Override
         public Set<String> resourceLocks() {
-            return Set.of(SsuJobLocks.region(level.dimension(), regionName));
+            return resourceLocks;
         }
 
         @Override

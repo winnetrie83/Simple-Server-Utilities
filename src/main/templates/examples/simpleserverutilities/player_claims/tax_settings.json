@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 2,
+  "enabled": false,
+  "rateMinorPerChunk": 0,
+  "intervalMillis": 604800000,
+  "reminderLeadMillis": 86400000,
+  "dimensionMultipliers": {
+    "minecraft:overworld": 1.0,
+    "minecraft:the_nether": 1.2,
+    "minecraft:the_end": 1.5
+  }
+}

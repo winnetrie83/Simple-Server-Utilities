@@ -3,6 +3,7 @@
   "package": "be.winnetrie.mod.simpleserverutilities.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [
+    "BlockEntityComponentInvoker",
     "FlowingFluidMixin",
     "BucketItemMixin",
     "LiquidBlockMixin",

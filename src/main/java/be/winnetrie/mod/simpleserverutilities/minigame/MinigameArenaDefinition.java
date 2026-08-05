@@ -14,13 +14,23 @@ public final class MinigameArenaDefinition {
     public boolean enabled = true;
     public String regionId = "";
     public boolean resetRegionAfterMatch;
+    /** True only for arena regions created and owned by the Minigame Selection wizard. */
+    public boolean managedRegion;
     public MinigameLocation lobby = new MinigameLocation();
     public MinigameLocation spectator = new MinigameLocation();
+    /** Optional movement cuboid for eliminated spectators. */
+    public MinigameAreaBounds spectatorBounds = new MinigameAreaBounds();
+    /** Optional Spleef floor volume. Only configured floor blocks are breakable. */
+    public MinigameAreaBounds playFloor = new MinigameAreaBounds();
     public List<MinigameSpawnPoint> teamSpawns = new ArrayList<>();
+    public List<MinigameFlagPoint> flagPoints = new ArrayList<>();
+    public List<MinigameControlPoint> controlPoints = new ArrayList<>();
 
     public MinigameArenaDefinition() {
         teamSpawns.add(new MinigameSpawnPoint(1, new MinigameLocation()));
         teamSpawns.add(new MinigameSpawnPoint(2, new MinigameLocation()));
+        flagPoints.add(new MinigameFlagPoint(1, new MinigameLocation()));
+        flagPoints.add(new MinigameFlagPoint(2, new MinigameLocation()));
     }
 
     public void normalize() {
@@ -31,6 +41,10 @@ public final class MinigameArenaDefinition {
         if (spectator == null) spectator = lobby.copy();
         lobby.normalize();
         spectator.normalize();
+        if (spectatorBounds == null) spectatorBounds = new MinigameAreaBounds();
+        if (playFloor == null) playFloor = new MinigameAreaBounds();
+        spectatorBounds.normalize();
+        playFloor.normalize();
         ArrayList<MinigameSpawnPoint> normalized = new ArrayList<>();
         if (teamSpawns != null) {
             for (MinigameSpawnPoint spawn : teamSpawns) {
@@ -41,11 +55,79 @@ public final class MinigameArenaDefinition {
             }
         }
         teamSpawns = normalized;
+        ArrayList<MinigameFlagPoint> normalizedFlags = new ArrayList<>();
+        if (flagPoints != null) {
+            for (MinigameFlagPoint point : flagPoints) {
+                if (point == null) continue;
+                point.normalize();
+                normalizedFlags.add(point);
+                if (normalizedFlags.size() >= 2) break;
+            }
+        }
+        flagPoints = normalizedFlags;
+        ArrayList<MinigameControlPoint> normalizedControlPoints = new ArrayList<>();
+        if (controlPoints != null) {
+            for (MinigameControlPoint point : controlPoints) {
+                if (point == null) continue;
+                point.normalize();
+                normalizedControlPoints.add(point);
+                if (normalizedControlPoints.size() >= 9) break;
+            }
+        }
+        controlPoints = normalizedControlPoints;
+        normalizeControlPointRespawns();
     }
 
-    public MinigameLocation spawnForTeam(int team) {
+    private void normalizeControlPointRespawns() {
+        if (controlPoints.isEmpty()) return;
+        double centerX = 0.0D;
+        double centerZ = 0.0D;
+        for (MinigameControlPoint point : controlPoints) {
+            centerX += point.location.x;
+            centerZ += point.location.z;
+        }
+        centerX /= controlPoints.size();
+        centerZ /= controlPoints.size();
+        for (MinigameControlPoint point : controlPoints) {
+            if (point.respawn == null || sameBlock(point.location, point.respawn)) {
+                double dx = centerX - point.location.x;
+                double dz = centerZ - point.location.z;
+                double length = Math.sqrt(dx * dx + dz * dz);
+                double offset = length < 0.001D ? 2.5D : Math.min(2.5D, Math.max(1.5D, length * 0.35D));
+                double spawnX = length < 0.001D ? point.location.x + offset
+                        : point.location.x + dx / length * offset;
+                double spawnZ = length < 0.001D ? point.location.z
+                        : point.location.z + dz / length * offset;
+                point.respawn = new MinigameLocation(point.location.dimension, spawnX, point.location.y, spawnZ,
+                        point.location.yaw, point.location.pitch);
+            }
+            point.respawn.normalize();
+        }
+    }
+
+    private static boolean sameBlock(MinigameLocation first, MinigameLocation second) {
+        return first != null && second != null && first.dimension.equals(second.dimension)
+                && (int) Math.floor(first.x) == (int) Math.floor(second.x)
+                && (int) Math.floor(first.y) == (int) Math.floor(second.y)
+                && (int) Math.floor(first.z) == (int) Math.floor(second.z);
+    }
+
+    public MinigameLocation spawnForTeam(int team) { return spawnForTeam(team, 0); }
+
+    public MinigameLocation spawnForTeam(int team, int ordinal) {
+        int requested = Math.max(0, ordinal);
+        int found = 0;
+        for (MinigameSpawnPoint spawn : teamSpawns) {
+            if (spawn.team != team) continue;
+            if (found++ == requested) return spawn.location;
+        }
         for (MinigameSpawnPoint spawn : teamSpawns) if (spawn.team == team) return spawn.location;
         return lobby;
+    }
+
+    public MinigameFlagPoint flagForTeam(int team) {
+        for (MinigameFlagPoint point : flagPoints) if (point.team == team) return point;
+        return null;
     }
 
     private static String bound(String value, int max, String fallback) {

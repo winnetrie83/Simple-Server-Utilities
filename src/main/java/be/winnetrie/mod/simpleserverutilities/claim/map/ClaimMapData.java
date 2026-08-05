@@ -18,6 +18,11 @@ public class ClaimMapData {
     private final int selectedClaimChunks;
     private final int maxChunksPerClaim;
     private final boolean canCreateClaims;
+    private final boolean selectedClaimTaxSettlementRequired;
+    private final String selectedClaimTaxEstimate;
+    private final int selectedClaimTaxPeakChunks;
+    private final long selectedClaimTaxDueAt;
+    private final int confiscatedChunks;
     private final String notice;
     private final boolean error;
 
@@ -36,6 +41,11 @@ public class ClaimMapData {
             int selectedClaimChunks,
             int maxChunksPerClaim,
             boolean canCreateClaims,
+            boolean selectedClaimTaxSettlementRequired,
+            String selectedClaimTaxEstimate,
+            int selectedClaimTaxPeakChunks,
+            long selectedClaimTaxDueAt,
+            int confiscatedChunks,
             String notice,
             boolean error
     ) {
@@ -51,6 +61,11 @@ public class ClaimMapData {
         this.selectedClaimChunks = Math.max(0, selectedClaimChunks);
         this.maxChunksPerClaim = Math.max(0, maxChunksPerClaim);
         this.canCreateClaims = canCreateClaims;
+        this.selectedClaimTaxSettlementRequired = selectedClaimTaxSettlementRequired;
+        this.selectedClaimTaxEstimate = selectedClaimTaxEstimate == null ? "" : selectedClaimTaxEstimate;
+        this.selectedClaimTaxPeakChunks = Math.max(0, selectedClaimTaxPeakChunks);
+        this.selectedClaimTaxDueAt = Math.max(0L, selectedClaimTaxDueAt);
+        this.confiscatedChunks = Math.max(0, confiscatedChunks);
         this.notice = notice == null ? "" : notice;
         this.error = error;
     }
@@ -102,6 +117,12 @@ public class ClaimMapData {
     public boolean canCreateClaims() {
         return canCreateClaims;
     }
+
+    public boolean isSelectedClaimTaxSettlementRequired() { return selectedClaimTaxSettlementRequired; }
+    public String getSelectedClaimTaxEstimate() { return selectedClaimTaxEstimate; }
+    public int getSelectedClaimTaxPeakChunks() { return selectedClaimTaxPeakChunks; }
+    public long getSelectedClaimTaxDueAt() { return selectedClaimTaxDueAt; }
+    public int getConfiscatedChunks() { return confiscatedChunks; }
 
     public String getNotice() {
         return notice;

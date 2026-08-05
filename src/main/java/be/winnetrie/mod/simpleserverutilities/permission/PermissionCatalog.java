@@ -158,6 +158,8 @@ public final class PermissionCatalog {
         bool(values, PermissionKeys.WARPS_DELETE, "Allows deleting server warps.");
         bool(values, PermissionKeys.WARPS_INFO, "Allows viewing detailed warp administration information.");
         integer(values, PermissionKeys.WARPS_MAX, "Maximum number of server warps this administrator may create.", 0, 100_000);
+        bool(values, PermissionKeys.WARPS_RENT, "Allows the player to rent and manage personal warps through the dashboard.");
+        integer(values, PermissionKeys.WARPS_RENT_MAX, "Maximum number of player warps this player may rent.", 0, 100_000);
         integer(values, PermissionKeys.WARPS_TELEPORT_DELAY, "Delay in seconds before a warp teleport starts.", 0, 86_400);
         integer(values, PermissionKeys.WARPS_TELEPORT_COOLDOWN, "Cooldown in seconds after using a warp teleport.", 0, 86_400);
 

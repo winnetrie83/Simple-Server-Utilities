@@ -102,7 +102,7 @@ public final class RegionEditorService {
         SimpleServerUtilities.REGIONS.save();
         RegionCommands.getSelectionManager().clear(player);
         SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
-        return Result.ok("Region '" + name + "' created and configured.");
+        return Result.ok("Region '" + name + "' created.");
     }
 
     private record Result(boolean success, String message) {

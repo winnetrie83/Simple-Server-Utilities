@@ -61,6 +61,23 @@ public class WarpPolicy {
                 && PermissionService.getBoolean(player, PermissionKeys.WARPS_INFO, true, context);
     }
 
+    public static boolean canRentWarp(ServerPlayer player) {
+        return canRentWarp(player, PermissionContext.global(player));
+    }
+
+    public static boolean canRentWarp(ServerPlayer player, PermissionContext context) {
+        return canUseWarps(player, context)
+                && PermissionService.getBoolean(player, PermissionKeys.WARPS_RENT, false, context);
+    }
+
+    public static int getMaxRentedWarps(ServerPlayer player) {
+        return getMaxRentedWarps(player, PermissionContext.global(player));
+    }
+
+    public static int getMaxRentedWarps(ServerPlayer player, PermissionContext context) {
+        return Math.max(0, PermissionService.getInt(player, PermissionKeys.WARPS_RENT_MAX, 0, context));
+    }
+
     public static int getMaxWarps(ServerPlayer player) {
         return PermissionService.getInt(
                 player,

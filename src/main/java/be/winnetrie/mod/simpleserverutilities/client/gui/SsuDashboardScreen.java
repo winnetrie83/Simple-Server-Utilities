@@ -105,6 +105,13 @@ public final class SsuDashboardScreen extends Screen {
     private EditBox accountAmountBox;
     private EditBox homeNameBox;
     private EditBox warpNameBox;
+    private EditBox warpRentalPriceBox;
+    private EditBox warpRentalDaysBox;
+    private EditBox claimTaxRateBox;
+    private EditBox claimTaxIntervalBox;
+    private EditBox claimTaxReminderBox;
+    private EditBox claimTaxDimensionBox;
+    private EditBox claimTaxMultiplierBox;
     private EditBox rankNameBox;
     private EditBox rankRenameBox;
     private EditBox rankPlayerBox;
@@ -158,6 +165,13 @@ public final class SsuDashboardScreen extends Screen {
     private String draftHomeName = "";
     private String homesClaimName = "";
     private String draftWarpName = "";
+    private String draftWarpRentalPrice = "100";
+    private String draftWarpRentalDays = "30";
+    private String draftClaimTaxRate = "0";
+    private String draftClaimTaxInterval = "168";
+    private String draftClaimTaxReminder = "24";
+    private String draftClaimTaxDimension = "minecraft:overworld";
+    private String draftClaimTaxMultiplier = "1";
     private String travelFilter = "all";
     private String draftRankName = "";
     private String draftRankRename = "";
@@ -175,6 +189,7 @@ public final class SsuDashboardScreen extends Screen {
     private String pendingDeleteHologram = "";
     private String pendingDeleteHome = "";
     private String pendingDeleteWarp = "";
+    private String pendingSetPlayerWarp = "";
     private String pendingDeleteAdminClaim = "";
     private String pendingDeleteRank = "";
     private String pendingDeleteRegion = "";
@@ -182,6 +197,7 @@ public final class SsuDashboardScreen extends Screen {
     private String pendingClearRegion = "";
     private String pendingRedefineRegion = "";
     private boolean pendingResetAllBorderColors;
+    private boolean pendingEnableClaimTax;
     private String pendingResetStatistic = "";
     private String pendingDeleteStatistic = "";
     private final java.util.ArrayList<SettingsTooltip> settingsTooltips = new java.util.ArrayList<>();
@@ -224,6 +240,8 @@ public final class SsuDashboardScreen extends Screen {
         if (page == Page.UTILITY_MINING_ADMIN) syncMiningDrafts(payload);
         if (page == Page.MAINTENANCE) syncMaintenanceDrafts(payload);
         if (page == Page.AUCTION_TAX) syncAuctionTaxDraft(payload);
+        if (page == Page.CLAIM_TAX) syncClaimTaxDrafts(payload);
+        if (page == Page.WARP_RENTAL) syncWarpRentalDrafts(payload);
         pageIndex = payload.pageIndex();
         selectedRow = -1;
         loading = false;
@@ -319,6 +337,7 @@ public final class SsuDashboardScreen extends Screen {
             case HOMES -> addHomesButtons(l);
             case TRAVEL -> addTravelButtons(l);
             case TRAVEL_ADMIN -> addAdminTravelButtons(l);
+            case MY_WARPS -> addPlayerWarpButtons(l);
             case ADMIN_CLAIMS -> addAdminClaimButtons(l);
             case RANKS -> addRankButtons(l);
             case WALLET -> addWalletButtons(l);
@@ -326,6 +345,7 @@ public final class SsuDashboardScreen extends Screen {
             case TRANSACTIONS -> addTransactionsButtons(l);
             case AUCTION_TAX -> addAuctionTaxButtons(l);
             case CLAIM_TAX -> addClaimTaxButtons(l);
+            case WARP_RENTAL -> addWarpRentalButtons(l);
             case REGIONS -> addRegionButtons(l);
             case REGION_ADMIN -> addRegionAdminButtons(l);
             case UTILITY_MINING_ADMIN -> addUtilityMiningAdminButtons(l);
@@ -338,7 +358,7 @@ public final class SsuDashboardScreen extends Screen {
             case RENT_OPERATIONS -> addRentOperationButtons(l);
             case CORE -> addCoreButtons(l);
             case PROFILE -> addProfileButtons(l);
-            case MAIL, AUCTION_HOUSE, QUESTS, MINIGAMES, DUNGEONS -> { }
+            case MAIL, AUCTION_HOUSE, QUESTS, MINIGAMES, MINIGAME_ADMIN, DUNGEONS -> { }
         }
         if (requestInitialRemotePage) {
             requestInitialRemotePage = false;
@@ -350,7 +370,7 @@ public final class SsuDashboardScreen extends Screen {
         skin = null; searchBox = null; payPlayerBox = null; payAmountBox = null;
         economyHistoryLimitBox = null; transactionPlayerBox = null; auctionTaxBox = null;
         permissionTargetSearchBox = null; permissionSearchBox = null; playerProfileSearchBox = null; permissionValueInputs.clear();
-        accountAmountBox = null; homeNameBox = null; warpNameBox = null; rankNameBox = null; rankRenameBox = null; rankPlayerBox = null; regionDaysBox = null; regionFillBox = null; regionCoordinatesBox = null; miningLeafRangeBox = null; miningTreeMaxBox = null; miningVeinMaxBox = null; miningBlockIdBox = null; maintenanceHexBox = null; maintenanceBuybackBox = null; settingsTooltips.clear();
+        accountAmountBox = null; homeNameBox = null; warpNameBox = null; warpRentalPriceBox = null; warpRentalDaysBox = null; claimTaxRateBox = null; claimTaxIntervalBox = null; claimTaxReminderBox = null; claimTaxDimensionBox = null; claimTaxMultiplierBox = null; rankNameBox = null; rankRenameBox = null; rankPlayerBox = null; regionDaysBox = null; regionFillBox = null; regionCoordinatesBox = null; miningLeafRangeBox = null; miningTreeMaxBox = null; miningVeinMaxBox = null; miningBlockIdBox = null; maintenanceHexBox = null; maintenanceBuybackBox = null; settingsTooltips.clear();
     }
 
     private void addHomeButtons(Layout l) {
@@ -369,6 +389,7 @@ public final class SsuDashboardScreen extends Screen {
         java.util.ArrayList<Module> modules = new java.util.ArrayList<>(List.of(
                 new Module("Claims & Land", "Your connected land claims, claim settings, homes and map tools.", ICON_CLAIM, Page.CLAIMS, snapshot.moduleSettings().claims()),
                 new Module("Travel", "All available homes, warps and server destinations.", ICON_PORTAL, Page.TRAVEL, true),
+                new Module("My Warps", "Rent, place and control the visibility of your personal warps.", ICON_PORTAL, Page.MY_WARPS, snapshot.moduleSettings().warps()),
                 new Module("Wallet", "Balance, payments and your transaction history.", ICON_MARKET, Page.WALLET, snapshot.economy().enabled()),
                 new Module("Mail", "Inbox, sent mail, items and money attachments.", ICON_MARKET, Page.MAIL, snapshot.moduleSettings().mail())
         ));
@@ -408,14 +429,14 @@ public final class SsuDashboardScreen extends Screen {
                 new Module("Core status", "Storage, indexes and migrated modules.", ICON_SETTINGS, Page.CORE, snapshot.adminAccess().core()),
                 new Module("Module settings", "Enable modules and configure world render distances.", ICON_SETTINGS, Page.MODULE_SETTINGS, snapshot.administrator()),
                 new Module("Utility Mining", "Configure Treecapitator and Veinminer block rules.", ICON_SETTINGS, Page.UTILITY_MINING_ADMIN, snapshot.administrator()),
+                new Module("Minigames", "Configure game modes, arenas, rewards and live matches.", ICON_PORTAL, Page.MINIGAME_ADMIN,
+                        snapshot.administrator() && snapshot.moduleSettings().minigames()),
                 new Module("Admin tools", "Get purpose-built world editing and setup tools.", ICON_SETTINGS, Page.ADMIN_TOOLS, snapshot.administrator()),
                 new Module("Holograms", "Edit, teleport to and delete floating text from anywhere.", ICON_SETTINGS, Page.HOLOGRAMS,
                         snapshot.administrator() && snapshot.moduleSettings().holograms()),
                 new Module("Statistics", "Create event counters and publish personal values or leaderboards.", ICON_PLAYERS, Page.STATISTICS,
                         snapshot.administrator() && snapshot.moduleSettings().statistics()),
-                new Module("Regions", "Open region and rental administration.", ICON_SHIELD, Page.REGIONS, snapshot.moduleSettings().regions()),
-                new Module("Region maintenance", "Snapshots, recovery, world-edit and rental maintenance.", ICON_SHIELD, Page.REGION_ADMIN,
-                        snapshot.moduleSettings().regions() && snapshot.administrator()),
+                new Module("Regions", "Open server-region details, visibility and settings.", ICON_SHIELD, Page.REGIONS, snapshot.moduleSettings().regions()),
                 new Module("Maintenance", "Reload SSU, refresh runtime content and manage visualization defaults.", ICON_SETTINGS, Page.MAINTENANCE,
                         snapshot.administrator())
         );
@@ -429,7 +450,9 @@ public final class SsuDashboardScreen extends Screen {
                         snapshot.economy().canAdmin()),
                 new Module("Auction House tax", "Configure the tax withheld from completed player sales.", ICON_MARKET, Page.AUCTION_TAX,
                         snapshot.economy().canAdmin()),
-                new Module("Player Claim tax", "Review Player Claim taxation availability.", ICON_CLAIM, Page.CLAIM_TAX,
+                new Module("Player Claim tax", "Configure recurring per-chunk claim taxation and dimension multipliers.", ICON_CLAIM, Page.CLAIM_TAX,
+                        snapshot.economy().canAdmin()),
+                new Module("Player Warp rentals", "Configure the prepaid price and duration for player-rented warps.", ICON_PORTAL, Page.WARP_RENTAL,
                         snapshot.economy().canAdmin()),
                 new Module("Rent journal", "Inspect rental reconciliation and refund operations.", ICON_PORTAL, Page.RENT_OPERATIONS,
                         snapshot.economy().canAdmin())
@@ -438,13 +461,13 @@ public final class SsuDashboardScreen extends Screen {
 
     private List<AdminTool> adminTools() {
         return List.of(
-                new AdminTool("Region Tool", "Left-click position 1, then left-click position 2. Right-click opens the initial region settings GUI.", "region"),
+                new AdminTool("Region Tool", "Left-click point 1 and point 2. Right-click opens Create Region or the selection block editor.", "region"),
                 new AdminTool("Hologram Tool", "Right-click to create one block ahead. Right-click an existing hologram with the tool to edit or delete it.", "hologram"),
                 new AdminTool("NPC Tool", "Right-click to create/edit. Sneak-right-click an NPC to copy and elsewhere to paste a linked placement.", "npc"),
                 new AdminTool("Shop Manager", "Create and edit shared NPC shops and inspect every linked NPC.", "shops"),
                 new AdminTool("Item Price Catalog", "Edit what players pay and receive for every vanilla and modded item.", "item_prices"),
                 new AdminTool("Quest Editor", "Create and edit quest prerequisites, objectives, rewards and lifecycle settings.", "quest"),
-                new AdminTool("Minigame Editor", "Create queues, teams, arenas, lifecycle settings and rewards.", "minigame"),
+                new AdminTool("Minigame Setup Tool", "Left-click performs the selected in-world setup action; right-click opens its action and arena menu.", "minigame"),
                 new AdminTool("Dungeon Editor", "Create region arenas, checkpoints, ordered stages, lives and rewards.", "dungeon")
         );
     }
@@ -461,7 +484,7 @@ public final class SsuDashboardScreen extends Screen {
             if (index >= tools.size()) break;
             AdminTool tool = tools.get(index);
             int y = rowStart + local * rowStep;
-            Button getTool = Button.builder(Component.literal(("quest".equals(tool.id()) || "minigame".equals(tool.id())
+            Button getTool = Button.builder(Component.literal(("quest".equals(tool.id())
                             || "dungeon".equals(tool.id()) || "shops".equals(tool.id()) || "item_prices".equals(tool.id()))
                             ? "Open Editor" : "Get Tool"), ignored -> action("admin_tool_get", tool.id(), "", ""))
                     .bounds(l.contentRight() - 84, y + 10, 84, 20).build();
@@ -812,6 +835,63 @@ public final class SsuDashboardScreen extends Screen {
         addPagination(l, 110);
     }
 
+    private void addPlayerWarpButtons(Layout l) {
+        boolean canRentPermission = Boolean.parseBoolean(pageValue("player_warps", "can_rent", "false"));
+        boolean economyEnabled = Boolean.parseBoolean(pageValue("player_warps", "economy_enabled", "false"));
+        boolean canRent = canRentPermission && economyEnabled;
+        boolean canUse = Boolean.parseBoolean(pageValue("player_warps", "can_use", "false"));
+        int maximum = parseInt(pageValue("player_warps", "maximum", "0"), 0);
+        int current = parseInt(pageValue("player_warps", "count", "0"), 0);
+        boolean canCreate = canRent && maximum > 0 && current < maximum;
+        int y = l.contentTop() + 42;
+        int fieldWidth = Math.max(100, l.contentWidth() - 112);
+        warpNameBox = box(l.contentX(), y, fieldWidth, "Warp name", draftWarpName, value -> draftWarpName = value);
+        warpNameBox.setMaxLength(32);
+        warpNameBox.active = canCreate;
+        addRenderableWidget(warpNameBox);
+        String normalizedDraftWarp = draftWarpName.trim();
+        boolean confirmingSet = !normalizedDraftWarp.isBlank() && pendingSetPlayerWarp.equalsIgnoreCase(normalizedDraftWarp);
+        Button set = Button.builder(Component.literal(confirmingSet ? "Confirm" : "Rent new"), ignored -> {
+                    String name = draftWarpName.trim();
+                    if (name.isBlank()) { setNotice("Enter a warp name first.", true); return; }
+                    if (!pendingSetPlayerWarp.equalsIgnoreCase(name)) {
+                        pendingSetPlayerWarp = name;
+                        String price = pageValue("player_warps", "price", "the configured rent");
+                        setNotice("Confirm renting '" + name + "'. The first period is prepaid at " + price + ".", false);
+                        return;
+                    }
+                    pendingSetPlayerWarp = "";
+                    action("player_warp_set", name, "", "");
+                }).bounds(l.contentRight() - 106, y, 106, 20).build();
+        set.active = canCreate;
+        addRenderableWidget(set);
+
+        List<SsuMenuPageDataPayload.LocationEntry> values = pageData.locations();
+        for (int i = 0; i < values.size(); i++) {
+            var entry = values.get(i);
+            int rowY = rowY(l, i, 86);
+            int right = l.contentRight();
+            addRenderableWidget(Button.builder(Component.literal("Move here"), ignored ->
+                            action("player_warp_move", entry.name(), "", ""))
+                    .bounds(right - 280, rowY, 58, 20).build());
+            Button teleport = Button.builder(Component.literal("Teleport"), ignored ->
+                            action("teleport_warp", entry.name(), "player_warps", ""))
+                    .bounds(right - 218, rowY, 64, 20).build();
+            teleport.active = canUse;
+            addRenderableWidget(teleport);
+            boolean isPublic = "public".equals(entry.kind());
+            addRenderableWidget(Button.builder(Component.literal(isPublic ? "Make private" : "Make public"), ignored ->
+                            action("player_warp_visibility", entry.name(), "", Boolean.toString(!isPublic)))
+                    .bounds(right - 150, rowY, 80, 20).build());
+            Button delete = Button.builder(Component.literal(deleteWarpLabel(entry.name())), ignored -> requestDeleteWarp(entry.name()))
+                    .bounds(right - 66, rowY, 66, 20).build();
+            addRenderableWidget(delete);
+        }
+        addRenderableWidget(Button.builder(Component.literal("Open Travel"), ignored -> openPage(Page.TRAVEL))
+                .bounds(l.contentX(), l.footerY(), 82, 20).build());
+        addPagination(l, 88);
+    }
+
     private void addAdminTravelButtons(Layout l) {
         addTravelFilterButtons(l, true);
         boolean compact = l.contentWidth() < 500;
@@ -1061,7 +1141,89 @@ public final class SsuDashboardScreen extends Screen {
     }
 
     private void addClaimTaxButtons(Layout l) {
-        // Informational page. Player Claims currently have no monetary tax base or recurring tax cycle.
+        boolean enabled = Boolean.parseBoolean(pageValue("claim_tax", "enabled", "false"));
+        int top = l.contentTop() + 24;
+        int gap = 4;
+        int toggleW = 80;
+        int applyW = 62;
+        int available = l.contentWidth() - toggleW - applyW - gap * 4;
+        int fieldW = Math.max(54, available / 3);
+        Button toggle = Button.builder(Component.literal(enabled ? "Disable" : pendingEnableClaimTax ? "Confirm" : "Enable"), ignored -> {
+            if (enabled) { pendingEnableClaimTax = false; action("claim_tax_toggle", "", "", "false"); return; }
+            if (!pendingEnableClaimTax) {
+                pendingEnableClaimTax = true;
+                setNotice("Enabling claim tax can permanently delete every claim and linked home of players who cannot pay, then confiscate the taxed peak chunks from their future claim capacity. Click Confirm to enable it.", true);
+                rebuildWidgets();
+                return;
+            }
+            pendingEnableClaimTax = false;
+            action("claim_tax_toggle", "", "", "true");
+        }).bounds(l.contentX(), top, toggleW, 20).build();
+        addRenderableWidget(toggle);
+        int x = l.contentX() + toggleW + gap;
+        claimTaxRateBox = box(x, top, fieldW, "Rate/chunk", draftClaimTaxRate, value -> draftClaimTaxRate = value);
+        addRenderableWidget(claimTaxRateBox); x += fieldW + gap;
+        claimTaxIntervalBox = box(x, top, fieldW, "Interval h", draftClaimTaxInterval, value -> draftClaimTaxInterval = value);
+        addRenderableWidget(claimTaxIntervalBox); x += fieldW + gap;
+        claimTaxReminderBox = box(x, top, fieldW, "Reminder h", draftClaimTaxReminder, value -> draftClaimTaxReminder = value);
+        addRenderableWidget(claimTaxReminderBox);
+        addRenderableWidget(Button.builder(Component.literal("Apply"), ignored ->
+                        action("claim_tax_settings", draftClaimTaxRate, draftClaimTaxInterval, draftClaimTaxReminder))
+                .bounds(l.contentRight() - applyW, top, applyW, 20).build());
+
+        int dimY = top + 28;
+        int multiplierW = 64, saveW = 82;
+        int dimensionW = Math.max(120, l.contentWidth() - multiplierW - saveW - gap * 2);
+        claimTaxDimensionBox = box(l.contentX(), dimY, dimensionW, "namespace:dimension", draftClaimTaxDimension, value -> draftClaimTaxDimension = value);
+        claimTaxDimensionBox.setMaxLength(128);
+        addRenderableWidget(claimTaxDimensionBox);
+        claimTaxMultiplierBox = box(l.contentX() + dimensionW + gap, dimY, multiplierW, "Multiplier", draftClaimTaxMultiplier, value -> draftClaimTaxMultiplier = value);
+        addRenderableWidget(claimTaxMultiplierBox);
+        addRenderableWidget(Button.builder(Component.literal("Add / update"), ignored ->
+                        action("claim_tax_dimension", draftClaimTaxDimension, "", draftClaimTaxMultiplier))
+                .bounds(l.contentRight() - saveW, dimY, saveW, 20).build());
+
+        List<SsuMenuPageDataPayload.PermissionEntry> dimensions = pageData.permissions().stream()
+                .filter(entry -> "dimension".equals(entry.kind())).toList();
+        for (int i = 0; i < dimensions.size() && i < 7; i++) {
+            var entry = dimensions.get(i);
+            int rowY = l.contentTop() + 86 + i * 25;
+            boolean vanilla = entry.key().equals("minecraft:overworld") || entry.key().equals("minecraft:the_nether") || entry.key().equals("minecraft:the_end");
+            Button edit = Button.builder(Component.literal("Edit"), ignored -> {
+                        draftClaimTaxDimension = entry.key();
+                        draftClaimTaxMultiplier = entry.value();
+                        rebuildWidgets();
+                    }).bounds(l.contentRight() - (vanilla ? 54 : 112), rowY, 50, 20).build();
+            addRenderableWidget(edit);
+            if (!vanilla) addRenderableWidget(Button.builder(Component.literal("Remove"), ignored ->
+                            action("claim_tax_dimension_remove", entry.key(), "", ""))
+                    .bounds(l.contentRight() - 56, rowY, 56, 20).build());
+        }
+        addPagination(l, 0);
+    }
+
+    private void addWarpRentalButtons(Layout l) {
+        int y = l.contentTop() + 50;
+        int applyW = 70, gap = 6;
+        int fieldW = Math.max(90, (l.contentWidth() - applyW - gap * 2) / 2);
+        warpRentalPriceBox = box(l.contentX(), y, fieldW, "Price", draftWarpRentalPrice, value -> draftWarpRentalPrice = value);
+        addRenderableWidget(warpRentalPriceBox);
+        warpRentalDaysBox = box(l.contentX() + fieldW + gap, y, fieldW, "Days", draftWarpRentalDays, value -> draftWarpRentalDays = value);
+        addRenderableWidget(warpRentalDaysBox);
+        addRenderableWidget(Button.builder(Component.literal("Apply"), ignored ->
+                        action("warp_rental_settings", draftWarpRentalPrice, "", draftWarpRentalDays))
+                .bounds(l.contentRight() - applyW, y, applyW, 20).build());
+    }
+
+    private void syncClaimTaxDrafts(SsuMenuPageDataPayload payload) {
+        draftClaimTaxRate = payloadValue(payload, "claim_tax", "rate", draftClaimTaxRate);
+        draftClaimTaxInterval = payloadValue(payload, "claim_tax", "interval_hours", draftClaimTaxInterval);
+        draftClaimTaxReminder = payloadValue(payload, "claim_tax", "reminder_hours", draftClaimTaxReminder);
+    }
+
+    private void syncWarpRentalDrafts(SsuMenuPageDataPayload payload) {
+        draftWarpRentalPrice = payloadValue(payload, "warp_rental", "price", draftWarpRentalPrice);
+        draftWarpRentalDays = payloadValue(payload, "warp_rental", "days", draftWarpRentalDays);
     }
 
     private void addSearchAt(Layout l, int y) {
@@ -1077,26 +1239,13 @@ public final class SsuDashboardScreen extends Screen {
         for (int i = 0; i < values.size(); i++) {
             var entry = values.get(i); int y = rowY(l, i); int right = l.contentRight(); int row = i;
             addRenderableWidget(Button.builder(Component.literal("Details"), ignored -> select(row))
-                    .bounds(right - 300, y, 56, 20).build());
+                    .bounds(right - 184, y, 56, 20).build());
             addRenderableWidget(Button.builder(Component.literal("Settings"), ignored -> openPropertySettings("region", entry.name()))
-                    .bounds(right - 240, y, 66, 20).build());
+                    .bounds(right - 124, y, 66, 20).build());
             if (snapshot.administrator()) {
                 addRenderableWidget(Button.builder(Component.literal(entry.visible() ? "Disable" : "Show"), ignored ->
                         action("region_visibility", entry.name(), "", Boolean.toString(!entry.visible())))
-                        .bounds(right - 170, y, 54, 20).build());
-            }
-            String label = entry.rentedByPlayer() ? (entry.periodText().equals("permanent") ? "Unrent" : "Extend")
-                    : entry.rentable() && !entry.rented() ? "Rent" : "";
-            if (!label.isBlank()) {
-                String op = label.equals("Rent") ? "region_rent" : label.equals("Extend") ? "region_extend" : "region_unrent";
-                String buttonLabel = op.equals("region_unrent") ? unrentLabel(entry.name()) : label;
-                addRenderableWidget(Button.builder(Component.literal(buttonLabel), ignored -> {
-                    if (op.equals("region_unrent")) requestUnrent(entry.name()); else action(op, entry.name(), "", "");
-                }).bounds(right - 112, y, 54, 20).build());
-                if (entry.rentedByPlayer() && label.equals("Extend")) {
-                    addRenderableWidget(Button.builder(Component.literal(unrentLabel(entry.name())), ignored -> requestUnrent(entry.name()))
-                            .bounds(right - 56, y, 56, 20).build());
-                }
+                        .bounds(right - 54, y, 54, 20).build());
             }
         }
         if (snapshot.administrator()) {
@@ -1184,6 +1333,20 @@ public final class SsuDashboardScreen extends Screen {
         }
         addRenderableWidget(Button.builder(Component.literal("Refresh"), ignored -> requestPage(false))
                 .bounds(l.contentRight() - 68, l.footerY(), 68, 20).build());
+    }
+
+    private String pageValue(String owner, String key, String fallback) {
+        return pageData.permissions().stream().filter(entry -> owner.equals(entry.owner()) && key.equals(entry.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse(fallback);
+    }
+
+    private static String payloadValue(SsuMenuPageDataPayload payload, String owner, String key, String fallback) {
+        return payload.permissions().stream().filter(entry -> owner.equals(entry.owner()) && key.equals(entry.key()))
+                .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse(fallback);
+    }
+
+    private static int parseInt(String value, int fallback) {
+        try { return Integer.parseInt(value); } catch (Exception ignored) { return fallback; }
     }
 
     private String miningValue(String owner, String key, String fallback) {
@@ -1880,8 +2043,8 @@ public final class SsuDashboardScreen extends Screen {
     }
     private String deleteWarpLabel(String warp) { return pendingDeleteWarp.equalsIgnoreCase(warp) ? "Confirm" : "Delete"; }
     private void requestDeleteWarp(String warp) {
-        if (pendingDeleteWarp.equalsIgnoreCase(warp)) { pendingDeleteWarp = ""; action("warp_delete", warp, page.remoteId(), ""); return; }
-        pendingDeleteWarp = warp; pendingDeleteHome = "";
+        if (pendingDeleteWarp.equalsIgnoreCase(warp)) { pendingDeleteWarp = ""; action(page == Page.MY_WARPS ? "player_warp_delete" : "warp_delete", warp, page.remoteId(), ""); return; }
+        pendingDeleteWarp = warp; pendingDeleteHome = ""; pendingSetPlayerWarp = "";
         setNotice("Click Confirm again to permanently delete warp '" + warp + "'.", true);
     }
     private String deleteAdminClaimLabel(String claimId) { return pendingDeleteAdminClaim.equals(claimId) ? "Confirm" : "Delete"; }
@@ -1986,6 +2149,8 @@ public final class SsuDashboardScreen extends Screen {
         if (page == Page.RANKS) return Math.min(5, rowsThatFit(l, 84));
         if (page == Page.TRAVEL) return Math.min(PAGE_SIZE, rowsThatFit(l, 82));
         if (page == Page.TRAVEL_ADMIN) return Math.min(PAGE_SIZE, rowsThatFit(l, l.contentWidth() < 500 ? 130 : 106));
+        if (page == Page.MY_WARPS) return Math.min(PAGE_SIZE, rowsThatFit(l, 86));
+        if (page == Page.CLAIM_TAX) return Math.min(7, rowsThatFit(l, 86));
         if (page == Page.WALLET) return Math.min(PAGE_SIZE, rowsThatFit(l, 78));
         if (page == Page.TRANSACTIONS) return Math.min(PAGE_SIZE, rowsThatFit(l, 108));
         if (page == Page.REGION_ADMIN) return Math.min(4, rowsThatFit(l, l.contentWidth() < 440 ? 130 : 105));
@@ -2067,6 +2232,10 @@ public final class SsuDashboardScreen extends Screen {
             ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload("open", "", nextRequestId++));
             return;
         }
+        if (target == Page.MINIGAME_ADMIN) {
+            ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload("open_admin", "", nextRequestId++));
+            return;
+        }
         if (target == Page.DUNGEONS) {
             ClientPacketDistributor.sendToServer(new DungeonLobbyRequestPayload("open", "", nextRequestId++));
             return;
@@ -2083,7 +2252,7 @@ public final class SsuDashboardScreen extends Screen {
             selectedTransactionPlayerLabel = "";
             draftTransactionPlayer = "";
         }
-        previousPage = page; page = target; pageIndex = 0; if (target == Page.ADMIN_TOOLS) adminToolScroll = 0; if (target == Page.ADMIN) adminModuleScroll = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingDeleteHome = ""; pendingDeleteWarp = ""; pendingDeleteAdminClaim = ""; pendingDeleteRank = ""; clearRegionConfirmations(); pendingResetAllBorderColors = false; pendingResetStatistic = ""; pendingDeleteStatistic = "";
+        previousPage = page; page = target; pageIndex = 0; if (target == Page.ADMIN_TOOLS) adminToolScroll = 0; if (target == Page.ADMIN) adminModuleScroll = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingDeleteHome = ""; pendingDeleteWarp = ""; pendingSetPlayerWarp = ""; pendingDeleteAdminClaim = ""; pendingDeleteRank = ""; clearRegionConfirmations(); pendingResetAllBorderColors = false; pendingEnableClaimTax = false; pendingResetStatistic = ""; pendingDeleteStatistic = "";
         loading = false;
         if (target != Page.PERMISSIONS) permissionLoading = false;
         if (target != Page.PLAYER_INFO) playerProfileLoading = false;
@@ -2106,7 +2275,7 @@ public final class SsuDashboardScreen extends Screen {
             page = previousPage == page ? Page.HOME : previousPage;
             previousPage = Page.HOME;
         }
-        pageIndex = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingDeleteHome = ""; pendingDeleteWarp = ""; pendingDeleteAdminClaim = ""; pendingDeleteRank = ""; clearRegionConfirmations(); pendingResetAllBorderColors = false; pendingResetStatistic = ""; pendingDeleteStatistic = "";
+        pageIndex = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingDeleteHome = ""; pendingDeleteWarp = ""; pendingSetPlayerWarp = ""; pendingDeleteAdminClaim = ""; pendingDeleteRank = ""; clearRegionConfirmations(); pendingResetAllBorderColors = false; pendingEnableClaimTax = false; pendingResetStatistic = ""; pendingDeleteStatistic = "";
         loading = false;
         if (page != Page.PERMISSIONS) permissionLoading = false;
         if (page != Page.PLAYER_INFO) playerProfileLoading = false;
@@ -2126,7 +2295,7 @@ public final class SsuDashboardScreen extends Screen {
 
     private static boolean isEconomicsChild(Page page) {
         return page == Page.ACCOUNTS || page == Page.TRANSACTIONS || page == Page.AUCTION_TAX
-                || page == Page.CLAIM_TAX || page == Page.RENT_OPERATIONS;
+                || page == Page.CLAIM_TAX || page == Page.WARP_RENTAL || page == Page.RENT_OPERATIONS;
     }
 
     private String transactionRequestQuery() {
@@ -2434,7 +2603,7 @@ public final class SsuDashboardScreen extends Screen {
         drawUtilityButton(g, settingsBounds(l), ICON_SETTINGS, page == Page.SETTINGS,
                 mouseX, mouseY, snapshot.settingsAvailable());
         drawUtilityButton(g, adminBounds(l), ICON_SHIELD,
-                page == Page.ADMIN || page == Page.MODULE_SETTINGS || page == Page.ADMIN_TOOLS
+                page == Page.ADMIN || page == Page.MODULE_SETTINGS || page == Page.ADMIN_TOOLS || page == Page.MINIGAME_ADMIN
                         || page == Page.HOLOGRAMS || page == Page.PERMISSIONS || page == Page.PLAYER_INFO
                         || page == Page.ECONOMICS || page == Page.TRANSACTIONS || page == Page.AUCTION_TAX
                         || page == Page.CLAIM_TAX || page == Page.ACCOUNTS || page == Page.RENT_OPERATIONS,
@@ -2736,9 +2905,10 @@ public final class SsuDashboardScreen extends Screen {
             case HOLOGRAMS -> drawHolograms(g, l);
             case STATISTICS -> drawStatistics(g, l);
             case CLAIMS -> drawClaims(g,l); case HOMES -> drawHomes(g,l); case TRAVEL -> drawTravel(g,l,false);
+            case MY_WARPS -> drawPlayerWarps(g,l);
             case TRAVEL_ADMIN -> drawTravel(g,l,true); case ADMIN_CLAIMS -> drawAdminClaims(g,l); case RANKS -> drawRanks(g,l);
             case WALLET -> drawWallet(g,l); case ECONOMICS -> drawEconomics(g,l); case TRANSACTIONS -> drawTransactions(g,l);
-            case AUCTION_TAX -> drawAuctionTax(g,l); case CLAIM_TAX -> drawClaimTax(g,l);
+            case AUCTION_TAX -> drawAuctionTax(g,l); case CLAIM_TAX -> drawClaimTax(g,l); case WARP_RENTAL -> drawWarpRental(g,l);
             case REGIONS -> drawRegions(g,l); case REGION_ADMIN -> drawRegionAdmin(g,l); case UTILITY_MINING_ADMIN -> drawUtilityMiningAdmin(g,l); case MAINTENANCE -> drawMaintenance(g,l); case SETTINGS -> drawSettingsIntro(g, l);
             case PERMISSIONS -> drawPermissions(g,l,mouseX,mouseY); case PLAYER_INFO -> drawPlayerInfo(g,l);
             case ACCOUNTS -> drawAccounts(g,l); case JOBS -> drawJobs(g,l);
@@ -2747,6 +2917,7 @@ public final class SsuDashboardScreen extends Screen {
             case AUCTION_HOUSE -> g.text(font,"Opening Auction House…",l.contentX(),l.contentTop(),MUTED,false);
             case QUESTS -> g.text(font,"Opening Questbook…",l.contentX(),l.contentTop(),MUTED,false);
             case MINIGAMES -> g.text(font,"Opening Minigame Lobby…",l.contentX(),l.contentTop(),MUTED,false);
+            case MINIGAME_ADMIN -> g.text(font,"Opening Minigame Administration…",l.contentX(),l.contentTop(),MUTED,false);
             case DUNGEONS -> g.text(font,"Opening Dungeon Lobby…",l.contentX(),l.contentTop(),MUTED,false);
         }
     }
@@ -2908,6 +3079,43 @@ public final class SsuDashboardScreen extends Screen {
             g.text(font,trim(e.name(),34),l.contentX(),y,TEXT,false);g.text(font,e.chunkCount()+" chunks | "+shortDim(e.dimension()),l.contentX()+170,y,MUTED,false);}
         if(selectedRow>=0&&selectedRow<pageData.claims().size()){var e=pageData.claims().get(selectedRow);
             detail(g,l,"Administrative claim details",List.of("Claim ID: "+e.id(),"Owner / claim: "+e.name(),"Trusted: "+(e.trustedPlayers().isBlank()?e.trustedCount():e.trustedPlayers()),"Flags: "+e.flags()));}}
+    private void drawPlayerWarps(GuiGraphicsExtractor g, Layout l) {
+        boolean canRentPermission = Boolean.parseBoolean(pageValue("player_warps", "can_rent", "false"));
+        boolean economyEnabled = Boolean.parseBoolean(pageValue("player_warps", "economy_enabled", "false"));
+        boolean canRent = canRentPermission && economyEnabled;
+        String price = pageValue("player_warps", "price", "-");
+        String period = pageValue("player_warps", "period", "-");
+        String count = pageValue("player_warps", "count", "0");
+        String maximum = pageValue("player_warps", "maximum", "0");
+        int currentCount = parseInt(count, 0);
+        int maximumCount = parseInt(maximum, 0);
+        boolean canCreate = canRent && maximumCount > 0 && currentCount < maximumCount;
+        g.text(font, "Rented warps: " + count + " / " + maximum + " | " + price + " every " + period,
+                l.contentX(), l.contentTop() + 2, canCreate ? GOOD : WARNING, false);
+        String availability = canCreate
+                ? "New rentals are prepaid. Use Move here on an existing warp without changing its paid period."
+                : !canRentPermission ? "Your rank does not currently allow new player-warp rentals. Existing rentals remain manageable."
+                : !economyEnabled ? "Economy is disabled, so new rentals are unavailable. Existing rentals remain manageable."
+                : "You reached your rented-warp limit. Existing rentals can still be moved, hidden or deleted.";
+        g.text(font, availability, l.contentX(), l.contentTop() + 15, canCreate ? MUTED : WARNING, false);
+        if (pageData.locations().isEmpty()) {
+            g.text(font, canRent ? "You do not rent any warps yet." : "No rented warps are available.",
+                    l.contentX(), l.contentTop() + 92, MUTED, false);
+        }
+        for (int i = 0; i < pageData.locations().size(); i++) {
+            var entry = pageData.locations().get(i);
+            int y = rowTextY(l, i, 86);
+            String paidUntil = pageData.permissions().stream()
+                    .filter(meta -> "warp".equals(meta.kind()) && meta.owner().equalsIgnoreCase(entry.name()) && "paid_until".equals(meta.key()))
+                    .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse("0");
+            long timestamp; try { timestamp = Long.parseLong(paidUntil); } catch (Exception ignored) { timestamp = 0L; }
+            g.text(font, trim(entry.name(), 20), l.contentX(), y, TEXT, false);
+            if (l.contentWidth() >= 500) {
+                g.text(font, cap(entry.kind()) + " | paid until " + time(timestamp), l.contentX() + 104, y, MUTED, false);
+            }
+        }
+    }
+
     private void drawTravel(GuiGraphicsExtractor g,Layout l,boolean admin){
         if(pageData.locations().isEmpty())empty(g,l,admin?"No server warps or spawn match this filter.":"No available travel destinations match this filter.");
         int offset=admin?(l.contentWidth()<500?130:106):82;
@@ -2946,12 +3154,39 @@ public final class SsuDashboardScreen extends Screen {
     }
 
     private void drawClaimTax(GuiGraphicsExtractor g, Layout l) {
-        g.text(font, "Player Claim tax is not currently active.", l.contentX(), l.contentTop() + 8, WARNING, true);
-        g.text(font, "Player Claims have no purchase price, recurring billing cycle or taxable income in the current system.",
-                l.contentX(), l.contentTop() + 27, MUTED, false);
-        g.text(font, "A tax rate cannot be applied safely until its amount, timing and insufficient-funds behaviour are defined.",
-                l.contentX(), l.contentTop() + 42, MUTED, false);
-        g.text(font, "No player is being charged by this page.", l.contentX(), l.contentTop() + 62, GOOD, false);
+        boolean enabled = Boolean.parseBoolean(pageValue("claim_tax", "enabled", "false"));
+        boolean safetyHalt = Boolean.parseBoolean(pageValue("claim_tax", "safety_halt", "false"));
+        long next; try { next = Long.parseLong(pageValue("claim_tax", "next_charge", "0")); } catch (Exception ignored) { next = 0L; }
+        g.text(font, "Recurring Player Claim tax: " + (enabled ? "ENABLED" : "DISABLED")
+                        + " | earliest due " + time(next),
+                l.contentX(), l.contentTop() + 2, enabled ? WARNING : MUTED, true);
+        g.text(font, "Each claim has its own cycle. Money uses its recorded peak and dimension multiplier.",
+                l.contentX(), l.contentTop() + 14, MUTED, false);
+        if (safetyHalt) {
+            g.text(font, "SAFETY HALT: tax enforcement and claim mutations are fail-closed; inspect the server log.",
+                    l.contentX(), l.contentTop() + 26, ERROR, true);
+        }
+        List<SsuMenuPageDataPayload.PermissionEntry> dimensions = pageData.permissions().stream()
+                .filter(entry -> "dimension".equals(entry.kind())).toList();
+        for (int i = 0; i < dimensions.size() && i < 7; i++) {
+            var entry = dimensions.get(i);
+            int y = l.contentTop() + 92 + i * 25;
+            g.text(font, trim(entry.key(), 31), l.contentX(), y, TEXT, false);
+            g.text(font, "x" + entry.value(), l.contentX() + 190, y, ACCENT, false);
+        }
+        g.text(font, trim("WARNING: failed payment removes all claims/homes and permanently confiscates the exact taxed peak chunks.",
+                        Math.max(28, l.contentWidth() / 6)),
+                l.contentX(), l.footerY() - 13, ERROR, false);
+    }
+
+    private void drawWarpRental(GuiGraphicsExtractor g, Layout l) {
+        String active = pageValue("warp_rental", "active", "0");
+        g.text(font, "Player Warp rentals", l.contentX(), l.contentTop() + 5, ACCENT, true);
+        g.text(font, "Players with ssu.warps.rent prepay this amount. Renewal is charged automatically at expiry.",
+                l.contentX(), l.contentTop() + 20, MUTED, false);
+        g.text(font, "If renewal cannot be paid, the warp is deleted and its name becomes available again.",
+                l.contentX(), l.contentTop() + 33, WARNING, false);
+        g.text(font, "Active player rentals: " + active, l.contentX(), l.contentTop() + 82, GOOD, false);
     }
 
     private void drawTransactionRows(GuiGraphicsExtractor g, Layout l, int offset) {
@@ -3180,16 +3415,18 @@ public final class SsuDashboardScreen extends Screen {
         AUCTION_HOUSE("Auction House","Browse, buy and sell player auctions",""),
         QUESTS("Questbook","Available, active and completed quests",""),
         MINIGAMES("Minigames","Queues, arenas and active matches",""),
+        MINIGAME_ADMIN("Minigame Administration","Modes, arenas, setup and live-match control",""),
         DUNGEONS("Customized Dungeons","Parties, stages, checkpoints and dungeon runs",""),
         CLAIMS("Claims & Land","Owned claims, border visibility and claim-linked homes","claims"), HOMES("Homes","Personal teleport locations linked to one claim","homes"),
-        TRAVEL("Travel","Homes, warps and server destinations","travel"), TRAVEL_ADMIN("Travel Management","Server warp and spawn administration","travel_admin"), ADMIN_CLAIMS("Player Claims","Administrative claim inspection and recovery","admin_claims"),
+        TRAVEL("Travel","Homes, warps and server destinations","travel"), MY_WARPS("My Warps","Rent and manage personal warps","player_warps"), TRAVEL_ADMIN("Travel Management","Server warp and spawn administration","travel_admin"), ADMIN_CLAIMS("Player Claims","Administrative claim inspection and recovery","admin_claims"),
         RANKS("Rank Management","Create, rename and maintain permission ranks","ranks"),
         WALLET("Wallet & Transactions","Payments and your personal transaction history","wallet_transactions"),
         ECONOMICS("Economics","Accounts, transactions, taxes and economy journals",""),
         TRANSACTIONS("Transactions","Filter and inspect the complete transaction journal","transactions"),
         AUCTION_TAX("Auction House Tax","Tax withheld from completed Auction House sales","auction_tax"),
-        CLAIM_TAX("Player Claim Tax","Player Claim taxation status and configuration","claim_tax"),
-        REGIONS("Regions & Rentals","Rentals, region details and visibility","regions"),
+        CLAIM_TAX("Player Claim Tax","Recurring per-chunk taxation and dimension multipliers","claim_tax"),
+        WARP_RENTAL("Player Warp Rentals","Prepaid rental pricing and renewal period","warp_rental"),
+        REGIONS("Regions","Server-region details, visibility and settings","regions"),
         REGION_ADMIN("Region Maintenance","Snapshots, recovery, selection and rental administration","region_admin"),
         UTILITY_MINING_ADMIN("Utility Mining","Server rules for Treecapitator and Veinminer","utility_mining_admin"), MAINTENANCE("Maintenance","Reload, refresh and visualization defaults","maintenance"), SETTINGS("Settings","Personal settings",""),
         ADMIN("Admin Center","Paged administrative tools",""), DIMENSIONS("Dimensions","Create and configure custom dimensions",""), MODULE_SETTINGS("Module Settings","Global module switches and render distances",""),

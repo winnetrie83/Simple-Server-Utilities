@@ -55,7 +55,8 @@ public final class ContentActionEngine {
         ArrayList<PreparedContentAction> prepared = new ArrayList<>(rawActions.size());
         try {
             if (rawActions.size() > 256) throw new IllegalArgumentException("At most 256 actions may execute together.");
-            for (ContentAction rawAction : rawActions) {
+            for (int actionIndex = 0; actionIndex < rawActions.size(); actionIndex++) {
+                ContentAction rawAction = rawActions.get(actionIndex);
                 if (rawAction == null) throw new IllegalArgumentException("Action list contains an empty entry.");
                 ContentAction action = rawAction.normalize();
                 ContentActionHandler handler;
@@ -63,7 +64,7 @@ public final class ContentActionEngine {
                     handler = handlers.get(action.type());
                 }
                 if (handler == null) throw new IllegalArgumentException("Unknown action type: " + action.type());
-                PreparedContentAction step = handler.prepare(action, context, progression);
+                PreparedContentAction step = handler.prepare(action, actionContext(context, actionIndex), progression);
                 if (step == null) throw new IllegalArgumentException("Action handler returned no step: " + action.type());
                 prepared.add(step);
             }
@@ -80,6 +81,14 @@ public final class ContentActionEngine {
         boolean committed = result.status() == SsuTransactionManager.Status.SUCCESS
                 || result.status() == SsuTransactionManager.Status.DUPLICATE;
         return new ExecutionResult(committed, result.status().name().toLowerCase(Locale.ROOT), result.error(), result);
+    }
+
+    private static ContentActionContext actionContext(ContentActionContext context, int actionIndex) {
+        if (context == null) return null;
+        String key = context.idempotencyKey();
+        if (!key.isBlank()) key = key + ":action:" + actionIndex;
+        return new ContentActionContext(context.server(), context.player(), context.sourceModule(),
+                context.sourceId(), key, context.variables());
     }
 
     private static String namespacedTransactionKey(String module, String source, String rawKey) {

@@ -14,6 +14,7 @@ public record MinigameLobbyDataPayload(
         String notice,
         boolean error,
         boolean canAdmin,
+        boolean adminView,
         long requestId,
         String queuedMinigameId,
         String activeMatchId,
@@ -37,6 +38,7 @@ public record MinigameLobbyDataPayload(
         buffer.writeUtf(payload.notice, 512);
         buffer.writeBoolean(payload.error);
         buffer.writeBoolean(payload.canAdmin);
+        buffer.writeBoolean(payload.adminView);
         buffer.writeVarLong(payload.requestId);
         buffer.writeUtf(payload.queuedMinigameId, 64);
         buffer.writeUtf(payload.activeMatchId, 64);
@@ -48,13 +50,15 @@ public record MinigameLobbyDataPayload(
         String notice = buffer.readUtf(512);
         boolean error = buffer.readBoolean();
         boolean admin = buffer.readBoolean();
+        boolean adminView = buffer.readBoolean();
         long request = buffer.readVarLong();
         String queued = buffer.readUtf(64);
         String match = buffer.readUtf(64);
-        int count = Math.min(MAX_GAMES, Math.max(0, buffer.readVarInt()));
+        int count = buffer.readVarInt();
+        if (count < 0 || count > MAX_GAMES) throw new IllegalArgumentException("Invalid minigame game count: " + count);
         ArrayList<GameEntry> games = new ArrayList<>(count);
         for (int i = 0; i < count; i++) games.add(GameEntry.decode(buffer));
-        return new MinigameLobbyDataPayload(notice, error, admin, request, queued, match, games);
+        return new MinigameLobbyDataPayload(notice, error, admin, adminView, request, queued, match, games);
     }
 
     public record GameEntry(
@@ -62,6 +66,7 @@ public record MinigameLobbyDataPayload(
             String displayName,
             String description,
             String iconItem,
+            String gameType,
             boolean enabled,
             int minPlayers,
             int maxPlayers,
@@ -84,6 +89,7 @@ public record MinigameLobbyDataPayload(
             displayName = PayloadBounds.string(displayName, 128);
             description = PayloadBounds.string(description, 8_192);
             iconItem = PayloadBounds.string(iconItem, 128);
+            gameType = PayloadBounds.string(gameType, 32);
             minPlayers = Math.max(1, minPlayers);
             maxPlayers = Math.max(minPlayers, maxPlayers);
             teamCount = Math.max(1, teamCount);
@@ -102,6 +108,7 @@ public record MinigameLobbyDataPayload(
             buffer.writeUtf(displayName, 128);
             buffer.writeUtf(description, 8_192);
             buffer.writeUtf(iconItem, 128);
+            buffer.writeUtf(gameType, 32);
             buffer.writeBoolean(enabled);
             buffer.writeVarInt(minPlayers);
             buffer.writeVarInt(maxPlayers);
@@ -122,7 +129,7 @@ public record MinigameLobbyDataPayload(
 
         private static GameEntry decode(RegistryFriendlyByteBuf buffer) {
             return new GameEntry(buffer.readUtf(64), buffer.readUtf(128), buffer.readUtf(8_192),
-                    buffer.readUtf(128), buffer.readBoolean(), buffer.readVarInt(), buffer.readVarInt(),
+                    buffer.readUtf(128), buffer.readUtf(32), buffer.readBoolean(), buffer.readVarInt(), buffer.readVarInt(),
                     buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt(),
                     buffer.readVarInt(), buffer.readUtf(32), buffer.readBoolean(), buffer.readUtf(512),
                     buffer.readBoolean(), buffer.readBoolean(), buffer.readUtf(32), buffer.readVarInt(),

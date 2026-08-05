@@ -4,5 +4,6 @@ public enum MailSource {
     PLAYER,
     SYSTEM,
     AUCTION,
+    MINIGAME,
     RECOVERY
 }

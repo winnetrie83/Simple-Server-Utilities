@@ -6,7 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/** Initial region settings submitted from the region admin tool GUI. */
+/** Region creation submitted from the GUI-first region selection tool. */
 public record RegionEditorSubmitPayload(
         String name,
         int priority,

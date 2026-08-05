@@ -305,7 +305,7 @@ public final class PlayerUiPreferences {
         return switch (source == null ? be.winnetrie.mod.simpleserverutilities.mail.MailSource.SYSTEM : source) {
             case PLAYER -> mailAutoDeletePlayerAttachments;
             case AUCTION -> mailAutoDeleteAuctionAttachments;
-            case SYSTEM, RECOVERY -> mailAutoDeleteSystemAttachments;
+            case SYSTEM, MINIGAME, RECOVERY -> mailAutoDeleteSystemAttachments;
         };
     }
 

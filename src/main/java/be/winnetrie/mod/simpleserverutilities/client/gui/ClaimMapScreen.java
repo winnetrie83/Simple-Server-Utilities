@@ -218,7 +218,12 @@ public final class ClaimMapScreen extends Screen {
         graphics.text(font, "Claims: " + payload.usedClaimGroups() + " / " + payload.maxClaimGroups(), x, y, MUTED); y += 14;
         if (!payload.selectedClaimGroup().isBlank()) {
             String limit = payload.maxChunksPerClaim() <= 0 ? "unlimited" : Integer.toString(payload.maxChunksPerClaim());
-            graphics.text(font, "Current: " + payload.selectedClaimChunks() + " / " + limit, x, y, MUTED); y += 20;
+            graphics.text(font, "Current: " + payload.selectedClaimChunks() + " / " + limit, x, y, MUTED); y += 14;
+            if (payload.selectedClaimTaxSettlementRequired()) {
+                graphics.text(font, "Tax peak: " + payload.selectedClaimTaxPeakChunks(), x, y, 0xFFFFC96B); y += 14;
+            } else {
+                y += 6;
+            }
         } else {
             y += 6;
         }
@@ -321,6 +326,11 @@ public final class ClaimMapScreen extends Screen {
                 payload.selectedClaimChunks(),
                 payload.maxChunksPerClaim(),
                 payload.canCreateClaims(),
+                payload.selectedClaimTaxSettlementRequired(),
+                payload.selectedClaimTaxEstimate(),
+                payload.selectedClaimTaxPeakChunks(),
+                payload.selectedClaimTaxDueAt(),
+                payload.confiscatedChunks(),
                 payload.ownClaimColor(),
                 payload.otherClaimColor(),
                 payload.regionColor(),
@@ -406,6 +416,10 @@ public final class ClaimMapScreen extends Screen {
         }
         pendingDeleteClaim = "";
         selectedChunks.clear();
+        if (payload.selectedClaimTaxSettlementRequired()) {
+            minecraft.setScreenAndShow(new ClaimTaxDeleteScreen(this, payload));
+            return;
+        }
         ClientPacketDistributor.sendToServer(new ClaimMapActionPayload(
                 ClaimMapOperation.DELETE, claim, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), List.of()));
     }
