@@ -11,8 +11,8 @@ import net.minecraft.network.chat.Component;
 final class GenericMinigameEditorScreen extends MinigameEditorScreen {
     private static final int W = 620, H = 330;
     private EditBox id, name, minPlayers, maxPlayers, countdown, duration;
-    private boolean enabled, automatic;
-    private Button enabledButton, automaticButton;
+    private boolean enabled, automatic, inventoryLock;
+    private Button enabledButton, automaticButton, inventoryLockButton;
 
     GenericMinigameEditorScreen(MinigameEditorOpenPayload initial, Screen parent) {
         super(initial, parent, "Generic Minigame Editor");
@@ -26,11 +26,13 @@ final class GenericMinigameEditorScreen extends MinigameEditorScreen {
         maxPlayers = field(x + 158, y + 150, 120, 4, "Maximum players", Integer.toString(draft.maxPlayers));
         countdown = field(x + 296, y + 150, 140, 6, "Countdown", Integer.toString(draft.countdownSeconds));
         duration = field(x + 450, y + 150, 146, 8, "Match duration", Integer.toString(draft.matchDurationSeconds));
-        enabled = draft.enabled; automatic = draft.automaticStart;
+        enabled = draft.enabled; automatic = draft.automaticStart; inventoryLock = draft.lockInventory;
         enabledButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> { enabled = !enabled; labels(); })
                 .bounds(x + 24, y + 214, 150, 20).build());
         automaticButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> { automatic = !automatic; labels(); })
                 .bounds(x + 184, y + 214, 180, 20).build());
+        inventoryLockButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> { inventoryLock = !inventoryLock; labels(); })
+                .bounds(x + 374, y + 214, 180, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Cancel"), ignored -> onClose()).bounds(x + 24, y + H - 38, 90, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Save minigame"), ignored -> save()).bounds(x + W - 144, y + H - 38, 120, 20).build()).active = !awaiting;
         labels();
@@ -39,6 +41,7 @@ final class GenericMinigameEditorScreen extends MinigameEditorScreen {
     private void labels() {
         if (enabledButton != null) enabledButton.setMessage(Component.literal("Enabled: " + (enabled ? "Yes" : "No")));
         if (automaticButton != null) automaticButton.setMessage(Component.literal("Automatic start: " + (automatic ? "Yes" : "No")));
+        if (inventoryLockButton != null) inventoryLockButton.setMessage(Component.literal("Inventory lock: " + (inventoryLock ? "Yes" : "No")));
     }
 
     private void save() {
@@ -48,7 +51,7 @@ final class GenericMinigameEditorScreen extends MinigameEditorScreen {
             draft.maxPlayers = parseInt(maxPlayers, "Maximum players", draft.minPlayers, 128);
             draft.countdownSeconds = parseInt(countdown, "Countdown", 0, 600);
             draft.matchDurationSeconds = parseInt(duration, "Match duration", 0, 86_400);
-            draft.enabled = enabled; draft.automaticStart = automatic;
+            draft.enabled = enabled; draft.automaticStart = automatic; draft.lockInventory = inventoryLock;
             submitDraft();
         } catch (RuntimeException exception) { setNotice(exception.getMessage(), true); }
     }

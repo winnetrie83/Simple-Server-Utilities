@@ -335,8 +335,8 @@ public final class MailScreen extends Screen {
     }
 
     private Layout layout() {
-        int panelWidth = Math.min(900, Math.max(340, width - 16));
-        int panelHeight = Math.min(500, Math.max(300, height - 16));
+        int panelWidth = Math.min(675, Math.max(340, width - 16));
+        int panelHeight = Math.min(375, Math.max(300, height - 16));
         int left = (width - panelWidth) / 2;
         int top = (height - panelHeight) / 2;
         int listTop = top + 86;

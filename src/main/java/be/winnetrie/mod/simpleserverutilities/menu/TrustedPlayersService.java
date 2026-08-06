@@ -9,10 +9,13 @@ import java.util.Map;
 import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimAccessRole;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.network.SsuTrustedPlayersActionPayload;
+import be.winnetrie.mod.simpleserverutilities.network.SsuClaimRolePermissionActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuTrustedPlayersDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuTrustedPlayersRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.ClaimPolicy;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -21,6 +24,19 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /** Server-authoritative management screen for one claim's trusted-player set. */
 public final class TrustedPlayersService {
     private static final int MAX_CANDIDATES = 100;
+    private static final List<Map.Entry<String, String>> ROLE_PERMISSION_LABELS = List.of(
+            Map.entry(PermissionKeys.CLAIM_CONTEXT_BREAK_BLOCKS, "Break blocks"),
+            Map.entry(PermissionKeys.CLAIM_CONTEXT_PLACE_BLOCKS, "Place blocks"),
+            Map.entry(PermissionKeys.CLAIM_CONTEXT_MODIFY_NONLIVING, "Modify item frames / armor stands"),
+            Map.entry(PermissionKeys.CLAIM_CONTEXT_OPEN_CONTAINERS, "Open containers"),
+            Map.entry(PermissionKeys.CLAIM_CONTEXT_USE_DOORS, "Use doors / trapdoors"),
+            Map.entry(PermissionKeys.CLAIM_CONTEXT_USE_SWITCHES, "Use buttons / levers / plates"),
+            Map.entry(PermissionKeys.CLAIM_CONTEXT_ITEM_TRANSFER, "Pick up / drop items"),
+            Map.entry(PermissionKeys.CLAIM_CONTEXT_USE_HOMES, "Use claim homes"),
+            Map.entry(PermissionKeys.CLAIM_CONTEXT_DAMAGE_LIVING, "Damage living entities"),
+            Map.entry(PermissionKeys.CLAIM_CONTEXT_INTERACT_ENTITIES, "Interact with living entities"),
+            Map.entry(PermissionKeys.CLAIM_CONTEXT_INTERACT_OTHER, "Other block interactions")
+    );
 
     private TrustedPlayersService() {}
 
@@ -50,8 +66,18 @@ public final class TrustedPlayersService {
                     if (claim.isTrusted(target)) {
                         throw new IllegalArgumentException(name + " is already trusted.");
                     }
-                    claim.trust(target);
-                    notice = name + " is now trusted.";
+                    claim.setAccessRole(target, ClaimAccessRole.MEMBER);
+                    notice = name + " is now a claim member.";
+                }
+                case "role_member" -> {
+                    if (!claim.isTrusted(target)) throw new IllegalArgumentException(name + " has no assigned claim role.");
+                    claim.setAccessRole(target, ClaimAccessRole.MEMBER);
+                    notice = name + " is now a claim member.";
+                }
+                case "role_co_owner" -> {
+                    if (!claim.isTrusted(target)) throw new IllegalArgumentException(name + " has no assigned claim role.");
+                    claim.setAccessRole(target, ClaimAccessRole.CO_OWNER);
+                    notice = name + " is now a claim co-owner.";
                 }
                 case "remove" -> {
                     if (!claim.isTrusted(target)) {
@@ -74,6 +100,39 @@ public final class TrustedPlayersService {
         send(player, payload.claim(), payload.search(), payload.requestId(), notice, error);
     }
 
+    public static void handleRolePermissionAction(SsuClaimRolePermissionActionPayload payload, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player)) return;
+        String notice;
+        boolean error = false;
+        try {
+            PlayerClaim claim = requireEditableClaim(player, payload.claim());
+            String role = normalizeEditableRole(payload.role());
+            if (ROLE_PERMISSION_LABELS.stream().noneMatch(entry -> entry.getKey().equals(payload.key()))) {
+                throw new IllegalArgumentException("Unknown claim-role permission.");
+            }
+            if (payload.reset()) {
+                claim.removeRolePermissionOverride(role, payload.key());
+                notice = "This permission now uses the server default.";
+            } else {
+                if (!"true".equals(payload.value()) && !"false".equals(payload.value())) {
+                    throw new IllegalArgumentException("Permission value must be true or false.");
+                }
+                claim.setRolePermissionOverride(role, payload.key(), Boolean.parseBoolean(payload.value()));
+                notice = "Claim-role permission updated.";
+            }
+            SimpleServerUtilities.PLAYER_CLAIMS.save();
+        } catch (IllegalArgumentException exception) {
+            notice = exception.getMessage();
+            error = true;
+        } catch (Exception exception) {
+            SimpleServerUtilities.LOGGER.error("Claim-role permission action failed for {}",
+                    player.getName().getString(), exception);
+            notice = "The claim-role permission could not be changed safely.";
+            error = true;
+        }
+        send(player, payload.claim(), "", payload.requestId(), notice, error);
+    }
+
     private static void send(
             ServerPlayer player,
             String claimName,
@@ -92,8 +151,10 @@ public final class TrustedPlayersService {
         removeSystemAccountsFromClaim(claim);
         boolean canEdit = claim.isOwner(player.getUUID()) && ClaimPolicy.canTrust(player);
         Map<UUID, String> known = knownPlayerNames(player);
-        List<SsuTrustedPlayersDataPayload.Entry> trusted = claim.getTrustedPlayers().stream()
-                .map(playerId -> entry(player, playerId, known.getOrDefault(playerId, displayName(player, playerId))))
+        List<SsuTrustedPlayersDataPayload.Entry> trusted = claim.getAccessRoles().entrySet().stream()
+                .map(access -> entry(player, access.getKey(),
+                        known.getOrDefault(access.getKey(), displayName(player, access.getKey())),
+                        access.getValue().serializedName()))
                 .sorted(entryComparator())
                 .toList();
 
@@ -107,7 +168,7 @@ public final class TrustedPlayersService {
             if (!normalizedSearch.isBlank()
                     && !name.toLowerCase(Locale.ROOT).contains(normalizedSearch)
                     && !playerId.toString().contains(normalizedSearch)) continue;
-            matchingCandidates.add(entry(player, playerId, name));
+            matchingCandidates.add(entry(player, playerId, name, ""));
         }
         matchingCandidates.sort(entryComparator());
         int candidateTotal = matchingCandidates.size();
@@ -117,7 +178,7 @@ public final class TrustedPlayersService {
 
         PacketDistributor.sendToPlayer(player, new SsuTrustedPlayersDataPayload(
                 claim.getDisplayName(),
-                "Trusted players — " + claim.getDisplayName(),
+                "Claim access — " + claim.getDisplayName(),
                 displaySearch,
                 requestId,
                 canEdit,
@@ -125,8 +186,37 @@ public final class TrustedPlayersService {
                 error,
                 candidateTotal,
                 trusted,
-                candidates
+                candidates,
+                rolePermissions(claim)
         ));
+    }
+
+    private static List<SsuTrustedPlayersDataPayload.RolePermissionEntry> rolePermissions(PlayerClaim claim) {
+        List<SsuTrustedPlayersDataPayload.RolePermissionEntry> result = new ArrayList<>();
+        for (String role : List.of("co_owner", "member", "visitor")) {
+            Map<String, String> local = claim.getRolePermissionOverrides(role);
+            Map<String, String> defaults = SimpleServerUtilities.PERMISSIONS
+                    .getOrCreatePlayerClaimContextScope(role).getPermissions();
+            boolean fallback = !"visitor".equals(role);
+            for (Map.Entry<String, String> permission : ROLE_PERMISSION_LABELS) {
+                String override = local.get(permission.getKey());
+                String inherited = defaults.get(permission.getKey());
+                boolean allowed = override != null ? Boolean.parseBoolean(override)
+                        : inherited != null ? Boolean.parseBoolean(inherited) : fallback;
+                result.add(new SsuTrustedPlayersDataPayload.RolePermissionEntry(
+                        role, permission.getKey(), permission.getValue(), allowed, override != null));
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private static String normalizeEditableRole(String raw) {
+        String role = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT)
+                .replace('-', '_').replace(' ', '_');
+        if (!List.of("co_owner", "member", "visitor").contains(role)) {
+            throw new IllegalArgumentException("Choose Co-owner, Member or Visitor.");
+        }
+        return role;
     }
 
     private static PlayerClaim requireEditableClaim(ServerPlayer player, String claimName) {
@@ -140,9 +230,10 @@ public final class TrustedPlayersService {
         return claim;
     }
 
-    private static SsuTrustedPlayersDataPayload.Entry entry(ServerPlayer viewer, UUID playerId, String name) {
+    private static SsuTrustedPlayersDataPayload.Entry entry(
+            ServerPlayer viewer, UUID playerId, String name, String role) {
         boolean online = viewer.level().getServer().getPlayerList().getPlayer(playerId) != null;
-        return new SsuTrustedPlayersDataPayload.Entry(playerId, name, online);
+        return new SsuTrustedPlayersDataPayload.Entry(playerId, name, online, role);
     }
 
     private static Comparator<SsuTrustedPlayersDataPayload.Entry> entryComparator() {

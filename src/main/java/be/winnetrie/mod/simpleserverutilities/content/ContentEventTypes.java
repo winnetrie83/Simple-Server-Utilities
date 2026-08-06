@@ -21,6 +21,16 @@ public final class ContentEventTypes {
     public static final String MINIGAME_STARTED = "minigame_started";
     public static final String MINIGAME_WON = "minigame_won";
     public static final String MINIGAME_COMPLETED = "minigame_completed";
+    public static final String MINIGAME_KILL = "minigame_kill";
+    public static final String MINIGAME_DEATH = "minigame_death";
+    public static final String MINIGAME_ASSIST = "minigame_assist";
+    public static final String MINIGAME_HEALING = "minigame_healing";
+    public static final String MINIGAME_DAMAGE = "minigame_damage";
+    public static final String MINIGAME_CAPTURE = "minigame_capture";
+    public static final String MINIGAME_DEFENSE = "minigame_defense";
+    public static final String MINIGAME_OBJECTIVE_TIME = "minigame_objective_time";
+    public static final String MINIGAME_BOOST_COLLECTED = "minigame_boost_collected";
+    public static final String MINIGAME_LEVEL_UP = "minigame_level_up";
     public static final String DUNGEON_QUEUE_JOINED = "dungeon_queue_joined";
     public static final String DUNGEON_QUEUE_LEFT = "dungeon_queue_left";
     public static final String DUNGEON_STARTED = "dungeon_started";

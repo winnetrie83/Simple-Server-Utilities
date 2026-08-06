@@ -15,6 +15,7 @@ import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
 import net.neoforged.neoforge.event.entity.item.ItemTossEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingHealEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
@@ -38,6 +39,7 @@ public final class MinigameEvents {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onBlockBreak(BreakBlockEvent event) {
         if (!active() || !(event.getPlayer() instanceof ServerPlayer player)) return;
+        SimpleServerUtilities.MINIGAMES.recordActivity(player);
         if (interruptCastAction(player, "tried to break a block")) {
             event.setCanceled(true);
             return;
@@ -57,12 +59,14 @@ public final class MinigameEvents {
     public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
         if (event.getAction() != PlayerInteractEvent.LeftClickBlock.Action.START
                 || !(event.getEntity() instanceof ServerPlayer player) || !active()) return;
+        SimpleServerUtilities.MINIGAMES.recordActivity(player);
         if (interruptCastAction(player, "attacked a block")) event.setCanceled(true);
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
         if (!active() || !(event.getEntity() instanceof ServerPlayer player)) return;
+        SimpleServerUtilities.MINIGAMES.recordActivity(player);
         if (interruptCastAction(player, "tried to place a block")) {
             event.setCanceled(true);
             return;
@@ -76,6 +80,7 @@ public final class MinigameEvents {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || !active()) return;
+        SimpleServerUtilities.MINIGAMES.recordActivity(player);
 
         // The main-hand objective click is the action that starts the cast. Handle it before
         // generic cast interruption, but only when no cast was already running. A later
@@ -126,6 +131,7 @@ public final class MinigameEvents {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || !participant(player)) return;
+        SimpleServerUtilities.MINIGAMES.recordActivity(player);
         if (SimpleServerUtilities.MINIGAMES.objectiveCastStartedThisTick(player)) {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.SUCCESS);
@@ -260,6 +266,7 @@ public final class MinigameEvents {
     public static void onAttackEntity(AttackEntityEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer attacker)
                 || SimpleServerUtilities.MINIGAMES.matchView(attacker.getUUID()) == null) return;
+        SimpleServerUtilities.MINIGAMES.recordActivity(attacker);
         if (interruptCastAction(attacker, "attacked")) {
             event.setCanceled(true);
             return;
@@ -283,6 +290,13 @@ public final class MinigameEvents {
         }
     }
 
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onDamageApplied(LivingDamageEvent.Post event) {
+        if (!active() || !(event.getEntity() instanceof ServerPlayer victim)) return;
+        ServerPlayer attacker = attackingPlayer(event.getSource().getEntity());
+        SimpleServerUtilities.MINIGAMES.recordCombatDamage(attacker, victim, event.getInflictedDamage());
+    }
+
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onHeal(LivingHealEvent event) {
         if (active() && event.getEntity() instanceof ServerPlayer player
@@ -294,6 +308,8 @@ public final class MinigameEvents {
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onDeath(LivingDeathEvent event) {
         if (active() && event.getEntity() instanceof ServerPlayer player) {
+            ServerPlayer killer = attackingPlayer(event.getSource().getEntity());
+            SimpleServerUtilities.MINIGAMES.recordDeathStatistics(player, killer);
             if (SimpleServerUtilities.MINIGAMES.handlePlayerDeath(player)) {
                 event.setCanceled(true);
             } else {

@@ -1,0 +1,50 @@
+SSU 1.9.0-dev3.3.1 validation report
+=====================================
+
+Base: 1.9.0-dev3.3
+Target: 1.9.0-dev3.3.1
+Purpose: Minecraft 26.2 compile hotfix for DamageIndicatorEvents and PlayerIdentityManager.
+
+Corrected API calls
+-------------------
+1. DamageIndicatorEvents.java
+   - Removed unavailable LivingDamageEvent.Post#getNewDamage().
+   - Uses LivingDamageEvent.Post#getInflictedDamage(), the same post-reduction damage accessor already used by SSU's StatisticsEvents, QuestGameplayEvents and MinigameEvents.
+
+2. PlayerIdentityManager.java
+   - Removed unavailable ServerPlayer#hasPermissions(int).
+   - Title Administration now resolves `ssu.permissions.admin` through PermissionService.getBoolean(..., false).
+   - PermissionService's existing operator check remains the administrator fallback/bypass.
+
+Validation performed
+--------------------
+- 633 Java source files passed lexical delimiter/string/comment integrity validation.
+- 14 JSON resources parsed successfully.
+- DamageIndicatorEvents compiled successfully in a focused API-stub harness exposing the 26.2 methods used by the class.
+- 11/11 hotfix invariants passed:
+  * mod version is 1.9.0-dev3.3.1
+  * getInflictedDamage() is present in DamageIndicatorEvents
+  * getNewDamage() is absent from the Java tree
+  * ServerPlayer.hasPermissions(...) is absent from the Java tree
+  * Title Administration uses PermissionService
+  * PermissionService's operator bypass remains present
+  * network protocol remains 88
+  * Player UI preference schema remains 11
+  * Minigame definition/recovery schemas remain 18/4
+  * Title catalogue schema remains 1
+  * Player identity schema remains 1
+
+Version/schema state
+--------------------
+- Network protocol: 88
+- Minigame definition schema: 18
+- Minigame recovery schema: 4
+- Minigame progression schema: 3
+- Minigame match-history schema: 1
+- Player UI preference schema: 11
+- Title catalogue schema: 1
+- Player identity schema: 1
+
+Build limitation
+----------------
+A complete Gradle/NeoForge build was not executed in this container. The project requires Java 25 and Gradle dependency resolution; the local environment does not contain the complete cached Minecraft/NeoForge toolchain. Run `gradlew.bat clean build` locally with Java 25.

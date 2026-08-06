@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.utilitymining.MiningActivationMode
 /** Persistent player-side UI choices, validated by the server. */
 public final class PlayerUiPreferences {
 
-    public static final int CURRENT_SCHEMA = 9;
+    public static final int CURRENT_SCHEMA = 11;
 
     private int schema = CURRENT_SCHEMA;
     private String uuid = "";
@@ -36,14 +36,20 @@ public final class PlayerUiPreferences {
     private boolean mailAutoDeleteAuctionAttachments;
     private boolean treecapitatorEnabled;
     private MiningActivationMode treecapitatorActivation = MiningActivationMode.SNEAK;
-    private int treecapitatorOutlineColor = 0xFF55FF77;
+    private int treecapitatorOutlineColor = 0xFF80C71F;
     private int treecapitatorOutlineBrightness = 85;
     private boolean treecapitatorInfoEnabled = true;
     private boolean veinminerEnabled;
     private MiningActivationMode veinminerActivation = MiningActivationMode.SNEAK;
-    private int veinminerOutlineColor = 0xFF55AAFF;
+    private int veinminerOutlineColor = 0xFF3AB3DA;
     private int veinminerOutlineBrightness = 85;
     private boolean veinminerInfoEnabled = true;
+    /** Whether this player's selected global title is published above their name. */
+    private boolean titleVisible = true;
+    /** Whether this player's rank prefix is published above their name; chat prefixes remain server-defined. */
+    private boolean rankVisible = true;
+    private boolean damageIndicatorsEnabled = true;
+    private DamageIndicatorStyle damageIndicatorStyle = DamageIndicatorStyle.FLOATING;
 
     public PlayerUiPreferences() {
         // Required for Gson.
@@ -95,6 +101,19 @@ public final class PlayerUiPreferences {
             treecapitatorInfoEnabled = true;
             veinminerInfoEnabled = true;
         }
+        if (previousSchema < 10) {
+            // dev3.2 replaces the old six-colour/custom outline cycle with the fixed
+            // sixteen-colour Minecraft palette. Existing values migrate to the nearest colour.
+            treecapitatorOutlineColor = MinecraftColorPalette.nearest(treecapitatorOutlineColor);
+            veinminerOutlineColor = MinecraftColorPalette.nearest(veinminerOutlineColor);
+        }
+        if (previousSchema < 11) {
+            // Global identity labels and damage indicators are visible by default.
+            titleVisible = true;
+            rankVisible = true;
+            damageIndicatorsEnabled = true;
+            damageIndicatorStyle = DamageIndicatorStyle.FLOATING;
+        }
         schema = CURRENT_SCHEMA;
         minimapSize = Math.max(64, Math.min(256, minimapSize));
         if (minimapShape == null) {
@@ -109,12 +128,15 @@ public final class PlayerUiPreferences {
         if (veinminerActivation == null) {
             veinminerActivation = MiningActivationMode.SNEAK;
         }
+        if (damageIndicatorStyle == null) {
+            damageIndicatorStyle = DamageIndicatorStyle.FLOATING;
+        }
         treecapitatorOutlineBrightness = clampPercent(treecapitatorOutlineBrightness);
         veinminerOutlineBrightness = clampPercent(veinminerOutlineBrightness);
         markerBeamDistance = Math.max(16, Math.min(512, markerBeamDistance));
         mapLiveUpdateRadiusChunks = Math.max(1, Math.min(32, mapLiveUpdateRadiusChunks));
-        treecapitatorOutlineColor |= 0xFF000000;
-        veinminerOutlineColor |= 0xFF000000;
+        treecapitatorOutlineColor = MinecraftColorPalette.nearest(treecapitatorOutlineColor);
+        veinminerOutlineColor = MinecraftColorPalette.nearest(veinminerOutlineColor);
     }
 
     public String getUuid() {
@@ -337,7 +359,7 @@ public final class PlayerUiPreferences {
     }
 
     public void setTreecapitatorOutlineColor(int value) {
-        treecapitatorOutlineColor = value | 0xFF000000;
+        treecapitatorOutlineColor = MinecraftColorPalette.nearest(value);
     }
 
     public int getTreecapitatorOutlineBrightness() {
@@ -377,7 +399,7 @@ public final class PlayerUiPreferences {
     }
 
     public void setVeinminerOutlineColor(int value) {
-        veinminerOutlineColor = value | 0xFF000000;
+        veinminerOutlineColor = MinecraftColorPalette.nearest(value);
     }
 
     public int getVeinminerOutlineBrightness() {
@@ -398,6 +420,39 @@ public final class PlayerUiPreferences {
 
     private static int clampPercent(int value) {
         return Math.max(10, Math.min(100, value));
+    }
+
+
+    public boolean isTitleVisible() {
+        return titleVisible;
+    }
+
+    public void setTitleVisible(boolean titleVisible) {
+        this.titleVisible = titleVisible;
+    }
+
+    public boolean isRankVisible() {
+        return rankVisible;
+    }
+
+    public void setRankVisible(boolean rankVisible) {
+        this.rankVisible = rankVisible;
+    }
+
+    public boolean isDamageIndicatorsEnabled() {
+        return damageIndicatorsEnabled;
+    }
+
+    public void setDamageIndicatorsEnabled(boolean damageIndicatorsEnabled) {
+        this.damageIndicatorsEnabled = damageIndicatorsEnabled;
+    }
+
+    public DamageIndicatorStyle getDamageIndicatorStyle() {
+        return damageIndicatorStyle == null ? DamageIndicatorStyle.FLOATING : damageIndicatorStyle;
+    }
+
+    public void setDamageIndicatorStyle(DamageIndicatorStyle damageIndicatorStyle) {
+        this.damageIndicatorStyle = damageIndicatorStyle == null ? DamageIndicatorStyle.FLOATING : damageIndicatorStyle;
     }
 
 }

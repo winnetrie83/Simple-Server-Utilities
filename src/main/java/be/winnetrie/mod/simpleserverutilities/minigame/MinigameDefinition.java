@@ -10,7 +10,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentId;
 
 /** Data-driven minigame definition. Actual game rules can build on this lifecycle. */
 public final class MinigameDefinition {
-    public static final int SCHEMA_VERSION = 15;
+    public static final int SCHEMA_VERSION = 19;
     public static final int MAX_ARENAS = 32;
     public static final int MAX_REWARDS = 64;
 
@@ -30,6 +30,8 @@ public final class MinigameDefinition {
     /** Delay before CTF/Domination players return after being defeated. */
     public int respawnDelaySeconds = 5;
     public boolean automaticStart = true;
+    /** Server-owned match loadouts are immutable unless an administrator explicitly disables this rule. */
+    public boolean lockInventory = true;
     public boolean allowLateJoin;
     public String victoryMode = "highest_score";
     public ContentCondition prerequisites = new ContentCondition();
@@ -42,6 +44,7 @@ public final class MinigameDefinition {
     public SpleefRules spleef = new SpleefRules();
     public CaptureTheFlagRules captureTheFlag = new CaptureTheFlagRules();
     public DominationRules domination = new DominationRules();
+    public MinigameExperienceRules experience = new MinigameExperienceRules();
 
     public MinigameDefinition() {
         arenas.add(new MinigameArenaDefinition());
@@ -82,6 +85,8 @@ public final class MinigameDefinition {
         captureTheFlag.normalize();
         if (domination == null) domination = new DominationRules();
         domination.normalize();
+        if (experience == null) experience = new MinigameExperienceRules();
+        experience.normalize();
         if (prerequisites == null) prerequisites = new ContentCondition();
         prerequisites.normalize();
         participationRewards = normalizeActions(participationRewards);

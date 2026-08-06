@@ -60,6 +60,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportOptions;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportPolicy;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportType;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.WarpPolicy;
+import be.winnetrie.mod.simpleserverutilities.protection.ProtectionHelper;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
 import be.winnetrie.mod.simpleserverutilities.region.RegionRentOperationRecord;
 import be.winnetrie.mod.simpleserverutilities.region.RegionMutationGuard;
@@ -129,9 +130,12 @@ public final class SsuMenuService {
                         ? SimpleServerUtilities.WARPS.countWarps() : 0
         );
 
+        var selectedTitle = SimpleServerUtilities.IDENTITY.selectedTitle(player);
         PacketDistributor.sendToPlayer(player, new SsuMenuSnapshotPayload(
                 player.getName().getString(),
                 SimpleServerUtilities.PERMISSIONS.getPrimaryRankName(player.getUUID()),
+                selectedTitle.map(value -> value.displayName).orElse(""),
+                selectedTitle.map(value -> value.color).orElse(0xFFFFFFFF),
                 PermissionService.getBoolean(player, PermissionKeys.SETTINGS_USE, true),
                 new SsuMenuSnapshotPayload.UiSettingsSummary(
                         uiPreferences.isDashboardHints(), uiPreferences.isMinimapEnabled(),
@@ -160,7 +164,11 @@ public final class SsuMenuService {
                         uiPreferences.getVeinminerActivation().name(),
                         uiPreferences.getVeinminerOutlineColor(),
                         uiPreferences.getVeinminerOutlineBrightness(),
-                        uiPreferences.isVeinminerInfoEnabled()
+                        uiPreferences.isVeinminerInfoEnabled(),
+                        uiPreferences.isTitleVisible(),
+                        uiPreferences.isRankVisible(),
+                        uiPreferences.isDamageIndicatorsEnabled(),
+                        uiPreferences.getDamageIndicatorStyle().name()
                 ),
                 administrator,
                 Config.ENABLE_CROPS_HARVESTING.get(),
@@ -290,7 +298,25 @@ public final class SsuMenuService {
         }
         PacketDistributor.sendToPlayer(player, new SsuMenuActionResultPayload(
                 payload.requestId(), result.success(), result.message(), result.refreshPage()));
+        if (result.success() && affectsPlayerIdentity(payload.action())) {
+            SimpleServerUtilities.IDENTITY.syncAll();
+        }
         if (result.refreshShell()) open(player);
+    }
+
+
+    private static boolean affectsPlayerIdentity(String action) {
+        if (action == null || action.isBlank()) return false;
+        return switch (action) {
+            case "permission_assign_rank", "permission_add_rank", "permission_remove_rank",
+                    "rank_create", "rank_delete", "rank_rename", "rank_default", "rank_priority",
+                    "rank_inherit", "rank_uninherit", "rank_reset_player",
+                    "permission_player_set", "permission_player_unset",
+                    "permission_rank_set", "permission_rank_unset", "permission_player_dimension_set",
+                    "permission_player_dimension_unset", "permission_rank_dimension_set",
+                    "permission_rank_dimension_unset" -> true;
+            default -> false;
+        };
     }
 
     private ActionResult performAction(ServerPlayer player, SsuMenuActionPayload payload) {
@@ -330,6 +356,7 @@ public final class SsuMenuService {
             case "region_admin_add_time" -> regionAdminAddTime(player, payload.target(), payload.value());
             case "region_admin_pause" -> regionAdminPause(player, payload.target(), payload.value());
             case "region_renting_toggle" -> regionRentingToggle(player, payload.value());
+            case "region_rent_refund" -> regionRentRefund(player, payload.target(), payload.value());
             case "region_selection_point1" -> regionSelectionPoint(player, 1);
             case "region_selection_point2" -> regionSelectionPoint(player, 2);
             case "region_selection_coordinates" -> regionSelectionCoordinates(player, payload.target(), payload.value());
@@ -351,11 +378,16 @@ public final class SsuMenuService {
             case "economy_set" -> economyAdminMutation(player, payload.target(), payload.value(), "set");
             case "economy_history_limit" -> economyHistoryLimit(player, payload.value());
             case "permission_assign_rank" -> assignRank(player, payload.target(), payload.value());
+            case "permission_add_rank" -> addPlayerRank(player, payload.target(), payload.value());
+            case "permission_remove_rank" -> removePlayerRank(player, payload.target(), payload.value());
             case "permission_check" -> permissionCheck(player, payload.target(), payload.secondary());
             case "rank_create" -> rankCreate(player, payload.target());
             case "rank_delete" -> rankDelete(player, payload.target());
             case "rank_rename" -> rankRename(player, payload.target(), payload.secondary());
             case "rank_default" -> rankDefault(player, payload.target());
+            case "rank_priority" -> rankPriority(player, payload.target(), payload.value());
+            case "rank_inherit" -> rankInheritance(player, payload.target(), payload.value(), true);
+            case "rank_uninherit" -> rankInheritance(player, payload.target(), payload.value(), false);
             case "rank_reset_player" -> rankResetPlayer(player, payload.target());
             case "permission_player_set" -> setPlayerPermission(player, payload.target(), payload.secondary(), payload.value());
             case "permission_player_unset" -> unsetPlayerPermission(player, payload.target(), payload.secondary());
@@ -365,6 +397,8 @@ public final class SsuMenuService {
             case "permission_player_dimension_unset" -> unsetPlayerDimensionPermission(player, payload.target(), payload.secondary(), payload.value());
             case "permission_rank_dimension_set" -> setRankDimensionPermission(player, payload.target(), payload.secondary(), payload.value());
             case "permission_rank_dimension_unset" -> unsetRankDimensionPermission(player, payload.target(), payload.secondary(), payload.value());
+            case "permission_claim_context_set" -> setClaimContextPermission(player, payload.target(), payload.secondary(), payload.value());
+            case "permission_claim_context_unset" -> unsetClaimContextPermission(player, payload.target(), payload.secondary());
             case "permission_region_set" -> setRegionPermission(player, payload.target(), payload.secondary(), payload.value());
             case "permission_region_unset" -> unsetRegionPermission(player, payload.target(), payload.secondary());
             case "permission_set" -> setPlayerPermission(player, payload.target(), payload.secondary(), payload.value());
@@ -872,6 +906,15 @@ public final class SsuMenuService {
             SimpleServerUtilities.HOMES.getHomes(player.getUUID()).stream()
                     .filter(home -> claims.stream().anyMatch(claim -> ClaimHomeSupport.contains(claim, home)))
                     .forEach(home -> all.add(location("home", home)));
+            for (PlayerClaim sharedClaim : SimpleServerUtilities.PLAYER_CLAIMS.getClaims()) {
+                if (sharedClaim == null || sharedClaim.isOwner(player.getUUID())) continue;
+                boolean assigned = sharedClaim.getAccessRole(player.getUUID()) != null;
+                boolean visitingNow = isInsideClaim(player, sharedClaim);
+                if ((!assigned && !visitingNow) || !ProtectionHelper.canUseClaimHomes(player, sharedClaim)) continue;
+                SimpleServerUtilities.HOMES.getHomes(sharedClaim.getOwner()).stream()
+                        .filter(home -> ClaimHomeSupport.contains(sharedClaim, home))
+                        .forEach(home -> all.add(location("home", home, sharedClaim)));
+            }
         }
 
         List<SsuMenuPageDataPayload.LocationEntry> visible = all.stream()
@@ -1274,6 +1317,7 @@ public final class SsuMenuService {
             SsuPermissionEditorRequestPayload request
     ) {
         if ("region".equals(request.mode())) return regionPermissionEditorData(viewer, request);
+        if ("claim_role".equals(request.mode())) return claimRolePermissionEditorData(viewer, request);
         if (!canPermissionAdmin(viewer)) {
             return SsuPermissionEditorDataPayload.empty(request.mode(), request.requestId(),
                     "You do not have permission to use the permission editor.", true);
@@ -1444,6 +1488,96 @@ public final class SsuMenuService {
                 targets, dimensions, rankOptions, permissionEntries
         );
     }
+
+    private SsuPermissionEditorDataPayload claimRolePermissionEditorData(
+            ServerPlayer viewer,
+            SsuPermissionEditorRequestPayload request
+    ) {
+        if (!canPermissionAdmin(viewer)) {
+            return SsuPermissionEditorDataPayload.empty("claim_role", request.requestId(),
+                    "You do not have permission to edit claim role permissions.", true);
+        }
+        List<SsuPermissionEditorDataPayload.TargetEntry> allTargets = List.of(
+                new SsuPermissionEditorDataPayload.TargetEntry("owner", "Owner", "Always has full claim control and is the only role allowed to open Claim Settings."),
+                new SsuPermissionEditorDataPayload.TargetEntry("co_owner", "Co-owner", "Trusted role with configurable in-claim permissions; cannot open Claim Settings."),
+                new SsuPermissionEditorDataPayload.TargetEntry("member", "Member", "Trusted role with configurable in-claim permissions; cannot open Claim Settings."),
+                new SsuPermissionEditorDataPayload.TargetEntry("visitor", "Visitor", "Any other player standing inside the claim."),
+                new SsuPermissionEditorDataPayload.TargetEntry("none", "Outside / none", "Fallback context when no claim role applies.")
+        );
+        String targetQuery = request.targetQuery().toLowerCase(Locale.ROOT);
+        List<SsuPermissionEditorDataPayload.TargetEntry> targets = allTargets.stream()
+                .filter(target -> targetQuery.isBlank() || (target.label() + " " + target.summary())
+                        .toLowerCase(Locale.ROOT).contains(targetQuery))
+                .toList();
+        String normalizedTarget = normalizeClaimRole(request.selectedTarget());
+        boolean selectedTargetExists = normalizedTarget.isBlank() || allTargets.stream()
+                .anyMatch(entry -> entry.id().equals(normalizedTarget));
+        final String selectedTarget = !request.selectedTarget().isBlank() && !selectedTargetExists
+                ? ""
+                : normalizedTarget;
+        String selectedLabel = allTargets.stream().filter(entry -> entry.id().equals(selectedTarget))
+                .map(SsuPermissionEditorDataPayload.TargetEntry::label).findFirst().orElse("");
+        String targetSummary = allTargets.stream().filter(entry -> entry.id().equals(selectedTarget))
+                .map(SsuPermissionEditorDataPayload.TargetEntry::summary).findFirst().orElse("");
+
+        Map<String, String> directValues = selectedTarget.isBlank() ? Map.of()
+                : Map.copyOf(SimpleServerUtilities.PERMISSIONS
+                .getOrCreatePlayerClaimContextScope(selectedTarget).getPermissions());
+        List<PermissionCatalog.Definition> definitions = PermissionCatalog.definitions().stream()
+                .filter(definition -> CLAIM_CONTEXT_PERMISSION_KEYS.contains(definition.key()))
+                .toList();
+        String permissionQuery = request.permissionQuery().toLowerCase(Locale.ROOT);
+        if (!permissionQuery.isBlank()) {
+            definitions = definitions.stream().filter(definition -> (definition.key() + " " + definition.description())
+                    .toLowerCase(Locale.ROOT).contains(permissionQuery)).toList();
+        }
+        int totalPermissions = selectedTarget.isBlank() ? 0 : definitions.size();
+        int pageCount = Math.max(1, (totalPermissions + request.pageSize() - 1) / request.pageSize());
+        int resolvedPageIndex = Math.min(request.pageIndex(), pageCount - 1);
+        int from = Math.min(totalPermissions, resolvedPageIndex * request.pageSize());
+        int to = Math.min(totalPermissions, from + request.pageSize());
+        List<SsuPermissionEditorDataPayload.PermissionEntry> entries = new ArrayList<>();
+        if (!selectedTarget.isBlank()) {
+            for (PermissionCatalog.Definition definition : definitions.subList(from, to)) {
+                String direct = directValues.getOrDefault(definition.key(), "");
+                boolean builtIn = switch (selectedTarget) {
+                    case "owner", "co_owner", "member" -> true;
+                    default -> false;
+                };
+                String effective = direct.isBlank() ? Boolean.toString(builtIn) : direct;
+                entries.add(new SsuPermissionEditorDataPayload.PermissionEntry(
+                        definition.key(), direct, effective, Boolean.toString(builtIn),
+                        direct.isBlank() ? "role default" : "claim role override", "boolean",
+                        definition.description(), 0, 1));
+            }
+        }
+        return new SsuPermissionEditorDataPayload(
+                "claim_role", selectedTarget, "", selectedLabel, targetSummary,
+                resolvedPageIndex, request.pageSize(), totalPermissions, request.requestId(), "", false,
+                targets, List.of(), List.of(), entries);
+    }
+
+    private static String normalizeClaimRole(String raw) {
+        String value = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        return switch (value) {
+            case "owner", "co_owner", "member", "visitor", "none" -> value;
+            default -> "";
+        };
+    }
+
+    private static final Set<String> CLAIM_CONTEXT_PERMISSION_KEYS = Set.of(
+            PermissionKeys.CLAIM_CONTEXT_BREAK_BLOCKS,
+            PermissionKeys.CLAIM_CONTEXT_PLACE_BLOCKS,
+            PermissionKeys.CLAIM_CONTEXT_MODIFY_NONLIVING,
+            PermissionKeys.CLAIM_CONTEXT_OPEN_CONTAINERS,
+            PermissionKeys.CLAIM_CONTEXT_USE_DOORS,
+            PermissionKeys.CLAIM_CONTEXT_USE_SWITCHES,
+            PermissionKeys.CLAIM_CONTEXT_ITEM_TRANSFER,
+            PermissionKeys.CLAIM_CONTEXT_USE_HOMES,
+            PermissionKeys.CLAIM_CONTEXT_DAMAGE_LIVING,
+            PermissionKeys.CLAIM_CONTEXT_INTERACT_ENTITIES,
+            PermissionKeys.CLAIM_CONTEXT_INTERACT_OTHER
+    );
 
     private static String dimensionLabel(
             List<SsuPermissionEditorDataPayload.TargetEntry> dimensions, String dimensionId
@@ -1842,12 +1976,26 @@ public final class SsuMenuService {
                 case "veinminer_color" -> prefs.setVeinminerOutlineColor(parseColor(value));
                 case "veinminer_brightness" -> prefs.setVeinminerOutlineBrightness(Integer.parseInt(value));
                 case "veinminer_info" -> prefs.setVeinminerInfoEnabled(strictBoolean(value));
+                case "title_visible" -> prefs.setTitleVisible(strictBoolean(value));
+                case "rank_visible" -> prefs.setRankVisible(strictBoolean(value));
+                case "damage_indicators_enabled" -> {
+                    boolean enabled = strictBoolean(value);
+                    if (enabled && !PermissionService.getBooleanWithoutOperatorBypass(
+                            player, PermissionKeys.DAMAGE_INDICATORS_USE, true)) {
+                        return ActionResult.fail("You do not have permission to use damage indicators.", "");
+                    }
+                    prefs.setDamageIndicatorsEnabled(enabled);
+                }
+                case "damage_indicator_style" -> prefs.setDamageIndicatorStyle(
+                        be.winnetrie.mod.simpleserverutilities.settings.DamageIndicatorStyle.valueOf(
+                                value.toUpperCase(Locale.ROOT)));
                 default -> { return ActionResult.fail("Unknown setting.", ""); }
             }
         } catch (Exception e) { return ActionResult.fail("Invalid setting value.", ""); }
         SimpleServerUtilities.UI_PREFERENCES.save();
         BlockInformationService.syncPlayer(player);
         MapMarkerService.sync(player);
+        SimpleServerUtilities.IDENTITY.syncAll();
         return ActionResult.shell("Setting saved.");
     }
 
@@ -1897,6 +2045,7 @@ public final class SsuMenuService {
         } else return ActionResult.fail("Unknown border layer.", "");
         SimpleServerUtilities.BORDER_VISUALIZATIONS.syncOverview(player, true);
         SimpleServerUtilities.MINIGAMES.syncRuntimeBorders(player);
+        be.winnetrie.mod.simpleserverutilities.minigame.MinigameSetupToolService.refreshVisuals(player);
         return ActionResult.shell("Border visibility updated.");
     }
 
@@ -2123,6 +2272,26 @@ public final class SsuMenuService {
         catch (IllegalArgumentException exception) { return ActionResult.fail(exception.getMessage(), "region_admin"); }
         SimpleServerUtilities.REGIONS.setRentingEnabled(enabled);
         return ActionResult.shellPage("Region renting is now " + (enabled ? "enabled" : "paused") + ".", "region_admin");
+    }
+
+    private ActionResult regionRentRefund(ServerPlayer player, String type, String rawPercent) {
+        if (!RegionPolicy.canAdminRentRegion(player)) {
+            return ActionResult.fail("Region rental administration denied.", "rent_operations");
+        }
+        final int value;
+        try { value = percent(rawPercent); }
+        catch (IllegalArgumentException exception) { return ActionResult.fail(exception.getMessage(), "rent_operations"); }
+        int permille = value * 10;
+        if ("player".equalsIgnoreCase(type)) {
+            SimpleServerUtilities.REGIONS.rentEconomySettings().setPlayerCancelRefundPermille(permille);
+        } else if ("admin".equalsIgnoreCase(type)) {
+            SimpleServerUtilities.REGIONS.rentEconomySettings().setAdminCancelRefundPermille(permille);
+        } else {
+            return ActionResult.fail("Unknown refund policy.", "rent_operations");
+        }
+        SimpleServerUtilities.REGIONS.save();
+        return ActionResult.shellPage(("player".equalsIgnoreCase(type) ? "Player" : "Administrator")
+                + " cancellation refund set to " + value + "%.", "rent_operations");
     }
 
     private ActionResult regionSelectionPoint(ServerPlayer player, int point) {
@@ -2367,6 +2536,12 @@ public final class SsuMenuService {
                 : ActionResult.fail("Claim could not be deleted.", "admin_claims");
     }
 
+    private static boolean isInsideClaim(ServerPlayer player, PlayerClaim claim) {
+        if (player == null || claim == null) return false;
+        PlayerClaim at = ProtectionHelper.getClaimAt(player.level(), player.blockPosition());
+        return at != null && at.getId().equals(claim.getId());
+    }
+
     private PlayerClaim findClaim(String rawId) {
         try {
             UUID id = UUID.fromString(rawId);
@@ -2377,31 +2552,62 @@ public final class SsuMenuService {
         }
     }
 
-    private ActionResult teleportHome(ServerPlayer player, String name, String claimName, String refreshPage) {
+    private ActionResult teleportHome(ServerPlayer player, String name, String claimReference, String refreshPage) {
         String page = "travel".equals(refreshPage) ? "travel" : "homes";
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
-        if (!HomePolicy.canTeleportHome(player, context)) return ActionResult.fail(TeleportPolicy.denialMessage(TeleportType.HOME, context), page);
-        PlayerHome home = SimpleServerUtilities.HOMES.getHome(player.getUUID(), name);
-        if (home == null) {
-            return ActionResult.fail("Home was not found.", page);
+        if (!HomePolicy.canTeleportHome(player, context)) {
+            return ActionResult.fail(TeleportPolicy.denialMessage(TeleportType.HOME, context), page);
         }
-        PlayerClaim claim = claimName == null || claimName.isBlank()
-                ? ownedClaims(player).stream().filter(value -> ClaimHomeSupport.contains(value, home)).findFirst().orElse(null)
-                : SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
+        UUID homeOwner = player.getUUID();
+        PlayerClaim claim = null;
+        boolean shared = claimReference != null && claimReference.contains("|");
+        if (shared) {
+            String[] parts = claimReference.split("\\|", -1);
+            if (parts.length != 2) return ActionResult.fail("Shared home reference is invalid.", page);
+            try {
+                UUID parsedOwner = UUID.fromString(parts[0]);
+                UUID claimId = UUID.fromString(parts[1]);
+                homeOwner = parsedOwner;
+                claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaims().stream()
+                        .filter(value -> claimId.equals(value.getId()) && parsedOwner.equals(value.getOwner()))
+                        .findFirst().orElse(null);
+            } catch (IllegalArgumentException exception) {
+                return ActionResult.fail("Shared home reference is invalid.", page);
+            }
+            if (claim == null || (claim.getAccessRole(player.getUUID()) == null && !isInsideClaim(player, claim))
+                    || !ProtectionHelper.canUseClaimHomes(player, claim)) {
+                return ActionResult.fail("You no longer have permission to use that claim home.", page);
+            }
+        }
+        PlayerHome home = SimpleServerUtilities.HOMES.getHome(homeOwner, name);
+        if (home == null) return ActionResult.fail("Home was not found.", page);
+        if (!shared) {
+            claim = claimReference == null || claimReference.isBlank()
+                    ? ownedClaims(player).stream().filter(value -> ClaimHomeSupport.contains(value, home)).findFirst().orElse(null)
+                    : SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimReference);
+        }
         if (claim == null || !ClaimHomeSupport.contains(claim, home)) {
-            return ActionResult.fail("Home is no longer linked to one of your claims.", page);
+            return ActionResult.fail(shared ? "The shared home is no longer linked to that claim."
+                    : "Home is no longer linked to one of your claims.", page);
         }
         ServerLevel level = level(player.level().getServer(), home.getDimension());
         if (level == null) return ActionResult.fail("Home dimension is not loaded.", page);
         TeleportOptions options = TeleportPolicy.resolve(player, TeleportType.HOME, context);
+        PlayerClaim requiredClaim = claim;
+        boolean requiredShared = shared;
         int result = SimpleServerUtilities.TELEPORTS.requestTeleport(
-                player, "homes", "home '" + home.getDisplayName() + "'",
+                player, "homes", (shared ? "shared " : "") + "home '" + home.getDisplayName() + "'",
                 options, level, home.getX(), home.getY(), home.getZ(), home.getYaw(), home.getPitch(),
                 candidate -> HomePolicy.canTeleportHome(candidate,
-                        PermissionContext.at(candidate, candidate.blockPosition())),
-                candidate -> TeleportPolicy.denialMessage(TeleportType.HOME,
+                        PermissionContext.at(candidate, candidate.blockPosition()))
+                        && (!requiredShared || (requiredClaim.getAccessRole(candidate.getUUID()) != null
+                        || isInsideClaim(candidate, requiredClaim))
+                        && ProtectionHelper.canUseClaimHomes(candidate, requiredClaim)),
+                candidate -> requiredShared ? "You no longer have permission to use that claim home."
+                        : TeleportPolicy.denialMessage(TeleportType.HOME,
                         PermissionContext.at(candidate, candidate.blockPosition())));
-        return result > 0 ? ActionResult.ok("Home teleport requested.", page) : ActionResult.fail("Home teleport failed.", page);
+        return result > 0 ? ActionResult.ok("Home teleport requested.", page)
+                : ActionResult.fail("Home teleport failed.", page);
     }
 
     private ActionResult teleportWarp(ServerPlayer player, String name, String refreshPage) {
@@ -2642,6 +2848,38 @@ public final class SsuMenuService {
         return ActionResult.shellPage("Default rank updated.", "ranks");
     }
 
+    private ActionResult rankPriority(ServerPlayer actor, String rankName, String rawPriority) {
+        if (!canPermissionAdmin(actor)) return ActionResult.fail("Permission administration denied.", "ranks");
+        PermissionRank rank = SimpleServerUtilities.PERMISSIONS.getRank(rankName);
+        if (rank == null) return ActionResult.fail("Rank not found.", "ranks");
+        final int priority;
+        try { priority = Integer.parseInt(rawPriority == null ? "" : rawPriority.trim()); }
+        catch (NumberFormatException exception) { return ActionResult.fail("Priority must be a whole number.", "ranks"); }
+        if (priority < -1_000_000 || priority > 1_000_000) {
+            return ActionResult.fail("Priority must be between -1000000 and 1000000.", "ranks");
+        }
+        SimpleServerUtilities.PERMISSIONS.setRankPriority(rankName, priority);
+        return ActionResult.shellPage("Priority for '" + rankName + "' set to " + priority + ".", "ranks");
+    }
+
+    private ActionResult rankInheritance(ServerPlayer actor, String rankName, String parentRank, boolean add) {
+        if (!canPermissionAdmin(actor)) return ActionResult.fail("Permission administration denied.", "ranks");
+        if (SimpleServerUtilities.PERMISSIONS.getRank(rankName) == null
+                || SimpleServerUtilities.PERMISSIONS.getRank(parentRank) == null) {
+            return ActionResult.fail("Both ranks must already exist.", "ranks");
+        }
+        boolean changed = add
+                ? SimpleServerUtilities.PERMISSIONS.addRankInheritance(rankName, parentRank)
+                : SimpleServerUtilities.PERMISSIONS.removeRankInheritance(rankName, parentRank);
+        if (!changed) {
+            return ActionResult.fail(add
+                    ? "Inheritance was not added. It may already exist, target itself, or create a cycle."
+                    : "That inheritance link was not present.", "ranks");
+        }
+        return ActionResult.shellPage((add ? "Added inheritance from '" : "Removed inheritance from '")
+                + parentRank + "' for '" + rankName + "'.", "ranks");
+    }
+
     private ActionResult rankResetPlayer(ServerPlayer actor, String playerReference) {
         if (!canPermissionAdmin(actor)) return ActionResult.fail("Permission administration denied.", "ranks");
         UUID target = resolvePlayerId(actor.level().getServer(), playerReference);
@@ -2680,6 +2918,63 @@ public final class SsuMenuService {
         SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
         BlockInformationService.syncAll(actor.level().getServer());
         return ActionResult.ok("Assigned rank '" + rankName + "'.", "permissions");
+    }
+
+    private ActionResult addPlayerRank(ServerPlayer actor, String playerReference, String rankName) {
+        if (!canPermissionAdmin(actor)) return ActionResult.fail("Permission administration denied.", "permissions");
+        UUID target = resolvePlayerId(actor.level().getServer(), playerReference);
+        if (target == null || SimpleServerUtilities.PERMISSIONS.getRank(rankName) == null) {
+            return ActionResult.fail("Player or rank not found.", "permissions");
+        }
+        SimpleServerUtilities.PERMISSIONS.addPlayerRank(target, rankName);
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        BlockInformationService.syncAll(actor.level().getServer());
+        return ActionResult.ok("Added rank '" + rankName + "'. Existing ranks were kept.", "permissions");
+    }
+
+    private ActionResult removePlayerRank(ServerPlayer actor, String playerReference, String rankName) {
+        if (!canPermissionAdmin(actor)) return ActionResult.fail("Permission administration denied.", "permissions");
+        UUID target = resolvePlayerId(actor.level().getServer(), playerReference);
+        if (target == null || SimpleServerUtilities.PERMISSIONS.getRank(rankName) == null) {
+            return ActionResult.fail("Player or rank not found.", "permissions");
+        }
+        boolean removed = SimpleServerUtilities.PERMISSIONS.removePlayerRank(target, rankName);
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        BlockInformationService.syncAll(actor.level().getServer());
+        return removed ? ActionResult.ok("Removed rank '" + rankName + "'.", "permissions")
+                : ActionResult.ok("That player did not have rank '" + rankName + "'.", "permissions");
+    }
+
+    private ActionResult setClaimContextPermission(ServerPlayer actor, String roleName, String key, String value) {
+        if (!canPermissionAdmin(actor)) return ActionResult.fail("Permission administration denied.", "permissions");
+        String role = normalizeClaimRole(roleName);
+        if (role.isBlank() || !CLAIM_CONTEXT_PERMISSION_KEYS.contains(key)) {
+            return ActionResult.fail("Choose a valid claim role and claim permission.", "permissions");
+        }
+        if ("owner".equals(role)) {
+            return ActionResult.fail("Owner always has full claim control and cannot be restricted.", "permissions");
+        }
+        final String normalized;
+        try { normalized = PermissionCatalog.normalizeValue(key, value); }
+        catch (IllegalArgumentException exception) { return ActionResult.fail(exception.getMessage(), "permissions"); }
+        SimpleServerUtilities.PERMISSIONS.setPlayerClaimContextPermission(role, key, normalized);
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        return ActionResult.ok("Claim role permission updated.", "permissions");
+    }
+
+    private ActionResult unsetClaimContextPermission(ServerPlayer actor, String roleName, String key) {
+        if (!canPermissionAdmin(actor)) return ActionResult.fail("Permission administration denied.", "permissions");
+        String role = normalizeClaimRole(roleName);
+        if (role.isBlank() || !CLAIM_CONTEXT_PERMISSION_KEYS.contains(key)) {
+            return ActionResult.fail("Choose a valid claim role and claim permission.", "permissions");
+        }
+        if ("owner".equals(role)) {
+            return ActionResult.fail("Owner always has full claim control and cannot be restricted.", "permissions");
+        }
+        boolean removed = SimpleServerUtilities.PERMISSIONS.removePlayerClaimContextPermission(role, key);
+        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        return ActionResult.ok(removed ? "Claim role permission reset to its default."
+                : "Claim role permission was already using its default.", "permissions");
     }
 
     private ActionResult setPlayerPermission(ServerPlayer actor, String playerReference, String key, String value) {
@@ -3019,6 +3314,11 @@ public final class SsuMenuService {
 
     private static SsuMenuPageDataPayload.LocationEntry location(String kind, PlayerHome home) {
         return new SsuMenuPageDataPayload.LocationEntry(kind, home.getDisplayName(), home.getDimension(), home.getX(), home.getY(), home.getZ());
+    }
+
+    private static SsuMenuPageDataPayload.LocationEntry location(String kind, PlayerHome home, PlayerClaim claim) {
+        return new SsuMenuPageDataPayload.LocationEntry(kind, home.getDisplayName(), home.getDimension(),
+                home.getX(), home.getY(), home.getZ(), claim.getOwner().toString(), claim.getId().toString());
     }
     private static SsuMenuPageDataPayload.LocationEntry location(String kind, Warp warp) {
         return new SsuMenuPageDataPayload.LocationEntry(kind, warp.getDisplayName(), warp.getDimension(), warp.getX(), warp.getY(), warp.getZ());

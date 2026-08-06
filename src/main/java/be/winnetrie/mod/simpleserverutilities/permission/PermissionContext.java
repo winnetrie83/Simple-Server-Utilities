@@ -156,10 +156,8 @@ public class PermissionContext {
                 return ClaimRole.OWNER;
             }
 
-            if (claim.isTrusted(player.getUUID())) {
-                return ClaimRole.MEMBER;
-            }
-
+            if (claim.isCoOwner(player.getUUID())) return ClaimRole.CO_OWNER;
+            if (claim.isTrusted(player.getUUID())) return ClaimRole.MEMBER;
             return ClaimRole.VISITOR;
         }
     }

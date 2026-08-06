@@ -139,6 +139,17 @@ public final class PermissionCatalog {
         integer(values, PermissionKeys.CLAIMS_TELEPORT_DELAY, "Delay in seconds before a claim teleport starts.", 0, 86_400);
         integer(values, PermissionKeys.CLAIMS_TELEPORT_COOLDOWN, "Cooldown in seconds after using a claim teleport.", 0, 86_400);
         bool(values, PermissionKeys.CLAIMS_ADMIN_BYPASS, "Bypasses normal player-claim protection checks.");
+        bool(values, PermissionKeys.CLAIM_CONTEXT_BREAK_BLOCKS, "Allows this claim role to break blocks.");
+        bool(values, PermissionKeys.CLAIM_CONTEXT_PLACE_BLOCKS, "Allows this claim role to place blocks.");
+        bool(values, PermissionKeys.CLAIM_CONTEXT_MODIFY_NONLIVING, "Allows this claim role to damage or modify item frames, armor stands and other non-living entities.");
+        bool(values, PermissionKeys.CLAIM_CONTEXT_OPEN_CONTAINERS, "Allows this claim role to open chests, barrels and other inventory blocks.");
+        bool(values, PermissionKeys.CLAIM_CONTEXT_USE_DOORS, "Allows this claim role to open and close doors, trapdoors and fence gates.");
+        bool(values, PermissionKeys.CLAIM_CONTEXT_USE_SWITCHES, "Allows this claim role to use buttons, levers and pressure plates.");
+        bool(values, PermissionKeys.CLAIM_CONTEXT_ITEM_TRANSFER, "Allows this claim role to pick up and drop item entities.");
+        bool(values, PermissionKeys.CLAIM_CONTEXT_USE_HOMES, "Allows this claim role to use the owner's homes linked to the claim, without editing them.");
+        bool(values, PermissionKeys.CLAIM_CONTEXT_DAMAGE_LIVING, "Allows this claim role to damage non-player living entities.");
+        bool(values, PermissionKeys.CLAIM_CONTEXT_INTERACT_ENTITIES, "Allows this claim role to interact with living entities such as villagers and animals.");
+        bool(values, PermissionKeys.CLAIM_CONTEXT_INTERACT_OTHER, "Allows this claim role to use other interactive blocks not covered by containers, doors or switches.");
         integer(values, PermissionKeys.CLAIMS_MAX_CHUNKS, "Maximum total number of claimed chunks for the player.", 0, 1_000_000);
         integer(values, PermissionKeys.CLAIMS_MAX_GROUPS, "Maximum number of separate connected claim groups.", 0, 100_000);
         integer(values, PermissionKeys.CLAIMS_MAX_CHUNKS_PER_GROUP, "Maximum chunks in one connected claim group.", 0, 1_000_000);
@@ -255,6 +266,7 @@ public final class PermissionCatalog {
         bool(values, PermissionKeys.BLOCK_INFORMATION_INVENTORY, "Allows Block Information to show server-authoritative container, display and equipment contents when normal interaction protection also allows access.");
         bool(values, PermissionKeys.BLOCK_INFORMATION_INVENTORY_FULL, "Shows every available non-empty preview stack up to SSU's hard cap, overriding the numeric inventory preview limit.");
         integer(values, PermissionKeys.BLOCK_INFORMATION_INVENTORY_MAX_ITEMS, "Maximum number of item stacks shown by Block Information; defaults to one and is hard-capped at 54.", 0, 54);
+        bool(values, PermissionKeys.DAMAGE_INDICATORS_USE, "Allows the player to receive floating damage and healing indicators; enabled by default when unset.");
         bool(values, PermissionKeys.STATISTICS_ADMIN, "Allows creating, editing, pausing, resetting and deleting custom player statistics.");
 
         bool(values, PermissionKeys.CROPS_HARVESTING_USE, "Allows right-click harvesting and automatic replanting while the global Crops Harvesting feature is enabled.");

@@ -78,6 +78,27 @@ public final class RegionWorldEditManager {
     }
 
 
+    public static RegionFillJob createFillJob(
+            ServerLevel level,
+            Region region,
+            String weightedBlockList,
+            long maxVolume,
+            boolean suppressContainerDrops
+    ) {
+        if (region == null) throw new IllegalArgumentException("Region is required.");
+        if (!level.dimension().equals(region.getDimension())) {
+            throw new IllegalArgumentException("The region belongs to another dimension.");
+        }
+        List<WeightedBlock> blocks = parseWeightedBlocks(weightedBlockList);
+        if (blocks.isEmpty()) throw new IllegalArgumentException("No valid preset blocks were provided.");
+        if (region.getVolume() > maxVolume) {
+            throw new IllegalArgumentException("Region is too large: " + region.getVolume() + " blocks. Limit: " + maxVolume + ".");
+        }
+        return new RegionFillJob(level, region.getMinX(), region.getMinY(), region.getMinZ(),
+                region.getMaxX(), region.getMaxY(), region.getMaxZ(), blocks,
+                Set.of(SsuJobLocks.region(level.dimension(), region.getName())), suppressContainerDrops);
+    }
+
     public static RegionClearJob createClearJob(ServerLevel level, Region region, long maxVolume) {
         long volume = region.getVolume();
         if (volume > maxVolume) {

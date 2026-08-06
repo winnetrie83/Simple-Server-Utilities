@@ -17,7 +17,7 @@ import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 /** Right-click action selector for the dedicated in-world Minigame Setup Tool. */
 public final class MinigameSetupToolScreen extends Screen {
-    private static final int W = 520, H = 330;
+    private static final int W = 520, H = 358;
     private static final int PANEL = 0xF0161D25, BORDER = 0xFF586978, TEXT = 0xFFF3F5F7,
             MUTED = 0xFFAAB5BE, GOOD = 0xFF83E39A, ERROR = 0xFFFF8585, ACCENT = 0xFF7FC8FF;
     private MinigameSetupToolOpenPayload data;
@@ -49,6 +49,24 @@ public final class MinigameSetupToolScreen extends Screen {
             addCycle(x + 174, y + 174, 144, indexLabel,
                     () -> changeIndex(-1), () -> changeIndex(1), Integer.toString(data.index() + 1));
         }
+
+        boolean targetSelected = !data.selectedMinigameId().isBlank() && !data.selectedArenaId().isBlank();
+        Button validate = addRenderableWidget(Button.builder(Component.literal("Validate"), ignored -> send("validate",
+                data.selectedMinigameId(), data.selectedArenaId(), data.action(), data.team(), data.index()))
+                .bounds(x + 18, y + H - 60, 76, 20).build());
+        Button clone = addRenderableWidget(Button.builder(Component.literal("Clone"), ignored -> send("clone_arena",
+                data.selectedMinigameId(), data.selectedArenaId(), data.action(), data.team(), data.index()))
+                .bounds(x + 100, y + H - 60, 68, 20).build());
+        Button export = addRenderableWidget(Button.builder(Component.literal("Export"), ignored -> send("export_arena",
+                data.selectedMinigameId(), data.selectedArenaId(), data.action(), data.team(), data.index()))
+                .bounds(x + 174, y + H - 60, 68, 20).build());
+        Button importButton = addRenderableWidget(Button.builder(Component.literal("Import"), ignored -> send("import_arena",
+                data.selectedMinigameId(), data.selectedArenaId(), data.action(), data.team(), data.index()))
+                .bounds(x + 248, y + H - 60, 68, 20).build());
+        validate.active = targetSelected && !awaiting;
+        clone.active = targetSelected && !awaiting;
+        export.active = targetSelected && !awaiting;
+        importButton.active = targetSelected && !awaiting;
 
         Button create = addRenderableWidget(Button.builder(Component.literal("Create new game"), ignored -> {
             if (minecraft != null) minecraft.setScreenAndShow(new MinigameSetupCreateScreen(data, this));
@@ -212,7 +230,7 @@ public final class MinigameSetupToolScreen extends Screen {
                     + " -> " + p2.getX() + "," + p2.getY() + "," + p2.getZ(), x + 18, infoY + 45, GOOD, false);
             g.text(font, data.selectionVolume() + " selected blocks", x + 18, infoY + 58, GOOD, false);
         } else g.text(font, "To create a game, select New arena bounds and left-click two corners.", x + 18, infoY + 45, MUTED, false);
-        if (!data.notice().isBlank()) g.text(font, trim(data.notice(), 76), x + 18, y + H - 52,
+        if (!data.notice().isBlank()) g.text(font, trim(data.notice(), 76), x + 18, y + H - 80,
                 data.error() ? ERROR : GOOD, false);
         super.extractRenderState(g, mouseX, mouseY, partialTick);
     }

@@ -40,8 +40,15 @@ import be.winnetrie.mod.simpleserverutilities.mail.MailOperationResult;
 import be.winnetrie.mod.simpleserverutilities.mail.MailSource;
 import be.winnetrie.mod.simpleserverutilities.mixin.BlockEntityComponentInvoker;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameHudPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameKillFeedPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameResultsPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameProfilePayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameMatchOverviewPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameMatchOverviewRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameSpectatorActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameCastBarPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameDominationVisualPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameDiagnosticsPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameCtfVisualPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyRequestPayload;
@@ -52,6 +59,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
+import be.winnetrie.mod.simpleserverutilities.statistics.StatisticEventType;
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderCategory;
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderLayer;
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderVisualizationSettings;
@@ -59,6 +67,7 @@ import be.winnetrie.mod.simpleserverutilities.visualization.PlayerBorderPreferen
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -83,15 +92,12 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
-import net.minecraft.world.entity.projectile.FireworkRocketEntity;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.DyedItemColor;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
-import net.minecraft.world.item.component.FireworkExplosion;
-import net.minecraft.world.item.component.Fireworks;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.AbstractBannerBlock;
@@ -112,7 +118,6 @@ import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.network.PacketDistributor;
-import it.unimi.dsi.fastutil.ints.IntList;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
@@ -120,7 +125,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * It deliberately contains no NPC, quest or dungeon dependency.
  */
 public final class MinigameManager {
-    public static final int DEFINITION_SCHEMA_VERSION = 15;
+    public static final int DEFINITION_SCHEMA_VERSION = 19;
     public static final int RECOVERY_SCHEMA_VERSION = 4;
     public static final int MAX_DEFINITIONS = 256;
     public static final int MAX_SERIALIZED_CHARACTERS = 65_535;
@@ -149,8 +154,8 @@ public final class MinigameManager {
             ROLE_TANK_SWORD, ROLE_TANK_FIELD, ROLE_TANK_SHIELD,
             ROLE_HEALER_SWORD, ROLE_HEAL_SINGLE, ROLE_HEAL_AOE, ROLE_HEAL_SELF,
             ROLE_TEAM_HELMET, ROLE_TEAM_CHESTPLATE, ROLE_TEAM_LEGGINGS, ROLE_TEAM_BOOTS);
-    private static final float MINIGAME_GAME_BORDER_WIDTH = 3.75F;
-    private static final float MINIGAME_SPECTATOR_BORDER_WIDTH = 3.25F;
+    private static final float MINIGAME_GAME_BORDER_WIDTH = 3.5F;
+    private static final float MINIGAME_SPECTATOR_BORDER_WIDTH = 3.5F;
 
     private final Map<String, MinigameDefinition> definitions = new LinkedHashMap<>();
     private final Map<String, LinkedHashMap<UUID, Long>> queues = new LinkedHashMap<>();
@@ -170,10 +175,19 @@ public final class MinigameManager {
     private final Map<UUID, RuntimeBorderSyncState> runtimeBorderSyncStates = new HashMap<>();
     private final DirtyJsonRecordStore definitionStore = new DirtyJsonRecordStore();
     private final DirtyJsonRecordStore recoveryStore = new DirtyJsonRecordStore();
+    private final DirtyJsonRecordStore experienceStore = new DirtyJsonRecordStore();
+    private MinigameProgressionData progression = new MinigameProgressionData();
+    private MinigameMatchHistory history = new MinigameMatchHistory();
+    /** Current spectator target cursor per participant. */
+    private final Map<UUID, Integer> spectatorCursors = new HashMap<>();
+    /** Round-robin cursor used by next-arena/rematch voting and ordinary queue starts. */
+    private final Map<String, Integer> arenaRotationCursors = new HashMap<>();
 
     private MinecraftServer server;
     private Path definitionFolder;
     private Path recoveryFile;
+    private Path progressionFile;
+    private Path historyFile;
     private long serverTicks;
     /** Session fail-safe: no new live player state may be replaced while recovery persistence is uncertain. */
     private boolean recoverySafetyHalted;
@@ -186,8 +200,11 @@ public final class MinigameManager {
         Path root = StoragePaths.minigames(StoragePaths.root(server));
         definitionFolder = StoragePaths.minigameDefinitions(StoragePaths.root(server));
         recoveryFile = StoragePaths.minigameRecovery(StoragePaths.root(server));
+        progressionFile = StoragePaths.minigameProgression(StoragePaths.root(server));
+        historyFile = StoragePaths.minigameHistory(StoragePaths.root(server));
         definitionStore.reset();
         recoveryStore.reset();
+        experienceStore.reset();
         recoverySafetyHalted = false;
         definitions.clear();
         recoveries.clear();
@@ -197,11 +214,14 @@ public final class MinigameManager {
             Files.createDirectories(definitionFolder);
             definitionStore.discover(definitionFolder);
             recoveryStore.discoverFile(recoveryFile);
+            experienceStore.discoverFile(progressionFile);
+            experienceStore.discoverFile(historyFile);
             loadDefinitions();
             loadRecovery();
+            loadExperienceData();
             saveAll();
-            SimpleServerUtilities.LOGGER.info("Loaded {} SSU minigames and {} pending player recoveries.",
-                    definitions.size(), recoveries.size());
+            SimpleServerUtilities.LOGGER.info("Loaded {} SSU minigames, {} pending recoveries, {} progression profiles and {} match history entries.",
+                    definitions.size(), recoveries.size(), progression.players.size(), history.matches.size());
         } catch (Exception exception) {
             SimpleServerUtilities.LOGGER.error("Failed to load SSU Minigame Framework.", exception);
         }
@@ -241,6 +261,33 @@ public final class MinigameManager {
         }
     }
 
+    private void loadExperienceData() {
+        progression = new MinigameProgressionData();
+        history = new MinigameMatchHistory();
+        if (progressionFile != null && Files.exists(progressionFile)) {
+            try {
+                MinigameProgressionData loaded = JsonStorage.read(GSON, progressionFile, MinigameProgressionData.class);
+                if (loaded != null) progression = loaded;
+                progression.normalize();
+            } catch (Exception exception) {
+                Path archived = JsonStorage.archiveBrokenFile(progressionFile);
+                experienceStore.forget(progressionFile);
+                SimpleServerUtilities.LOGGER.error("Failed to load minigame progression; archived as {}.", archived, exception);
+            }
+        }
+        if (historyFile != null && Files.exists(historyFile)) {
+            try {
+                MinigameMatchHistory loaded = JsonStorage.read(GSON, historyFile, MinigameMatchHistory.class);
+                if (loaded != null) history = loaded;
+                history.normalize();
+            } catch (Exception exception) {
+                Path archived = JsonStorage.archiveBrokenFile(historyFile);
+                experienceStore.forget(historyFile);
+                SimpleServerUtilities.LOGGER.error("Failed to load minigame history; archived as {}.", archived, exception);
+            }
+        }
+    }
+
     public synchronized void saveAll() {
         if (definitionFolder == null) return;
         Set<Path> kept = new LinkedHashSet<>();
@@ -251,11 +298,67 @@ public final class MinigameManager {
         }
         definitionStore.queueDeleteMissing(kept);
         saveRecovery();
+        saveExperienceData();
     }
 
     private void saveRecovery() {
         if (recoveryFile == null) return;
         recoveryStore.queueJson(GSON, recoveryFile, recoverySnapshot());
+    }
+
+    private void saveExperienceData() {
+        if (progressionFile != null) {
+            progression.normalize();
+            experienceStore.queueJson(GSON, progressionFile, progression);
+        }
+        if (historyFile != null) {
+            history.normalize();
+            experienceStore.queueJson(GSON, historyFile, history);
+        }
+    }
+
+    /**
+     * Persists progression and history as one logical minigame settlement barrier.
+     * Both files are flushed and byte-verified before cleanup may return players.
+     */
+    private synchronized boolean saveExperienceDataDurably(String operation) {
+        if (progressionFile == null || historyFile == null) {
+            SimpleServerUtilities.LOGGER.error(
+                    "Paused minigame cleanup because experience storage is unavailable during '{}'.", operation);
+            return false;
+        }
+        progression.normalize();
+        history.normalize();
+        String expectedProgression = GSON.toJson(progression);
+        String expectedHistory = GSON.toJson(history);
+        experienceStore.queueJson(GSON, progressionFile, progression);
+        experienceStore.queueJson(GSON, historyFile, history);
+        if (!SimpleServerUtilities.STORAGE.flushPath(progressionFile, CRITICAL_RECOVERY_FLUSH_TIMEOUT)
+                || !SimpleServerUtilities.STORAGE.flushPath(historyFile, CRITICAL_RECOVERY_FLUSH_TIMEOUT)) {
+            SimpleServerUtilities.LOGGER.error(
+                    "Paused minigame cleanup because experience storage could not be flushed during '{}'.", operation);
+            return false;
+        }
+        try {
+            String storedProgression = Files.readString(progressionFile, StandardCharsets.UTF_8);
+            String storedHistory = Files.readString(historyFile, StandardCharsets.UTF_8);
+            if (!expectedProgression.equals(storedProgression) || !expectedHistory.equals(storedHistory)) {
+                experienceStore.forget(progressionFile);
+                experienceStore.forget(historyFile);
+                SimpleServerUtilities.LOGGER.error(
+                        "Paused minigame cleanup because experience storage verification differed after '{}'.",
+                        operation);
+                return false;
+            }
+            return true;
+        } catch (IOException exception) {
+            experienceStore.forget(progressionFile);
+            experienceStore.forget(historyFile);
+            SimpleServerUtilities.LOGGER.error(
+                    "Paused minigame cleanup because experience storage verification failed after '{}'.",
+                    operation, exception);
+            return false;
+        }
     }
 
     private synchronized MinigameRecoveryData recoverySnapshot() {
@@ -344,6 +447,25 @@ public final class MinigameManager {
 
     public MinigameDefinition copy(MinigameDefinition definition) {
         return definition == null ? null : GSON.fromJson(GSON.toJson(definition), MinigameDefinition.class);
+    }
+
+    public MinigameArenaDefinition copyArena(MinigameArenaDefinition arena) {
+        return arena == null ? null : GSON.fromJson(GSON.toJson(arena), MinigameArenaDefinition.class);
+    }
+
+    public String arenaToJson(MinigameArenaDefinition arena) {
+        if (arena == null) throw new IllegalArgumentException("Arena is required.");
+        return GSON.toJson(arena);
+    }
+
+    public MinigameArenaDefinition arenaFromJson(String json) {
+        if (json == null || json.isBlank() || json.length() > MAX_SERIALIZED_CHARACTERS) {
+            throw new IllegalArgumentException("Arena import data is missing or too large.");
+        }
+        MinigameArenaDefinition arena = GSON.fromJson(json, MinigameArenaDefinition.class);
+        if (arena == null) throw new IllegalArgumentException("Arena import data is invalid.");
+        arena.normalize();
+        return arena;
     }
 
     public synchronized boolean saveDefinition(String rawOriginalId, MinigameDefinition definition) {
@@ -625,13 +747,13 @@ public final class MinigameManager {
                     }
                 }
             }
-            if (gameType == MinigameGameType.SPLEEF && definition.enabled && !arena.resetRegionAfterMatch) {
+            if (gameType == MinigameGameType.SPLEEF && definition.enabled && arena.enabled && !arena.resetRegionAfterMatch) {
                 throw new IllegalArgumentException("Enabled Spleef arenas require a verified region snapshot reset.");
             }
-            if (gameType == MinigameGameType.CAPTURE_THE_FLAG && definition.enabled && !arena.resetRegionAfterMatch) {
+            if (gameType == MinigameGameType.CAPTURE_THE_FLAG && definition.enabled && arena.enabled && !arena.resetRegionAfterMatch) {
                 throw new IllegalArgumentException("Enabled Capture the Flag arenas require a verified region snapshot reset.");
             }
-            if (gameType == MinigameGameType.DOMINATION && definition.enabled && !arena.resetRegionAfterMatch) {
+            if (gameType == MinigameGameType.DOMINATION && definition.enabled && arena.enabled && !arena.resetRegionAfterMatch) {
                 throw new IllegalArgumentException("Enabled Domination arenas require a verified region snapshot reset.");
             }
             if (arena.resetRegionAfterMatch && arena.regionId.isBlank()) {
@@ -822,9 +944,282 @@ public final class MinigameManager {
         sendLobby(actor, notice, error, payload.requestId(), true);
     }
 
+    public void handleSpectatorAction(MinigameSpectatorActionPayload payload, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player)) return;
+        context.enqueueWork(() -> spectateParticipant(player, payload == null ? "" : payload.action()));
+    }
+
+    private void spectateParticipant(ServerPlayer spectator, String action) {
+        if (spectator == null) return;
+        MinigameMatch match;
+        MinigameDefinition definition;
+        synchronized (this) {
+            match = matchFor(spectator.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+        }
+        if (match == null || definition == null || definition.experience == null
+                || !definition.experience.spectatorToolsEnabled
+                || !spectator.isSpectator()) return;
+        ArrayList<ServerPlayer> targets = new ArrayList<>();
+        for (UUID playerId : match.joinOrder) {
+            if (playerId.equals(spectator.getUUID()) || match.eliminated.contains(playerId)
+                    || match.pendingRespawns.containsKey(playerId) || match.disconnected.containsKey(playerId)) continue;
+            ServerPlayer target = server.getPlayerList().getPlayer(playerId);
+            if (target != null && !target.isDeadOrDying()) targets.add(target);
+        }
+        if (targets.isEmpty()) {
+            spectator.sendSystemMessage(Component.literal("No living participant is available to spectate."), true);
+            return;
+        }
+        int delta = "previous".equalsIgnoreCase(action) ? -1 : 1;
+        int cursor = Math.floorMod(spectatorCursors.getOrDefault(spectator.getUUID(), delta < 0 ? 0 : -1) + delta,
+                targets.size());
+        spectatorCursors.put(spectator.getUUID(), cursor);
+        ServerPlayer target = targets.get(cursor);
+        spectator.setCamera(target);
+        spectator.sendSystemMessage(Component.literal("Spectating " + target.getName().getString()
+                + " • , previous • . next"), true);
+    }
+
     public void handleRequest(MinigameLobbyRequestPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> processRequest(player, payload));
+    }
+
+    public void handleMatchOverviewRequest(MinigameMatchOverviewRequestPayload payload, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player)) return;
+        context.enqueueWork(() -> processMatchOverviewRequest(player, payload));
+    }
+
+    private void processMatchOverviewRequest(ServerPlayer player, MinigameMatchOverviewRequestPayload payload) {
+        if (player == null || payload == null) return;
+        String action = payload.action();
+        if ("leave".equals(action)) {
+            String notice;
+            try {
+                notice = leave(player, true);
+            } catch (RuntimeException exception) {
+                notice = exception.getMessage() == null ? "The match could not be left safely." : exception.getMessage();
+                sendMatchOverview(player, notice, true, payload.requestId(), false);
+                return;
+            }
+            if (isInMatch(player.getUUID(), "")) {
+                sendMatchOverview(player, notice, false, payload.requestId(), false);
+            } else {
+                PacketDistributor.sendToPlayer(player, MinigameMatchOverviewPayload.inactive(false, notice, false,
+                        payload.requestId()));
+            }
+            return;
+        }
+        if (!"open".equals(action) && !"refresh".equals(action)) {
+            PacketDistributor.sendToPlayer(player, MinigameMatchOverviewPayload.inactive(false,
+                    "Unknown match-overview action.", true, payload.requestId()));
+            return;
+        }
+        sendMatchOverview(player, "", false, payload.requestId(), true);
+    }
+
+    private void sendMatchOverview(ServerPlayer player, String notice, boolean error, long requestId,
+                                   boolean openDashboardFallback) {
+        MinigameMatch match;
+        MinigameDefinition definition;
+        MinigameArenaDefinition arena;
+        synchronized (this) {
+            match = matchFor(player.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+            arena = definition == null || match == null ? null : arena(definition, match.arenaId);
+        }
+        if (match == null || definition == null) {
+            PacketDistributor.sendToPlayer(player, MinigameMatchOverviewPayload.inactive(openDashboardFallback,
+                    notice, error, requestId));
+            return;
+        }
+
+        ArrayList<MinigameMatchOverviewPayload.TeamRow> teamRows = new ArrayList<>();
+        ArrayList<MinigameMatchOverviewPayload.PlayerRow> playerRows = new ArrayList<>();
+        ArrayList<String> objectiveLines = new ArrayList<>();
+        ArrayList<String> statusLines = new ArrayList<>();
+        ArrayList<String> ruleLines = new ArrayList<>();
+        int ownTeam;
+        String ownRole;
+        long ownScore;
+        boolean spectator;
+        boolean overtime;
+        String phase;
+        long remaining;
+
+        synchronized (this) {
+            ownTeam = match.team(player.getUUID());
+            ownRole = match.role(player.getUUID()).id();
+            ownScore = match.score(player.getUUID());
+            spectator = player.isSpectator() || match.eliminated.contains(player.getUUID())
+                    || match.pendingRespawns.containsKey(player.getUUID());
+            overtime = match.overtime;
+            phase = match.state.name().toLowerCase(Locale.ROOT);
+            remaining = matchRemainingSeconds(match, definition);
+
+            for (int team = 1; team <= Math.max(1, definition.teamCount); team++) {
+                int requestedTeam = team;
+                int count = (int) match.teams.values().stream().filter(value -> value == requestedTeam).count();
+                long teamScore = teamScore(match, definition, team);
+                teamRows.add(new MinigameMatchOverviewPayload.TeamRow(team,
+                        matchTeamName(match, definition, team), teamScore, count));
+            }
+            for (UUID playerId : match.joinOrder) {
+                MinigamePerformance performance = match.performance(playerId);
+                int team = match.team(playerId);
+                playerRows.add(new MinigameMatchOverviewPayload.PlayerRow(playerId.toString(),
+                        participantName(playerId), team, matchTeamName(match, definition, team),
+                        match.role(playerId).id(), match.score(playerId), performance.kills,
+                        performance.deaths, performance.assists, performance.captures,
+                        performance.defenses, match.disconnected.containsKey(playerId),
+                        match.eliminated.contains(playerId) || match.pendingRespawns.containsKey(playerId),
+                        playerId.equals(player.getUUID())));
+            }
+            appendObjectiveOverview(match, definition, arena, objectiveLines);
+            appendStatusOverview(match, definition, player.getUUID(), statusLines);
+            appendRuleOverview(definition, ruleLines);
+        }
+        PacketDistributor.sendToPlayer(player, new MinigameMatchOverviewPayload(true, false,
+                match.id.toString(), definition.id, definition.displayName, definition.gameType,
+                definition.description, phase, remaining, ownTeam,
+                matchTeamName(match, definition, ownTeam), ownRole, ownScore, spectator, overtime,
+                teamRows, playerRows, objectiveLines, statusLines, ruleLines, notice, error, requestId));
+    }
+
+    private long matchRemainingSeconds(MinigameMatch match, MinigameDefinition definition) {
+        long elapsed = Math.max(0L, (serverTicks - match.stateStartedTick) / 20L);
+        return switch (match.state) {
+            case COUNTDOWN -> Math.max(0L, definition.countdownSeconds - elapsed);
+            case RUNNING -> match.overtime
+                    ? Math.max(0L, (match.overtimeCompletesTick - serverTicks + 19L) / 20L)
+                    : definition.matchDurationSeconds <= 0 ? -1L
+                    : Math.max(0L, definition.matchDurationSeconds - elapsed);
+            case POST_GAME -> {
+                long duration = definition.postGameSeconds;
+                if (definition.experience != null && definition.experience.postGameVotingEnabled) {
+                    duration = Math.max(duration, definition.experience.postGameVoteSeconds);
+                }
+                yield Math.max(0L, duration - elapsed);
+            }
+            case RESETTING, FINISHED -> 0L;
+        };
+    }
+
+    private static long teamScore(MinigameMatch match, MinigameDefinition definition, int team) {
+        return switch (MinigameGameType.parse(definition.gameType)) {
+            case CAPTURE_THE_FLAG -> match.ctfScores.getOrDefault(team, 0);
+            case DOMINATION -> match.dominationScores.getOrDefault(team, 0);
+            default -> {
+                long total = 0L;
+                for (Map.Entry<UUID, Integer> entry : match.teams.entrySet()) {
+                    if (entry.getValue() == team) total = saturatingAdd(total, match.score(entry.getKey()));
+                }
+                yield total;
+            }
+        };
+    }
+
+    private String matchTeamName(MinigameMatch match, MinigameDefinition definition, int team) {
+        if (team <= 0) return "No team";
+        return switch (MinigameGameType.parse(definition.gameType)) {
+            case CAPTURE_THE_FLAG -> definition.captureTheFlag.teamName(team);
+            case DOMINATION -> definition.domination.teamName(team);
+            case SPLEEF -> {
+                String name = "Player " + team;
+                for (Map.Entry<UUID, Integer> entry : match.teams.entrySet()) {
+                    if (entry.getValue() == team) {
+                        name = participantName(entry.getKey());
+                        break;
+                    }
+                }
+                yield name;
+            }
+            default -> "Team " + team;
+        };
+    }
+
+    private void appendObjectiveOverview(MinigameMatch match, MinigameDefinition definition,
+                                         MinigameArenaDefinition arena, List<String> lines) {
+        MinigameGameType type = MinigameGameType.parse(definition.gameType);
+        switch (type) {
+            case CAPTURE_THE_FLAG -> {
+                lines.add(definition.captureTheFlag.teamName(1) + ": " + match.ctfScores.getOrDefault(1, 0)
+                        + "/" + definition.captureTheFlag.scoreToWin);
+                lines.add(definition.captureTheFlag.teamName(2) + ": " + match.ctfScores.getOrDefault(2, 0)
+                        + "/" + definition.captureTheFlag.scoreToWin);
+                for (int flagTeam = 1; flagTeam <= 2; flagTeam++) {
+                    UUID carrier = match.flagCarriers.get(flagTeam);
+                    String state = carrier != null ? "carried by " + participantName(carrier)
+                            : match.ctfDroppedFlags.containsKey(flagTeam) ? "dropped" : "at base";
+                    lines.add(definition.captureTheFlag.teamName(flagTeam) + " flag: " + state);
+                }
+            }
+            case DOMINATION -> {
+                lines.add("First to " + definition.domination.scoreToWin + " points wins.");
+                if (arena != null) {
+                    for (MinigameControlPoint point : arena.controlPoints) {
+                        int owner = match.dominationOwners.getOrDefault(point.id, 0);
+                        MinigameMatch.DominationClaim claim = match.dominationClaims.get(point.id);
+                        String state = claim != null ? "being claimed by "
+                                + definition.domination.teamName(claim.claimingTeam())
+                                : owner == 0 ? "Neutral" : definition.domination.teamName(owner);
+                        lines.add(point.displayName + ": " + state);
+                    }
+                }
+            }
+            case SPLEEF -> {
+                int alive = 0;
+                for (UUID playerId : match.teams.keySet()) if (!match.eliminated.contains(playerId)) alive++;
+                lines.add(alive + " player" + (alive == 1 ? "" : "s") + " still alive.");
+                lines.add("Last player standing wins.");
+                if (definition.spleef.standardProjectileEnabled) lines.add("Snowball projectile unlocks during the match.");
+            }
+            default -> {
+                lines.add("Victory mode: " + definition.victoryMode.replace('_', ' '));
+                lines.add("Highest team score wins.");
+            }
+        }
+    }
+
+    private void appendStatusOverview(MinigameMatch match, MinigameDefinition definition, UUID playerId,
+                                      List<String> lines) {
+        lines.add("Phase: " + match.state.name().toLowerCase(Locale.ROOT).replace('_', ' '));
+        lines.add("Players: " + match.teams.size() + "/" + definition.maxPlayers);
+        if (!match.disconnected.isEmpty()) lines.add("Disconnected: " + match.disconnected.size());
+        if (!match.activeBoosts.isEmpty()) lines.add("Active boosts: " + match.activeBoosts.size());
+        MinigameMatch.PendingRespawn pending = match.pendingRespawns.get(playerId);
+        if (pending != null) {
+            lines.add("Respawn in " + Math.max(1L, (pending.completesTick - serverTicks + 19L) / 20L) + "s");
+        }
+        if (match.overtime) lines.add("Objective sudden-death overtime is active.");
+        if (match.state == MinigameMatchState.POST_GAME && !match.finishReason.isBlank()) {
+            lines.add(match.finishReason);
+        }
+    }
+
+    private static void appendRuleOverview(MinigameDefinition definition, List<String> lines) {
+        switch (MinigameGameType.parse(definition.gameType)) {
+            case CAPTURE_THE_FLAG -> {
+                lines.add("Take the enemy flag and return it to your own base.");
+                lines.add("First team to " + definition.captureTheFlag.scoreToWin + " captures wins.");
+                lines.add("Defend your carrier and recover dropped flags.");
+            }
+            case DOMINATION -> {
+                lines.add("Right-click and hold position to claim bases.");
+                lines.add("Owned bases generate score for your team.");
+                lines.add("First team to " + definition.domination.scoreToWin + " points wins.");
+            }
+            case SPLEEF -> {
+                lines.add("Break the floor beneath opponents.");
+                lines.add("Avoid falling below the elimination depth.");
+                lines.add("Be the last surviving player.");
+            }
+            default -> {
+                lines.add("Complete the configured objectives.");
+                lines.add("Work with your team and earn the highest score.");
+            }
+        }
     }
 
     private void processRequest(ServerPlayer player, MinigameLobbyRequestPayload payload) {
@@ -834,7 +1229,9 @@ public final class MinigameManager {
         // a previously closed lobby while all mutating follow-up actions remain ordered.
         boolean adminView = "open_admin".equals(action) || "refresh_admin".equals(action)
                 || "force_start".equals(action) || "finish".equals(action)
-                || "release_arena".equals(action) || "delete".equals(action);
+                || "release_arena".equals(action) || "delete".equals(action)
+                || "diagnostics".equals(action) || "integrity_check".equals(action)
+                || "clean_orphans".equals(action);
         if ("open".equals(action) || "open_admin".equals(action)) resetRequestSequence(player.getUUID(), payload.requestId());
         else if (!acceptRequest(player.getUUID(), payload.requestId())) return;
         if (!active() || (adminView ? !canAdmin(player) : !canAccess(player))) {
@@ -849,9 +1246,25 @@ public final class MinigameManager {
         try {
             switch (action) {
                 case "open", "refresh" -> { }
+                case "profile" -> {
+                    sendProfile(player, "", false, payload.requestId(),
+                            payload.contextMinigameId().isBlank() ? payload.minigameId() : payload.contextMinigameId());
+                    return;
+                }
+                case "select_title" -> {
+                    updateProfileSelection(player, true, payload.minigameId());
+                    sendProfile(player, "Selected title updated.", false, payload.requestId(), payload.contextMinigameId());
+                    return;
+                }
+                case "select_victory" -> {
+                    updateProfileSelection(player, false, payload.minigameId());
+                    sendProfile(player, "Selected victory effect updated.", false, payload.requestId(), payload.contextMinigameId());
+                    return;
+                }
                 case "open_admin", "refresh_admin" -> requireAdmin(player);
                 case "join" -> notice = joinQueue(player, payload.minigameId(), payload.preferredRole());
                 case "leave" -> notice = leave(player, true);
+                case "vote_rematch", "vote_next", "vote_leave" -> notice = castPostGameVote(player, action);
                 case "force_start" -> {
                     requireAdmin(player);
                     notice = forceStart(payload.minigameId());
@@ -869,13 +1282,149 @@ public final class MinigameManager {
                     if (!deleteDefinition(payload.minigameId())) throw new IllegalArgumentException("The minigame is active or could not be deleted.");
                     notice = "Minigame deleted.";
                 }
+                case "diagnostics" -> {
+                    requireAdmin(player);
+                    sendDiagnostics(player, "", false, false, payload.requestId());
+                    return;
+                }
+                case "integrity_check" -> {
+                    requireAdmin(player);
+                    sendDiagnostics(player, "Integrity check completed.", false, true, payload.requestId());
+                    return;
+                }
+                case "clean_orphans" -> {
+                    requireAdmin(player);
+                    int cleaned = cleanOrphanedRuntimeData();
+                    sendDiagnostics(player, "Cleaned " + cleaned + " orphaned runtime reference(s).", false, true, payload.requestId());
+                    return;
+                }
                 default -> throw new IllegalArgumentException("Unknown minigame action.");
             }
         } catch (RuntimeException exception) {
             notice = exception.getMessage() == null ? "The minigame action failed safely." : exception.getMessage();
             error = true;
+            if ("profile".equals(action) || "select_title".equals(action) || "select_victory".equals(action)) {
+                sendProfile(player, notice, true, payload.requestId(), payload.contextMinigameId());
+                return;
+            }
         }
         sendLobby(player, notice, error, payload.requestId(), adminView);
+    }
+
+    private void updateProfileSelection(ServerPlayer player, boolean title, String value) {
+        if (player == null) throw new IllegalArgumentException("Player is unavailable.");
+        synchronized (this) {
+            MinigameProgressionData.PlayerProgress progress = progression.getOrCreate(
+                    player.getUUID(), player.getName().getString());
+            if (title) progress.selectTitle(value);
+            else progress.selectVictoryEffect(value);
+            progress.updatedAtEpochMilli = System.currentTimeMillis();
+            progress.normalize(player.getUUID());
+            saveExperienceData();
+        }
+    }
+
+    /** Shared progression level used by the global title catalogue. */
+    public synchronized int progressionLevel(UUID playerId) {
+        if (playerId == null) return 1;
+        MinigameProgressionData.PlayerProgress value = progression.players.get(playerId.toString());
+        if (value == null) return 1;
+        value.normalize(playerId);
+        return value.level;
+    }
+
+    /** Lifetime minigame wins used by the global title catalogue. */
+    public synchronized long progressionWins(UUID playerId) {
+        if (playerId == null) return 0L;
+        MinigameProgressionData.PlayerProgress value = progression.players.get(playerId.toString());
+        if (value == null) return 0L;
+        value.normalize(playerId);
+        return value.matchesWon;
+    }
+
+    /** Legacy selected minigame title, used once when migrating to the global profile system. */
+    public synchronized String legacySelectedTitle(UUID playerId) {
+        if (playerId == null) return "Rookie";
+        MinigameProgressionData.PlayerProgress value = progression.players.get(playerId.toString());
+        if (value == null) return "Rookie";
+        value.normalize(playerId);
+        return value.selectedTitle;
+    }
+
+    private void sendProfile(ServerPlayer player, String notice, boolean error, long requestId,
+                             String requestedMinigameId) {
+        MinigameProgressionData.PlayerProgress progress;
+        ArrayList<MinigameProfilePayload.Rating> ratings = new ArrayList<>();
+        MinigameDefinition challengeDefinition = null;
+        synchronized (this) {
+            progress = progression.getOrCreate(player.getUUID(), player.getName().getString());
+            String requested = ContentId.normalize(requestedMinigameId);
+            if (!requested.isBlank()) challengeDefinition = definitions.get(requested);
+            if (challengeDefinition == null) {
+                MinigameMatch activeMatch = matchFor(player.getUUID());
+                if (activeMatch != null) challengeDefinition = definitions.get(activeMatch.minigameId);
+            }
+            if (challengeDefinition == null) {
+                String queued = playerQueues.get(player.getUUID());
+                if (queued != null) challengeDefinition = definitions.get(queued);
+            }
+            if (challengeDefinition == null) {
+                for (MinigameDefinition definition : definitions.values()) {
+                    if (definition != null && definition.enabled) {
+                        challengeDefinition = definition;
+                        break;
+                    }
+                }
+            }
+            if (challengeDefinition == null && !definitions.isEmpty()) {
+                challengeDefinition = definitions.values().iterator().next();
+            }
+            for (MinigameDefinition definition : definitions.values()) {
+                if (definition == null) continue;
+                ratings.add(new MinigameProfilePayload.Rating(definition.id, definition.displayName,
+                        progress.rating(definition.id)));
+            }
+        }
+        ratings.sort(Comparator.comparing(MinigameProfilePayload.Rating::rating).reversed()
+                .thenComparing(MinigameProfilePayload.Rating::displayName, String.CASE_INSENSITIVE_ORDER));
+        MinigameExperienceRules challengeRules = challengeDefinition == null || challengeDefinition.experience == null
+                ? new MinigameExperienceRules() : challengeDefinition.experience;
+        challengeRules.normalize();
+        PacketDistributor.sendToPlayer(player, new MinigameProfilePayload(progress.level,
+                MinigameProgressionData.experienceIntoLevel(progress.experience),
+                MinigameProgressionData.experienceForNextLevel(progress.level),
+                progress.matchesPlayed, progress.matchesWon, progress.selectedTitle,
+                progress.selectedVictoryEffect, progress.weeklyMatches, progress.weeklyWins,
+                progress.weeklyContribution,
+                challengeDefinition == null ? "" : challengeDefinition.id,
+                challengeDefinition == null ? "" : challengeDefinition.displayName,
+                challengeRules.weeklyChallengesEnabled,
+                challengeRules.weeklyMatchesRequired, challengeRules.weeklyMatchesExperience,
+                challengeRules.weeklyWinsRequired, challengeRules.weeklyWinsExperience,
+                challengeRules.weeklyContributionRequired, challengeRules.weeklyContributionExperience,
+                progress.badges(), progress.unlockedTitles(), progress.unlockedVictoryEffects(),
+                ratings, notice, error, requestId));
+    }
+
+    private String castPostGameVote(ServerPlayer player, String action) {
+        if (player == null) throw new IllegalArgumentException("Player is unavailable.");
+        String vote = switch (action) {
+            case "vote_rematch" -> "rematch";
+            case "vote_next" -> "next";
+            default -> "leave";
+        };
+        synchronized (this) {
+            MinigameMatch match = matchFor(player.getUUID());
+            MinigameDefinition definition = match == null ? null : definitions.get(match.minigameId);
+            if (match == null || match.state != MinigameMatchState.POST_GAME) {
+                throw new IllegalArgumentException("There is no post-game vote in progress.");
+            }
+            if (definition == null || definition.experience == null || !definition.experience.postGameVotingEnabled) {
+                throw new IllegalArgumentException("Post-game voting is disabled.");
+            }
+            match.postGameVotes.put(player.getUUID(), vote);
+        }
+        return "Vote recorded: " + vote.replace('_', ' ') + ".";
     }
 
     private synchronized void resetRequestSequence(UUID playerId, long requestId) {
@@ -992,6 +1541,9 @@ public final class MinigameManager {
         target.teams.put(playerId, selectedTeam);
         target.preferredRoles.put(playerId, normalizedPreference);
         target.scores.put(playerId, 0L);
+        target.performance(playerId);
+        target.lastActivityTicks.put(playerId, serverTicks);
+        target.lastActivityLocations.put(playerId, MinigameLocation.of(player));
         target.joinOrder.add(playerId);
         target.playerStates.put(playerId, state);
         target.returnLocations.put(playerId, returnLocation);
@@ -1293,16 +1845,17 @@ public final class MinigameManager {
         Map<UUID, MinigameRole> requeuePreferences = new LinkedHashMap<>(match.preferredRoles);
         match.rewardsDelivered = true;
         match.rewardsEnabled = false;
-        announce(match, reason);
         MinigameArenaDefinition arena = definition == null ? null : arena(definition, match.arenaId);
         if (!cleanup(match, definition, arena)) {
-            announce(match, "Return is paused because SSU could not durably store player recovery data.");
+            announceImportant(match, "Match return paused",
+                    "SSU could not durably store player recovery data. No state was discarded.");
             return;
         }
-        if (definition == null || !definition.enabled) return;
         for (UUID playerId : requeue) {
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
             if (player == null || player.isDeadOrDying()) continue;
+            sendImportantMessage(player, "Match cancelled", reason);
+            if (definition == null || !definition.enabled) continue;
             try {
                 joinQueue(player, definition.id,
                         requeuePreferences.getOrDefault(playerId, MinigameRole.DPS).id());
@@ -1340,9 +1893,11 @@ public final class MinigameManager {
 
     private void tickRealtimeMinigames() {
         for (MinigameMatch match : List.copyOf(matches.values())) {
-            if (match.state != MinigameMatchState.RUNNING) continue;
+            if (match.state != MinigameMatchState.COUNTDOWN && match.state != MinigameMatchState.RUNNING) continue;
             MinigameDefinition definition = definitions.get(match.minigameId);
             if (definition == null) continue;
+            if (definition.lockInventory) tickLockedInventories(match);
+            if (match.state != MinigameMatchState.RUNNING) continue;
             MinigameArenaDefinition arena = arena(definition, match.arenaId);
             if (arena == null) continue;
             MinigameGameType type = MinigameGameType.parse(definition.gameType);
@@ -1354,7 +1909,6 @@ public final class MinigameManager {
             else if (type == MinigameGameType.CAPTURE_THE_FLAG) tickCtfRealtime(match, definition, arena);
             if (type == MinigameGameType.DOMINATION || type == MinigameGameType.CAPTURE_THE_FLAG) {
                 tickBoosts(match, definition, arena);
-                tickRoleRuntime(match, definition);
             }
         }
     }
@@ -1416,6 +1970,46 @@ public final class MinigameManager {
         player.connection.send(new ClientboundSetSubtitleTextPacket(Component.literal("Respawning")));
     }
 
+    private void showPreparationCountdown(MinigameMatch match, long seconds) {
+        if (match == null || seconds < 1L || seconds > 10L) return;
+        SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(
+                Identifier.parse("minecraft:block.note_block.hat")).orElse(null);
+        for (UUID playerId : match.teams.keySet()) {
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null) continue;
+            player.connection.send(new ClientboundSetTitlesAnimationPacket(0, 18, 2));
+            player.connection.send(new ClientboundSetTitleTextPacket(Component.literal(Long.toString(seconds))));
+            player.connection.send(new ClientboundSetSubtitleTextPacket(Component.literal("Match starts in")));
+            if (sound != null) {
+                float pitch = seconds <= 3L ? 1.35F : seconds <= 5L ? 1.15F : 1.0F;
+                player.connection.send(new ClientboundSoundPacket(
+                        BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound), SoundSource.MASTER,
+                        player.getX(), player.getY(), player.getZ(), 0.9F, pitch,
+                        serverTicks ^ player.getUUID().getLeastSignificantBits() ^ seconds));
+            }
+        }
+    }
+
+    private void showMatchStart(MinigameMatch match, MinigameDefinition definition) {
+        if (match == null) return;
+        SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(
+                Identifier.parse("minecraft:entity.player.levelup")).orElse(null);
+        for (UUID playerId : match.teams.keySet()) {
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null) continue;
+            player.connection.send(new ClientboundSetTitlesAnimationPacket(0, 20, 5));
+            player.connection.send(new ClientboundSetTitleTextPacket(Component.literal("GO!")));
+            player.connection.send(new ClientboundSetSubtitleTextPacket(Component.literal(
+                    definition == null ? "" : definition.displayName)));
+            if (sound != null) {
+                player.connection.send(new ClientboundSoundPacket(
+                        BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound), SoundSource.MASTER,
+                        player.getX(), player.getY(), player.getZ(), 0.8F, 1.2F,
+                        serverTicks ^ player.getUUID().getMostSignificantBits()));
+            }
+        }
+    }
+
     private static void clearRespawnTitle(ServerPlayer player) {
         if (player == null) return;
         player.connection.send(new ClientboundSetTitleTextPacket(Component.empty()));
@@ -1467,6 +2061,7 @@ public final class MinigameManager {
             match.dominationOwners.put(point.id, 0); // no team scores while the base is being claimed
             match.dominationClaims.put(point.id, new MinigameMatch.DominationClaim(
                     previousOwner, cast.team(), serverTicks, serverTicks + delayTicks));
+            match.dominationClaimers.put(point.id, playerId);
             placeDominationClaimMarker(definition, point, previousOwner, cast.team());
             announce(match, definition.domination.teamName(cast.team()) + " is claiming "
                     + point.displayName + "! Capture completes in "
@@ -1480,12 +2075,15 @@ public final class MinigameManager {
             MinigameControlPoint point = controlPoint(arena, entry.getKey());
             MinigameMatch.DominationClaim claim = entry.getValue();
             match.dominationClaims.remove(entry.getKey());
+            UUID claimerId = match.dominationClaimers.remove(entry.getKey());
             match.dominationOwners.put(entry.getKey(), claim.claimingTeam());
+            if (claimerId != null) recordObjectiveCapture(match, definition, claimerId,
+                    point == null ? entry.getKey() : point.displayName);
             if (point != null) {
                 placeDominationMarker(definition, point, claim.claimingTeam());
                 announce(match, definition.domination.teamName(claim.claimingTeam()) + " captured "
                         + point.displayName + "!");
-                playDominationCaptureCompleteSounds(match, claim.claimingTeam(), claim.previousOwner());
+                playObjectiveCaptureResultSounds(match, claim.claimingTeam());
             }
             visualsChanged = true;
         }
@@ -1623,13 +2221,16 @@ public final class MinigameManager {
         UUID matchId = UUID.randomUUID();
         MinigameMatch match = new MinigameMatch(matchId, definition.id, arena.id, serverTicks);
         match.rewardsEnabled = !forced;
-        int team = 1;
+        Map<UUID, Integer> balancedTeams = assignBalancedTeams(definition, candidates);
         for (ServerPlayer player : candidates) {
             UUID playerId = player.getUUID();
-            match.teams.put(playerId, team);
+            match.teams.put(playerId, balancedTeams.getOrDefault(playerId, 1));
             match.preferredRoles.put(playerId,
                     playerRolePreferences.getOrDefault(playerId, MinigameRole.DPS));
             match.scores.put(playerId, 0L);
+            match.performance(playerId);
+            match.lastActivityTicks.put(playerId, serverTicks);
+            match.lastActivityLocations.put(playerId, MinigameLocation.of(player));
             match.joinOrder.add(playerId);
             MinigamePlayerState state = capturedStates.get(playerId);
             MinigameLocation returnLocation = capturedReturns.get(playerId);
@@ -1638,7 +2239,6 @@ public final class MinigameManager {
             recoveries.put(playerId, new MinigameRecoveryData.Entry(playerId, definition.id,
                     match.id.toString(), returnLocation.copy(), state));
             playerMatches.put(playerId, match.id);
-            team = team % definition.teamCount + 1;
         }
         if (!assignMatchRoles(match, definition, forced)) {
             for (ServerPlayer player : candidates) {
@@ -1687,6 +2287,37 @@ public final class MinigameManager {
                     + ". Match begins in " + definition.countdownSeconds + " seconds."));
         }
         return match;
+    }
+
+    private Map<UUID, Integer> assignBalancedTeams(MinigameDefinition definition, List<ServerPlayer> candidates) {
+        LinkedHashMap<UUID, Integer> result = new LinkedHashMap<>();
+        if (candidates == null || candidates.isEmpty()) return result;
+        int teamCount = Math.max(1, definition.teamCount);
+        MinigameExperienceRules rules = definition.experience == null
+                ? new MinigameExperienceRules() : definition.experience;
+        ArrayList<ServerPlayer> ordered = new ArrayList<>(candidates);
+        if (rules.performanceBalancingEnabled && teamCount > 1) {
+            ordered.sort(Comparator.comparingInt((ServerPlayer player) ->
+                    progression.getOrCreate(player.getUUID(), player.getName().getString()).rating(definition.id)).reversed()
+                    .thenComparing(player -> player.getUUID().toString()));
+        }
+        int[] counts = new int[teamCount + 1];
+        double[] strength = new double[teamCount + 1];
+        for (ServerPlayer player : ordered) {
+            int rating = progression.getOrCreate(player.getUUID(), player.getName().getString()).rating(definition.id);
+            int selected = 1;
+            double best = Double.POSITIVE_INFINITY;
+            for (int team = 1; team <= teamCount; team++) {
+                double countPressure = counts[team] * 1_000.0D;
+                double ratingPressure = strength[team] * Math.max(0.0D, Math.min(1.0D, rules.performanceBalanceWeight));
+                double score = countPressure + ratingPressure;
+                if (score < best) { best = score; selected = team; }
+            }
+            result.put(player.getUUID(), selected);
+            counts[selected]++;
+            strength[selected] += rating;
+        }
+        return result;
     }
 
     private boolean assignMatchRoles(MinigameMatch match, MinigameDefinition definition, boolean forced) {
@@ -1793,17 +2424,24 @@ public final class MinigameManager {
         }
         long elapsedSeconds = Math.max(0L, (serverTicks - match.stateStartedTick) / 20L);
         updateHud(match, definition, elapsedSeconds);
+        tickActivityAndDisconnects(match, definition, arena);
+        if (!matches.containsKey(match.id)) return;
         switch (match.state) {
             case COUNTDOWN -> {
                 long remaining = Math.max(0L, definition.countdownSeconds - elapsedSeconds);
-                if (remaining != match.lastAnnouncementSecond && (remaining <= 5L || remaining == 10L || remaining % 30L == 0L)) {
+                if (remaining != match.lastAnnouncementSecond) {
                     match.lastAnnouncementSecond = remaining;
-                    announce(match, remaining == 0L ? "Go!" : "Match starts in " + remaining + "…");
+                    if (remaining >= 1L && remaining <= 10L) {
+                        showPreparationCountdown(match, remaining);
+                    } else if (remaining > 10L && remaining % 30L == 0L) {
+                        announce(match, "Match starts in " + remaining + "…");
+                    }
                 }
                 if (elapsedSeconds >= definition.countdownSeconds) {
                     match.state = MinigameMatchState.RUNNING;
                     match.stateStartedTick = serverTicks;
                     match.lastAnnouncementSecond = Long.MIN_VALUE;
+                    showMatchStart(match, definition);
                     MinigameGameType startingType = MinigameGameType.parse(definition.gameType);
                     if (startingType == MinigameGameType.CAPTURE_THE_FLAG
                             && !initializeCaptureTheFlag(match, definition, arena)) {
@@ -1828,6 +2466,7 @@ public final class MinigameManager {
             }
             case RUNNING -> {
                 MinigameGameType runningType = MinigameGameType.parse(definition.gameType);
+                tickObjectiveTime(match, definition, runningType);
                 if (runningType == MinigameGameType.SPLEEF) {
                     tickSpleef(match, definition, arena);
                     if (match.state != MinigameMatchState.RUNNING) return;
@@ -1847,15 +2486,126 @@ public final class MinigameManager {
                         return;
                     }
                 }
-                if (definition.matchDurationSeconds > 0 && elapsedSeconds >= definition.matchDurationSeconds) {
-                    finish(match, "Time limit reached.");
+                if (match.overtime) {
+                    if (serverTicks >= match.overtimeCompletesTick) {
+                        match.winningTeams = determineWinners(match);
+                        finish(match, "Overtime expired.");
+                    }
+                } else if (definition.matchDurationSeconds > 0 && elapsedSeconds >= definition.matchDurationSeconds) {
+                    Set<Integer> timedWinners = determineWinners(match);
+                    if (definition.experience != null && definition.experience.overtimeEnabled
+                            && timedWinners.isEmpty() && (runningType == MinigameGameType.CAPTURE_THE_FLAG
+                            || runningType == MinigameGameType.DOMINATION)) {
+                        match.overtime = true;
+                        match.overtimeCompletesTick = safeAdd(serverTicks,
+                                Math.max(5L, definition.experience.overtimeSeconds) * 20L);
+                        announce(match, "Overtime! The next objective capture wins. Maximum "
+                                + definition.experience.overtimeSeconds + " seconds.");
+                    } else {
+                        match.winningTeams = timedWinners;
+                        finish(match, "Time limit reached.");
+                    }
                 }
             }
             case POST_GAME -> {
-                if (elapsedSeconds >= definition.postGameSeconds) cleanup(match, definition, arena);
+                long postGameDuration = definition.postGameSeconds;
+                if (definition.experience != null && definition.experience.postGameVotingEnabled) {
+                    postGameDuration = Math.max(postGameDuration, definition.experience.postGameVoteSeconds);
+                }
+                if (elapsedSeconds >= postGameDuration) {
+                    match.postGameDecision = resolvePostGameDecision(match, definition);
+                    cleanup(match, definition, arena);
+                }
             }
             case RESETTING, FINISHED -> { }
         }
+    }
+
+    public void recordActivity(ServerPlayer player) {
+        if (player == null) return;
+        synchronized (this) {
+            MinigameMatch match = matchFor(player.getUUID());
+            if (match == null || match.state == MinigameMatchState.POST_GAME
+                    || match.state == MinigameMatchState.RESETTING || match.state == MinigameMatchState.FINISHED) return;
+            match.lastActivityTicks.put(player.getUUID(), serverTicks);
+            match.lastActivityLocations.put(player.getUUID(), MinigameLocation.of(player));
+            match.afkWarned.remove(player.getUUID());
+        }
+    }
+
+    private void tickActivityAndDisconnects(MinigameMatch match, MinigameDefinition definition,
+                                            MinigameArenaDefinition arena) {
+        MinigameExperienceRules rules = definition.experience;
+        for (UUID playerId : List.copyOf(match.teams.keySet())) {
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player != null) {
+                MinigameLocation previous = match.lastActivityLocations.get(playerId);
+                MinigameLocation current = MinigameLocation.of(player);
+                if (previous == null || !previous.dimension.equals(current.dimension)
+                        || distanceSquared(previous, current) > 0.04D) {
+                    match.lastActivityTicks.put(playerId, serverTicks);
+                    match.lastActivityLocations.put(playerId, current);
+                    match.afkWarned.remove(playerId);
+                }
+            }
+        }
+        for (Map.Entry<UUID, MinigameMatch.DisconnectedParticipant> entry
+                : List.copyOf(match.disconnected.entrySet())) {
+            if (serverTicks < entry.getValue().expiresTick()) continue;
+            expireDisconnectedParticipant(match, definition, arena, entry.getKey());
+        }
+        if (rules == null || !rules.afkDetectionEnabled || match.state != MinigameMatchState.RUNNING) return;
+        long timeoutTicks = Math.max(30L, rules.afkTimeoutSeconds) * 20L;
+        long warningTicks = Math.max(5L, rules.afkWarningSeconds) * 20L;
+        for (UUID playerId : List.copyOf(match.teams.keySet())) {
+            if (match.disconnected.containsKey(playerId) || match.pendingRespawns.containsKey(playerId)) continue;
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null) continue;
+            long inactive = Math.max(0L, serverTicks - match.lastActivityTicks.getOrDefault(playerId, match.stateStartedTick));
+            if (inactive >= timeoutTicks) {
+                player.sendSystemMessage(Component.literal("You were removed from the minigame for inactivity."));
+                withdrawFromMatch(playerId, "Player removed for inactivity.");
+                publish(player, ContentEventTypes.MINIGAME_QUEUE_LEFT, definition.id, 1L,
+                        Map.of("reason", "afk", "match", match.id.toString()));
+            } else if (inactive >= timeoutTicks - warningTicks && match.afkWarned.add(playerId)) {
+                long seconds = Math.max(1L, (timeoutTicks - inactive + 19L) / 20L);
+                player.sendSystemMessage(Component.literal("Move or act within " + seconds
+                        + " seconds or you will be removed for inactivity."), true);
+            }
+        }
+    }
+
+    private void expireDisconnectedParticipant(MinigameMatch match, MinigameDefinition definition,
+                                               MinigameArenaDefinition arena, UUID playerId) {
+        match.disconnected.remove(playerId);
+        if (MinigameGameType.parse(definition.gameType) == MinigameGameType.CAPTURE_THE_FLAG && arena != null) {
+            returnFlagsCarriedBy(match, definition, arena, playerId, "A disconnected carrier's flag returned to base.");
+        }
+        synchronized (this) {
+            match.joinOrder.remove(playerId);
+            match.teams.remove(playerId);
+            match.preferredRoles.remove(playerId);
+            match.roles.remove(playerId);
+            match.roleCooldowns.remove(playerId);
+            match.pendingRespawns.remove(playerId);
+            match.eliminated.remove(playerId);
+            playerMatches.remove(playerId);
+            runtimeBorderSyncStates.remove(playerId);
+        }
+        announce(match, "A disconnected participant's rejoin time expired.");
+        if (match.state == MinigameMatchState.COUNTDOWN && match.teams.size() < definition.minPlayers) {
+            cancelCountdown(match, definition, "Countdown cancelled because too few players remain.");
+        } else if (match.state == MinigameMatchState.RUNNING && activeTeams(match).size() <= 1
+                && definition.teamCount > 1) {
+            Set<Integer> alive = activeTeams(match);
+            match.winningTeams = alive.isEmpty() ? Set.of() : alive;
+            finish(match, "The opposing team ran out of connected participants.");
+        }
+    }
+
+    private static double distanceSquared(MinigameLocation first, MinigameLocation second) {
+        double x = first.x - second.x, y = first.y - second.y, z = first.z - second.z;
+        return x * x + y * y + z * z;
     }
 
     /** Immutable runtime view for concrete minigame rule handlers. */
@@ -1970,18 +2720,40 @@ public final class MinigameManager {
 
     public void onLogin(ServerPlayer player) {
         MinigameRecoveryData.Entry recovery;
-        MinigameArenaDefinition activeArena = null;
+        MinigameMatch activeMatch;
+        MinigameDefinition activeDefinition;
+        MinigameArenaDefinition activeArena;
         synchronized (this) {
-            MinigameMatch activeMatch = matchFor(player.getUUID());
-            if (activeMatch != null) {
-                MinigameDefinition definition = definitions.get(activeMatch.minigameId);
-                activeArena = definition == null ? null : arena(definition, activeMatch.arenaId);
-                recovery = null;
-            } else {
-                recovery = recoveries.get(player.getUUID());
-            }
+            activeMatch = matchFor(player.getUUID());
+            activeDefinition = activeMatch == null ? null : definitions.get(activeMatch.minigameId);
+            activeArena = activeDefinition == null || activeMatch == null ? null : arena(activeDefinition, activeMatch.arenaId);
+            recovery = activeMatch == null ? recoveries.get(player.getUUID()) : null;
         }
-        if (activeArena != null) {
+        if (activeMatch != null && activeDefinition != null && activeArena != null) {
+            MinigameMatch.DisconnectedParticipant disconnected = activeMatch.disconnected.get(player.getUUID());
+            boolean withinGrace = disconnected != null && serverTicks <= disconnected.expiresTick();
+            if (withinGrace && activeDefinition.experience != null && activeDefinition.experience.rejoinEnabled) {
+                synchronized (this) {
+                    activeMatch.disconnected.remove(player.getUUID());
+                    activeMatch.lastActivityTicks.put(player.getUUID(), serverTicks);
+                    activeMatch.lastActivityLocations.put(player.getUUID(), MinigameLocation.of(player));
+                }
+                if (activeMatch.state == MinigameMatchState.COUNTDOWN) {
+                    prepareCountdownPlayer(player, activeDefinition, activeArena, activeMatch);
+                } else if (activeMatch.pendingRespawns.containsKey(player.getUUID())) {
+                    player.setGameMode(GameType.SPECTATOR);
+                    teleport(player, activeArena.spectator);
+                } else if (activeMatch.state == MinigameMatchState.RUNNING) {
+                    beginParticipant(player, activeDefinition, activeArena, activeMatch);
+                } else {
+                    player.setGameMode(GameType.SPECTATOR);
+                    teleport(player, activeArena.spectator);
+                }
+                player.sendSystemMessage(Component.literal("Rejoined " + activeDefinition.displayName
+                        + " within the reconnect grace period."));
+                syncRuntimeBorders(player);
+                return;
+            }
             player.setGameMode(GameType.SPECTATOR);
             teleport(player, activeArena.spectator);
             player.sendSystemMessage(Component.literal("You rejoined an active minigame as a spectator."));
@@ -2014,7 +2786,36 @@ public final class MinigameManager {
 
     public void onLogout(ServerPlayer player) {
         if (player == null) return;
-        leave(player, false);
+        MinigameMatch match;
+        MinigameDefinition definition;
+        MinigameArenaDefinition arena;
+        synchronized (this) {
+            match = matchFor(player.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+            arena = definition == null || match == null ? null : arena(definition, match.arenaId);
+        }
+        boolean grace = match != null && definition != null && definition.experience != null
+                && definition.experience.rejoinEnabled
+                && (match.state == MinigameMatchState.COUNTDOWN || match.state == MinigameMatchState.RUNNING);
+        if (grace) {
+            long expires = serverTicks + Math.max(10L, definition.experience.rejoinGraceSeconds) * 20L;
+            synchronized (this) {
+                match.disconnected.put(player.getUUID(), new MinigameMatch.DisconnectedParticipant(serverTicks, expires));
+                match.afkWarned.remove(player.getUUID());
+            }
+            MinigameGameType type = MinigameGameType.parse(definition.gameType);
+            if (type == MinigameGameType.CAPTURE_THE_FLAG && arena != null) {
+                interruptCtfCast(match, player.getUUID(), "Flag capture interrupted by disconnect.");
+                returnFlagsCarriedBy(match, definition, arena, player.getUUID(),
+                        "A disconnected carrier's flag returned to base.");
+            } else if (type == MinigameGameType.DOMINATION) {
+                interruptDominationCast(match, player.getUUID(), "Objective capture interrupted by disconnect.");
+            }
+            announce(match, player.getName().getString() + " disconnected and may rejoin for "
+                    + definition.experience.rejoinGraceSeconds + " seconds.");
+        } else {
+            leave(player, false);
+        }
         synchronized (this) { lastRequests.remove(player.getUUID()); }
     }
 
@@ -2044,7 +2845,296 @@ public final class MinigameManager {
         }
         celebrateWinners(match, definition);
         String winners = winnerAnnouncement(match, definition);
-        announce(match, definition.displayName + " finished. " + winners + ". " + match.finishReason);
+        announceImportant(match, winners, match.finishReason.isBlank()
+                ? definition.displayName + " has ended." : match.finishReason);
+        prepareMatchExperiencePreview(match, definition);
+        sendResults(match, definition, definition.experience == null ? 0 : definition.experience.postGameVoteSeconds);
+    }
+
+    /**
+     * Computes the result-screen XP and projected level without changing durable progression.
+     * Definitive progression is settled only after configured rewards have committed.
+     */
+    private void prepareMatchExperiencePreview(MinigameMatch match, MinigameDefinition definition) {
+        if (match == null || definition == null) return;
+        match.experienceGained.clear();
+        match.priorLevels.clear();
+        match.resultingLevels.clear();
+        MinigameExperienceRules rules = definition.experience == null
+                ? new MinigameExperienceRules() : definition.experience;
+        for (UUID playerId : match.joinOrder) {
+            String name = participantName(playerId);
+            MinigameProgressionData.PlayerProgress progress = progressionPreview(playerId, name);
+            boolean won = match.winningTeams.contains(match.team(playerId));
+            int experienceGained = calculateExperienceGain(match, rules, progress, won,
+                    match.performance(playerId), false);
+            long projectedExperience = saturatingAdd(progress.experience, experienceGained);
+            match.experienceGained.put(playerId, experienceGained);
+            match.priorLevels.put(playerId, progress.level);
+            match.resultingLevels.put(playerId, MinigameProgressionData.levelForExperience(projectedExperience));
+        }
+    }
+
+    private MinigameProgressionData.PlayerProgress progressionPreview(UUID playerId, String name) {
+        MinigameProgressionData.PlayerProgress stored = progression.players.get(playerId.toString());
+        if (stored != null) {
+            stored.normalize(playerId);
+            return stored;
+        }
+        MinigameProgressionData.PlayerProgress preview = new MinigameProgressionData.PlayerProgress();
+        preview.uuid = playerId.toString();
+        preview.lastKnownName = name == null || name.isBlank() ? shortPlayerName(playerId) : name;
+        preview.normalize(playerId);
+        return preview;
+    }
+
+    private int calculateExperienceGain(MinigameMatch match, MinigameExperienceRules rules,
+                                        MinigameProgressionData.PlayerProgress progress,
+                                        boolean won, MinigamePerformance performance,
+                                        boolean commitWeekly) {
+        if (match == null || rules == null || progress == null || performance == null
+                || !rules.progressionEnabled || !match.rewardsEnabled) return 0;
+        long objective = Math.min(rules.objectiveExperienceCap,
+                Math.max(0L, performance.contributionScore() / 100L));
+        int weeklyBonus = commitWeekly
+                ? progress.recordWeekly(won, performance.contributionScore(), rules)
+                : progress.previewWeeklyBonus(won, performance.contributionScore(), rules);
+        long calculated = (long) rules.participationExperience
+                + (won ? rules.winnerExperience : 0L) + objective + weeklyBonus;
+        return (int) Math.min(1_000_000L, Math.max(0L, calculated));
+    }
+
+    /**
+     * Applies progression/history only after rewards are committed, then flushes and verifies
+     * both files before any participant is returned. The persisted settlement receipt makes
+     * retries idempotent even when cleanup is paused by storage or mail failures.
+     */
+    private boolean finalizeMatchExperienceAfterRewards(MinigameMatch match, MinigameDefinition definition) {
+        if (match == null || definition == null || match.state != MinigameMatchState.POST_GAME) return true;
+        if (!match.experienceSettlementDurable) {
+            if (!progression.isSettled(match.id)) {
+                applyExperienceSettlementState(match, definition);
+            } else if (match.experienceGained.isEmpty()) {
+                hydrateExperienceFromHistory(match);
+            }
+            if (!saveExperienceDataDurably("minigame settlement " + match.id)) return false;
+            match.experienceSettlementDurable = true;
+        }
+        if (!match.experienceSideEffectsPublished) {
+            if (!deliverAllMatchSummaryMails(match, definition)) return false;
+            // Mark before non-transactional statistics/events so an unexpected handler failure
+            // can never make a cleanup retry increment counters twice in this server session.
+            match.experienceSideEffectsPublished = true;
+            publishExperienceSideEffects(match, definition);
+        }
+        return true;
+    }
+
+    private void applyExperienceSettlementState(MinigameMatch match, MinigameDefinition definition) {
+        MinigameMatchHistory.Entry historyEntry = new MinigameMatchHistory.Entry();
+        historyEntry.matchId = match.id.toString();
+        historyEntry.minigameId = definition.id;
+        historyEntry.displayName = definition.displayName;
+        historyEntry.arenaId = match.arenaId;
+        historyEntry.startedAtEpochMilli = match.startedEpochMilli;
+        historyEntry.finishedAtEpochMilli = System.currentTimeMillis();
+        historyEntry.finishReason = match.finishReason;
+        historyEntry.winningTeams = new ArrayList<>(match.winningTeams);
+        MinigameExperienceRules rules = definition.experience == null
+                ? new MinigameExperienceRules() : definition.experience;
+        match.experienceGained.clear();
+        match.priorLevels.clear();
+        match.resultingLevels.clear();
+        for (UUID playerId : match.joinOrder) {
+            int team = match.team(playerId);
+            boolean won = match.winningTeams.contains(team);
+            String name = participantName(playerId);
+            MinigamePerformance performance = match.performance(playerId);
+            MinigameProgressionData.PlayerProgress progress = progression.getOrCreate(playerId, name);
+            int priorLevel = progress.level;
+            int experienceGained = calculateExperienceGain(match, rules, progress, won, performance, true);
+            if (rules.progressionEnabled && match.rewardsEnabled) {
+                progress.experience = saturatingAdd(progress.experience, experienceGained);
+                progress.gameExperience.put(definition.id, saturatingAdd(
+                        progress.gameExperience.getOrDefault(definition.id, 0L), experienceGained));
+                progress.matchesPlayed = saturatingAdd(progress.matchesPlayed, 1L);
+                if (won) progress.matchesWon = saturatingAdd(progress.matchesWon, 1L);
+                int rating = progress.rating(definition.id);
+                int adjustment = match.winningTeams.isEmpty() ? 0 : won ? 18 : -12;
+                progress.ratings.put(definition.id, Math.max(100, Math.min(4_000, rating + adjustment)));
+                progress.updatedAtEpochMilli = System.currentTimeMillis();
+            }
+            progress.normalize(playerId);
+            match.experienceGained.put(playerId, experienceGained);
+            match.priorLevels.put(playerId, priorLevel);
+            match.resultingLevels.put(playerId, progress.level);
+
+            MinigameMatchHistory.PlayerEntry playerEntry = new MinigameMatchHistory.PlayerEntry();
+            playerEntry.name = name;
+            playerEntry.team = team;
+            playerEntry.role = match.role(playerId).id();
+            playerEntry.won = won;
+            playerEntry.score = match.score(playerId);
+            playerEntry.performance = performance.copy();
+            playerEntry.experienceGained = experienceGained;
+            playerEntry.resultingLevel = progress.level;
+            historyEntry.players.put(playerId.toString(), playerEntry);
+        }
+        historyEntry.normalize();
+        history.matches.removeIf(entry -> entry != null && match.id.toString().equals(entry.matchId));
+        history.matches.add(historyEntry);
+        history.normalize();
+        progression.rememberSettlement(match.id, definition.id, match.joinOrder.size());
+        progression.normalize();
+    }
+
+    private void hydrateExperienceFromHistory(MinigameMatch match) {
+        for (MinigameMatchHistory.Entry entry : history.matches) {
+            if (entry == null || !match.id.toString().equals(entry.matchId)) continue;
+            for (Map.Entry<String, MinigameMatchHistory.PlayerEntry> playerEntry : entry.players.entrySet()) {
+                try {
+                    UUID playerId = UUID.fromString(playerEntry.getKey());
+                    MinigameMatchHistory.PlayerEntry value = playerEntry.getValue();
+                    if (value == null) continue;
+                    match.experienceGained.put(playerId, value.experienceGained);
+                    match.resultingLevels.put(playerId, value.resultingLevel);
+                } catch (RuntimeException ignored) {
+                }
+            }
+            return;
+        }
+    }
+
+    private boolean deliverAllMatchSummaryMails(MinigameMatch match, MinigameDefinition definition) {
+        MinigameExperienceRules rules = definition.experience == null
+                ? new MinigameExperienceRules() : definition.experience;
+        if (!rules.matchSummaryMailEnabled || !match.rewardsEnabled) return true;
+        for (UUID playerId : match.joinOrder) {
+            String name = participantName(playerId);
+            if (!deliverMatchSummaryMail(match, definition, playerId, name,
+                    match.winningTeams.contains(match.team(playerId)),
+                    match.experienceGained.getOrDefault(playerId, 0),
+                    match.resultingLevels.getOrDefault(playerId, 1), match.performance(playerId))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void publishExperienceSideEffects(MinigameMatch match, MinigameDefinition definition) {
+        if (!match.rewardsEnabled) return;
+        for (UUID playerId : match.joinOrder) {
+            ServerPlayer online = server.getPlayerList().getPlayer(playerId);
+            if (online == null) continue;
+            boolean won = match.winningTeams.contains(match.team(playerId));
+            try {
+                SimpleServerUtilities.STATISTICS.increment(
+                        online, StatisticEventType.MINIGAME_COMPLETED, definition.id, 1L);
+                if (won) SimpleServerUtilities.STATISTICS.increment(
+                        online, StatisticEventType.MINIGAME_WIN, definition.id, 1L);
+                int before = match.priorLevels.getOrDefault(playerId,
+                        match.resultingLevels.getOrDefault(playerId, 1));
+                int after = match.resultingLevels.getOrDefault(playerId, before);
+                if (after > before) publish(online, ContentEventTypes.MINIGAME_LEVEL_UP,
+                        definition.id, after, Map.of("match", match.id.toString(),
+                                "level", Integer.toString(after)));
+            } catch (RuntimeException exception) {
+                SimpleServerUtilities.LOGGER.error(
+                        "Could not publish post-settlement minigame statistics for {} in match {}.",
+                        online.getName().getString(), match.id, exception);
+            }
+        }
+    }
+
+    private boolean deliverMatchSummaryMail(MinigameMatch match, MinigameDefinition definition,
+                                            UUID playerId, String playerName, boolean won,
+                                            int experienceGained, int level, MinigamePerformance performance) {
+        if (!Config.ENABLE_MAIL.get() || !SimpleServerUtilities.CORE.modules().isActive("mail")) return true;
+        String result = match.winningTeams.isEmpty() ? "Draw" : won ? "Victory" : "Defeat";
+        String body = result + " in " + definition.displayName + "\n"
+                + "Arena: " + match.arenaId + "\n"
+                + "Score: " + match.score(playerId) + "\n"
+                + "Kills / deaths / assists: " + performance.kills + " / " + performance.deaths
+                + " / " + performance.assists + "\n"
+                + "Damage: " + formatHealth(performance.damageDealt / 100.0D)
+                + " health • Healing: " + formatHealth(performance.healingDone / 100.0D) + " health\n"
+                + "Captures: " + performance.captures + " • Defenses: " + performance.defenses
+                + " • Objective time: " + performance.objectiveSeconds() + "s\n"
+                + "Progression: +" + experienceGained + " XP • Level " + level;
+        MailOperationResult delivered = SimpleServerUtilities.MAIL.deliverSystemMail(playerId, playerName,
+                "Minigame summary: " + definition.displayName, body, List.of(), 0L,
+                MailSource.MINIGAME, "minigame-summary:" + match.id + ":" + playerId);
+        if (!delivered.successful()) {
+            SimpleServerUtilities.LOGGER.error(
+                    "Paused minigame cleanup because summary mail for {} in match {} failed: {}",
+                    playerName, match.id, delivered.message());
+            return false;
+        }
+        return true;
+    }
+
+    private void sendResults(MinigameMatch match, MinigameDefinition definition, int voteRemaining) {
+        if (match == null || definition == null || definition.experience == null
+                || !definition.experience.resultsScreenEnabled) return;
+        ArrayList<MinigameResultsPayload.PlayerRow> rows = new ArrayList<>();
+        for (UUID playerId : match.joinOrder) {
+            String name = participantName(playerId);
+            MinigamePerformance p = match.performance(playerId);
+            rows.add(new MinigameResultsPayload.PlayerRow(playerId.toString(), name, match.team(playerId),
+                    match.role(playerId).id(), match.winningTeams.contains(match.team(playerId)), match.score(playerId),
+                    p.kills, p.deaths, p.assists, p.damageDealt, p.healingDone, p.captures, p.defenses,
+                    p.objectiveSeconds(), p.contributionScore()));
+        }
+        for (UUID playerId : match.teams.keySet()) {
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null) continue;
+            MinigameProgressionData.PlayerProgress progress = progressionPreview(
+                    playerId, player.getName().getString());
+            int gained = match.experienceGained.getOrDefault(playerId, 0);
+            long projectedExperience = saturatingAdd(progress.experience, gained);
+            int projectedLevel = match.resultingLevels.getOrDefault(
+                    playerId, MinigameProgressionData.levelForExperience(projectedExperience));
+            long requestId;
+            synchronized (this) { requestId = lastRequests.getOrDefault(playerId, 0L); }
+            PacketDistributor.sendToPlayer(player, new MinigameResultsPayload(true, match.id.toString(),
+                    definition.id, winnerAnnouncement(match, definition), match.finishReason,
+                    definition.experience.postGameVotingEnabled ? voteRemaining : 0,
+                    gained, projectedLevel,
+                    MinigameProgressionData.experienceIntoLevel(projectedExperience),
+                    MinigameProgressionData.experienceForNextLevel(projectedLevel),
+                    progress.badges(), rows, requestId));
+        }
+        match.resultsPublished = true;
+    }
+
+    private String resolvePostGameDecision(MinigameMatch match, MinigameDefinition definition) {
+        if (definition.experience == null || !definition.experience.postGameVotingEnabled) return "leave";
+        int rematch = 0, next = 0, leave = 0;
+        for (String vote : match.postGameVotes.values()) {
+            if ("rematch".equals(vote)) rematch++;
+            else if ("next".equals(vote)) next++;
+            else leave++;
+        }
+        if (rematch == 0 && next == 0) return "leave";
+        if (next > rematch && next >= leave) return "next";
+        if (rematch >= next && rematch >= leave) return "rematch";
+        return "leave";
+    }
+
+    private String participantName(UUID playerId) {
+        if (playerId == null) return "Player";
+        ServerPlayer online = server == null ? null : server.getPlayerList().getPlayer(playerId);
+        if (online != null) return online.getName().getString();
+        MinigameProgressionData.PlayerProgress known = progression.players.get(playerId.toString());
+        if (known != null && known.lastKnownName != null && !known.lastKnownName.isBlank()) {
+            return known.lastKnownName;
+        }
+        return shortPlayerName(playerId);
+    }
+
+    private static String shortPlayerName(UUID playerId) {
+        String value = playerId == null ? "unknown" : playerId.toString();
+        return "Player-" + value.substring(0, Math.min(8, value.length()));
     }
 
     private String winnerAnnouncement(MinigameMatch match, MinigameDefinition definition) {
@@ -2116,20 +3206,28 @@ public final class MinigameManager {
                     ? definition.captureTheFlag.color(entry.getValue())
                     : winnerType == MinigameGameType.DOMINATION
                     ? definition.domination.color(entry.getValue()) : 0xFFD700;
-            launchWinnerFirework(level, winner, color);
-            launchWinnerFirework(level, winner, color);
+            roleBurst(winner, color, 2.4D);
+            roleVerticalBurst(winner, color, 2.0D);
+            playRoleSound(match, winner, "minecraft:entity.firework_rocket.launch", 1.35F, 1.0F);
+            playUnlockedVictoryCosmetic(level, winner, color);
         }
     }
 
-    private static void launchWinnerFirework(ServerLevel level, ServerPlayer winner, int color) {
-        ItemStack rocket = new ItemStack(Items.FIREWORK_ROCKET);
-        FireworkExplosion explosion = new FireworkExplosion(FireworkExplosion.Shape.STAR,
-                IntList.of(color), IntList.of(0xFFFFFF), true, true);
-        rocket.set(DataComponents.FIREWORKS, new Fireworks(1, List.of(explosion)));
-        FireworkRocketEntity entity = new FireworkRocketEntity(level, winner.getX(), winner.getY() + 0.5D,
-                winner.getZ(), rocket);
-        level.addFreshEntity(entity);
+    private void playUnlockedVictoryCosmetic(ServerLevel level, ServerPlayer winner, int color) {
+        MinigameProgressionData.PlayerProgress progress = progression.getOrCreate(
+                winner.getUUID(), winner.getName().getString());
+        if ("spark".equals(progress.selectedVictoryEffect)
+                && progress.unlockedCosmetics.contains("victory:spark")) {
+            level.sendParticles(new DustParticleOptions(color & 0x00FFFFFF, 1.5F),
+                    winner.getX(), winner.getY() + 1.0D, winner.getZ(),
+                    42, 0.65D, 0.9D, 0.65D, 0.06D);
+        } else if ("star".equals(progress.selectedVictoryEffect)
+                && progress.unlockedCosmetics.contains("victory:star")) {
+            level.sendParticles(ParticleTypes.END_ROD, winner.getX(), winner.getY() + 1.2D, winner.getZ(),
+                    28, 0.7D, 0.8D, 0.7D, 0.08D);
+        }
     }
+
 
     private Set<Integer> determineWinners(MinigameMatch match) {
         MinigameDefinition definition = definitions.get(match.minigameId);
@@ -2322,6 +3420,10 @@ public final class MinigameManager {
     private boolean cleanup(MinigameMatch match, MinigameDefinition definition, MinigameArenaDefinition arena) {
         if (definition == null) definition = definition(match.minigameId);
         if (definition != null && arena == null) arena = arena(definition, match.arenaId);
+        List<UUID> postGamePlayers = List.copyOf(match.joinOrder);
+        Map<UUID, MinigameRole> postGamePreferences = new LinkedHashMap<>(match.preferredRoles);
+        String postGameDecision = match.postGameDecision == null ? "leave" : match.postGameDecision;
+        String previousArenaId = match.arenaId;
 
         // Restore the real inventory/state before rewards are granted. This prevents item
         // rewards from being written into a temporary minigame inventory and then lost.
@@ -2340,6 +3442,10 @@ public final class MinigameManager {
         if (definition != null && !match.rewardsDelivered) {
             if (match.rewardsEnabled && !deliverRewardsAndEvents(match, definition)) return false;
             match.rewardsDelivered = true;
+        }
+        if (definition != null && match.state == MinigameMatchState.POST_GAME
+                && !finalizeMatchExperienceAfterRewards(match, definition)) {
+            return false;
         }
         if (!match.postRewardRecoveryDurable) {
             // Persist the restored state including any item rewards before the final
@@ -2384,6 +3490,25 @@ public final class MinigameManager {
             synchronized (this) { unsafeArenas.remove(arenaKey(match.minigameId, match.arenaId)); }
             releaseArena(match.minigameId, match.arenaId);
             saveRecovery();
+        }
+        if (definition != null && !"leave".equals(postGameDecision)) {
+            if ("next".equals(postGameDecision)) rotateAfterArena(definition, previousArenaId);
+            for (UUID playerId : postGamePlayers) {
+                ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                if (player == null || player.isDeadOrDying()) continue;
+                try {
+                    joinQueue(player, definition.id,
+                            postGamePreferences.getOrDefault(playerId, MinigameRole.DPS).id());
+                    player.sendSystemMessage(Component.literal("Post-game vote: queued for "
+                            + ("next".equals(postGameDecision) ? "the next arena." : "a rematch.")));
+                } catch (RuntimeException exception) {
+                    player.sendSystemMessage(Component.literal("Post-game requeue failed safely: " + exception.getMessage()));
+                }
+            }
+        }
+        for (UUID playerId : postGamePlayers) {
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player != null) PacketDistributor.sendToPlayer(player, MinigameResultsPayload.clear());
         }
         return true;
     }
@@ -2559,6 +3684,8 @@ public final class MinigameManager {
             }
         }
         teleport(player, arena.lobby);
+        if (definition.lockInventory) captureLockedInventory(match, player);
+        else match.lockedInventories.remove(player.getUUID());
         updateHud(match, definition, 0L);
     }
 
@@ -2597,6 +3724,8 @@ public final class MinigameManager {
                 player.getFoodData().setSaturation(20.0F);
             }
         }
+        if (definition.lockInventory) captureLockedInventory(match, player);
+        else match.lockedInventories.remove(player.getUUID());
         int team = match.team(player.getUUID());
         teleport(player, matchSpawn(definition, arena, match, player.getUUID(), team));
     }
@@ -2937,6 +4066,66 @@ public final class MinigameManager {
         return BuiltInRegistries.BLOCK.getOptional(Identifier.parse(blockId)).orElse(null);
     }
 
+    private void tickObjectiveTime(MinigameMatch match, MinigameDefinition definition,
+                                   MinigameGameType type) {
+        LinkedHashSet<UUID> objectivePlayers = new LinkedHashSet<>();
+        if (type == MinigameGameType.CAPTURE_THE_FLAG) {
+            objectivePlayers.addAll(match.flagCarriers.values());
+            objectivePlayers.addAll(match.ctfCasts.keySet());
+        } else if (type == MinigameGameType.DOMINATION) {
+            objectivePlayers.addAll(match.dominationCasts.keySet());
+        }
+        for (UUID playerId : objectivePlayers) {
+            if (!match.active(playerId)) continue;
+            match.performance(playerId).objectiveTicks = saturatingAdd(
+                    match.performance(playerId).objectiveTicks, 20L);
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player != null && match.rewardsEnabled) {
+                SimpleServerUtilities.STATISTICS.increment(player,
+                        StatisticEventType.MINIGAME_OBJECTIVE_TIME, definition.id, 1L);
+                publish(player, ContentEventTypes.MINIGAME_OBJECTIVE_TIME, definition.id, 1L,
+                        Map.of("match", match.id.toString()));
+            }
+        }
+    }
+
+    private void recordObjectiveCapture(MinigameMatch match, MinigameDefinition definition,
+                                        UUID playerId, String objective) {
+        if (match == null || definition == null || playerId == null) return;
+        match.performance(playerId).captures = saturatingAdd(match.performance(playerId).captures, 1L);
+        ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+        if (player != null) {
+            if (match.rewardsEnabled) {
+                SimpleServerUtilities.STATISTICS.increment(player, StatisticEventType.MINIGAME_CAPTURE, definition.id, 1L);
+                publish(player, ContentEventTypes.MINIGAME_CAPTURE, definition.id, 1L,
+                        Map.of("match", match.id.toString(), "objective", objective == null ? "" : objective));
+            }
+            sendKillFeed(match, definition, player.getName().getString() + " captured " + objective, 0xFF83E39A);
+        }
+        if (match.overtime && match.state == MinigameMatchState.RUNNING) {
+            int team = match.team(playerId);
+            if (team > 0) {
+                match.winningTeams = Set.of(team);
+                finish(match, "Sudden-death objective captured in overtime.");
+            }
+        }
+    }
+
+    private void recordObjectiveDefense(MinigameMatch match, MinigameDefinition definition,
+                                        UUID playerId, String objective) {
+        if (match == null || definition == null || playerId == null) return;
+        match.performance(playerId).defenses = saturatingAdd(match.performance(playerId).defenses, 1L);
+        ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+        if (player != null) {
+            if (match.rewardsEnabled) {
+                SimpleServerUtilities.STATISTICS.increment(player, StatisticEventType.MINIGAME_DEFENSE, definition.id, 1L);
+                publish(player, ContentEventTypes.MINIGAME_DEFENSE, definition.id, 1L,
+                        Map.of("match", match.id.toString(), "objective", objective == null ? "" : objective));
+            }
+            sendKillFeed(match, definition, player.getName().getString() + " defended " + objective, 0xFF7FC8FF);
+        }
+    }
+
     private void tickDomination(MinigameMatch match, MinigameDefinition definition,
                                 MinigameArenaDefinition arena) {
         Region region = SimpleServerUtilities.REGIONS.get(arena.regionId);
@@ -3136,6 +4325,8 @@ public final class MinigameManager {
         interruptCtfCast(match, player.getUUID(), "");
         removeDroppedCtfFlagBlock(definition, flagTeam, dropped);
         if (returned) {
+            recordObjectiveDefense(match, definition, player.getUUID(),
+                    definition.captureTheFlag.teamName(flagTeam) + " flag");
             placeCtfFlagAtBase(definition, arena, flagTeam);
             announce(match, player.getName().getString() + " returned the "
                     + definition.captureTheFlag.teamName(flagTeam) + " flag to base.");
@@ -3171,7 +4362,9 @@ public final class MinigameManager {
             if (claim != null) {
                 if (claim.previousOwner() != 0 && team == claim.previousOwner()) {
                     match.dominationClaims.remove(point.id);
+                    match.dominationClaimers.remove(point.id);
                     match.dominationOwners.put(point.id, claim.previousOwner());
+                    recordObjectiveDefense(match, definition, player.getUUID(), point.displayName);
                     cancelCastsForPoint(match, point.id, "The defending team secured this base.");
                     placeDominationMarker(definition, point, claim.previousOwner());
                     announce(match, definition.domination.teamName(team) + " defended " + point.displayName + "!");
@@ -3185,6 +4378,7 @@ public final class MinigameManager {
                 }
                 // A neutral point can be counter-claimed, but the challenger must complete a fresh cast.
                 match.dominationClaims.remove(point.id);
+                match.dominationClaimers.remove(point.id);
                 match.dominationOwners.put(point.id, claim.previousOwner());
                 placeDominationMarker(definition, point, claim.previousOwner());
                 announce(match, definition.domination.teamName(team) + " interrupted the claim on " + point.displayName + ".");
@@ -3265,12 +4459,15 @@ public final class MinigameManager {
                 }
             }
             removeCtfCarrierVisual(match, carrierId);
+            recordObjectiveCapture(match, definition, carrierId,
+                    definition.captureTheFlag.teamName(enemyFlagTeam) + " flag");
             placeCtfFlagAtBase(definition, arena, enemyFlagTeam);
             int score = match.ctfScores.getOrDefault(carrierTeam, 0);
             announce(match, carrier.getName().getString() + " captured the "
                     + definition.captureTheFlag.teamName(enemyFlagTeam) + " flag! "
                     + definition.captureTheFlag.teamName(carrierTeam) + " " + score + "–"
                     + match.ctfScores.getOrDefault(carrierTeam == 1 ? 2 : 1, 0));
+            playObjectiveCaptureResultSounds(match, carrierTeam);
             publishCtfVisuals(match, definition);
             if (score >= definition.captureTheFlag.scoreToWin) {
                 match.winningTeams = Set.of(carrierTeam);
@@ -3546,6 +4743,28 @@ public final class MinigameManager {
         }
     }
 
+    private int cleanOrphanedBoostEntities() {
+        if (server == null) return 0;
+        LinkedHashSet<UUID> referenced = new LinkedHashSet<>();
+        for (MinigameMatch match : matches.values()) {
+            for (MinigameMatch.ActiveBoost boost : match.activeBoosts.values()) {
+                if (boost.entityId != null) referenced.add(boost.entityId);
+            }
+        }
+        int removed = 0;
+        for (ServerLevel level : server.getAllLevels()) {
+            for (Entity entity : level.getAllEntities()) {
+                Component customName = entity.getCustomName();
+                if (customName != null && BOOST_ENTITY_TAG.equals(customName.getString())
+                        && !referenced.contains(entity.getUUID())) {
+                    entity.discard();
+                    removed++;
+                }
+            }
+        }
+        return removed;
+    }
+
     private void removeOrphanMinigameBoosts() {
         if (server == null) return;
         for (ServerLevel level : server.getAllLevels()) {
@@ -3720,24 +4939,31 @@ public final class MinigameManager {
         }
     }
 
-    private void playDominationCaptureCompleteSounds(MinigameMatch match, int capturingTeam, int previousOwner) {
-        SoundEvent captured = BuiltInRegistries.SOUND_EVENT.getOptional(
-                Identifier.parse("minecraft:block.beacon.activate")).orElse(null);
+    /**
+     * Celebrates a completed CTF score or Domination base capture for the scoring team
+     * with the vanilla Ponder goat horn. Every opposing team member receives a short,
+     * clearly negative non-horn sound instead.
+     */
+    private void playObjectiveCaptureResultSounds(MinigameMatch match, int capturingTeam) {
+        if (match == null || capturingTeam <= 0) return;
+        SoundEvent ponder = BuiltInRegistries.SOUND_EVENT.getOptional(
+                Identifier.parse("minecraft:item.goat_horn.sound.0")).orElse(null);
         SoundEvent lost = BuiltInRegistries.SOUND_EVENT.getOptional(
                 Identifier.parse("minecraft:block.beacon.deactivate")).orElse(null);
-        if (captured == null || lost == null) return;
+        if (ponder == null && lost == null) return;
         for (Map.Entry<UUID, Integer> entry : match.teams.entrySet()) {
             ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
             if (player == null) continue;
-            SoundEvent sound = entry.getValue() == capturingTeam ? captured
-                    : previousOwner != 0 && entry.getValue() == previousOwner ? lost : null;
+            boolean captured = entry.getValue() == capturingTeam;
+            SoundEvent sound = captured ? ponder : lost;
             if (sound == null) continue;
             player.connection.send(new ClientboundSoundPacket(
                     BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound),
                     SoundSource.MASTER,
                     player.getX(), player.getY(), player.getZ(),
-                    1.5F, 1.0F,
-                    serverTicks ^ player.getUUID().getLeastSignificantBits()));
+                    captured ? 16.0F : 1.5F,
+                    captured ? 1.0F : 0.85F,
+                    serverTicks ^ player.getUUID().getLeastSignificantBits() ^ capturingTeam));
         }
     }
 
@@ -3801,6 +5027,105 @@ public final class MinigameManager {
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
             if (player != null) PacketDistributor.sendToPlayer(player, MinigameCtfVisualPayload.clear());
         }
+    }
+
+    public void recordCombatDamage(ServerPlayer attacker, ServerPlayer victim, float inflictedDamage) {
+        if (victim == null || inflictedDamage <= 0.0F) return;
+        MinigameMatch match;
+        MinigameDefinition definition;
+        long amount = Math.max(0L, Math.round(inflictedDamage * 100.0F));
+        synchronized (this) {
+            match = matchFor(victim.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+            if (match == null || definition == null || match.state != MinigameMatchState.RUNNING
+                    || match.pendingRespawns.containsKey(victim.getUUID())) return;
+            match.performance(victim.getUUID()).damageTaken = saturatingAdd(
+                    match.performance(victim.getUUID()).damageTaken, amount);
+            if (attacker != null && !attacker.getUUID().equals(victim.getUUID())
+                    && matchFor(attacker.getUUID()) == match && match.team(attacker.getUUID()) != match.team(victim.getUUID())) {
+                match.performance(attacker.getUUID()).damageDealt = saturatingAdd(
+                        match.performance(attacker.getUUID()).damageDealt, amount);
+                Map<UUID, MinigameMatch.DamageContribution> contributions = match.recentDamage.computeIfAbsent(
+                        victim.getUUID(), ignored -> new LinkedHashMap<>());
+                MinigameMatch.DamageContribution previous = contributions.get(attacker.getUUID());
+                long total = amount + (previous == null ? 0L : previous.amountHundredths());
+                contributions.put(attacker.getUUID(), new MinigameMatch.DamageContribution(total, serverTicks));
+            }
+        }
+        recordActivity(victim);
+        if (attacker != null) recordActivity(attacker);
+        if (attacker != null && matchFor(attacker.getUUID()) == match && match.rewardsEnabled) {
+            SimpleServerUtilities.STATISTICS.increment(attacker, StatisticEventType.MINIGAME_DAMAGE, definition.id, amount);
+            publish(attacker, ContentEventTypes.MINIGAME_DAMAGE, definition.id, amount,
+                    Map.of("match", match.id.toString(), "victim", victim.getUUID().toString()));
+        }
+    }
+
+    public void recordDeathStatistics(ServerPlayer victim, ServerPlayer directKiller) {
+        if (victim == null) return;
+        MinigameMatch match;
+        MinigameDefinition definition;
+        ArrayList<UUID> assists = new ArrayList<>();
+        ServerPlayer killer = directKiller;
+        synchronized (this) {
+            match = matchFor(victim.getUUID());
+            definition = match == null ? null : definitions.get(match.minigameId);
+            if (match == null || definition == null || match.state != MinigameMatchState.RUNNING) return;
+            match.performance(victim.getUUID()).deaths = saturatingAdd(match.performance(victim.getUUID()).deaths, 1L);
+            if (killer != null && (matchFor(killer.getUUID()) != match
+                    || match.team(killer.getUUID()) == match.team(victim.getUUID()))) killer = null;
+            if (killer != null) {
+                match.performance(killer.getUUID()).kills = saturatingAdd(match.performance(killer.getUUID()).kills, 1L);
+            }
+            Map<UUID, MinigameMatch.DamageContribution> contributors = match.recentDamage.remove(victim.getUUID());
+            if (contributors != null) {
+                for (Map.Entry<UUID, MinigameMatch.DamageContribution> entry : contributors.entrySet()) {
+                    if (killer != null && entry.getKey().equals(killer.getUUID())) continue;
+                    if (serverTicks - entry.getValue().lastHitTick() > 200L || entry.getValue().amountHundredths() <= 0L) continue;
+                    if (!match.teams.containsKey(entry.getKey()) || match.team(entry.getKey()) == match.team(victim.getUUID())) continue;
+                    match.performance(entry.getKey()).assists = saturatingAdd(match.performance(entry.getKey()).assists, 1L);
+                    assists.add(entry.getKey());
+                }
+            }
+        }
+        if (match.rewardsEnabled) {
+            SimpleServerUtilities.STATISTICS.increment(victim, StatisticEventType.MINIGAME_DEATH, definition.id, 1L);
+            publish(victim, ContentEventTypes.MINIGAME_DEATH, definition.id, 1L,
+                    Map.of("match", match.id.toString()));
+            if (killer != null) {
+                SimpleServerUtilities.STATISTICS.increment(killer, StatisticEventType.MINIGAME_KILL, definition.id, 1L);
+                publish(killer, ContentEventTypes.MINIGAME_KILL, definition.id, 1L,
+                        Map.of("match", match.id.toString(), "victim", victim.getUUID().toString()));
+            }
+            for (UUID assistId : assists) {
+                ServerPlayer assist = server.getPlayerList().getPlayer(assistId);
+                if (assist != null) {
+                    SimpleServerUtilities.STATISTICS.increment(assist, StatisticEventType.MINIGAME_ASSIST, definition.id, 1L);
+                    publish(assist, ContentEventTypes.MINIGAME_ASSIST, definition.id, 1L,
+                            Map.of("match", match.id.toString(), "victim", victim.getUUID().toString()));
+                }
+            }
+        }
+        String line = killer == null ? victim.getName().getString() + " was defeated"
+                : killer.getName().getString() + " defeated " + victim.getName().getString();
+        if (!assists.isEmpty()) line += " (assist" + (assists.size() == 1 ? "" : "s") + ": " + assists.size() + ")";
+        sendKillFeed(match, definition, line, 0xFFF0F3F6);
+    }
+
+    private void sendKillFeed(MinigameMatch match, MinigameDefinition definition, String text, int color) {
+        if (match == null || definition == null || definition.experience == null
+                || !definition.experience.killFeedEnabled || text == null || text.isBlank()) return;
+        MinigameKillFeedPayload payload = new MinigameKillFeedPayload(text, color, 120);
+        for (UUID playerId : match.teams.keySet()) {
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player != null) PacketDistributor.sendToPlayer(player, payload);
+        }
+    }
+
+    private static long saturatingAdd(long first, long second) {
+        if (second <= 0L) return Math.max(0L, first);
+        if (first > Long.MAX_VALUE - second) return Long.MAX_VALUE;
+        return Math.max(0L, first) + second;
     }
 
     public boolean handlePlayerDeath(ServerPlayer player) {
@@ -4067,6 +5392,11 @@ public final class MinigameManager {
             if (visual != null) visual.discard();
         }
         if (player != null) {
+            match.performance(player.getUUID()).boostsCollected = saturatingAdd(
+                    match.performance(player.getUUID()).boostsCollected, 1L);
+            MinigameDefinition definition = definitions.get(match.minigameId);
+            if (definition != null && match.rewardsEnabled) publish(player, ContentEventTypes.MINIGAME_BOOST_COLLECTED,
+                    definition.id, 1L, Map.of("match", match.id.toString(), "boost", boost.type.id()));
             applyBoost(match, player, boost.type, rules);
             playBoostPickupSound(match, player, boost.type);
             player.sendSystemMessage(Component.literal(boost.type.label() + " boost activated for "
@@ -4110,7 +5440,7 @@ public final class MinigameManager {
         }
         if (type == MinigameBoostType.REGENERATION) {
             match.boostRegenerationExpires.put(player.getUUID(), safeAdd(serverTicks, durationTicks));
-            match.boostRegenerationNextHeal.put(player.getUUID(), safeAdd(serverTicks, 50L));
+            match.boostRegenerationNextHeal.put(player.getUUID(), safeAdd(serverTicks, 20L));
         }
         String effectId = switch (type) {
             case SPEED -> "minecraft:speed";
@@ -4138,8 +5468,11 @@ public final class MinigameManager {
             long next = match.boostRegenerationNextHeal.getOrDefault(playerId, serverTicks);
             if (next > serverTicks) continue;
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-            if (player != null && match.active(playerId)) healPlayer(player, 1.0D);
-            match.boostRegenerationNextHeal.put(playerId, safeAdd(serverTicks, 50L));
+            MinigameDefinition definition = definitions.get(match.minigameId);
+            MinigameBoostRules rules = definition == null ? null : boostRules(definition);
+            double amount = rules == null ? 2.0D : rules.regenerationHealthPerSecond;
+            if (player != null && match.active(playerId)) healPlayer(player, amount);
+            match.boostRegenerationNextHeal.put(playerId, safeAdd(serverTicks, 20L));
         }
     }
 
@@ -4213,6 +5546,61 @@ public final class MinigameManager {
 
     private static double randomUnit(MinigameMatch match, int salt) {
         return randomInt(match, 0, 1_000_000, salt) / 1_000_000.0D;
+    }
+
+    private static final List<EquipmentSlot> LOCKED_EQUIPMENT_SLOTS = List.of(
+            EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.OFFHAND);
+
+    private static void captureLockedInventory(MinigameMatch match, ServerPlayer player) {
+        if (match == null || player == null) return;
+        ArrayList<ItemStack> inventory = new ArrayList<>(36);
+        for (int slot = 0; slot < 36; slot++) inventory.add(player.getInventory().getItem(slot).copy());
+        LinkedHashMap<EquipmentSlot, ItemStack> equipment = new LinkedHashMap<>();
+        for (EquipmentSlot slot : LOCKED_EQUIPMENT_SLOTS) equipment.put(slot, player.getItemBySlot(slot).copy());
+        match.lockedInventories.put(player.getUUID(), new MinigameMatch.LockedInventory(inventory, equipment));
+    }
+
+    private void tickLockedInventories(MinigameMatch match) {
+        for (UUID playerId : match.teams.keySet()) {
+            if (!match.active(playerId)) continue;
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null) continue;
+            enforceLockedInventory(match, player);
+        }
+    }
+
+    /** Restores the exact server-owned layout and clears any cursor-carried duplicate. */
+    private static void enforceLockedInventory(MinigameMatch match, ServerPlayer player) {
+        MinigameMatch.LockedInventory expected = match.lockedInventories.get(player.getUUID());
+        if (expected == null || expected.inventory.size() < 36) {
+            captureLockedInventory(match, player);
+            return;
+        }
+        boolean changed = false;
+        for (int slot = 0; slot < 36; slot++) {
+            ItemStack wanted = expected.inventory.get(slot);
+            ItemStack current = player.getInventory().getItem(slot);
+            if (!ItemStack.matches(current, wanted)) {
+                player.getInventory().setItem(slot, wanted.copy());
+                changed = true;
+            }
+        }
+        boolean carryingFlag = match.flagCarriers.containsValue(player.getUUID());
+        for (EquipmentSlot slot : LOCKED_EQUIPMENT_SLOTS) {
+            // The CTF carrier banner is an intentional temporary replacement of the locked helmet.
+            if (carryingFlag && slot == EquipmentSlot.HEAD) continue;
+            ItemStack wanted = expected.equipment.getOrDefault(slot, ItemStack.EMPTY);
+            ItemStack current = player.getItemBySlot(slot);
+            if (!ItemStack.matches(current, wanted)) {
+                player.setItemSlot(slot, wanted.copy());
+                changed = true;
+            }
+        }
+        if (!player.containerMenu.getCarried().isEmpty()) {
+            player.containerMenu.setCarried(ItemStack.EMPTY);
+            changed = true;
+        }
+        if (changed) syncInventory(player);
     }
 
     private void tickRoleRuntime(MinigameMatch match, MinigameDefinition definition) {
@@ -4383,23 +5771,58 @@ public final class MinigameManager {
         }
         if (!roleAbilityReady(match, player, held, ability)) return true;
 
-        boolean used = switch (ability) {
+        MinigameAbilityDefinition abilityDefinition = roleAbilityDefinition(ability, rules);
+        if (abilityDefinition == null) return true;
+        boolean used = executeRoleAbility(match, rules, player, abilityDefinition);
+        if (!used) return true;
+        match.performance(player.getUUID()).abilitiesUsed = saturatingAdd(
+                match.performance(player.getUUID()).abilitiesUsed, 1L);
+        recordActivity(player);
+        startRoleCooldown(match, player, held, ability, abilityDefinition.cooldownSeconds());
+        return true;
+    }
+
+    private static MinigameAbilityDefinition roleAbilityDefinition(String ability, MinigameRoleRules rules) {
+        if (rules == null || ability == null) return null;
+        return switch (ability) {
+            case "tank_slow" -> new MinigameAbilityDefinition("tank_slow", ROLE_TANK_FIELD,
+                    MinigameAbilityTarget.ENEMY_AOE, 0.0D, rules.tankSlowRadius,
+                    rules.tankSlowCooldownSeconds, 0x5DADE2, 0xA7D8FF,
+                    "minecraft:block.beacon.activate", 1.35F, 0.72F,
+                    List.of(new MinigameAbilityEffect(MinigameAbilityEffect.Type.SLOW, 1.0D,
+                                    rules.tankSlowDurationSeconds * 20, 0),
+                            new MinigameAbilityEffect(MinigameAbilityEffect.Type.KNOCKBACK,
+                                    rules.tankKnockbackStrength, 0, 0)));
+            case "healer_single" -> new MinigameAbilityDefinition("healer_single", ROLE_HEAL_SINGLE,
+                    MinigameAbilityTarget.ALLY_RAY, 8.0D, 0.0D,
+                    rules.healerSingleHealCooldownSeconds, 0x5CFF8A, 0xD4FFE0,
+                    "minecraft:block.amethyst_block.chime", 1.2F, 1.3F,
+                    List.of(new MinigameAbilityEffect(MinigameAbilityEffect.Type.HEAL,
+                            rules.healerSingleHealAmount, 0, 0)));
+            case "healer_aoe" -> new MinigameAbilityDefinition("healer_aoe", ROLE_HEAL_AOE,
+                    MinigameAbilityTarget.ALLY_AOE, 0.0D, rules.healerAoeHealRadius,
+                    rules.healerAoeHealCooldownSeconds, 0x5CFF8A, 0xC7FFD8,
+                    "minecraft:block.beacon.power_select", 1.25F, 1.18F,
+                    List.of(new MinigameAbilityEffect(MinigameAbilityEffect.Type.HEAL,
+                            rules.healerAoeHealAmount, 0, 0)));
+            case "healer_self" -> new MinigameAbilityDefinition("healer_self", ROLE_HEAL_SELF,
+                    MinigameAbilityTarget.SELF, 0.0D, 0.0D,
+                    rules.healerSelfHealCooldownSeconds, 0xFFF176, 0xFFF9B0,
+                    "minecraft:entity.player.levelup", 1.05F, 1.35F,
+                    List.of(new MinigameAbilityEffect(MinigameAbilityEffect.Type.HEAL, 0.25D, 0, 0)));
+            default -> null;
+        };
+    }
+
+    private boolean executeRoleAbility(MinigameMatch match, MinigameRoleRules rules, ServerPlayer player,
+                                       MinigameAbilityDefinition definition) {
+        return switch (definition.id()) {
             case "tank_slow" -> useTankSlow(match, rules, player);
             case "healer_single" -> useHealerSingle(match, rules, player);
             case "healer_aoe" -> useHealerAoe(match, rules, player);
             case "healer_self" -> useHealerSelf(match, rules, player);
             default -> false;
         };
-        if (!used) return true;
-        int cooldownSeconds = switch (ability) {
-            case "tank_slow" -> rules.tankSlowCooldownSeconds;
-            case "healer_single" -> rules.healerSingleHealCooldownSeconds;
-            case "healer_aoe" -> rules.healerAoeHealCooldownSeconds;
-            case "healer_self" -> rules.healerSelfHealCooldownSeconds;
-            default -> 1;
-        };
-        startRoleCooldown(match, player, held, ability, cooldownSeconds);
-        return true;
     }
 
     private static String roleAbilityId(ItemStack stack) {
@@ -4454,19 +5877,22 @@ public final class MinigameManager {
                         rules.tankSlowDurationSeconds * 20, 0, false, true, true));
             }
             if (rules.tankKnockbackStrength > 0.0D) {
-                double x = tank.getX() - target.getX();
-                double z = tank.getZ() - target.getZ();
-                if (x * x + z * z < 1.0E-6D) {
+                Vec3 away = target.position().subtract(tank.position());
+                Vec3 horizontal = new Vec3(away.x, 0.0D, away.z);
+                if (horizontal.lengthSqr() < 1.0E-6D) {
                     Vec3 look = tank.getLookAngle();
-                    x = -look.x;
-                    z = -look.z;
+                    horizontal = new Vec3(look.x, 0.0D, look.z);
                 }
-                target.knockback(rules.tankKnockbackStrength, x, z, tank.damageSources().playerAttack(tank), 0.0F);
+                horizontal = horizontal.normalize().scale(rules.tankKnockbackStrength);
+                Vec3 current = target.getDeltaMovement();
+                double upward = Math.max(current.y, Math.min(0.45D, 0.16D + rules.tankKnockbackStrength * 0.08D));
+                target.setDeltaMovement(horizontal.x, upward, horizontal.z);
+                target.connection.send(new net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket(target.getId(), target.getDeltaMovement()));
             }
         }
         roleBurst(tank, 0x5DADE2, radius);
         roleVerticalBurst(tank, 0xA7D8FF, radius);
-        playRoleSound(match, tank, "minecraft:block.beacon.activate", 1.35F, 0.72F);
+        playRoleSound(match, tank, "minecraft:entity.lightning_bolt.impact", 1.35F, 0.92F);
         tank.sendSystemMessage(Component.literal(targets.isEmpty()
                 ? "Defensive field activated, but no enemy was inside the AOE."
                 : "Defensive field slowed and pushed " + targets.size() + " enemy player(s)."), true);
@@ -4485,7 +5911,7 @@ public final class MinigameManager {
             healer.sendSystemMessage(Component.literal("Healing beam missed; cooldown consumed."), true);
             return true;
         }
-        boolean healed = healPlayer(target, rules.healerSingleHealAmount);
+        boolean healed = healAndRecord(match, healer, target, rules.healerSingleHealAmount);
         healer.sendSystemMessage(Component.literal(healed
                 ? "Healed " + target.getName().getString() + " for up to "
                     + formatHealth(rules.healerSingleHealAmount) + " hearts."
@@ -4504,7 +5930,7 @@ public final class MinigameManager {
             if (!match.active(candidate.getUUID())
                     || match.team(candidate.getUUID()) != team
                     || candidate.distanceToSqr(healer) > radiusSqr) continue;
-            if (healPlayer(candidate, rules.healerAoeHealAmount)) healed++;
+            if (healAndRecord(match, healer, candidate, rules.healerAoeHealAmount)) healed++;
         }
         roleBurst(healer, 0x5CFF8A, radius);
         roleVerticalBurst(healer, 0xC7FFD8, radius);
@@ -4518,13 +5944,32 @@ public final class MinigameManager {
 
     private boolean useHealerSelf(MinigameMatch match, MinigameRoleRules rules, ServerPlayer healer) {
         double amount = healer.getMaxHealth() * 0.25D;
-        boolean healed = healPlayer(healer, amount);
+        boolean healed = healAndRecord(match, healer, healer, amount);
         roleBurst(healer, 0xFFF176, 1.5D);
         roleVerticalBurst(healer, 0xFFF9B0, 1.25D);
         playRoleSound(match, healer, "minecraft:entity.player.levelup", 1.05F, 1.35F);
         healer.sendSystemMessage(Component.literal(healed
                 ? "Self heal restored 25% of your maximum health."
                 : "Self heal activated at full health; cooldown consumed."), true);
+        return true;
+    }
+
+    private boolean healAndRecord(MinigameMatch match, ServerPlayer healer,
+                                  ServerPlayer target, double amount) {
+        if (match == null || healer == null || target == null) return false;
+        float before = target.getHealth();
+        boolean healed = healPlayer(target, amount);
+        if (!healed) return false;
+        long hundredths = Math.max(0L, Math.round((target.getHealth() - before) * 100.0F));
+        match.performance(healer.getUUID()).healingDone = saturatingAdd(
+                match.performance(healer.getUUID()).healingDone, hundredths);
+        MinigameDefinition definition = definitions.get(match.minigameId);
+        if (definition != null && hundredths > 0L && match.rewardsEnabled) {
+            SimpleServerUtilities.STATISTICS.increment(healer, StatisticEventType.MINIGAME_HEALING,
+                    definition.id, hundredths);
+            publish(healer, ContentEventTypes.MINIGAME_HEALING, definition.id, hundredths,
+                    Map.of("match", match.id.toString(), "target", target.getUUID().toString()));
+        }
         return true;
     }
 
@@ -5150,7 +6595,7 @@ public final class MinigameManager {
                     BorderCategory.MINIGAME_GAME_AREA,
                     definition.displayName + " game border",
                     settings.getStrokeArgb(BorderCategory.MINIGAME_GAME_AREA),
-                    0,
+                    settings.getFillArgb(BorderCategory.MINIGAME_GAME_AREA),
                     MINIGAME_GAME_BORDER_WIDTH,
                     true,
                     List.of(new BorderVisualizationPayload.Box(
@@ -5173,7 +6618,7 @@ public final class MinigameManager {
                     BorderCategory.MINIGAME_SPECTATOR_AREA,
                     definition.displayName + " spectator border",
                     settings.getStrokeArgb(BorderCategory.MINIGAME_SPECTATOR_AREA),
-                    0,
+                    settings.getFillArgb(BorderCategory.MINIGAME_SPECTATOR_AREA),
                     MINIGAME_SPECTATOR_BORDER_WIDTH,
                     true,
                     List.of(new BorderVisualizationPayload.Box(
@@ -5318,12 +6763,29 @@ public final class MinigameManager {
     }
 
     private synchronized MinigameArenaDefinition freeArena(MinigameDefinition definition) {
-        for (MinigameArenaDefinition arena : definition.arenas) {
+        if (definition == null || definition.arenas.isEmpty()) return null;
+        int start = Math.floorMod(arenaRotationCursors.getOrDefault(definition.id, 0), definition.arenas.size());
+        for (int offset = 0; offset < definition.arenas.size(); offset++) {
+            int index = Math.floorMod(start + offset, definition.arenas.size());
+            MinigameArenaDefinition arena = definition.arenas.get(index);
             if (!arena.enabled) continue;
             String key = arenaKey(definition.id, arena.id);
-            if (!arenaReservations.containsKey(key) && !resettingArenas.contains(key) && !blockedArenas.contains(key)) return arena;
+            if (!arenaReservations.containsKey(key) && !resettingArenas.contains(key) && !blockedArenas.contains(key)) {
+                arenaRotationCursors.put(definition.id, Math.floorMod(index + 1, definition.arenas.size()));
+                return arena;
+            }
         }
         return null;
+    }
+
+    private synchronized void rotateAfterArena(MinigameDefinition definition, String previousArenaId) {
+        if (definition == null || definition.arenas.isEmpty()) return;
+        for (int index = 0; index < definition.arenas.size(); index++) {
+            if (definition.arenas.get(index).id.equals(previousArenaId)) {
+                arenaRotationCursors.put(definition.id, Math.floorMod(index + 1, definition.arenas.size()));
+                return;
+            }
+        }
     }
 
     private static MinigameArenaDefinition arena(MinigameDefinition definition, String id) {
@@ -5351,6 +6813,24 @@ public final class MinigameManager {
         }
     }
 
+    private void announceImportant(MinigameMatch match, String title, String detail) {
+        if (match == null) return;
+        for (UUID playerId : match.teams.keySet()) {
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player != null) sendImportantMessage(player, title, detail);
+        }
+    }
+
+    private static void sendImportantMessage(ServerPlayer player, String title, String detail) {
+        if (player == null) return;
+        String safeTitle = title == null || title.isBlank() ? "Minigame update" : title;
+        String safeDetail = detail == null ? "" : detail;
+        player.connection.send(new ClientboundSetTitlesAnimationPacket(10, 100, 20));
+        player.connection.send(new ClientboundSetTitleTextPacket(Component.literal(safeTitle)));
+        player.connection.send(new ClientboundSetSubtitleTextPacket(Component.literal(safeDetail)));
+        player.sendSystemMessage(Component.literal(safeTitle + (safeDetail.isBlank() ? "" : ": " + safeDetail)));
+    }
+
     private void publishMatch(MinigameMatch match, String type, String phase) {
         for (Map.Entry<UUID, Integer> entry : match.teams.entrySet()) {
             ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
@@ -5363,6 +6843,104 @@ public final class MinigameManager {
     private void publish(ServerPlayer player, String type, String subject, long amount, Map<String, String> metadata) {
         SimpleServerUtilities.CONTENT_EVENTS.publish(player.level().getServer(),
                 ContentEvent.player(type, player.getUUID(), "minigames", subject, subject, amount, metadata));
+    }
+
+    private void sendDiagnostics(ServerPlayer player, String notice, boolean error, boolean includeIntegrity,
+                                 long requestId) {
+        ArrayList<MinigameDiagnosticsPayload.Line> lines = new ArrayList<>();
+        synchronized (this) {
+            int queued = queues.values().stream().mapToInt(Map::size).sum();
+            int activeBoosts = matches.values().stream().mapToInt(match -> match.activeBoosts.size()).sum();
+            int pendingRespawns = matches.values().stream().mapToInt(match -> match.pendingRespawns.size()).sum();
+            int disconnectGrace = matches.values().stream().mapToInt(match -> match.disconnected.size()).sum();
+            int casts = matches.values().stream().mapToInt(match -> match.ctfCasts.size() + match.dominationCasts.size()).sum();
+            lines.add(diag("info", "Definitions", definitions.size() + " configured"));
+            lines.add(diag(queued > 0 ? "info" : "ok", "Queues", queued + " player(s) in " + queues.size() + " queue(s)"));
+            lines.add(diag(matches.isEmpty() ? "ok" : "info", "Live matches", matches.size() + " active lifecycle(s)"));
+            lines.add(diag(arenaReservations.isEmpty() ? "ok" : "info", "Arena reservations", arenaReservations.size() + " reserved"));
+            lines.add(diag(resettingArenas.isEmpty() ? "ok" : "warning", "Arena resets", resettingArenas.size() + " resetting"));
+            lines.add(diag(blockedArenas.isEmpty() ? "ok" : "warning", "Blocked arenas", blockedArenas.size() + " blocked"));
+            lines.add(diag(unsafeArenas.isEmpty() ? "ok" : "error", "Unsafe arena markers", unsafeArenas.size() + " require recovery"));
+            lines.add(diag(recoveries.isEmpty() ? "ok" : "warning", "Player recoveries", recoveries.size() + " pending"));
+            lines.add(diag(recoverySafetyHalted ? "error" : "ok", "Recovery storage",
+                    recoverySafetyHalted ? "New state replacement is paused" : "Operational"));
+            lines.add(diag(disconnectGrace == 0 ? "ok" : "info", "Rejoin grace", disconnectGrace + " disconnected participant(s)"));
+            lines.add(diag(pendingRespawns == 0 ? "ok" : "info", "Pending respawns", Integer.toString(pendingRespawns)));
+            lines.add(diag(casts == 0 ? "ok" : "info", "Objective casts", Integer.toString(casts)));
+            lines.add(diag(activeBoosts == 0 ? "ok" : "info", "Active boosts", Integer.toString(activeBoosts)));
+            lines.add(diag("info", "Progression profiles", Integer.toString(progression.players.size())));
+            lines.add(diag("info", "Settlement receipts", progression.settledMatches.size()
+                    + "/" + MinigameProgressionData.MAX_SETTLEMENTS));
+            lines.add(diag("info", "Match history", history.matches.size() + "/" + MinigameMatchHistory.MAX_MATCHES));
+
+            for (MinigameDefinition definition : definitions.values()) {
+                int valid = 0, warning = 0, invalid = 0;
+                for (MinigameArenaDefinition arena : definition.arenas) {
+                    MinigameArenaValidation.Report report = MinigameArenaValidation.validate(server, definition, arena);
+                    if (report.errors() > 0) invalid++;
+                    else if (report.warnings() > 0) warning++;
+                    else valid++;
+                    if (includeIntegrity && (report.errors() > 0 || report.warnings() > 0)) {
+                        lines.add(diag(report.errors() > 0 ? "error" : "warning",
+                                definition.displayName + " / " + arena.displayName,
+                                report.errors() + " error(s), " + report.warnings() + " warning(s)"));
+                    }
+                }
+                lines.add(diag(invalid > 0 ? "error" : warning > 0 ? "warning" : "ok",
+                        definition.displayName,
+                        valid + " valid, " + warning + " warning, " + invalid + " invalid arena(s)"));
+            }
+        }
+        PacketDistributor.sendToPlayer(player, new MinigameDiagnosticsPayload(
+                "Minigame System Health", notice, error, lines, requestId));
+    }
+
+    private static MinigameDiagnosticsPayload.Line diag(String severity, String label, String value) {
+        return new MinigameDiagnosticsPayload.Line(severity, label, value);
+    }
+
+    private synchronized int cleanOrphanedRuntimeData() {
+        int cleaned = 0;
+        for (var iterator = playerMatches.entrySet().iterator(); iterator.hasNext();) {
+            Map.Entry<UUID, UUID> entry = iterator.next();
+            MinigameMatch match = matches.get(entry.getValue());
+            if (match == null || !match.teams.containsKey(entry.getKey())) {
+                iterator.remove();
+                cleaned++;
+            }
+        }
+        for (var iterator = playerQueues.entrySet().iterator(); iterator.hasNext();) {
+            Map.Entry<UUID, String> entry = iterator.next();
+            Map<UUID, Long> queue = queues.get(entry.getValue());
+            if (queue == null || !queue.containsKey(entry.getKey()) || playerMatches.containsKey(entry.getKey())) {
+                iterator.remove();
+                playerRolePreferences.remove(entry.getKey());
+                cleaned++;
+            }
+        }
+        for (Map.Entry<String, LinkedHashMap<UUID, Long>> queueEntry : queues.entrySet()) {
+            for (var iterator = queueEntry.getValue().keySet().iterator(); iterator.hasNext();) {
+                UUID playerId = iterator.next();
+                if (playerMatches.containsKey(playerId)
+                        || !queueEntry.getKey().equals(playerQueues.get(playerId))) {
+                    iterator.remove();
+                    cleaned++;
+                }
+            }
+        }
+        for (var iterator = arenaReservations.entrySet().iterator(); iterator.hasNext();) {
+            Map.Entry<String, UUID> entry = iterator.next();
+            MinigameMatch match = matches.get(entry.getValue());
+            if (match == null || !entry.getKey().equals(arenaKey(match.minigameId, match.arenaId))) {
+                iterator.remove();
+                cleaned++;
+            }
+        }
+        spectatorCursors.keySet().removeIf(playerId -> !playerMatches.containsKey(playerId));
+        runtimeBorderSyncStates.keySet().removeIf(playerId -> !playerMatches.containsKey(playerId));
+        cleaned += cleanOrphanedBoostEntities();
+        removeOrphanCtfBackFlags();
+        return cleaned;
     }
 
     private void sendLobby(ServerPlayer player, String notice, boolean error, long requestId, boolean adminView) {
@@ -5481,6 +7059,7 @@ public final class MinigameManager {
         blockedArenas.clear();
         lastRequests.clear();
         runtimeBorderSyncStates.clear();
+        spectatorCursors.clear();
         serverTicks = 0L;
         if (!keepServer) server = null;
     }
@@ -5492,8 +7071,14 @@ public final class MinigameManager {
         unsafeArenas.clear();
         definitionStore.reset();
         recoveryStore.reset();
+        experienceStore.reset();
+        progression = new MinigameProgressionData();
+        history = new MinigameMatchHistory();
+        spectatorCursors.clear();
         definitionFolder = null;
         recoveryFile = null;
+        progressionFile = null;
+        historyFile = null;
     }
 
     private boolean teleport(ServerPlayer player, MinigameLocation location) {

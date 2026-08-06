@@ -50,8 +50,8 @@ final class DominationMinigameEditorScreen extends MinigameEditorScreen {
     private EditBox id, name, icon, minPlayers, maxPlayers, countdown, respawnDelay, duration, postGame;
     private MultiLineEditBox description;
     private String descriptionValue = "";
-    private boolean enabled, automaticStart;
-    private Button enabledButton, automaticButton;
+    private boolean enabled, automaticStart, inventoryLock;
+    private Button enabledButton, automaticButton, inventoryLockButton;
 
     // Arena
     private EditBox arenaId, arenaName, regionId;
@@ -85,7 +85,7 @@ final class DominationMinigameEditorScreen extends MinigameEditorScreen {
     private boolean boostsEnabled, boostAutoMode, boostSpeed, boostRegeneration, boostArmor, boostJump;
     private Button boostsEnabledButton, boostModeButton, boostSpeedButton, boostRegenerationButton, boostArmorButton, boostJumpButton;
     private EditBox boostMaximumActive, boostInitialDelay, boostRespawnMin, boostRespawnMax, boostSpacing;
-    private EditBox boostSpeedDuration, boostSpeedColor, boostRegenerationDuration, boostRegenerationColor;
+    private EditBox boostSpeedDuration, boostSpeedColor, boostRegenerationDuration, boostRegenerationColor, boostRegenerationHealRate;
     private EditBox boostArmorDuration, boostArmorColor, boostArmorPoints, boostJumpDuration, boostJumpColor;
 
     // Optional tactical roles
@@ -150,6 +150,8 @@ final class DominationMinigameEditorScreen extends MinigameEditorScreen {
 
         addRenderableWidget(Button.builder(Component.literal("Cancel"), ignored -> onClose())
                 .bounds(left + 14, top + H - 30, 78, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Match flow"), ignored -> openMatchFlow())
+                .bounds(left + 98, top + H - 30, 92, 20).build());
         Button save = addRenderableWidget(Button.builder(Component.literal("Save Domination"), ignored -> saveAll())
                 .bounds(left + W - 108, top + H - 30, 94, 20).build());
         save.active = !awaiting;
@@ -173,11 +175,13 @@ final class DominationMinigameEditorScreen extends MinigameEditorScreen {
         respawnDelay = field(left + 326, top + 208, 96, 3, "Respawn delay", Integer.toString(draft.respawnDelaySeconds));
         duration = field(left + 430, top + 208, 96, 8, "Match duration", Integer.toString(draft.matchDurationSeconds));
         postGame = field(left + 534, top + 208, 97, 6, "Post-game duration", Integer.toString(draft.postGameSeconds));
-        enabled = draft.enabled; automaticStart = draft.automaticStart;
+        enabled = draft.enabled; automaticStart = draft.automaticStart; inventoryLock = draft.lockInventory;
         enabledButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> { enabled = !enabled; updateLabels(); })
                 .bounds(left + 14, top + 270, 146, 20).build());
         automaticButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> { automaticStart = !automaticStart; updateLabels(); })
                 .bounds(left + 170, top + 270, 174, 20).build());
+        inventoryLockButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> { inventoryLock = !inventoryLock; updateLabels(); })
+                .bounds(left + 354, top + 270, 174, 20).build());
         updateLabels();
     }
 
@@ -326,28 +330,29 @@ final class DominationMinigameEditorScreen extends MinigameEditorScreen {
         boostModeButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> {
             boostAutoMode = !boostAutoMode; updateLabels();
         }).bounds(left + 220, top + 43, 196, 20).build());
-        boostMaximumActive = field(left + 14, top + 92, 105, 3, "Max active", Integer.toString(boosts.maximumActive));
-        boostInitialDelay = field(left + 129, top + 92, 105, 6, "Initial delay", Integer.toString(boosts.initialSpawnDelaySeconds));
-        boostRespawnMin = field(left + 244, top + 92, 105, 6, "Respawn min", Integer.toString(boosts.respawnMinSeconds));
-        boostRespawnMax = field(left + 359, top + 92, 105, 6, "Respawn max", Integer.toString(boosts.respawnMaxSeconds));
-        boostSpacing = field(left + 474, top + 92, 105, 3, "Min spacing", Integer.toString((int) Math.round(boosts.minimumSpacing)));
+        boostMaximumActive = field(left + 14, top + 88, 96, 3, "Max active", Integer.toString(boosts.maximumActive));
+        boostInitialDelay = field(left + 120, top + 88, 96, 6, "Initial delay", Integer.toString(boosts.initialSpawnDelaySeconds));
+        boostRespawnMin = field(left + 226, top + 88, 96, 6, "Respawn min", Integer.toString(boosts.respawnMinSeconds));
+        boostRespawnMax = field(left + 332, top + 88, 96, 6, "Respawn max", Integer.toString(boosts.respawnMaxSeconds));
+        boostSpacing = field(left + 438, top + 88, 96, 3, "Min spacing", Integer.toString((int) Math.round(boosts.minimumSpacing)));
 
-        boostSpeedButton = boostToggle(left + 14, top + 146, 150, () -> { boostSpeed = !boostSpeed; updateLabels(); });
-        boostSpeedDuration = field(left + 174, top + 146, 96, 6, "Duration", Integer.toString(boosts.speedDurationSeconds));
-        boostSpeedColor = field(left + 280, top + 146, 96, 8, "Mist RGB", rgb(boosts.speedColor));
+        boostSpeedButton = boostToggle(left + 14, top + 148, 142, () -> { boostSpeed = !boostSpeed; updateLabels(); });
+        boostSpeedDuration = field(left + 166, top + 148, 78, 6, "Duration", Integer.toString(boosts.speedDurationSeconds));
+        boostSpeedColor = field(left + 254, top + 148, 88, 8, "Mist RGB", rgb(boosts.speedColor));
 
-        boostRegenerationButton = boostToggle(left + 14, top + 184, 150, () -> { boostRegeneration = !boostRegeneration; updateLabels(); });
-        boostRegenerationDuration = field(left + 174, top + 184, 96, 6, "Duration", Integer.toString(boosts.regenerationDurationSeconds));
-        boostRegenerationColor = field(left + 280, top + 184, 96, 8, "Mist RGB", rgb(boosts.regenerationColor));
+        boostRegenerationButton = boostToggle(left + 14, top + 180, 142, () -> { boostRegeneration = !boostRegeneration; updateLabels(); });
+        boostRegenerationDuration = field(left + 166, top + 180, 78, 6, "Duration", Integer.toString(boosts.regenerationDurationSeconds));
+        boostRegenerationColor = field(left + 254, top + 180, 88, 8, "Mist RGB", rgb(boosts.regenerationColor));
+        boostRegenerationHealRate = field(left + 352, top + 180, 96, 8, "Heal / second", roleNumber(boosts.regenerationHealthPerSecond));
 
-        boostArmorButton = boostToggle(left + 14, top + 222, 150, () -> { boostArmor = !boostArmor; updateLabels(); });
-        boostArmorDuration = field(left + 174, top + 222, 96, 6, "Duration", Integer.toString(boosts.armorDurationSeconds));
-        boostArmorColor = field(left + 280, top + 222, 96, 8, "Mist RGB", rgb(boosts.armorColor));
-        boostArmorPoints = field(left + 386, top + 222, 96, 3, "Armor points", Integer.toString((int) Math.round(boosts.armorPoints)));
+        boostArmorButton = boostToggle(left + 14, top + 212, 142, () -> { boostArmor = !boostArmor; updateLabels(); });
+        boostArmorDuration = field(left + 166, top + 212, 78, 6, "Duration", Integer.toString(boosts.armorDurationSeconds));
+        boostArmorColor = field(left + 254, top + 212, 88, 8, "Mist RGB", rgb(boosts.armorColor));
+        boostArmorPoints = field(left + 352, top + 212, 96, 8, "Armor points", roleNumber(boosts.armorPoints));
 
-        boostJumpButton = boostToggle(left + 14, top + 260, 150, () -> { boostJump = !boostJump; updateLabels(); });
-        boostJumpDuration = field(left + 174, top + 260, 96, 6, "Duration", Integer.toString(boosts.jumpDurationSeconds));
-        boostJumpColor = field(left + 280, top + 260, 96, 8, "Mist RGB", rgb(boosts.jumpColor));
+        boostJumpButton = boostToggle(left + 14, top + 244, 142, () -> { boostJump = !boostJump; updateLabels(); });
+        boostJumpDuration = field(left + 166, top + 244, 78, 6, "Duration", Integer.toString(boosts.jumpDurationSeconds));
+        boostJumpColor = field(left + 254, top + 244, 88, 8, "Mist RGB", rgb(boosts.jumpColor));
         updateLabels();
     }
 
@@ -445,7 +450,7 @@ final class DominationMinigameEditorScreen extends MinigameEditorScreen {
         draft.respawnDelaySeconds = parseInt(respawnDelay, "Respawn delay", 1, 300);
         draft.matchDurationSeconds = parseInt(duration, "Match duration", 0, 86_400);
         draft.postGameSeconds = parseInt(postGame, "Result screen duration", 0, 600);
-        draft.enabled = enabled; draft.automaticStart = automaticStart;
+        draft.enabled = enabled; draft.automaticStart = automaticStart; draft.lockInventory = inventoryLock;
         draft.gameType = "domination"; draft.allowLateJoin = false; draft.teamCount = 2;
         draft.victoryMode = "highest_score";
     }
@@ -537,6 +542,8 @@ final class DominationMinigameEditorScreen extends MinigameEditorScreen {
         boosts.regenerationEnabled = boostRegeneration;
         boosts.regenerationDurationSeconds = parseInt(boostRegenerationDuration, "Regeneration duration", 1, 600);
         boosts.regenerationColor = parseRgb(boostRegenerationColor, "Regeneration mist color");
+        boosts.regenerationHealthPerSecond = roleDouble(boostRegenerationHealRate,
+                "Regeneration health per second", 0.1D, 40.0D);
         boosts.armorEnabled = boostArmor;
         boosts.armorDurationSeconds = parseInt(boostArmorDuration, "Armor duration", 1, 600);
         boosts.armorColor = parseRgb(boostArmorColor, "Armor mist color");
@@ -608,6 +615,11 @@ final class DominationMinigameEditorScreen extends MinigameEditorScreen {
     }
 
     private void saveAll() { if (saveCurrentPage()) submitDraft(); }
+    private void openMatchFlow() {
+        if (!saveCurrentPage()) return;
+        if (minecraft != null) minecraft.setScreenAndShow(new MinigameExperienceSettingsScreen(draft, this));
+    }
+
     private void switchPage(int target) { if (target != page && saveCurrentPage()) { page = target; rebuildWidgets(); } }
 
     private void switchArena(int delta) {
@@ -910,23 +922,19 @@ final class DominationMinigameEditorScreen extends MinigameEditorScreen {
     }
 
     private void renderBoosts(GuiGraphicsExtractor g, int left, int top) {
-        wrapped(g, boostAutoMode
-                        ? "Automatic Domination placement searches safe ground near the configured capture nodes."
-                        : "Manual placement uses the boost spawn slots registered with the Minigame Setup Tool.",
-                left + 428, top + 43, 203, boostAutoMode ? GOOD : MUTED, 3);
-        fieldInfo(g, left + 14, top + 76, "Max active", "Maximum boosts present together.", 105);
-        fieldInfo(g, left + 129, top + 76, "Initial delay", "Seconds after match start.", 105);
-        fieldInfo(g, left + 244, top + 76, "Respawn min", "Shortest random delay.", 105);
-        fieldInfo(g, left + 359, top + 76, "Respawn max", "Longest random delay.", 105);
-        fieldInfo(g, left + 474, top + 76, "Min spacing", "No boosts closer than this.", 105);
-        g.text(font, "Allowed boost", left + 14, top + 130, TEXT, true);
-        g.text(font, "Duration (seconds)", left + 174, top + 130, TEXT, true);
-        g.text(font, "Gaussian-like mist RGB", left + 280, top + 130, TEXT, true);
-        wrapped(g, "Items float without an entity glow. A soft cloud of colored dust surrounds each item; walking through it consumes the boost and schedules a new random spawn.",
-                left + 386, top + 146, 245, MUTED, 6);
-        wrapped(g, "Automatic positions are biased around node locations but still checked for solid ground, free headroom and minimum spacing.",
-                left + 386, top + 242, 245, GOOD, 4);
-        g.text(font, "Use six-digit RGB colors without alpha, for example 40C4FF.", left + 14, top + 298, MUTED, false);
+        g.text(font, "Max active", left + 14, top + 74, TEXT, true);
+        g.text(font, "Initial delay", left + 120, top + 74, TEXT, true);
+        g.text(font, "Respawn min", left + 226, top + 74, TEXT, true);
+        g.text(font, "Respawn max", left + 332, top + 74, TEXT, true);
+        g.text(font, "Min spacing", left + 438, top + 74, TEXT, true);
+
+        g.text(font, "Allowed boost", left + 14, top + 132, TEXT, true);
+        g.text(font, "Duration", left + 166, top + 132, TEXT, true);
+        g.text(font, "Mist RGB", left + 254, top + 132, TEXT, true);
+        g.text(font, "Heal/sec | armor", left + 352, top + 132, TEXT, true);
+
+        g.text(font, "2 health points equal 1 heart. RGB values use six digits, for example 40C4FF.",
+                left + 14, top + 282, MUTED, false);
     }
 
 
@@ -1041,6 +1049,7 @@ final class DominationMinigameEditorScreen extends MinigameEditorScreen {
     private void updateLabels() {
         if (enabledButton != null) enabledButton.setMessage(Component.literal("Minigame enabled: " + yes(enabled)));
         if (automaticButton != null) automaticButton.setMessage(Component.literal("Automatic start: " + yes(automaticStart)));
+        if (inventoryLockButton != null) inventoryLockButton.setMessage(Component.literal("Inventory lock: " + yes(inventoryLock)));
         if (arenaEnabledButton != null) arenaEnabledButton.setMessage(Component.literal("Arena enabled: " + yes(arenaEnabled)));
         if (spawnTeamButton != null) spawnTeamButton.setMessage(Component.literal("Team: "
                 + draft.domination.teamName(selectedSpawnTeam)));

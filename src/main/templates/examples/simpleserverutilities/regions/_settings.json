@@ -1,7 +1,6 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "rentingEnabled": true,
-  "rentOwnerSharePermille": 0,
   "playerCancelRefundPermille": 0,
   "adminCancelRefundPermille": 1000
 }

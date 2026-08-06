@@ -1,0 +1,24 @@
+SSU 1.9.0-dev3.6.1 validation report
+
+Scope
+- Compile hotfix built directly on SSU 1.9.0-dev3.6.
+- No functional or schema changes.
+
+Fixes verified
+1. SsuMenuService claim-role target resolution now produces one final selectedTarget before it is captured by stream lambdas.
+2. RegionSelectionSnapshotManager CaptureJob no longer declares a stale @Override operationCount() method.
+3. RegionSelectionSnapshotManager PasteJob no longer declares a stale @Override operationCount() method.
+4. SsuJob itself remains unchanged.
+
+Static validation
+- 648 Java source files passed delimiter/string/comment lexical integrity checks.
+- 15 JSON files parsed successfully.
+- A focused Java 21 language harness reproduced and compiled the corrected lambda-capture pattern.
+- A focused SsuJob harness compiled capture/paste jobs without the invalid operationCount overrides.
+- Source search found no remaining operationCount() declaration in RegionSelectionSnapshotManager.
+
+Full build status
+- A complete Gradle/NeoForge build could not be started in the container.
+- Gradle 9.2.1 is not cached and services.gradle.org is unreachable.
+- The container provides Java 21 while SSU requires Java 25.
+- Run gradlew.bat clean build locally with Java 25.

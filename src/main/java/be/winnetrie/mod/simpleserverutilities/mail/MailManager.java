@@ -546,6 +546,22 @@ public final class MailManager {
         EconomyResult result = SimpleServerUtilities.ECONOMY.transferTyped(player.getUUID(), player.getName().getString(),
                 ESCROW_ACCOUNT_ID, player.getUUID(), mail.getMoneyMinor(), EconomyTransactionType.MAIL_ESCROW_CLAIM,
                 "mail", "Claim mail money from " + mail.getSenderName(), "mail:claim-money:" + mail.getId());
+        if (!result.successful() && "insufficient_funds".equals(result.code()) && canRepairSystemEscrow(mail)) {
+            EconomyResult repair = SimpleServerUtilities.ECONOMY.creditTyped(null, "server", ESCROW_ACCOUNT_ID,
+                    mail.getMoneyMinor(), EconomyTransactionType.MAIL_ESCROW_DEPOSIT, "mail",
+                    "Repair missing escrow for system mail " + mail.getId(),
+                    "mail:system-fund-repair:" + mail.getId());
+            if (repair.successful() || "duplicate".equals(repair.code())) {
+                result = SimpleServerUtilities.ECONOMY.transferTyped(player.getUUID(), player.getName().getString(),
+                        ESCROW_ACCOUNT_ID, player.getUUID(), mail.getMoneyMinor(),
+                        EconomyTransactionType.MAIL_ESCROW_CLAIM, "mail",
+                        "Claim mail money from " + mail.getSenderName(), "mail:claim-money:" + mail.getId());
+            } else {
+                SimpleServerUtilities.LOGGER.error("Could not repair missing escrow for system mail {}: {}",
+                        mail.getId(), repair.message());
+                return MailOperationResult.failure(repair.code(), repair.message());
+            }
+        }
         if (!result.successful() && !"duplicate".equals(result.code())) {
             return MailOperationResult.failure(result.code(), result.message());
         }
@@ -556,6 +572,15 @@ public final class MailManager {
         return MailOperationResult.success("Money attachment claimed: "
                 + MoneyFormat.format(mail.getMoneyMinor(), SimpleServerUtilities.ECONOMY.settings())
                 + (removed ? ". The mail was automatically deleted." : "."));
+    }
+
+
+    private static boolean canRepairSystemEscrow(MailMessage mail) {
+        if (mail == null || mail.getSenderId() != null) return false;
+        return switch (mail.getSource()) {
+            case SYSTEM, MINIGAME, RECOVERY -> true;
+            case PLAYER, AUCTION -> false;
+        };
     }
 
     private MailOperationResult claimAll(ServerPlayer player, String rawId) {

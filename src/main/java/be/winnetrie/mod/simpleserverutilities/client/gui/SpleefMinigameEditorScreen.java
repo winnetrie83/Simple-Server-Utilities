@@ -46,8 +46,8 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
     private EditBox id, name, icon, minPlayers, maxPlayers, countdown, duration, postGame;
     private MultiLineEditBox description;
     private String descriptionValue = "";
-    private boolean enabled, automaticStart;
-    private Button enabledButton, automaticButton;
+    private boolean enabled, automaticStart, inventoryLock;
+    private Button enabledButton, automaticButton, inventoryLockButton;
 
     // Arena
     private EditBox arenaId, arenaName, regionId;
@@ -115,6 +115,8 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
 
         addRenderableWidget(Button.builder(Component.literal("Cancel"), ignored -> onClose())
                 .bounds(left + 14, top + H - 30, 78, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Match flow"), ignored -> openMatchFlow())
+                .bounds(left + 98, top + H - 30, 92, 20).build());
         Button save = addRenderableWidget(Button.builder(Component.literal("Save Spleef"), ignored -> saveAll())
                 .bounds(left + W - 108, top + H - 30, 94, 20).build());
         save.active = !awaiting;
@@ -137,11 +139,13 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
         countdown = field(left + 254, top + 208, 112, 6, "Countdown", Integer.toString(draft.countdownSeconds));
         duration = field(left + 374, top + 208, 112, 8, "Match duration", Integer.toString(draft.matchDurationSeconds));
         postGame = field(left + 494, top + 208, 137, 6, "Post-game duration", Integer.toString(draft.postGameSeconds));
-        enabled = draft.enabled; automaticStart = draft.automaticStart;
+        enabled = draft.enabled; automaticStart = draft.automaticStart; inventoryLock = draft.lockInventory;
         enabledButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> { enabled = !enabled; updateLabels(); })
                 .bounds(left + 14, top + 270, 146, 20).build());
         automaticButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> { automaticStart = !automaticStart; updateLabels(); })
                 .bounds(left + 170, top + 270, 174, 20).build());
+        inventoryLockButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> { inventoryLock = !inventoryLock; updateLabels(); })
+                .bounds(left + 354, top + 270, 174, 20).build());
         updateLabels();
     }
 
@@ -285,7 +289,7 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
         draft.countdownSeconds = parseInt(countdown, "Countdown seconds", 0, 600);
         draft.matchDurationSeconds = parseInt(duration, "Match duration", 0, 86_400);
         draft.postGameSeconds = parseInt(postGame, "Result screen duration", 0, 600);
-        draft.enabled = enabled; draft.automaticStart = automaticStart;
+        draft.enabled = enabled; draft.automaticStart = automaticStart; draft.lockInventory = inventoryLock;
         draft.gameType = "spleef"; draft.allowLateJoin = false; draft.teamCount = draft.maxPlayers;
         draft.victoryMode = "last_team_standing";
     }
@@ -342,6 +346,11 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
     }
 
     private void saveAll() { if (saveCurrentPage()) submitDraft(); }
+    private void openMatchFlow() {
+        if (!saveCurrentPage()) return;
+        if (minecraft != null) minecraft.setScreenAndShow(new MinigameExperienceSettingsScreen(draft, this));
+    }
+
     private void switchPage(int target) { if (target != page && saveCurrentPage()) { page = target; rebuildWidgets(); } }
 
     private void switchArena(int delta) {
@@ -685,6 +694,7 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
     private void updateLabels() {
         if (enabledButton != null) enabledButton.setMessage(Component.literal("Minigame enabled: " + yes(enabled)));
         if (automaticButton != null) automaticButton.setMessage(Component.literal("Automatic start: " + yes(automaticStart)));
+        if (inventoryLockButton != null) inventoryLockButton.setMessage(Component.literal("Inventory lock: " + yes(inventoryLock)));
         if (arenaEnabledButton != null) arenaEnabledButton.setMessage(Component.literal("Arena enabled: " + yes(arenaEnabled)));
         if (requireToolButton != null) requireToolButton.setMessage(Component.literal("Require configured tool: " + yes(requireTool)));
         if (pvpButton != null) pvpButton.setMessage(Component.literal("Player damage: " + yes(allowPvp)));

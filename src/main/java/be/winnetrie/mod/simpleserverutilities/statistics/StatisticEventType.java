@@ -10,7 +10,17 @@ public enum StatisticEventType {
     PLAYER_DEATH(false, false, "deaths"),
     DAMAGE_DEALT(true, true, "damage"),
     DAMAGE_TAKEN(true, true, "damage"),
-    PLAY_TIME(false, false, "seconds");
+    PLAY_TIME(false, false, "seconds"),
+    MINIGAME_KILL(true, false, "kills"),
+    MINIGAME_DEATH(true, false, "deaths"),
+    MINIGAME_ASSIST(true, false, "assists"),
+    MINIGAME_DAMAGE(true, true, "damage"),
+    MINIGAME_HEALING(true, true, "healing"),
+    MINIGAME_CAPTURE(true, false, "captures"),
+    MINIGAME_DEFENSE(true, false, "defenses"),
+    MINIGAME_OBJECTIVE_TIME(true, false, "seconds"),
+    MINIGAME_WIN(true, false, "wins"),
+    MINIGAME_COMPLETED(true, false, "matches");
 
     private final boolean targetSupported;
     private final boolean decimal;

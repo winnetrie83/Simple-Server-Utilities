@@ -8,6 +8,8 @@ import java.util.Map;
 public class PermissionRank {
 
     private int priority = 0;
+    /** Rich-text prefix encoded with the same formatting format as mail and floating text. */
+    private String displayPrefix = "";
     private List<String> inherits = new ArrayList<>();
     private Map<String, String> permissions = new HashMap<>();
     private Map<String, PermissionScope> dimensionPermissions = new HashMap<>();
@@ -26,6 +28,15 @@ public class PermissionRank {
 
     public void setPriority(int priority) {
         this.priority = priority;
+    }
+
+    public String getDisplayPrefix() {
+        return displayPrefix == null ? "" : displayPrefix;
+    }
+
+    public void setDisplayPrefix(String displayPrefix) {
+        String value = displayPrefix == null ? "" : displayPrefix.replace('\n', ' ').replace('\r', ' ');
+        this.displayPrefix = value.length() <= 256 ? value : value.substring(0, 256);
     }
 
     public List<String> getInherits() {

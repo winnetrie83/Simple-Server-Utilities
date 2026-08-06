@@ -1,6 +1,10 @@
 package be.winnetrie.mod.simpleserverutilities.minigame;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -15,12 +19,15 @@ import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupToolConfigurePayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupToolOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupVisualPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameValidationPayload;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
 import be.winnetrie.mod.simpleserverutilities.region.RegionOperationResult;
 import be.winnetrie.mod.simpleserverutilities.region.RegionSelection;
 import be.winnetrie.mod.simpleserverutilities.region.RegionSelectionSchematicManager;
+import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
+import be.winnetrie.mod.simpleserverutilities.visualization.BorderCategory;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -70,6 +77,13 @@ public final class MinigameSetupToolService {
         normalizeTarget(session);
         sendSetupVisuals(player, session);
         PacketDistributor.sendToPlayer(player, payload(player, session, notice, error, requestId));
+    }
+
+    /** Re-sends setup overlays after a personal border visibility setting changes. */
+    public static void refreshVisuals(ServerPlayer player) {
+        if (player == null) return;
+        MinigameSetupToolManager.Session session = SimpleServerUtilities.MINIGAME_SETUP_TOOLS.existing(player);
+        if (session != null) sendSetupVisuals(player, session);
     }
 
     public static void handleConfigure(MinigameSetupToolConfigurePayload payload, IPayloadContext context) {
@@ -130,6 +144,40 @@ public final class MinigameSetupToolService {
                     }
                     SimpleServerUtilities.MINIGAME_SETUP_TOOLS.giveTool(player);
                     open(player, "Minigame Setup Tool added to your inventory.", false, payload.requestId());
+                }
+                case "validate" -> {
+                    MinigameDefinition definition = targetDefinition(session);
+                    MinigameArenaDefinition arena = targetArena(definition, session);
+                    sendValidation(player, definition, arena, payload.requestId());
+                }
+                case "teleport_issue" -> {
+                    MinigameDefinition definition = targetDefinition(session);
+                    MinigameArenaDefinition arena = targetArena(definition, session);
+                    teleportValidationIssue(player, definition, arena, payload.index());
+                    open(player, "Teleported to the selected validation issue.", false, payload.requestId());
+                }
+                case "clone_arena" -> {
+                    MinigameDefinition definition = targetDefinition(session);
+                    MinigameArenaDefinition source = targetArena(definition, session);
+                    MinigameArenaDefinition clone = cloneArena(definition, source);
+                    saveTarget(definition);
+                    session.configure(definition.id, clone.id, MinigameSetupAction.ARENA_BOUNDS, 1, 0);
+                    open(player, "Arena template cloned. Link or create a new region before enabling it.", false, payload.requestId());
+                }
+                case "export_arena" -> {
+                    MinigameDefinition definition = targetDefinition(session);
+                    MinigameArenaDefinition arena = targetArena(definition, session);
+                    Path exported = exportArena(player.level().getServer(), definition, arena);
+                    open(player, "Arena exported to " + exported.getFileName() + ".", false, payload.requestId());
+                }
+                case "import_arena" -> {
+                    MinigameDefinition definition = targetDefinition(session);
+                    MinigameArenaDefinition selectedArena = targetArena(definition, session);
+                    MinigameArenaDefinition imported = importArena(player.level().getServer(), definition, selectedArena);
+                    saveTarget(definition);
+                    session.configure(definition.id, imported.id, MinigameSetupAction.ARENA_BOUNDS, 1, 0);
+                    open(player, "Arena import added as a disabled template. Configure a unique region before enabling it.",
+                            false, payload.requestId());
                 }
                 default -> throw new IllegalArgumentException("Unknown setup-tool operation.");
             }
@@ -539,6 +587,115 @@ public final class MinigameSetupToolService {
         }
     }
 
+    private static void sendValidation(ServerPlayer player, MinigameDefinition definition,
+                                       MinigameArenaDefinition arena, long requestId) {
+        MinigameArenaValidation.Report report = MinigameArenaValidation.validate(player.level().getServer(), definition, arena);
+        ArrayList<MinigameValidationPayload.Issue> issues = new ArrayList<>();
+        if (report.issues().isEmpty()) {
+            issues.add(new MinigameValidationPayload.Issue("ok", "Arena validation passed without warnings.",
+                    false, "", 0.0D, 0.0D, 0.0D));
+        } else {
+            for (MinigameArenaValidation.Issue issue : report.issues()) {
+                MinigameLocation location = issue.location();
+                issues.add(new MinigameValidationPayload.Issue(
+                        issue.severity().name().toLowerCase(Locale.ROOT), issue.message(), location != null,
+                        location == null ? "" : location.dimension,
+                        location == null ? 0.0D : location.x,
+                        location == null ? 0.0D : location.y,
+                        location == null ? 0.0D : location.z));
+            }
+        }
+        PacketDistributor.sendToPlayer(player, new MinigameValidationPayload(definition.id, arena.id, issues, requestId));
+    }
+
+    private static void teleportValidationIssue(ServerPlayer player, MinigameDefinition definition,
+                                                MinigameArenaDefinition arena, int issueIndex) {
+        MinigameArenaValidation.Report report = MinigameArenaValidation.validate(player.level().getServer(), definition, arena);
+        if (issueIndex < 0 || issueIndex >= report.issues().size()) {
+            throw new IllegalArgumentException("That validation issue no longer exists.");
+        }
+        MinigameLocation location = report.issues().get(issueIndex).location();
+        if (location == null) throw new IllegalArgumentException("That issue has no world location.");
+        MinecraftServer server = player.level().getServer();
+        ServerLevel level;
+        try {
+            level = server.getLevel(net.minecraft.resources.ResourceKey.create(
+                    net.minecraft.core.registries.Registries.DIMENSION, Identifier.parse(location.dimension)));
+        } catch (RuntimeException exception) {
+            level = null;
+        }
+        if (level == null) throw new IllegalArgumentException("The issue dimension is unavailable.");
+        player.teleportTo(level, location.x, location.y, location.z, Set.of(), location.yaw, location.pitch, true);
+    }
+
+    private static MinigameArenaDefinition cloneArena(MinigameDefinition definition,
+                                                       MinigameArenaDefinition source) {
+        MinigameArenaDefinition clone = SimpleServerUtilities.MINIGAMES.copyArena(source);
+        String base = source.id + "_copy";
+        clone.id = uniqueArenaId(definition, base);
+        clone.displayName = source.displayName + " Copy";
+        clone.enabled = false;
+        clone.regionId = "";
+        clone.managedRegion = false;
+        clone.resetRegionAfterMatch = false;
+        clone.normalize();
+        definition.arenas.add(clone);
+        definition.normalize();
+        return clone;
+    }
+
+    private static Path exportArena(MinecraftServer server, MinigameDefinition definition,
+                                    MinigameArenaDefinition arena) {
+        Path folder = StoragePaths.minigameExports(StoragePaths.root(server));
+        Path file = folder.resolve(safeFileName(definition.id + "__" + arena.id) + ".json");
+        try {
+            Files.createDirectories(folder);
+            Files.writeString(file, SimpleServerUtilities.MINIGAMES.arenaToJson(arena), StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("Arena export failed: " + message(exception));
+        }
+        return file;
+    }
+
+    private static MinigameArenaDefinition importArena(MinecraftServer server, MinigameDefinition definition,
+                                                        MinigameArenaDefinition selectedArena) {
+        Path file = StoragePaths.minigameExports(StoragePaths.root(server))
+                .resolve(safeFileName(definition.id + "__" + selectedArena.id) + ".json");
+        if (!Files.isRegularFile(file)) throw new IllegalArgumentException("No matching arena export exists: " + file.getFileName());
+        MinigameArenaDefinition imported;
+        try {
+            String json = Files.readString(file, StandardCharsets.UTF_8);
+            imported = SimpleServerUtilities.MINIGAMES.arenaFromJson(json);
+        } catch (IOException | RuntimeException exception) {
+            throw new IllegalArgumentException("Arena import failed safely: " + message(exception));
+        }
+        imported.id = uniqueArenaId(definition, imported.id + "_import");
+        imported.displayName = imported.displayName + " Import";
+        imported.enabled = false;
+        imported.regionId = "";
+        imported.managedRegion = false;
+        imported.resetRegionAfterMatch = false;
+        imported.normalize();
+        definition.arenas.add(imported);
+        definition.normalize();
+        return imported;
+    }
+
+    private static String uniqueArenaId(MinigameDefinition definition, String rawBase) {
+        String base = be.winnetrie.mod.simpleserverutilities.content.ContentId.normalize(rawBase);
+        if (base.isBlank()) base = "arena_copy";
+        String candidate = base;
+        int suffix = 2;
+        while (arena(definition, candidate) != null) candidate = base + "_" + suffix++;
+        return candidate;
+    }
+
+    private static String safeFileName(String value) {
+        String safe = value == null ? "arena" : value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9._-]", "_");
+        return safe.isBlank() ? "arena" : safe;
+    }
+
     private static MinigameSetupToolOpenPayload payload(ServerPlayer player, MinigameSetupToolManager.Session session,
                                                          String notice, boolean error, long requestId) {
         ArrayList<MinigameSetupToolOpenPayload.GameEntry> games = new ArrayList<>();
@@ -719,15 +876,22 @@ public final class MinigameSetupToolService {
         }
 
         ArrayList<MinigameSetupVisualPayload.Bounds> bounds = new ArrayList<>();
+        int gameBorderColor = SimpleServerUtilities.BORDER_SETTINGS.settings()
+                .getRgb(BorderCategory.MINIGAME_GAME_AREA);
+        int spectatorBorderColor = SimpleServerUtilities.BORDER_SETTINGS.settings()
+                .getRgb(BorderCategory.MINIGAME_SPECTATOR_AREA);
+        var borderPreferences = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID());
         Region region = SimpleServerUtilities.REGIONS.get(arena.regionId);
-        if (region != null) {
+        if (region != null && borderPreferences.isMinigameGameBorderVisible()) {
             bounds.add(new MinigameSetupVisualPayload.Bounds(
                     region.getDimension().identifier().toString(), region.getMinX(), region.getMinY(), region.getMinZ(),
-                    region.getMaxX(), region.getMaxY(), region.getMaxZ(), "Game border", 0x00BCD4,
+                    region.getMaxX(), region.getMaxY(), region.getMaxZ(), "Game border", gameBorderColor,
                     MinigameSetupVisualPayload.Bounds.GAME));
         }
-        addBounds(bounds, arena.spectatorBounds, "Spectator border", 0xAB47BC,
-                MinigameSetupVisualPayload.Bounds.SPECTATOR);
+        if (borderPreferences.isMinigameSpectatorBorderVisible()) {
+            addBounds(bounds, arena.spectatorBounds, "Spectator border", spectatorBorderColor,
+                    MinigameSetupVisualPayload.Bounds.SPECTATOR);
+        }
         if (type == MinigameGameType.SPLEEF) {
             addBounds(bounds, arena.playFloor, "Spleef floor", 0xFFB300,
                     MinigameSetupVisualPayload.Bounds.SPLEEF_FLOOR);

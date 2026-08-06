@@ -1,0 +1,32 @@
+SSU 1.9.0-dev3.0.1 validation summary
+======================================
+
+Release constants
+-----------------
+- Mod version: 1.9.0-dev3.0.1
+- Network protocol: 85
+- Minigame definition schema: 16
+- Minigame recovery schema: 4
+- Minigame progression schema: 3
+- Minigame match-history schema: 1
+- Player UI preference schema: 9
+
+Minecraft 26.2 API hotfixes
+---------------------------
+- Results payload close path uses Minecraft#setScreenAndShow(null).
+- MinigameResultsScreen#onClose uses Minecraft#setScreenAndShow(null).
+- Kill-feed HUD visibility uses Minecraft.gui.hud.isHidden().
+- Active-match reconnect invokes the existing syncRuntimeBorders(ServerPlayer) method.
+- No stale setScreen(null), Options.hideGui or sendRuntimeBorders references remain.
+
+Automated checks completed
+--------------------------
+- All Java source files scanned for merge markers, duplicate imports, unbalanced delimiters and stale API patterns.
+- All JSON resource files parsed successfully.
+- A focused 26.2 client API contract harness compiled for setScreenAndShow(null) and Gui.hud.isHidden().
+- Runtime-border call/declaration consistency checked.
+- Release ZIP integrity tested after packaging.
+
+Unavailable check
+-----------------
+A full Gradle/NeoForge compile could not be run in the container. Gradle 9.2.1 is not cached locally and the wrapper cannot reach services.gradle.org. The project also targets Java 25 while the container runtime is Java 21. Build locally with the required SSU toolchain before publishing.
