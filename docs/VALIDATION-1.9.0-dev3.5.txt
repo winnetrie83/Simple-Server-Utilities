@@ -1,0 +1,47 @@
+SSU 1.9.0-dev3.5 static validation
+===================================
+
+Base: SSU 1.9.0-dev3.4
+Mod version: 1.9.0-dev3.5
+Network protocol: 90
+Player Claim storage schema: 3
+Region storage schema: 5
+Minigame definition/recovery/progression/history: 19/4/3/1
+Player UI preference schema: 11
+Title catalogue / Player Identity schema: 1/1
+
+Implemented GUI-only gaps
+-------------------------
+1. Rank priority editor.
+2. Rank inheritance add/remove editor with cycle-safe backend.
+3. Add/remove multiple player ranks without replacing the entire rank set.
+4. Global Claim roles Permission Editor plus per-claim role overrides under Claim access > Manage.
+5. Player/admin Region Rental cancellation refund percentages in Rent Journal.
+6. Live minigame score Add/Set controls in Minigame Administration.
+
+Claim access additions
+----------------------
+- Legacy trusted players migrate to Member.
+- Explicit Member and Co-owner assignments are stored per claim.
+- Co-owner, Member and Visitor have per-claim overrides with server-wide defaults.
+- Owner remains the only role able to open or mutate Claim Settings and cannot be restricted through a crafted permission action.
+- Context enforcement covers blocks, non-living entities, containers, doors, switches/pressure plates,
+  pickup/drop, shared claim-home use, living damage and living interaction.
+
+Executed checks
+---------------
+- Full Java lexical delimiter/string/comment scan: PASS (644 Java files, 0 diagnostics).
+- JSON parse validation: PASS (15 JSON files).
+- PlayerClaim schema/migration/role-override Java harness: PASS.
+- Expanded trusted-player/menu payloads compiled against focused API stubs: PASS.
+- Claim access GUI compiled against focused client/API stubs: PASS.
+- Permission key/catalog compile against focused Identifier stub: PASS.
+- GUI/action/schema/protection source invariants: PASS (95/95).
+- Source ZIP integrity: PASS after final package creation.
+
+Full Gradle / NeoForge build
+----------------------------
+Attempted: ./gradlew clean build --offline --no-daemon
+Result: NOT RUN TO COMPILATION. The wrapper attempted to download Gradle 9.2.1 and failed because
+services.gradle.org is unreachable in this container (UnknownHostException). The container also exposes
+Java 21, while this project requires Java 25. Run gradlew.bat clean build locally with Java 25.

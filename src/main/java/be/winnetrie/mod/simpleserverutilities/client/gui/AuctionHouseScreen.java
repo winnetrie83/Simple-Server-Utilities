@@ -690,8 +690,8 @@ public final class AuctionHouseScreen extends Screen {
     }
 
     private Layout layout() {
-        int panelWidth = Math.min(920, Math.max(620, width - 24));
-        int panelHeight = Math.min(510, Math.max(390, height - 24));
+        int panelWidth = Math.min(690, Math.max(620, width - 24));
+        int panelHeight = Math.min(384, Math.max(360, height - 24));
         int left = (width - panelWidth) / 2;
         int top = (height - panelHeight) / 2;
         int categoryWidth = isBlacklistMode() ? 190 : 152;

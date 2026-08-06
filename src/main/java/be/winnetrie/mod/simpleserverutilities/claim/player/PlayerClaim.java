@@ -1,12 +1,14 @@
 package be.winnetrie.mod.simpleserverutilities.claim.player;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 public class PlayerClaim {
 
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
     private static final long DEFAULT_MULTIPLIER_BASIS_POINTS = 10_000L;
 
     private int schemaVersion = SCHEMA_VERSION;
@@ -33,7 +35,12 @@ public class PlayerClaim {
     private String welcomeMessage = "";
 
     private Set<ClaimChunk> chunks = new HashSet<>();
+    /** Legacy trusted set retained for safe migration from schema 2. */
     private Set<UUID> trustedPlayers = new HashSet<>();
+    /** Explicit per-player claim roles. Unassigned players inside the claim are visitors. */
+    private Map<UUID, ClaimAccessRole> accessRoles = new HashMap<>();
+    /** Optional per-claim overrides for the global claim-role permission defaults. */
+    private Map<String, Map<String, String>> rolePermissionOverrides = new HashMap<>();
     private ClaimSettings settings = new ClaimSettings();
 
     public PlayerClaim() {
@@ -59,9 +66,21 @@ public class PlayerClaim {
             chunks = new HashSet<>();
         }
 
-        if (trustedPlayers == null) {
-            trustedPlayers = new HashSet<>();
+        if (trustedPlayers == null) trustedPlayers = new HashSet<>();
+        if (accessRoles == null) accessRoles = new HashMap<>();
+        if (rolePermissionOverrides == null) rolePermissionOverrides = new HashMap<>();
+        rolePermissionOverrides.entrySet().removeIf(entry -> entry.getKey() == null || entry.getValue() == null);
+        for (Map<String, String> overrides : rolePermissionOverrides.values()) {
+            overrides.entrySet().removeIf(entry -> entry.getKey() == null || entry.getValue() == null);
         }
+        // Schema-2 trusted players become ordinary members. Co-owner did not exist yet.
+        for (UUID trusted : Set.copyOf(trustedPlayers)) {
+            if (trusted != null && !trusted.equals(owner)) accessRoles.putIfAbsent(trusted, ClaimAccessRole.MEMBER);
+        }
+        accessRoles.remove(owner);
+        accessRoles.entrySet().removeIf(entry -> entry.getKey() == null || entry.getValue() == null);
+        trustedPlayers.clear();
+        trustedPlayers.addAll(accessRoles.keySet());
 
         if (settings == null) {
             settings = new ClaimSettings();
@@ -159,24 +178,83 @@ public class PlayerClaim {
         return trustedPlayers;
     }
 
+    public Map<UUID, ClaimAccessRole> getAccessRoles() {
+        ensureDefaults();
+        return Map.copyOf(accessRoles);
+    }
+
     public boolean isOwner(UUID uuid) {
         return owner != null && owner.equals(uuid);
     }
 
+    public ClaimAccessRole getAccessRole(UUID uuid) {
+        ensureDefaults();
+        return uuid == null ? null : accessRoles.get(uuid);
+    }
+
+    public boolean isCoOwner(UUID uuid) {
+        return getAccessRole(uuid) == ClaimAccessRole.CO_OWNER;
+    }
+
     public boolean isTrusted(UUID uuid) {
-        return getTrustedPlayers().contains(uuid);
+        return getAccessRole(uuid) != null;
     }
 
     public boolean canBuild(UUID uuid) {
         return isOwner(uuid) || isTrusted(uuid);
     }
 
+    public void setAccessRole(UUID uuid, ClaimAccessRole role) {
+        ensureDefaults();
+        if (uuid == null || isOwner(uuid)) return;
+        if (role == null) accessRoles.remove(uuid);
+        else accessRoles.put(uuid, role);
+        trustedPlayers.clear();
+        trustedPlayers.addAll(accessRoles.keySet());
+    }
+
     public void trust(UUID uuid) {
-        getTrustedPlayers().add(uuid);
+        setAccessRole(uuid, ClaimAccessRole.MEMBER);
     }
 
     public void untrust(UUID uuid) {
-        getTrustedPlayers().remove(uuid);
+        setAccessRole(uuid, null);
+    }
+
+    public Map<String, String> getRolePermissionOverrides(String roleName) {
+        ensureDefaults();
+        Map<String, String> values = rolePermissionOverrides.get(normalizeRole(roleName));
+        return values == null ? Map.of() : Map.copyOf(values);
+    }
+
+    public String getRolePermissionOverride(String roleName, String permissionKey) {
+        ensureDefaults();
+        Map<String, String> values = rolePermissionOverrides.get(normalizeRole(roleName));
+        return values == null || permissionKey == null ? null : values.get(permissionKey.trim().toLowerCase(java.util.Locale.ROOT));
+    }
+
+    public void setRolePermissionOverride(String roleName, String permissionKey, boolean allowed) {
+        ensureDefaults();
+        String role = normalizeRole(roleName);
+        String key = permissionKey == null ? "" : permissionKey.trim().toLowerCase(java.util.Locale.ROOT);
+        if (role.isBlank() || key.isBlank() || "owner".equals(role) || "none".equals(role)) return;
+        rolePermissionOverrides.computeIfAbsent(role, ignored -> new HashMap<>())
+                .put(key, Boolean.toString(allowed));
+    }
+
+    public boolean removeRolePermissionOverride(String roleName, String permissionKey) {
+        ensureDefaults();
+        String role = normalizeRole(roleName);
+        Map<String, String> values = rolePermissionOverrides.get(role);
+        if (values == null || permissionKey == null) return false;
+        boolean removed = values.remove(permissionKey.trim().toLowerCase(java.util.Locale.ROOT)) != null;
+        if (values.isEmpty()) rolePermissionOverrides.remove(role);
+        return removed;
+    }
+
+    private static String normalizeRole(String roleName) {
+        return roleName == null ? "" : roleName.trim().toLowerCase(java.util.Locale.ROOT)
+                .replace('-', '_').replace(' ', '_');
     }
 
     public ClaimSettings getSettings() {

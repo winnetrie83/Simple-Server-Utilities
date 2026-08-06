@@ -2,10 +2,10 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 
 import java.util.List;
 
-import be.winnetrie.mod.simpleserverutilities.network.RegionEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionToolOpenPayload;
+import be.winnetrie.mod.simpleserverutilities.network.RegionSetupRequestPayload;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -39,8 +39,9 @@ public final class RegionSelectionToolScreen extends Screen {
         int buttonX = x + 24;
         int buttonWidth = WIDTH - 48;
         Button create = addRenderableWidget(Button.builder(Component.literal("Create server region"), ignored -> {
-                    if (minecraft != null) minecraft.setScreenAndShow(new RegionEditorScreen(
-                            new RegionEditorOpenPayload(selection.dimension(), selection.point1(), selection.point2()), this));
+                    ClientPacketDistributor.sendToServer(new RegionSetupRequestPayload("create", "", nextRequestId++));
+                    notice = "Opening full region setup…";
+                    noticeError = false;
                 }).bounds(buttonX, y + 76, buttonWidth, 24).build());
         create.active = selection.canCreateRegion();
         Button edit = addRenderableWidget(Button.builder(Component.literal("Edit selected blocks"), ignored -> {

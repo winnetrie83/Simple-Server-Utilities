@@ -1,0 +1,64 @@
+SSU 1.9.0-dev3.6.3 validation report
+======================================
+
+Base
+----
+- Built on: SSU 1.9.0-dev3.6.2 source
+- Mod version: 1.9.0-dev3.6.3
+- Network protocol: 91 (unchanged)
+- Player Claim schema: 3 (unchanged)
+- Region schema: 5 (unchanged)
+- Portable selection snapshot format: 1 (unchanged)
+- Minigame definition/recovery/progression/history: 19/4/3/1 (unchanged)
+- Player UI preference schema: 11 (unchanged)
+- Title catalogue / Player Identity schema: 1/1 (unchanged)
+
+Implemented polish list
+-----------------------
+1. Removed the duplicate region-create button from All regions while retaining the dedicated Selection creation route.
+2. Added live snapshot-name validation and immediate Save-button state updates; reflowed the snapshot page.
+3. Added a transparent world-visible preview control screen and Free mode, with server-side preview action blocking and cleanup.
+
+Static validation
+-----------------
+- Java source files scanned: 649
+- Lexical delimiter/string/comment errors: 0
+- JSON resources parsed: 14
+- JSON parse errors: 0
+- Focused source invariants: 49/49 passed
+- ZIP integrity: passed after packaging (915 entries)
+
+Focused compile and harness checks
+----------------------------------
+- RegionSnapshotPreviewScreen compiled against focused Minecraft/NeoForge API stubs.
+- RegionSnapshotPreviewClientState compiled against focused Minecraft/NeoForge API stubs.
+- Free mode state harness passed:
+  - preview became active;
+  - Free mode started;
+  - normal client workflows remained suppressed;
+  - a left-click edge returned to the preview controls;
+  - clear removed the active preview state.
+- During implementation, RegionSetupScreen and RegionInteractionEvents were also compiled against focused API stubs after their changes.
+
+Source invariants covered
+-------------------------
+- Exactly one `Create region from selection` GUI route remains.
+- All regions contains no duplicate create action.
+- Save full snapshot checks both selection points and the live validated name.
+- Snapshot names use 1-64 letters, numbers, dots, underscores or dashes.
+- Old large in-menu preview controls are absent.
+- Minimal preview contains all six movement controls, three rotation controls, two mirror controls, Confirm, Cancel and Free mode.
+- Free mode returns to edit controls on a left-click edge and does not move the snapshot with the player.
+- Preview HUD layer and client-tick suppression are registered.
+- Server preview sessions block block/item/entity actions, damage, block breaking, item pickup/drop, containers and commands.
+- Preview state is cleared on confirm, cancel, logout, death, dimension change and client logout.
+
+Full Gradle build
+-----------------
+A full NeoForge compile was attempted with:
+
+    ./gradlew compileJava --offline
+
+It could not start because Gradle 9.2.1 is not cached locally and the wrapper attempted to reach services.gradle.org, which is unavailable in this container. The container also provides Java 21 while this project requests the Java 25 toolchain. Run the final build locally with Java 25:
+
+    gradlew.bat clean build

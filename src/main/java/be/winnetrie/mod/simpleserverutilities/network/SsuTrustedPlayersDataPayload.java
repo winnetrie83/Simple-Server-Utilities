@@ -21,7 +21,8 @@ public record SsuTrustedPlayersDataPayload(
         boolean error,
         int candidateTotal,
         List<Entry> trusted,
-        List<Entry> candidates
+        List<Entry> candidates,
+        List<RolePermissionEntry> rolePermissions
 ) implements CustomPacketPayload {
     private static final int MAX_TRUSTED = 2048;
     private static final int MAX_CANDIDATES = 100;
@@ -40,13 +41,15 @@ public record SsuTrustedPlayersDataPayload(
         candidateTotal = Math.max(0, candidateTotal);
         trusted = trusted == null ? List.of() : List.copyOf(trusted);
         candidates = candidates == null ? List.of() : List.copyOf(candidates);
+        rolePermissions = rolePermissions == null ? List.of() : List.copyOf(rolePermissions);
         if (trusted.size() > MAX_TRUSTED) throw new IllegalArgumentException("Too many trusted players.");
         if (candidates.size() > MAX_CANDIDATES) throw new IllegalArgumentException("Too many player candidates.");
+        if (rolePermissions.size() > 64) throw new IllegalArgumentException("Too many claim-role permissions.");
     }
 
     public static SsuTrustedPlayersDataPayload error(String claim, String search, long requestId, String notice) {
-        return new SsuTrustedPlayersDataPayload(claim, "Trusted players", search, requestId,
-                false, notice, true, 0, List.of(), List.of());
+        return new SsuTrustedPlayersDataPayload(claim, "Claim access", search, requestId,
+                false, notice, true, 0, List.of(), List.of(), List.of());
     }
 
     private static void encode(RegistryFriendlyByteBuf buffer, SsuTrustedPlayersDataPayload payload) {
@@ -60,6 +63,7 @@ public record SsuTrustedPlayersDataPayload(
         buffer.writeVarInt(payload.candidateTotal);
         writeEntries(buffer, payload.trusted);
         writeEntries(buffer, payload.candidates);
+        writeRolePermissions(buffer, payload.rolePermissions);
     }
 
     private static SsuTrustedPlayersDataPayload decode(RegistryFriendlyByteBuf buffer) {
@@ -73,8 +77,9 @@ public record SsuTrustedPlayersDataPayload(
         int candidateTotal = buffer.readVarInt();
         List<Entry> trusted = readEntries(buffer, MAX_TRUSTED);
         List<Entry> candidates = readEntries(buffer, MAX_CANDIDATES);
+        List<RolePermissionEntry> rolePermissions = readRolePermissions(buffer);
         return new SsuTrustedPlayersDataPayload(claim, title, search, requestId, canEdit,
-                notice, error, candidateTotal, trusted, candidates);
+                notice, error, candidateTotal, trusted, candidates, rolePermissions);
     }
 
     private static void writeEntries(RegistryFriendlyByteBuf buffer, List<Entry> entries) {
@@ -83,6 +88,7 @@ public record SsuTrustedPlayersDataPayload(
             buffer.writeUUID(entry.playerId);
             buffer.writeUtf(entry.name, 64);
             buffer.writeBoolean(entry.online);
+            buffer.writeUtf(entry.role, 16);
         }
     }
 
@@ -91,7 +97,29 @@ public record SsuTrustedPlayersDataPayload(
         if (size < 0 || size > maximum) throw new IllegalArgumentException("Invalid trusted-player list size: " + size);
         List<Entry> result = new ArrayList<>(size);
         for (int index = 0; index < size; index++) {
-            result.add(new Entry(buffer.readUUID(), buffer.readUtf(64), buffer.readBoolean()));
+            result.add(new Entry(buffer.readUUID(), buffer.readUtf(64), buffer.readBoolean(), buffer.readUtf(16)));
+        }
+        return result;
+    }
+
+    private static void writeRolePermissions(RegistryFriendlyByteBuf buffer, List<RolePermissionEntry> entries) {
+        buffer.writeVarInt(entries.size());
+        for (RolePermissionEntry entry : entries) {
+            buffer.writeUtf(entry.role, 16);
+            buffer.writeUtf(entry.key, 96);
+            buffer.writeUtf(entry.label, 64);
+            buffer.writeBoolean(entry.allowed);
+            buffer.writeBoolean(entry.overridden);
+        }
+    }
+
+    private static List<RolePermissionEntry> readRolePermissions(RegistryFriendlyByteBuf buffer) {
+        int size = buffer.readVarInt();
+        if (size < 0 || size > 64) throw new IllegalArgumentException("Invalid claim-role permission list size: " + size);
+        List<RolePermissionEntry> result = new ArrayList<>(size);
+        for (int index = 0; index < size; index++) {
+            result.add(new RolePermissionEntry(buffer.readUtf(16), buffer.readUtf(96), buffer.readUtf(64),
+                    buffer.readBoolean(), buffer.readBoolean()));
         }
         return result;
     }
@@ -101,10 +129,19 @@ public record SsuTrustedPlayersDataPayload(
         return TYPE;
     }
 
-    public record Entry(UUID playerId, String name, boolean online) {
+    public record Entry(UUID playerId, String name, boolean online, String role) {
         public Entry {
             playerId = playerId == null ? new UUID(0L, 0L) : playerId;
             name = PayloadBounds.string(name, 64);
+            role = PayloadBounds.string(role, 16).trim().toLowerCase(java.util.Locale.ROOT);
         }
     }
+    public record RolePermissionEntry(String role, String key, String label, boolean allowed, boolean overridden) {
+        public RolePermissionEntry {
+            role = PayloadBounds.string(role, 16).trim().toLowerCase(java.util.Locale.ROOT);
+            key = PayloadBounds.string(key, 96).trim().toLowerCase(java.util.Locale.ROOT);
+            label = PayloadBounds.string(label, 64);
+        }
+    }
+
 }

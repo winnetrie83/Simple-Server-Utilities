@@ -1,3 +1,200 @@
+# Simple Server Utilities 1.9.0-dev3.6.4
+
+## Team-specific objective capture sounds
+
+- Capture the Flag now plays the vanilla Ponder goat horn (`minecraft:item.goat_horn.sound.0`) only for the team that successfully returns the enemy flag and scores.
+- The opposing CTF team receives the non-horn loss cue `minecraft:block.beacon.deactivate` instead.
+- Domination now uses the same Ponder team celebration whenever a base finishes capturing.
+- Every opposing Domination player receives the same non-horn loss cue, including when the captured base was previously neutral.
+- Existing sounds for starting a flag theft, starting a Domination claim and defending/interruption events remain unchanged.
+- Network protocol remains `91`; all storage, snapshot and schema versions remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.6.3
+
+- Removes the duplicate `Create region from selection` button from All regions.
+- Makes `Save full snapshot` react immediately to the typed name and shows live validation feedback.
+- Reflows the snapshot page so explanations, fields and buttons no longer overlap.
+- Moves ghost-preview controls into a minimal world-visible placement screen without a background panel.
+- Adds Free mode for walking/flying around the stationary preview; left-click returns to edit controls.
+- Blocks world interactions, attacks, block edits, item pickup/drop, containers and commands while a preview is active.
+- Safely clears preview state on cancel, placement, logout, death or dimension change.
+- Network protocol remains `91`; all storage and schema versions remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.6.2
+
+## Compact Region Setup layout and direct region selection
+
+- Reduces the Region Setup Tool from 840×480 to 690×400 logical pixels and compacts all six pages, controls, lists and footers into the smaller footprint.
+- Reorganizes labels, status text, action rows, block-mix editors, inventory grids, snapshot controls and region rows so explanatory text no longer renders behind buttons or input fields.
+- Changes reset/selection block mixes to a compact two-column layout and reduces snapshot/region rows per page where required to preserve readability.
+- Adds `Select region` / `Unselect region` to the General page of an existing region. Selecting copies the exact region bounds and dimension into the active Region Tool selection and immediately shows its selection border.
+- Unselecting clears the active Region Tool selection and hides its border. The action is server-authoritative and works for remotely opened regions as well.
+- Network protocol remains `91`; all storage, snapshot and schema versions remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.6.1
+
+## Compile hotfix
+
+- Fixes the claim-role Permission Editor lambda capture in `SsuMenuService` by resolving the selected role into one final value before stream lookups.
+- Removes two stale `@Override operationCount()` methods from full selection snapshot capture/paste jobs; `SsuJob` does not define that method and the counters are not used by the scheduler.
+- Network protocol and all storage/schema versions remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.6
+
+## Unified Region Setup Tool, remote administration and full selection snapshots
+
+- Removes the duplicate `Set point 1/2 to current position` controls from Region Setup. Selection corners remain an in-world Region Tool action.
+- Keeps automatic detection of the region at the administrator's position while adding an `All regions` browser for remote editing.
+- Adds `Teleport to region` from both the active editor and remote region browser. Configured region spawns are preferred; otherwise SSU searches the region and its immediate upper area for a safe destination.
+- Adds a permanent Selection tab to Region Setup with current point/dimension/volume status, Create region from selection, Clear selection points, Clear to air, Fill water, Fill lava and weighted inventory block mixes.
+- Adds portable full selection snapshots in format `1`. These preserve block states, block-entity NBT/inventories and structural entities such as item frames, paintings and armor stands.
+- Adds a non-destructive ghost preview workflow for full selection snapshots. A loaded snapshot appears five blocks in front of the administrator and can be moved on all three axes, rotated, mirrored, cancelled or confirmed before server-authoritative placement.
+- Bounds preview packets to 4,096 sampled non-air blocks while keeping the eventual placement complete and exact.
+- Updates the active Region Tool selection to the placed snapshot bounds after confirmation.
+- Clears server/client preview state on screen close and logout.
+- Raises the network protocol from `90` to `91`. Region storage remains schema `5`; Player Claim remains `3`; Minigame definition/recovery/progression/match-history remain `19/4/3/1`; Player UI preferences remain `11`; Title catalogue and Player Identity remain `1`.
+
+# Simple Server Utilities 1.9.0-dev3.5
+
+## GUI completion and Player Claim access roles
+
+- Adds Rank Management controls for editing priority and adding/removing inherited parent ranks, including cycle-safe server validation.
+- Adds non-destructive Add/Remove rank controls to the player Permission Editor so one player can hold multiple ranks.
+- Adds a Claim roles mode to the Permission Editor for server-wide claim-role defaults.
+- Replaces the simple trusted-player list with explicit Member and Co-owner assignments. Legacy trusted players migrate to Member.
+- Adds per-claim role permission overrides directly under Claim Settings > Claim access > Manage. Co-owner, Member and Visitor permissions can inherit the server default or be overridden for one claim.
+- Protects block placement/breaking, item frames and armor stands, containers, doors/trapdoors/fence gates, buttons/levers/pressure plates, item pickup/drop, claim homes, living-entity damage and living-entity interaction through the new claim-role context.
+- Keeps Claim Settings strictly owner-only. Co-owners receive only the in-claim actions granted to their role.
+- Exposes player/admin Region Rental cancellation refund percentages in the Rent Journal GUI.
+- Adds live minigame score Add/Set controls to Minigame Administration using the existing server-authoritative score action.
+- Extends Travel with read-only shared claim homes when the active claim role permits their use.
+- Raises network protocol from `89` to `90` and Player Claim storage schema from `2` to `3`. Region schema remains `5`; Minigame definition/recovery/progression/match-history remain `19/4/3/1`; Player UI preferences remain `11`; Title catalogue and Player Identity remain `1`.
+
+# Simple Server Utilities 1.9.0-dev3.4
+
+## Damage Indicator Drop style and GUI-first Region Setup Tool
+
+- Removes the exclamation mark from Pop indicators and square brackets from Burst indicators.
+- Adds the `Drop` Damage Indicator style: the value spawns tightly from the affected entity, briefly pops upward and then falls downward.
+- Replaces the Region Tool's fragmented right-click workflow with a full Region Setup Tool that edits the region at the player's position or guides creation from a two-point selection when no region is present.
+- Integrates region identity, priority, borders, welcome/leave messages, spawn, redefine/delete, all protection flags, context permission overrides, rental configuration and manager/member access into the same editor.
+- Adds persistent scheduled resets per region. Administrators can select a saved snapshot or a weighted inventory-built block preset, configure the interval and optionally postpone resets while players remain inside.
+- Adds immediate snapshot capture and Reset now actions. All capture/reset/fill operations use bounded SSU jobs and existing region resource locks.
+- Adds a region overload to the existing weighted-fill system and treats percentages below 100% as air, preserving the established inventory-preset workflow.
+- Makes CREATE submissions transactional by validating rent, interval and inventory preset data before creating the region.
+- Raises network protocol from `88` to `89` and region storage schema from `4` to `5`. Minigame definition/recovery/progression/match-history remain `19/4/3/1`; Player UI preferences remain `11`; Title catalogue and Player Identity remain `1`.
+
+# Simple Server Utilities 1.9.0-dev3.3.3
+
+- Damage/healing indicators are approximately twice as large, remain fully opaque for most of their lifetime and now offer five styles: Floating, Hearts, Compact, Pop and Burst.
+- Player titles no longer render for the local player and use partial-tick entity interpolation so they move smoothly with remote players.
+- Immutable match inventories are now a definition-level default for every minigame. CTF, Domination, Spleef and Generic editors expose an `Inventory lock` exception toggle; when enabled, inventory slots, armor, offhand and cursor stacks are restored server-side every tick. CTF flag banners remain an intentional temporary helmet replacement.
+- Minigame definition schema increases from `18` to `19`. Network protocol remains `88`; all other schemas remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.3.2
+
+## Rank/title GUI and chat-format hotfix
+
+- Replaces the sixteen plain colour-name buttons in the Rank Prefix Editor with real colour swatches while keeping each palette name readable with automatic contrasting text.
+- Shortens the Rank Management rename field to approximately half its former width, moves Title Manager and Refresh beside it without overlap, and clarifies that the field supplies the new name used by the row-level Rename button.
+- Doubles the administrator Title display-name field width and reorganizes the Title Administration controls and preview so the larger field remains clear and non-overlapping.
+- Fixes duplicated player names in chat by cancelling the vanilla wrapped chat line and broadcasting one complete server-authoritative SSU line in the form `RankPrefix PlayerName: message`.
+- Ensures exactly one normal space separates the styled rank prefix from the unstyled player name in chat.
+- Network protocol remains `88`; Player UI preference schema remains `11`; Title catalogue and Player Identity schemas remain `1`; Minigame definition/recovery/progression/match-history remain `18/4/3/1`.
+
+# Simple Server Utilities 1.9.0-dev3.3
+
+## Global titles, styled rank prefixes and damage indicators
+
+- Changes the Tank Defensive Field/AOE impact sound to the vanilla lightning-bolt impact sound for a stronger, more lively ability cue.
+- Promotes minigame titles into a global player-identity system. Players now select their active title from the normal SSU Profile instead of the Minigame Profile.
+- Adds a server-owned Title Administration screen. Administrators can create, edit, enable/disable and delete titles, choose one of the fixed sixteen Minecraft colours, and define acquisition through free access, minigame level, minigame wins, rank, permission or manual grant.
+- Migrates the original Rookie, Contender, Veteran, Champion, Elite and Legend title progression into the global catalogue and migrates each player's former minigame title selection on first load.
+- Adds personal Settings toggles for overhead title visibility and overhead rank-prefix visibility.
+- Adds a rich Rank Prefix editor to Rank Management using the same hidden formatting model as Mail and Floating Text, including multi-colour text and Bold/Italic/Underline/Strikethrough across the fixed sixteen-colour palette.
+- Shows the styled primary-rank prefix before the normal unstyled player name in overhead nameplates and chat. Disabling overhead rank visibility does not remove the authoritative chat prefix.
+- Adds damage/healing indicators around living entities with per-player enablement and three display styles: Floating, Hearts and Compact. Damage is red and healing is green.
+- Adds permission key `ssu.damage_indicators.use`, with a default fallback of `true`.
+- Network protocol increases from `87` to `88`.
+- Player UI preference schema increases from `10` to `11`; the new title catalogue and per-player identity records use schema `1`. Minigame definition/recovery/progression/match-history schemas remain `18/4/3/1`.
+
+# Simple Server Utilities 1.9.0-dev3.2.1
+
+## Minigame manager API compile hotfix
+
+- Restores eight established `MinigameManager` runtime methods that were accidentally deleted together with the obsolete Ready-check block in dev3.2: `matchView`, `finishMatch`, `addScore`, `setScore`, `eliminate`, `onPlayerDeath`, `onPlayerRespawn` and `onLogin`.
+- Fixes the resulting unresolved-method errors in `TeleportPolicy.java`, `MinigameEvents.java`, `MinigameCommands.java` and `MinigameManager.java` itself.
+- Keeps the dev3.2 preparation-only startup flow intact; no Ready/Unready state or ready timer has been reintroduced.
+- Network protocol remains `87`. Minigame definition schema remains `18`; recovery remains `4`; progression remains `3`; match-history remains `1`; Player UI preference schema remains `10`.
+
+# Simple Server Utilities 1.9.0-dev3.2
+
+## Minigame progression, preparation countdown and in-match overview
+
+- Adds administrator-configurable weekly cosmetic challenge settings to every minigame definition: challenge enablement, matches required/reward XP, wins required/reward XP and contribution required/reward XP.
+- Keeps the weekly counters shared per player while applying the active minigame definition's configured thresholds and rewards. Disabling weekly challenges stops both progress and weekly XP for that minigame.
+- Removes the Ready/Unready button, ready player counter, ready-check setting and maximum ready wait. A preparing match now starts automatically when its configured preparation time reaches zero, provided the minimum player composition remains valid.
+- Displays the final ten preparation seconds as large center-screen numbers with a synchronized sound on every second, and displays `GO!` when the match enters RUNNING.
+- Extends important end/cancellation messages to five seconds and duplicates the reason in chat so opponent-left, forfeit, cancellation, draw and overtime outcomes remain readable.
+- Routes the `U` key through a server-authoritative match check. Active participants and spectators receive a detailed current-match screen with phase/time, team scores, roster/statistics, objectives, status, rules and a confirmed Leave match action; players outside a match still open the normal SSU dashboard.
+- Fixes the Victory effect section title overlapping the effect selector in the Minigame Profile.
+- Replaces the former mining-outline colour cycle with the fixed sixteen-colour Minecraft palette and migrates existing Treecapitator/Veinminer colours to their nearest equivalent.
+- Network protocol increases from `86` to `87`.
+- Minigame definition schema increases from `17` to `18`; Player UI preference schema increases from `9` to `10`; recovery remains `4`, progression remains `3`, and match-history remains `1`.
+
+# Simple Server Utilities 1.9.0-dev3.1
+
+## MVP validator, boosts, borders and dashboard polish
+
+- Arena validation now permits lobby locations, spectator spawns and spectator bounds outside the playable arena region. Spectator bounds are still checked for a valid dimension.
+- Manual boost validation no longer treats a boost as a player spawn, and temporary End Rod setup markers are treated as empty space. Boosts still require their real position to be inside the arena, free above, and supported by a solid floor.
+- The validation report now explains that errors block readiness while warnings are advisory.
+- Adds the supplied `questbook.png` to the Questbook dashboard tile and restores `portal.png` to My Warps.
+- Changes the minigame scoreboard/HUD keybind from `L` to `J` so it no longer conflicts with Advancements.
+- Reworks Tank Defensive Field knockback into an explicit radial server velocity with a direct motion packet to the affected enemy player, while retaining enemy-only targeting, Slowness and the configured strength.
+- Adds administrator-configurable Regeneration Boost healing per second. The default is `2.0` health points per second; the supported range is `0.1` to `40.0`.
+- Compacts the CTF and Domination Boosts tabs, removes the former right-side explanatory paragraphs, and adds a dedicated regeneration-heal field without overlapping controls.
+- Adds clear labels and concise descriptions to all six Match Flow values and all four Progression & Integration values.
+- Makes the Minigame border and Spectator border toggles apply to both active-match overlays and Setup Tool overlays immediately.
+- Displays Treecapitator and Veinminer outline colors by readable names instead of raw hexadecimal values, while preserving RGB storage internally.
+- Network protocol increases from `85` to `86`.
+- Minigame definition schema increases from `16` to `17`; recovery schema remains `4`; progression schema remains `3`; match-history schema remains `1`; Player UI preference schema remains `9`.
+
+# Simple Server Utilities 1.9.0-dev3.0.2
+
+- Fixed system/minigame reward money claims that could fail with `Insufficient funds` when a legacy or interrupted system-mail escrow deposit was missing. Only server-generated SYSTEM, MINIGAME and RECOVERY mail can use the idempotent repair path; player and Auction House mail remain strictly escrow-backed.
+- Game and spectator borders now use the same stroke width, translucent fill and depth-aware region-box rendering style as normal region borders, both during setup and in live matches.
+- Reduced the maximum Mailbox dimensions from 900x500 to 675x375 and the Auction House from 920x510 to 690x384 while keeping both centered.
+- Added the supplied claim-land, travel, wallet, mail and minigame dashboard icons and render dashboard tile icons at approximately twice their previous size.
+- Network protocol remains 85; all storage and definition schemas remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.0.1
+
+## Minecraft 26.2 results, HUD and runtime-border compile hotfix
+
+- Replaces both remaining `Minecraft#setScreen(null)` calls in the results payload handler and `MinigameResultsScreen#onClose` with the project-supported Minecraft 26.2 `setScreenAndShow(null)` API.
+- Replaces the removed `Options.hideGui` field in the minigame kill-feed renderer with `minecraft.gui.hud.isHidden()`.
+- Corrects the active-match reconnect path to call the existing `syncRuntimeBorders(ServerPlayer)` method instead of the undefined `sendRuntimeBorders(ServerPlayer)` name.
+- Scans the full Java tree for the removed screen/HUD APIs and the stale runtime-border method name; no occurrences remain.
+- Network protocol remains `85`. Minigame definition schema remains `16`; recovery schema remains `4`; progression schema remains `3`; match-history schema remains `1`; Player UI preference schema remains `9`.
+
+# Simple Server Utilities 1.9.0-dev3.0
+
+## Minigame Experience, validation, diagnostics and transactional progression
+
+- Adds a complete post-match experience layer with detailed results, compact kill/objective feed, three scoreboard HUD modes, reconnect grace, AFK handling, ready checks, overtime, post-game voting and spectator target cycling.
+- Adds rating- and preferred-role-aware team balancing while preserving configured role minimums and maximums.
+- Adds a Minigame Profile with cosmetic-only XP, levels, per-game ratings, badges, selectable titles, victory effects and bounded weekly challenges.
+- Adds an Arena Validator with errors/warnings, issue teleporting, safe arena cloning and bounded JSON export/import.
+- Adds Minigame System Health diagnostics, integrity checks and conservative orphan cleanup.
+- Introduces a shared safe ability definition/effect foundation for future role spells without commands or arbitrary scripts.
+- Publishes minigame events and custom statistics for quest, hologram and other existing SSU integrations; existing participation and winner reward packages remain the authoritative reward path.
+- Fixes settlement ordering: result-screen XP is preview-only until every configured reward is committed. Progression, ratings, weekly challenges and match history are then applied once, stored with a bounded match-settlement ledger, and both progression/history files are flushed and byte-verified before cleanup continues.
+- Match-summary mail is delivered only after the durable settlement and uses an idempotent correlation key. A partial mail failure pauses cleanup and safely retries without duplicating rewards, progression or previously delivered summaries.
+- Non-transactional statistic and level-up events are emitted at most once per live settlement after durable progression storage.
+- Network protocol increases from `84` to `85` for the new result, profile, diagnostics, validation, spectator and kill-feed payloads.
+- Minigame definition schema increases from `15` to `16`; Minigame recovery schema remains `4`; Minigame progression schema is `3`; match-history schema is `1`; Player UI preference schema remains `9`.
+
 # Simple Server Utilities 1.9.0-dev2.9.3.1
 
 ## Minecraft 26.2 Tank knockback compile hotfix

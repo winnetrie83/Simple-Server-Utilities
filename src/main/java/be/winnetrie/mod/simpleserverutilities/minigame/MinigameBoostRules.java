@@ -23,6 +23,8 @@ public final class MinigameBoostRules {
     public boolean regenerationEnabled = true;
     public int regenerationDurationSeconds = 8;
     public int regenerationColor = 0xEC407A;
+    /** Direct health points restored each second while the regeneration boost is active. */
+    public double regenerationHealthPerSecond = 2.0D;
 
     public boolean armorEnabled = true;
     public int armorDurationSeconds = 12;
@@ -48,6 +50,9 @@ public final class MinigameBoostRules {
         jumpDurationSeconds = duration(jumpDurationSeconds);
         speedColor = color(speedColor, 0x29B6F6);
         regenerationColor = color(regenerationColor, 0xEC407A);
+        if (!Double.isFinite(regenerationHealthPerSecond) || regenerationHealthPerSecond <= 0.0D)
+            regenerationHealthPerSecond = 2.0D;
+        regenerationHealthPerSecond = Math.max(0.1D, Math.min(40.0D, regenerationHealthPerSecond));
         armorColor = color(armorColor, 0xB0BEC5);
         jumpColor = color(jumpColor, 0x66BB6A);
         if (!Double.isFinite(armorPoints)) armorPoints = 6.0D;

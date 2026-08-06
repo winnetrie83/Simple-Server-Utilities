@@ -13,7 +13,7 @@ public class ModNetworking {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("84");
+        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("91");
 
         registrar.playToClient(
                 ClaimMapDataPayload.TYPE,
@@ -142,6 +142,12 @@ public class ModNetworking {
                 SsuTrustedPlayersActionPayload.TYPE,
                 SsuTrustedPlayersActionPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.menu.TrustedPlayersService::handleAction
+        );
+
+        registrar.playToServer(
+                SsuClaimRolePermissionActionPayload.TYPE,
+                SsuClaimRolePermissionActionPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.menu.TrustedPlayersService::handleRolePermissionAction
         );
 
         registrar.playToClient(
@@ -504,6 +510,17 @@ public class ModNetworking {
         );
 
         registrar.playToServer(
+                MinigameMatchOverviewRequestPayload.TYPE,
+                MinigameMatchOverviewRequestPayload.STREAM_CODEC,
+                (payload, context) -> SimpleServerUtilities.MINIGAMES.handleMatchOverviewRequest(payload, context)
+        );
+
+        registrar.playToClient(
+                MinigameMatchOverviewPayload.TYPE,
+                MinigameMatchOverviewPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
                 MinigameScoreActionPayload.TYPE,
                 MinigameScoreActionPayload.STREAM_CODEC,
                 (payload, context) -> SimpleServerUtilities.MINIGAMES.handleScoreAction(payload, context)
@@ -584,6 +601,37 @@ public class ModNetworking {
                 MinigameSetupVisualPayload.STREAM_CODEC
         );
 
+        registrar.playToClient(
+                MinigameResultsPayload.TYPE,
+                MinigameResultsPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                MinigameProfilePayload.TYPE,
+                MinigameProfilePayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                MinigameKillFeedPayload.TYPE,
+                MinigameKillFeedPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                MinigameSpectatorActionPayload.TYPE,
+                MinigameSpectatorActionPayload.STREAM_CODEC,
+                (payload, context) -> SimpleServerUtilities.MINIGAMES.handleSpectatorAction(payload, context)
+        );
+
+        registrar.playToClient(
+                MinigameValidationPayload.TYPE,
+                MinigameValidationPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                MinigameDiagnosticsPayload.TYPE,
+                MinigameDiagnosticsPayload.STREAM_CODEC
+        );
+
         registrar.playToServer(
                 DungeonLobbyRequestPayload.TYPE,
                 DungeonLobbyRequestPayload.STREAM_CODEC,
@@ -615,6 +663,34 @@ public class ModNetworking {
         registrar.playToClient(
                 DungeonEditorResultPayload.TYPE,
                 DungeonEditorResultPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                RegionSetupOpenPayload.TYPE,
+                RegionSetupOpenPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                RegionSnapshotPreviewPayload.TYPE,
+                RegionSnapshotPreviewPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                RegionSetupRequestPayload.TYPE,
+                RegionSetupRequestPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.region.RegionSetupToolService::handleRequest
+        );
+
+        registrar.playToServer(
+                RegionSetupSavePayload.TYPE,
+                RegionSetupSavePayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.region.RegionSetupToolService::handleSave
+        );
+
+        registrar.playToServer(
+                RegionSetupActionPayload.TYPE,
+                RegionSetupActionPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.region.RegionSetupToolService::handleAction
         );
 
         registrar.playToClient(
@@ -685,6 +761,50 @@ public class ModNetworking {
         registrar.playToClient(
                 StatisticEditorResultPayload.TYPE,
                 StatisticEditorResultPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                TitleManagerRequestPayload.TYPE,
+                TitleManagerRequestPayload.STREAM_CODEC,
+                (payload, context) -> SimpleServerUtilities.IDENTITY.handleTitleRequest(payload, context)
+        );
+
+        registrar.playToServer(
+                TitleManagerActionPayload.TYPE,
+                TitleManagerActionPayload.STREAM_CODEC,
+                (payload, context) -> SimpleServerUtilities.IDENTITY.handleTitleAction(payload, context)
+        );
+
+        registrar.playToClient(
+                TitleManagerDataPayload.TYPE,
+                TitleManagerDataPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                RankDisplayRequestPayload.TYPE,
+                RankDisplayRequestPayload.STREAM_CODEC,
+                (payload, context) -> SimpleServerUtilities.IDENTITY.handleRankDisplayRequest(payload, context)
+        );
+
+        registrar.playToServer(
+                RankDisplaySavePayload.TYPE,
+                RankDisplaySavePayload.STREAM_CODEC,
+                (payload, context) -> SimpleServerUtilities.IDENTITY.handleRankDisplaySave(payload, context)
+        );
+
+        registrar.playToClient(
+                RankDisplayDataPayload.TYPE,
+                RankDisplayDataPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                PlayerIdentitySyncPayload.TYPE,
+                PlayerIdentitySyncPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                DamageIndicatorPayload.TYPE,
+                DamageIndicatorPayload.STREAM_CODEC
         );
 
     }

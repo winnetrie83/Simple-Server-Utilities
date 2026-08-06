@@ -12,6 +12,8 @@ import net.minecraft.resources.Identifier;
 public record SsuMenuSnapshotPayload(
         String playerName,
         String primaryRank,
+        String selectedTitle,
+        int selectedTitleColor,
         boolean settingsAvailable,
         UiSettingsSummary uiSettings,
         boolean administrator,
@@ -48,6 +50,7 @@ public record SsuMenuSnapshotPayload(
     public SsuMenuSnapshotPayload {
         playerName = playerName == null ? "" : playerName;
         primaryRank = primaryRank == null ? "" : primaryRank;
+        selectedTitle = selectedTitle == null ? "" : selectedTitle;
         uiSettings = uiSettings == null ? UiSettingsSummary.defaults() : uiSettings;
         moduleSettings = moduleSettings == null ? ModuleSettingsSummary.defaults() : moduleSettings;
         adminAccess = adminAccess == null ? AdminAccessSummary.none() : adminAccess;
@@ -66,6 +69,8 @@ public record SsuMenuSnapshotPayload(
     private static void encode(RegistryFriendlyByteBuf buffer, SsuMenuSnapshotPayload payload) {
         buffer.writeUtf(payload.playerName, 64);
         buffer.writeUtf(payload.primaryRank, 64);
+        buffer.writeUtf(payload.selectedTitle, 48);
+        buffer.writeInt(payload.selectedTitleColor);
         buffer.writeBoolean(payload.settingsAvailable);
         writeUiSettings(buffer, payload.uiSettings);
         buffer.writeBoolean(payload.administrator);
@@ -95,6 +100,8 @@ public record SsuMenuSnapshotPayload(
         return new SsuMenuSnapshotPayload(
                 buffer.readUtf(64),
                 buffer.readUtf(64),
+                buffer.readUtf(48),
+                buffer.readInt(),
                 buffer.readBoolean(),
                 readUiSettings(buffer),
                 buffer.readBoolean(),
@@ -203,6 +210,10 @@ public record SsuMenuSnapshotPayload(
         buffer.writeInt(settings.veinminerOutlineColor());
         buffer.writeVarInt(settings.veinminerOutlineBrightness());
         buffer.writeBoolean(settings.veinminerInfoEnabled());
+        buffer.writeBoolean(settings.titleVisible());
+        buffer.writeBoolean(settings.rankVisible());
+        buffer.writeBoolean(settings.damageIndicatorsEnabled());
+        buffer.writeUtf(settings.damageIndicatorStyle(), 16);
     }
 
     private static UiSettingsSummary readUiSettings(RegistryFriendlyByteBuf buffer) {
@@ -239,7 +250,11 @@ public record SsuMenuSnapshotPayload(
                 buffer.readUtf(16),
                 buffer.readInt(),
                 buffer.readVarInt(),
-                buffer.readBoolean()
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readUtf(16)
         );
     }
 
@@ -527,7 +542,11 @@ public record SsuMenuSnapshotPayload(
             String veinminerActivation,
             int veinminerOutlineColor,
             int veinminerOutlineBrightness,
-            boolean veinminerInfoEnabled
+            boolean veinminerInfoEnabled,
+            boolean titleVisible,
+            boolean rankVisible,
+            boolean damageIndicatorsEnabled,
+            String damageIndicatorStyle
     ) {
         public UiSettingsSummary {
             minimapSize = Math.max(64, Math.min(256, minimapSize));
@@ -539,6 +558,7 @@ public record SsuMenuSnapshotPayload(
             veinminerActivation = veinminerActivation == null ? "SNEAK" : veinminerActivation;
             treecapitatorOutlineBrightness = Math.max(10, Math.min(100, treecapitatorOutlineBrightness));
             veinminerOutlineBrightness = Math.max(10, Math.min(100, veinminerOutlineBrightness));
+            damageIndicatorStyle = damageIndicatorStyle == null ? "FLOATING" : damageIndicatorStyle;
         }
 
         public static UiSettingsSummary defaults() {
@@ -550,7 +570,8 @@ public record SsuMenuSnapshotPayload(
                     true, false, false,
                     false, false, false,
                     false, "SNEAK", 0xFF55FF77, 85, true,
-                    false, "SNEAK", 0xFF55AAFF, 85, true
+                    false, "SNEAK", 0xFF55AAFF, 85, true,
+                    true, true, true, "FLOATING"
             );
         }
     }

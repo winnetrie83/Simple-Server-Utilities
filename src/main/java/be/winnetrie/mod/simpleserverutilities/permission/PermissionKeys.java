@@ -24,6 +24,19 @@ public final class PermissionKeys {
     public static final String CLAIMS_TELEPORT_COOLDOWN = "ssu.claims.teleport.cooldown";
     public static final String CLAIMS_ADMIN_BYPASS = "ssu.claims.admin.bypass";
 
+    // Contextual actions resolved from the player's role inside a player claim.
+    public static final String CLAIM_CONTEXT_BREAK_BLOCKS = "ssu.claims.context.break_blocks";
+    public static final String CLAIM_CONTEXT_PLACE_BLOCKS = "ssu.claims.context.place_blocks";
+    public static final String CLAIM_CONTEXT_MODIFY_NONLIVING = "ssu.claims.context.modify_nonliving_entities";
+    public static final String CLAIM_CONTEXT_OPEN_CONTAINERS = "ssu.claims.context.open_containers";
+    public static final String CLAIM_CONTEXT_USE_DOORS = "ssu.claims.context.use_doors";
+    public static final String CLAIM_CONTEXT_USE_SWITCHES = "ssu.claims.context.use_switches";
+    public static final String CLAIM_CONTEXT_ITEM_TRANSFER = "ssu.claims.context.pickup_drop_items";
+    public static final String CLAIM_CONTEXT_USE_HOMES = "ssu.claims.context.use_claim_homes";
+    public static final String CLAIM_CONTEXT_DAMAGE_LIVING = "ssu.claims.context.damage_living_entities";
+    public static final String CLAIM_CONTEXT_INTERACT_ENTITIES = "ssu.claims.context.interact_entities";
+    public static final String CLAIM_CONTEXT_INTERACT_OTHER = "ssu.claims.context.interact_other_blocks";
+
     public static final String CLAIMS_MAX_CHUNKS = "ssu.claims.max_chunks";
     public static final String CLAIMS_MAX_GROUPS = "ssu.claims.max_groups";
     public static final String CLAIMS_MAX_CHUNKS_PER_GROUP = "ssu.claims.max_chunks_per_group";
@@ -149,6 +162,7 @@ public final class PermissionKeys {
     public static final String BLOCK_INFORMATION_INVENTORY = "ssu.block_information.inventory";
     public static final String BLOCK_INFORMATION_INVENTORY_FULL = "ssu.block_information.inventory.full";
     public static final String BLOCK_INFORMATION_INVENTORY_MAX_ITEMS = "ssu.block_information.inventory.max_items";
+    public static final String DAMAGE_INDICATORS_USE = "ssu.damage_indicators.use";
     public static final String STATISTICS_ADMIN = "ssu.statistics.admin";
 
     public static final String CROPS_HARVESTING_USE = "ssu.crops_harvesting.use";
@@ -201,6 +215,17 @@ public final class PermissionKeys {
             CLAIMS_TELEPORT_DELAY,
             CLAIMS_TELEPORT_COOLDOWN,
             CLAIMS_ADMIN_BYPASS,
+            CLAIM_CONTEXT_BREAK_BLOCKS,
+            CLAIM_CONTEXT_PLACE_BLOCKS,
+            CLAIM_CONTEXT_MODIFY_NONLIVING,
+            CLAIM_CONTEXT_OPEN_CONTAINERS,
+            CLAIM_CONTEXT_USE_DOORS,
+            CLAIM_CONTEXT_USE_SWITCHES,
+            CLAIM_CONTEXT_ITEM_TRANSFER,
+            CLAIM_CONTEXT_USE_HOMES,
+            CLAIM_CONTEXT_DAMAGE_LIVING,
+            CLAIM_CONTEXT_INTERACT_ENTITIES,
+            CLAIM_CONTEXT_INTERACT_OTHER,
             CLAIMS_MAX_CHUNKS,
             CLAIMS_MAX_GROUPS,
             CLAIMS_MAX_CHUNKS_PER_GROUP,
@@ -318,6 +343,7 @@ public final class PermissionKeys {
             BLOCK_INFORMATION_INVENTORY,
             BLOCK_INFORMATION_INVENTORY_FULL,
             BLOCK_INFORMATION_INVENTORY_MAX_ITEMS,
+            DAMAGE_INDICATORS_USE,
             STATISTICS_ADMIN,
             CROPS_HARVESTING_USE,
 

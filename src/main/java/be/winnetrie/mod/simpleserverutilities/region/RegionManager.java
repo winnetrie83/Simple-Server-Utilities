@@ -366,6 +366,7 @@ public class RegionManager {
         newRegion.setLeaveMessage(oldRegion.getLeaveMessage());
 
         copySettings(oldRegion, newRegion);
+        newRegion.getResetSettings().copyFrom(oldRegion.getResetSettings());
 
         if (oldRegion.getSpawnPos() != null
                 && newRegion.contains(newRegion.getDimension(), oldRegion.getSpawnPos())) {
@@ -518,6 +519,19 @@ public class RegionManager {
             }
         }
 
+        if (json.has("scheduledReset")) {
+            JsonObject reset = json.getAsJsonObject("scheduledReset");
+            RegionResetSettings settings = region.getResetSettings();
+            settings.setEnabled(getBoolean(reset, "enabled", false));
+            settings.setIntervalSeconds(getLong(reset, "intervalSeconds", RegionResetSettings.DEFAULT_INTERVAL_SECONDS));
+            settings.setMode(RegionResetMode.parse(getString(reset, "mode", RegionResetMode.SNAPSHOT.name())));
+            settings.setOnlyWhenEmpty(getBoolean(reset, "onlyWhenEmpty", true));
+            settings.setWeightedPreset(getString(reset, "weightedPreset", ""));
+            settings.setNextResetAt(getLong(reset, "nextResetAt", -1L));
+            settings.setLastResetAt(getLong(reset, "lastResetAt", -1L));
+            settings.normalize(System.currentTimeMillis());
+        }
+
         if (json.has("spawn")) {
             JsonObject spawn = json.getAsJsonObject("spawn");
             BlockPos spawnPos = new BlockPos(
@@ -539,7 +553,7 @@ public class RegionManager {
     private JsonObject regionToJson(Region region) {
         JsonObject json = new JsonObject();
 
-        json.addProperty("schemaVersion", 4);
+        json.addProperty("schemaVersion", 5);
         json.addProperty("name", region.getName());
         json.addProperty("dimension", region.getDimension().identifier().toString());
         json.addProperty("priority", region.getPriority());
@@ -613,6 +627,18 @@ public class RegionManager {
         }
 
         json.add("rent", rent);
+
+        RegionResetSettings scheduled = region.getResetSettings();
+        scheduled.normalize(System.currentTimeMillis());
+        JsonObject scheduledReset = new JsonObject();
+        scheduledReset.addProperty("enabled", scheduled.isEnabled());
+        scheduledReset.addProperty("intervalSeconds", scheduled.getIntervalSeconds());
+        scheduledReset.addProperty("mode", scheduled.getMode().name());
+        scheduledReset.addProperty("onlyWhenEmpty", scheduled.isOnlyWhenEmpty());
+        scheduledReset.addProperty("weightedPreset", scheduled.getWeightedPreset());
+        scheduledReset.addProperty("nextResetAt", scheduled.getNextResetAt());
+        scheduledReset.addProperty("lastResetAt", scheduled.getLastResetAt());
+        json.add("scheduledReset", scheduledReset);
 
         if (region.getSpawnPos() != null) {
             JsonObject spawn = new JsonObject();

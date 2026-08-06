@@ -11,11 +11,14 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.settings.MinecraftColorPalette;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuDimensionManagerRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.QuestBookRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.TitleManagerRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.RankDisplayRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.DungeonLobbyRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuPageDataPayload;
@@ -69,7 +72,12 @@ public final class SsuDashboardScreen extends Screen {
     private static final Identifier BUTTON_BACK_TEXTURE = texture("button_back.png");
     private static final Identifier BUTTON_BACK_GLOW_TEXTURE = texture("button_back_glow.png");
     private static final Identifier PORTRAIT_FRAME = texture("portrait_framework.png");
-    private static final Identifier ICON_CLAIM = texture("claim.png");
+    private static final Identifier ICON_CLAIM = texture("claim_land.png");
+    private static final Identifier ICON_TRAVEL = texture("travel.png");
+    private static final Identifier ICON_WALLET = texture("wallet.png");
+    private static final Identifier ICON_MAIL = texture("mail.png");
+    private static final Identifier ICON_MINIGAMES = texture("minigames.png");
+    private static final Identifier ICON_QUESTBOOK = texture("questbook.png");
     private static final Identifier ICON_SETTINGS = texture("cogwheel.png");
     private static final Identifier ICON_MARKET = texture("market.png");
     private static final Identifier ICON_PLAYERS = texture("multiplayer.png");
@@ -115,6 +123,10 @@ public final class SsuDashboardScreen extends Screen {
     private EditBox rankNameBox;
     private EditBox rankRenameBox;
     private EditBox rankPlayerBox;
+    private EditBox rankPriorityBox;
+    private EditBox rankInheritanceBox;
+    private EditBox regionPlayerRefundBox;
+    private EditBox regionAdminRefundBox;
     private EditBox regionDaysBox;
     private EditBox regionFillBox;
     private EditBox regionCoordinatesBox;
@@ -176,6 +188,10 @@ public final class SsuDashboardScreen extends Screen {
     private String draftRankName = "";
     private String draftRankRename = "";
     private String draftRankPlayer = "";
+    private String draftRankPriority = "0";
+    private String draftRankInheritance = "";
+    private String draftRegionPlayerRefund = "0";
+    private String draftRegionAdminRefund = "100";
     private String draftRegionDays = "1";
     private String draftRegionFill = "minecraft:stone";
     private String draftRegionCoordinates = "0 64 0";
@@ -370,7 +386,7 @@ public final class SsuDashboardScreen extends Screen {
         skin = null; searchBox = null; payPlayerBox = null; payAmountBox = null;
         economyHistoryLimitBox = null; transactionPlayerBox = null; auctionTaxBox = null;
         permissionTargetSearchBox = null; permissionSearchBox = null; playerProfileSearchBox = null; permissionValueInputs.clear();
-        accountAmountBox = null; homeNameBox = null; warpNameBox = null; warpRentalPriceBox = null; warpRentalDaysBox = null; claimTaxRateBox = null; claimTaxIntervalBox = null; claimTaxReminderBox = null; claimTaxDimensionBox = null; claimTaxMultiplierBox = null; rankNameBox = null; rankRenameBox = null; rankPlayerBox = null; regionDaysBox = null; regionFillBox = null; regionCoordinatesBox = null; miningLeafRangeBox = null; miningTreeMaxBox = null; miningVeinMaxBox = null; miningBlockIdBox = null; maintenanceHexBox = null; maintenanceBuybackBox = null; settingsTooltips.clear();
+        accountAmountBox = null; homeNameBox = null; warpNameBox = null; warpRentalPriceBox = null; warpRentalDaysBox = null; claimTaxRateBox = null; claimTaxIntervalBox = null; claimTaxReminderBox = null; claimTaxDimensionBox = null; claimTaxMultiplierBox = null; rankNameBox = null; rankRenameBox = null; rankPlayerBox = null; rankPriorityBox = null; rankInheritanceBox = null; regionPlayerRefundBox = null; regionAdminRefundBox = null; regionDaysBox = null; regionFillBox = null; regionCoordinatesBox = null; miningLeafRangeBox = null; miningTreeMaxBox = null; miningVeinMaxBox = null; miningBlockIdBox = null; maintenanceHexBox = null; maintenanceBuybackBox = null; settingsTooltips.clear();
     }
 
     private void addHomeButtons(Layout l) {
@@ -388,20 +404,20 @@ public final class SsuDashboardScreen extends Screen {
     private List<Module> homeModules(Layout l) {
         java.util.ArrayList<Module> modules = new java.util.ArrayList<>(List.of(
                 new Module("Claims & Land", "Your connected land claims, claim settings, homes and map tools.", ICON_CLAIM, Page.CLAIMS, snapshot.moduleSettings().claims()),
-                new Module("Travel", "All available homes, warps and server destinations.", ICON_PORTAL, Page.TRAVEL, true),
+                new Module("Travel", "All available homes, warps and server destinations.", ICON_TRAVEL, Page.TRAVEL, true),
                 new Module("My Warps", "Rent, place and control the visibility of your personal warps.", ICON_PORTAL, Page.MY_WARPS, snapshot.moduleSettings().warps()),
-                new Module("Wallet", "Balance, payments and your transaction history.", ICON_MARKET, Page.WALLET, snapshot.economy().enabled()),
-                new Module("Mail", "Inbox, sent mail, items and money attachments.", ICON_MARKET, Page.MAIL, snapshot.moduleSettings().mail())
+                new Module("Wallet", "Balance, payments and your transaction history.", ICON_WALLET, Page.WALLET, snapshot.economy().enabled()),
+                new Module("Mail", "Inbox, sent mail, items and money attachments.", ICON_MAIL, Page.MAIL, snapshot.moduleSettings().mail())
         ));
         if (snapshot.auctionHouseDashboardVisible()) {
             modules.add(new Module("Auction House", "Browse, buy and sell player-listed items.", ICON_MARKET, Page.AUCTION_HOUSE, true));
         }
         if (snapshot.moduleSettings().quests()
                 && "menu".equalsIgnoreCase(snapshot.moduleSettings().effectiveQuestAccessMode())) {
-            modules.add(new Module("Questbook", "Available, active and completed quests.", ICON_SETTINGS, Page.QUESTS, true));
+            modules.add(new Module("Questbook", "Available, active and completed quests.", ICON_QUESTBOOK, Page.QUESTS, true));
         }
         if (snapshot.moduleSettings().minigames()) {
-            modules.add(new Module("Minigames", "Queues, arenas and active matches.", ICON_PORTAL, Page.MINIGAMES, true));
+            modules.add(new Module("Minigames", "Queues, arenas and active matches.", ICON_MINIGAMES, Page.MINIGAMES, true));
         }
         if (snapshot.moduleSettings().dungeons()) {
             modules.add(new Module("Dungeons", "Parties, stages, checkpoints and customized dungeon runs.", ICON_SHIELD, Page.DUNGEONS, true));
@@ -823,6 +839,7 @@ public final class SsuDashboardScreen extends Screen {
             };
             String secondary = switch (entry.kind()) {
                 case "warp", "spawn" -> "travel";
+                case "home" -> entry.ownerId().isBlank() ? "" : entry.ownerId() + "|" + entry.claimId();
                 default -> "";
             };
             String value = "home".equals(entry.kind()) ? "travel" : "";
@@ -1043,25 +1060,65 @@ public final class SsuDashboardScreen extends Screen {
                     if (draftRankPlayer.isBlank()) setNotice("Enter a player name or UUID first.", true);
                     else action("rank_reset_player", draftRankPlayer, "", "");
                 }).bounds(l.contentX() + third * 2 + 66, top, 82, 20).build());
-        rankRenameBox = box(l.contentX(), top + 25, Math.max(130, l.contentWidth() - 88),
-                "New name used by the Rename button", draftRankRename, value -> draftRankRename = value);
+        int renameWidth = Math.max(160, (l.contentWidth() - 88) / 2);
+        rankRenameBox = box(l.contentX(), top + 25, renameWidth,
+                "New rank name — then click Rename below", draftRankRename, value -> draftRankRename = value);
         addRenderableWidget(rankRenameBox);
+        int secondaryX = l.contentX() + renameWidth + 6;
+        addRenderableWidget(Button.builder(Component.literal("Title manager"), ignored ->
+                        ClientPacketDistributor.sendToServer(new TitleManagerRequestPayload(true, nextRequestId++)))
+                .bounds(secondaryX, top + 25, 102, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Refresh"), ignored -> requestPage(false))
-                .bounds(l.contentRight() - 82, top + 25, 82, 20).build());
+                .bounds(secondaryX + 108, top + 25, 82, 20).build());
+
+        if (selectedRow >= 0 && selectedRow < pageData.permissions().size()) {
+            var selected = pageData.permissions().get(selectedRow);
+            int advancedY = top + 50;
+            int priorityWidth = 76;
+            rankPriorityBox = box(l.contentX(), advancedY, priorityWidth, "Priority", draftRankPriority,
+                    value -> draftRankPriority = value);
+            rankPriorityBox.setMaxLength(8);
+            addRenderableWidget(rankPriorityBox);
+            addRenderableWidget(Button.builder(Component.literal("Set priority"), ignored ->
+                            action("rank_priority", selected.owner(), "", draftRankPriority))
+                    .bounds(l.contentX() + priorityWidth + 4, advancedY, 72, 20).build());
+            int inheritX = l.contentX() + priorityWidth + 82;
+            int inheritWidth = Math.max(90, l.contentRight() - inheritX - 126);
+            rankInheritanceBox = box(inheritX, advancedY, inheritWidth, "Parent rank", draftRankInheritance,
+                    value -> draftRankInheritance = value);
+            addRenderableWidget(rankInheritanceBox);
+            addRenderableWidget(Button.builder(Component.literal("Inherit"), ignored -> {
+                        if (draftRankInheritance.isBlank()) setNotice("Enter a parent rank first.", true);
+                        else action("rank_inherit", selected.owner(), "", draftRankInheritance);
+                    }).bounds(l.contentRight() - 122, advancedY, 58, 20).build());
+            addRenderableWidget(Button.builder(Component.literal("Remove"), ignored -> {
+                        if (draftRankInheritance.isBlank()) setNotice("Enter a parent rank first.", true);
+                        else action("rank_uninherit", selected.owner(), "", draftRankInheritance);
+                    }).bounds(l.contentRight() - 60, advancedY, 60, 20).build());
+        }
 
         List<SsuMenuPageDataPayload.PermissionEntry> values = pageData.permissions();
         for (int i = 0; i < values.size(); i++) {
-            var entry = values.get(i); int y = rowY(l, i, 84); int right = l.contentRight();
+            var entry = values.get(i); int y = rowY(l, i, 110); int right = l.contentRight(); int row = i;
+            addRenderableWidget(Button.builder(Component.literal("Manage"), ignored -> {
+                        selectedRow = row;
+                        draftRankPriority = entry.value();
+                        draftRankInheritance = "";
+                        rebuildWidgets();
+                    }).bounds(right - 350, y, 58, 20).build());
+            addRenderableWidget(Button.builder(Component.literal("Prefix"), ignored ->
+                            ClientPacketDistributor.sendToServer(new RankDisplayRequestPayload(entry.owner())))
+                    .bounds(right - 288, y, 58, 20).build());
             Button makeDefault = Button.builder(Component.literal("Default"), ignored -> action("rank_default", entry.owner(), "", ""))
-                    .bounds(right - 220, y, 64, 20).build();
+                    .bounds(right - 226, y, 58, 20).build();
             makeDefault.active = !"default".equals(entry.key());
             addRenderableWidget(makeDefault);
             addRenderableWidget(Button.builder(Component.literal("Rename"), ignored -> {
                         if (draftRankRename.isBlank()) setNotice("Enter the new rank name above first.", true);
                         else action("rank_rename", entry.owner(), draftRankRename, "");
-                    }).bounds(right - 152, y, 70, 20).build());
+                    }).bounds(right - 164, y, 68, 20).build());
             Button delete = Button.builder(Component.literal(deleteRankLabel(entry.owner())), ignored -> requestDeleteRank(entry.owner()))
-                    .bounds(right - 78, y, 78, 20).build();
+                    .bounds(right - 92, y, 92, 20).build();
             delete.active = !"default".equals(entry.key()) && !"admin".equalsIgnoreCase(entry.owner());
             addRenderableWidget(delete);
         }
@@ -1524,6 +1581,7 @@ public final class SsuDashboardScreen extends Screen {
         int headerOffset = settingsCategory == SettingsCategory.BORDERS ? 38 : 24;
         int categoryY = l.contentTop() + headerOffset;
         int categoryWidth = Math.min(96, Math.max(78, l.contentWidth() / 4));
+        int categoryStep = l.panelHeight() < 310 ? 20 : 24;
         for (SettingsCategory category : SettingsCategory.values()) {
             Button button = Button.builder(Component.literal(category.label), ignored -> {
                         settingsCategory = category;
@@ -1531,7 +1589,7 @@ public final class SsuDashboardScreen extends Screen {
                     }).bounds(categoryX, categoryY, categoryWidth, 20).build();
             button.active = settingsCategory != category;
             addRenderableWidget(button);
-            categoryY += 24;
+            categoryY += categoryStep;
         }
 
         var s = snapshot.uiSettings();
@@ -1560,6 +1618,29 @@ public final class SsuDashboardScreen extends Screen {
                     debug.active = snapshot.moduleSettings().blockInformation() && s.blockInformationEnabled();
                     addRenderableWidget(debug);
                 }
+            }
+            case IDENTITY -> {
+                addSettingWithTooltip(x, y, w, "Visible title: " + onOff(s.titleVisible()),
+                        "title_visible", !s.titleVisible(),
+                        "Shows your selected title as a separate line above your player name.");
+                addSettingWithTooltip(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w,
+                        "Visible rank prefix: " + onOff(s.rankVisible()),
+                        "rank_visible", !s.rankVisible(),
+                        "Shows your styled rank before your overhead player name.",
+                        "The rank prefix remains visible in chat even when this is OFF.");
+                int row = twoColumns ? 27 : 54;
+                addRenderableWidget(Button.builder(Component.literal("Choose player title"), ignored ->
+                                ClientPacketDistributor.sendToServer(new TitleManagerRequestPayload(false, nextRequestId++)))
+                        .bounds(x, y + row, w, 20).build());
+            }
+            case COMBAT -> {
+                addSettingWithTooltip(x, y, w, "Damage indicators: " + onOff(s.damageIndicatorsEnabled()),
+                        "damage_indicators_enabled", !s.damageIndicatorsEnabled(),
+                        "Shows red damage and green healing values around affected entities.",
+                        "This setting also requires ssu.damage_indicators.use.");
+                addSetting(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w,
+                        "Indicator style: " + indicatorStyleLabel(s.damageIndicatorStyle()),
+                        "damage_indicator_style", nextIndicatorStyle(s.damageIndicatorStyle()));
             }
             case MINIMAP -> {
                 addSetting(x, y, w, "Minimap: " + onOff(s.minimapEnabled()), "minimap_enabled", !s.minimapEnabled());
@@ -1620,7 +1701,7 @@ public final class SsuDashboardScreen extends Screen {
                         "Activation: " + activationLabel(s.treecapitatorActivation()),
                         "treecapitator_activation", nextActivation(s.treecapitatorActivation()));
                 int row = twoColumns ? 27 : 54;
-                addSetting(x, y + row, w, "Tree outline: " + colorHex(s.treecapitatorOutlineColor()),
+                addSetting(x, y + row, w, "Tree outline: " + miningColorName(s.treecapitatorOutlineColor()),
                         "treecapitator_color", colorHex(nextMiningColor(s.treecapitatorOutlineColor())));
                 addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
                         "Tree glow: " + s.treecapitatorOutlineBrightness() + "%",
@@ -1632,7 +1713,7 @@ public final class SsuDashboardScreen extends Screen {
                         "Activation: " + activationLabel(s.veinminerActivation()),
                         "veinminer_activation", nextActivation(s.veinminerActivation()));
                 row += twoColumns ? 27 : 54;
-                addSetting(x, y + row, w, "Vein outline: " + colorHex(s.veinminerOutlineColor()),
+                addSetting(x, y + row, w, "Vein outline: " + miningColorName(s.veinminerOutlineColor()),
                         "veinminer_color", colorHex(nextMiningColor(s.veinminerOutlineColor())));
                 addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
                         "Vein glow: " + s.veinminerOutlineBrightness() + "%",
@@ -1729,25 +1810,33 @@ public final class SsuDashboardScreen extends Screen {
         if (permissionMode.equals("player") && !selectedPermissionTarget.isBlank()) {
             Rect rank = permissionRankBounds(l);
             addRenderableWidget(Button.builder(Component.literal((selectedAssignableRank.isBlank()
-                            ? "Assign rank" : selectedAssignableRank) + " ▾"),
+                            ? "Choose rank" : selectedAssignableRank) + " ▾"),
                             ignored -> togglePermissionDropdown("rank"))
                     .bounds(rank.x(), rank.y(), rank.width(), rank.height()).build());
-            Button assign = Button.builder(Component.literal("Assign"), ignored -> {
-                        if (selectedAssignableRank.isBlank()) {
-                            setNotice("Choose a rank first.", true);
-                        } else {
-                            action("permission_assign_rank", selectedPermissionTarget, "", selectedAssignableRank);
-                        }
-                    }).bounds(l.contentRight() - 58, y + 24, 58, 20).build();
-            assign.active = !selectedAssignableRank.isBlank();
-            addRenderableWidget(assign);
+            Button add = Button.builder(Component.literal("Add"), ignored -> {
+                        if (selectedAssignableRank.isBlank()) setNotice("Choose a rank first.", true);
+                        else action("permission_add_rank", selectedPermissionTarget, "", selectedAssignableRank);
+                    }).bounds(l.contentRight() - 110, y + 24, 52, 20).build();
+            add.active = !selectedAssignableRank.isBlank();
+            addRenderableWidget(add);
+            Button remove = Button.builder(Component.literal("Remove"), ignored -> {
+                        if (selectedAssignableRank.isBlank()) setNotice("Choose a rank first.", true);
+                        else action("permission_remove_rank", selectedPermissionTarget, "", selectedAssignableRank);
+                    }).bounds(l.contentRight() - 54, y + 24, 54, 20).build();
+            remove.active = !selectedAssignableRank.isBlank();
+            addRenderableWidget(remove);
         }
 
-        Rect dimension = permissionDimensionBounds(l);
-        addRenderableWidget(Button.builder(Component.literal("Dimension: " + selectedPermissionDimensionLabel() + " ▾"),
-                        ignored -> togglePermissionDropdown("dimension"))
-                .bounds(dimension.x(), dimension.y(), dimension.width(), dimension.height()).build());
-        int permissionSearchX = dimension.x() + dimension.width() + 6;
+        int permissionSearchX;
+        if (!"claim_role".equals(permissionMode)) {
+            Rect dimension = permissionDimensionBounds(l);
+            addRenderableWidget(Button.builder(Component.literal("Dimension: " + selectedPermissionDimensionLabel() + " ▾"),
+                            ignored -> togglePermissionDropdown("dimension"))
+                    .bounds(dimension.x(), dimension.y(), dimension.width(), dimension.height()).build());
+            permissionSearchX = dimension.x() + dimension.width() + 6;
+        } else {
+            permissionSearchX = l.contentX();
+        }
         permissionSearchBox = box(permissionSearchX, y + 48,
                 Math.max(90, l.contentRight() - permissionSearchX - 66),
                 "Search permission", draftPermissionSearch, value -> draftPermissionSearch = value);
@@ -1762,10 +1851,13 @@ public final class SsuDashboardScreen extends Screen {
             int rowY = listTop + i * PERMISSION_ROW_HEIGHT;
             int resetX = l.contentRight() - 22;
             int checkX = l.contentRight() - 68;
+            boolean immutableClaimOwner = "claim_role".equals(permissionMode) && "owner".equals(selectedPermissionTarget);
             if ("boolean".equals(entry.valueType())) {
                 String label = permissionBooleanLabel(entry);
-                addRenderableWidget(Button.builder(Component.literal(label), ignored -> toggleBooleanPermission(entry))
-                        .bounds(l.contentRight() - 174, rowY + 4, 102, 20).build());
+                Button toggle = Button.builder(Component.literal(label), ignored -> toggleBooleanPermission(entry))
+                        .bounds(l.contentRight() - 174, rowY + 4, 102, 20).build();
+                toggle.active = !immutableClaimOwner;
+                addRenderableWidget(toggle);
             } else {
                 EditBox value = box(l.contentRight() - 214, rowY + 4, 102,
                         "Value", permissionDraftValues.getOrDefault(entry.key(), ""),
@@ -1784,7 +1876,7 @@ public final class SsuDashboardScreen extends Screen {
             addRenderableWidget(check);
             Button reset = Button.builder(Component.literal("×"), ignored -> unsetPermissionValue(entry))
                     .bounds(resetX, rowY + 4, 22, 20).build();
-            reset.active = !entry.directValue().isBlank();
+            reset.active = !immutableClaimOwner && !entry.directValue().isBlank();
             addRenderableWidget(reset);
         }
         addPermissionPagination(l);
@@ -1803,11 +1895,19 @@ public final class SsuDashboardScreen extends Screen {
     }
 
     private String permissionModeLabel() {
-        return "rank".equals(permissionMode) ? "Ranks" : "Players";
+        return switch (permissionMode) {
+            case "rank" -> "Ranks";
+            case "claim_role" -> "Claim roles";
+            default -> "Players";
+        };
     }
 
     private String permissionTargetPrompt() {
-        return "rank".equals(permissionMode) ? "Choose rank" : "Choose player";
+        return switch (permissionMode) {
+            case "rank" -> "Choose rank";
+            case "claim_role" -> "Choose role";
+            default -> "Choose player";
+        };
     }
 
     private String selectedPermissionDimensionLabel() {
@@ -1838,10 +1938,12 @@ public final class SsuDashboardScreen extends Screen {
             setNotice("Choose a permission target first.", true);
             return;
         }
-        boolean dimensionScoped = !selectedPermissionDimension.isBlank();
-        String action = "rank".equals(permissionMode)
-                ? dimensionScoped ? "permission_rank_dimension_set" : "permission_rank_set"
-                : dimensionScoped ? "permission_player_dimension_set" : "permission_player_set";
+        boolean dimensionScoped = !"claim_role".equals(permissionMode) && !selectedPermissionDimension.isBlank();
+        String action = switch (permissionMode) {
+            case "rank" -> dimensionScoped ? "permission_rank_dimension_set" : "permission_rank_set";
+            case "claim_role" -> "permission_claim_context_set";
+            default -> dimensionScoped ? "permission_player_dimension_set" : "permission_player_set";
+        };
         String sentValue = dimensionScoped ? selectedPermissionDimension + "\n" + value : value;
         action(action, selectedPermissionTarget, entry.key(), sentValue);
     }
@@ -1849,10 +1951,12 @@ public final class SsuDashboardScreen extends Screen {
     private void unsetPermissionValue(SsuPermissionEditorDataPayload.PermissionEntry entry) {
         if (selectedPermissionTarget.isBlank()) return;
         permissionDraftValues.remove(entry.key());
-        boolean dimensionScoped = !selectedPermissionDimension.isBlank();
-        String action = "rank".equals(permissionMode)
-                ? dimensionScoped ? "permission_rank_dimension_unset" : "permission_rank_unset"
-                : dimensionScoped ? "permission_player_dimension_unset" : "permission_player_unset";
+        boolean dimensionScoped = !"claim_role".equals(permissionMode) && !selectedPermissionDimension.isBlank();
+        String action = switch (permissionMode) {
+            case "rank" -> dimensionScoped ? "permission_rank_dimension_unset" : "permission_rank_unset";
+            case "claim_role" -> "permission_claim_context_unset";
+            default -> dimensionScoped ? "permission_player_dimension_unset" : "permission_player_unset";
+        };
         action(action, selectedPermissionTarget, entry.key(), dimensionScoped ? selectedPermissionDimension : "");
     }
 
@@ -1904,7 +2008,7 @@ public final class SsuDashboardScreen extends Screen {
     }
 
     private Rect permissionRankBounds(Layout l) {
-        return new Rect(l.contentRight() - 214, l.contentTop() + 28, 150, 20);
+        return new Rect(l.contentRight() - 268, l.contentTop() + 28, 150, 20);
     }
 
     private void addPlayerInfoButtons(Layout l) {
@@ -2004,9 +2108,32 @@ public final class SsuDashboardScreen extends Screen {
         }
         addPagination(l, 106);
     }
-    private void addRentOperationButtons(Layout l) { addListSearch(l); for(int i=0;i<pageData.rentOperations().size();i++){
-        int row=i; addRenderableWidget(Button.builder(Component.literal("Details"), ignored -> select(row))
-                .bounds(l.contentRight()-62,rowY(l,i),62,20).build()); } addPagination(l,0); }
+    private void addRentOperationButtons(Layout l) {
+        int top = l.contentTop() + 2;
+        int half = Math.max(150, (l.contentWidth() - 8) / 2);
+        regionPlayerRefundBox = box(l.contentX(), top + 18, 54, "0-100", draftRegionPlayerRefund,
+                value -> draftRegionPlayerRefund = value);
+        regionPlayerRefundBox.setMaxLength(3);
+        addRenderableWidget(regionPlayerRefundBox);
+        addRenderableWidget(Button.builder(Component.literal("Set player refund"), ignored ->
+                        action("region_rent_refund", "player", "", draftRegionPlayerRefund))
+                .bounds(l.contentX() + 58, top + 18, half - 58, 20).build());
+        int adminX = l.contentX() + half + 8;
+        regionAdminRefundBox = box(adminX, top + 18, 54, "0-100", draftRegionAdminRefund,
+                value -> draftRegionAdminRefund = value);
+        regionAdminRefundBox.setMaxLength(3);
+        addRenderableWidget(regionAdminRefundBox);
+        addRenderableWidget(Button.builder(Component.literal("Set admin refund"), ignored ->
+                        action("region_rent_refund", "admin", "", draftRegionAdminRefund))
+                .bounds(adminX + 58, top + 18, Math.max(72, l.contentRight() - adminX - 58), 20).build());
+        addSearchAt(l, top + 44);
+        for (int i = 0; i < pageData.rentOperations().size(); i++) {
+            int row = i;
+            addRenderableWidget(Button.builder(Component.literal("Details"), ignored -> select(row))
+                    .bounds(l.contentRight() - 62, rowY(l, i, 110), 62, 20).build());
+        }
+        addPagination(l, 0);
+    }
     private void addJobButtons(Layout l) { addListSearch(l); for(int i=0;i<pageData.jobs().size();i++){
         var entry=pageData.jobs().get(i); addRenderableWidget(Button.builder(Component.literal("Cancel"), ignored -> action("job_cancel",entry.id(),"",""))
                 .bounds(l.contentRight()-58,rowY(l,i),58,20).build()); } addPagination(l,0); }
@@ -2016,7 +2143,11 @@ public final class SsuDashboardScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("Reset counters"), ignored -> action("core_reset", "", "", ""))
                 .bounds(l.contentX() + 106, l.contentTop() + 122, 100, 20).build());
     }
-    private void addProfileButtons(Layout l) { }
+    private void addProfileButtons(Layout l) {
+        addRenderableWidget(Button.builder(Component.literal("Choose title"), ignored ->
+                        ClientPacketDistributor.sendToServer(new TitleManagerRequestPayload(false, nextRequestId++)))
+                .bounds(l.contentX(), l.contentTop() + 196, 112, 20).build());
+    }
 
     private void addPagination(Layout l, int offset) {
         int size = Math.max(1, pageData.pageSize());
@@ -2162,7 +2293,7 @@ public final class SsuDashboardScreen extends Screen {
 
     private int pageRequestSize() {
         Layout l = layout();
-        if (page == Page.RANKS) return Math.min(5, rowsThatFit(l, 84));
+        if (page == Page.RANKS) return Math.min(4, rowsThatFit(l, 110));
         if (page == Page.TRAVEL) return Math.min(PAGE_SIZE, rowsThatFit(l, 82));
         if (page == Page.TRAVEL_ADMIN) return Math.min(PAGE_SIZE, rowsThatFit(l, l.contentWidth() < 500 ? 130 : 106));
         if (page == Page.MY_WARPS) return Math.min(PAGE_SIZE, rowsThatFit(l, 86));
@@ -2172,6 +2303,7 @@ public final class SsuDashboardScreen extends Screen {
         if (page == Page.REGION_ADMIN) return Math.min(4, rowsThatFit(l, l.contentWidth() < 440 ? 130 : 105));
         if (page == Page.UTILITY_MINING_ADMIN) return 10;
         if (page == Page.MAINTENANCE) return Math.min(5, rowsThatFit(l, 82));
+        if (page == Page.RENT_OPERATIONS) return Math.min(PAGE_SIZE, rowsThatFit(l, 110));
         return Math.min(PAGE_SIZE, rowsThatFit(l, 58));
     }
 
@@ -2357,6 +2489,8 @@ public final class SsuDashboardScreen extends Screen {
     private void setNotice(String text, boolean error) { notice = text; noticeError = error; rebuildWidgets(); }
     private void syncEconomyDrafts() {
         draftEconomyHistoryLimit = Integer.toString(snapshot.economy().transactionHistoryLimit());
+        draftRegionPlayerRefund = Integer.toString(snapshot.economy().playerCancelRefundPercent());
+        draftRegionAdminRefund = Integer.toString(snapshot.economy().adminCancelRefundPercent());
     }
 
     private void syncAuctionTaxDraft(SsuMenuPageDataPayload payload) {
@@ -2383,14 +2517,15 @@ public final class SsuDashboardScreen extends Screen {
         if (activeAnchor.contains(mouseX, mouseY)) return false;
 
         if (permissionModeDropdownOpen) {
-            Rect list = dropdownListBounds(permissionModeBounds(l), 2);
+            Rect list = dropdownListBounds(permissionModeBounds(l), 3);
             if (list.contains(mouseX, mouseY)) {
                 int index = (int) ((mouseY - list.y()) / 20.0);
-                String nextMode = index == 1 ? "rank" : "player";
+                String nextMode = index == 1 ? "rank" : index == 2 ? "claim_role" : "player";
                 if (!nextMode.equals(permissionMode)) {
                     permissionMode = nextMode;
                     selectedPermissionTarget = "";
                     selectedPermissionLabel = "";
+                    selectedPermissionDimension = "";
                     selectedAssignableRank = "";
                     permissionDraftValues.clear();
                     pageIndex = 0;
@@ -2686,7 +2821,7 @@ public final class SsuDashboardScreen extends Screen {
                 && !permissionDimensionDropdownOpen && !permissionRankDropdownOpen) return;
         g.nextStratum();
         if (permissionModeDropdownOpen) {
-            drawDropdown(g, permissionModeBounds(l), List.of("Players", "Ranks"), mouseX, mouseY);
+            drawDropdown(g, permissionModeBounds(l), List.of("Players", "Ranks", "Claim roles"), mouseX, mouseY);
         } else if (permissionTargetDropdownOpen) {
             List<SsuPermissionEditorDataPayload.TargetEntry> targets = visiblePermissionTargets();
             List<String> labels = targets.stream().map(target -> target.label()
@@ -2948,10 +3083,7 @@ public final class SsuDashboardScreen extends Screen {
             if (hovered) g.blit(RenderPipelines.GUI_TEXTURED, BUTTON_GLOW_TEXTURE, b.x(), b.y(), 0, 0,
                     TILE_SIZE, TILE_SIZE, TILE_SIZE, TILE_SIZE);
             if (!tile.module().enabled()) g.fill(b.x(), b.y(), b.x() + TILE_SIZE, b.y() + TILE_SIZE, 0x85000000);
-            int iw = tile.module().icon().equals(ICON_PLAYERS) ? 32 : 16;
-            int ih = tile.module().icon().equals(ICON_SHIELD) ? 19 : iw;
-            g.blit(RenderPipelines.GUI_TEXTURED, tile.module().icon(), b.x() + (TILE_SIZE - iw) / 2,
-                    b.y() + (TILE_SIZE - ih) / 2, 0, 0, iw, ih, iw, ih);
+            drawModuleTileIcon(g, tile.module().icon(), b);
             center(g, tile.module().label(), b.x() + TILE_SIZE / 2, b.y() + TILE_SIZE + 4,
                     tile.module().enabled() ? TEXT : MUTED);
             if (hovered && snapshot.uiSettings().dashboardHints()) {
@@ -2959,6 +3091,22 @@ public final class SsuDashboardScreen extends Screen {
                         List.of(Component.literal(tile.module().hint())), mouseX, mouseY);
             }
         }
+    }
+
+    private void drawModuleTileIcon(GuiGraphicsExtractor g, Identifier icon, Rect bounds) {
+        int sourceWidth = icon.equals(ICON_PLAYERS) ? 32 : 16;
+        int sourceHeight = icon.equals(ICON_SHIELD) ? 19 : sourceWidth;
+        float scale = sourceWidth >= 32 ? 1.0F : 2.0F;
+        int renderedWidth = Math.round(sourceWidth * scale);
+        int renderedHeight = Math.round(sourceHeight * scale);
+        int x = bounds.x() + (TILE_SIZE - renderedWidth) / 2;
+        int y = bounds.y() + (TILE_SIZE - renderedHeight) / 2;
+        g.pose().pushMatrix();
+        g.pose().translate(x, y);
+        g.pose().scale(scale, scale);
+        g.blit(RenderPipelines.GUI_TEXTURED, icon, 0, 0, 0, 0,
+                sourceWidth, sourceHeight, sourceWidth, sourceHeight);
+        g.pose().popMatrix();
     }
 
     private boolean useTexturedTiles(Layout l) {
@@ -3136,12 +3284,21 @@ public final class SsuDashboardScreen extends Screen {
         if(pageData.locations().isEmpty())empty(g,l,admin?"No server warps or spawn match this filter.":"No available travel destinations match this filter.");
         int offset=admin?(l.contentWidth()<500?130:106):82;
         for(int i=0;i<pageData.locations().size();i++){var e=pageData.locations().get(i);int y=rowTextY(l,i,offset);
-            g.text(font,cap(e.kind())+": "+e.name(),l.contentX(),y,TEXT,false);
+            String shared = "home".equals(e.kind()) && !e.ownerId().isBlank() ? " [shared]" : "";
+            g.text(font,cap(e.kind())+": "+e.name()+shared,l.contentX(),y,TEXT,false);
             if(admin)g.text(font,shortDim(e.dimension())+" | "+pos(e.x(),e.y(),e.z()),l.contentX()+130,y,MUTED,false);}}
-    private void drawRanks(GuiGraphicsExtractor g,Layout l){if(pageData.permissions().isEmpty())empty(g,l,"No ranks on this page.");
-        for(int i=0;i<pageData.permissions().size();i++){var e=pageData.permissions().get(i);int y=rowTextY(l,i,84);
-            g.text(font,e.owner(),l.contentX(),y,"default".equals(e.key())?GOOD:TEXT,false);
-            g.text(font,("default".equals(e.key())?"server default • ":"")+"priority "+e.value()+" • "+e.source(),l.contentX()+100,y,MUTED,false);}}
+    private void drawRanks(GuiGraphicsExtractor g, Layout l) {
+        if (pageData.permissions().isEmpty()) empty(g, l, "No ranks on this page.");
+        String help = selectedRow >= 0 ? "Advanced: set priority or add/remove one inherited parent rank."
+                : "Use Manage to edit priority and inheritance; Rename uses the field above.";
+        g.text(font, help, l.contentX(), l.contentTop() + 98, MUTED, false);
+        for (int i = 0; i < pageData.permissions().size(); i++) {
+            var e = pageData.permissions().get(i); int y = rowTextY(l, i, 110);
+            g.text(font, e.owner(), l.contentX(), y, selectedRow == i ? ACCENT : "default".equals(e.key()) ? GOOD : TEXT, false);
+            g.text(font, ("default".equals(e.key()) ? "server default • " : "") + "priority " + e.value() + " • " + e.source(),
+                    l.contentX() + 100, y, MUTED, false);
+        }
+    }
     private void drawWallet(GuiGraphicsExtractor g, Layout l) {
         g.text(font, "Balance: " + snapshot.economy().formattedBalance(), l.contentX(), l.contentTop(), GOOD, false);
         drawTransactionRows(g, l, 78);
@@ -3341,7 +3498,7 @@ public final class SsuDashboardScreen extends Screen {
 
     private void drawPermissions(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
         if (selectedPermissionTarget.isBlank()) {
-            g.text(font, "Choose a player or rank from the lists above.", l.contentX(), permissionListTop(l) + 8, MUTED, false);
+            g.text(font, "Choose a player, rank or claim role from the lists above.", l.contentX(), permissionListTop(l) + 8, MUTED, false);
             return;
         }
         g.text(font, trim(permissionData.selectedLabel() + " — " + permissionData.targetSummary(), 76),
@@ -3365,10 +3522,25 @@ public final class SsuDashboardScreen extends Screen {
             g.text(font,e.formattedBalance()+" | rev "+e.revision(),l.contentX()+130,y,MUTED,false);}}
     private void drawJobs(GuiGraphicsExtractor g,Layout l){if(pageData.jobs().isEmpty())empty(g,l,"No active jobs.");for(int i=0;i<pageData.jobs().size();i++){var e=pageData.jobs().get(i);int y=rowTextY(l,i);
         String progress=e.progress()<0?"unknown":String.format(Locale.ROOT,"%.1f%%",e.progress()*100);g.text(font,trim(e.description(),40),l.contentX(),y,TEXT,false);g.text(font,progress+" | "+e.operations()+" ops",l.contentX()+220,y,MUTED,false);}}
-    private void drawRentOps(GuiGraphicsExtractor g,Layout l){if(pageData.rentOperations().isEmpty())empty(g,l,"No rent journal records.");for(int i=0;i<pageData.rentOperations().size();i++){var e=pageData.rentOperations().get(i);int y=rowTextY(l,i);
-        g.text(font,e.region()+" | "+e.action(),l.contentX(),y,TEXT,false);g.text(font,e.status(),l.contentX()+170,y,MUTED,false);}
-        if(selectedRow>=0&&selectedRow<pageData.rentOperations().size()){var e=pageData.rentOperations().get(selectedRow);detail(g,l,"Rent operation",
-                List.of("ID: "+e.id(),"Renter: "+blank(e.renter()),"Gross: "+e.grossAmount(),"Refund: "+e.refundAmount(),"Updated: "+time(e.updatedAt()),"Error: "+blank(e.error())));}}
+    private void drawRentOps(GuiGraphicsExtractor g, Layout l) {
+        g.text(font, "Cancellation refunds: player " + snapshot.economy().playerCancelRefundPercent()
+                + "% • administrator " + snapshot.economy().adminCancelRefundPercent() + "%",
+                l.contentX(), l.contentTop() + 3, ACCENT, false);
+        if (pageData.rentOperations().isEmpty()) {
+            g.text(font, "No rent journal records.", l.contentX(), l.contentTop() + 116, MUTED, false);
+        }
+        for (int i = 0; i < pageData.rentOperations().size(); i++) {
+            var e = pageData.rentOperations().get(i); int y = rowTextY(l, i, 110);
+            g.text(font, e.region() + " | " + e.action(), l.contentX(), y, TEXT, false);
+            g.text(font, e.status(), l.contentX() + 170, y, MUTED, false);
+        }
+        if (selectedRow >= 0 && selectedRow < pageData.rentOperations().size()) {
+            var e = pageData.rentOperations().get(selectedRow);
+            detail(g, l, "Rent operation", List.of("ID: " + e.id(), "Renter: " + blank(e.renter()),
+                    "Gross: " + e.grossAmount(), "Refund: " + e.refundAmount(), "Updated: " + time(e.updatedAt()),
+                    "Error: " + blank(e.error())));
+        }
+    }
     private void drawCore(GuiGraphicsExtractor g,Layout l){var c=snapshot.core();int y=l.contentTop()+8;
         String[] lines={"Active jobs: "+snapshot.activeJobs(),"Pending storage writes: "+snapshot.pendingStorageWrites(),
                 "Permission checks: "+c.permissionChecks()+" | cache "+String.format(Locale.ROOT,"%.1f%%",c.permissionCacheHitPermille()/10D),
@@ -3376,10 +3548,14 @@ public final class SsuDashboardScreen extends Screen {
                 "Region index: "+c.regionIndexCells()+" cells | "+c.regionIndexReferences()+" refs",
                 "Modules: storage, jobs, transactions, economy, claims, permissions, homes, warps, spawn, regions, menu"};for(int i=0;i<lines.length;i++)g.text(font,lines[i],l.contentX(),y+i*18,i==5?GOOD:TEXT,false);}
     private void drawProfile(GuiGraphicsExtractor g,Layout l){var c=snapshot.core();int y=l.contentTop()+10;
-        String[] lines={"Player: "+snapshot.playerName(),"Primary rank: "+snapshot.primaryRank(),"Administrator: "+yesNo(snapshot.administrator()),
+        g.text(font,"Player: "+snapshot.playerName(),l.contentX(),y,ACCENT,false);
+        g.text(font,"Selected title: "+blank(snapshot.selectedTitle()),l.contentX(),y+18,snapshot.selectedTitleColor(),false);
+        String[] lines={"Primary rank: "+snapshot.primaryRank(),"Administrator: "+yesNo(snapshot.administrator()),
                 "Claims: "+c.claimCount()+" ("+c.claimedChunkCount()+" chunks)","Homes: "+c.homeCount(),"Warps: "+c.warpCount(),
                 "Active rentals: "+c.activeRentalCount(),"Balance: "+snapshot.economy().formattedBalance(),"Minimap: "+onOff(snapshot.uiSettings().minimapEnabled())};
-        for(int i=0;i<lines.length;i++)g.text(font,lines[i],l.contentX(),y+i*18,i==0?ACCENT:TEXT,false);}
+        for(int i=0;i<lines.length;i++)g.text(font,lines[i],l.contentX(),y+36+i*18,TEXT,false);
+        g.text(font,"Titles are global and can be earned from minigames, ranks, permissions or admin grants.",
+                l.contentX(),y+180,MUTED,false);}
 
     private void detail(GuiGraphicsExtractor g,Layout l,String title,List<String> lines){int w=Math.min(360,l.contentWidth());int x=l.contentRight()-w;int bottom=l.panelBottom()-36;int y=Math.max(l.contentTop()+20,bottom-158);
         g.fill(x,y,l.contentRight(),bottom,0xF0202832);g.outline(x,y,w,bottom-y,ACCENT);g.text(font,title,x+7,y+7,ACCENT,true);
@@ -3394,17 +3570,37 @@ public final class SsuDashboardScreen extends Screen {
     private static String activationLabel(String value) { return "KEYBIND".equals(value) ? "Keybind" : "Crouch"; }
     private static String nextActivation(String value) { return "KEYBIND".equals(value) ? "SNEAK" : "KEYBIND"; }
     private static int nextBrightness(int value) { return value >= 100 ? 25 : Math.min(100, value + 15); }
+    private static String nextIndicatorStyle(String value) {
+        return switch (value == null ? "FLOATING" : value.toUpperCase(Locale.ROOT)) {
+            case "FLOATING" -> "HEARTS";
+            case "HEARTS" -> "COMPACT";
+            case "COMPACT" -> "POP";
+            case "POP" -> "BURST";
+            case "BURST" -> "DROP";
+            default -> "FLOATING";
+        };
+    }
+    private static String indicatorStyleLabel(String value) {
+        return switch (value == null ? "FLOATING" : value.toUpperCase(Locale.ROOT)) {
+            case "HEARTS" -> "Hearts";
+            case "COMPACT" -> "Compact";
+            case "POP" -> "Pop";
+            case "BURST" -> "Burst";
+            case "DROP" -> "Drop";
+            default -> "Floating";
+        };
+    }
     private static int nextMapLiveUpdateRadius(int value) {
         int[] values = {1, 2, 4, 6, 8, 12, 16, 24, 32};
         for (int candidate : values) if (candidate > value) return candidate;
         return values[0];
     }
     private static String colorHex(int color) { return String.format(java.util.Locale.ROOT, "#%06X", color & 0xFFFFFF); }
+    private static String miningColorName(int color) {
+        return MinecraftColorPalette.name(color);
+    }
     private static int nextMiningColor(int current) {
-        int[] colors = {0x55FF77, 0x55AAFF, 0xFFD84D, 0xFF66DD, 0xFFFFFF, 0xFF704D};
-        int rgb = current & 0xFFFFFF;
-        for (int i = 0; i < colors.length; i++) if (colors[i] == rgb) return colors[(i + 1) % colors.length];
-        return colors[0];
+        return MinecraftColorPalette.next(current);
     }
 
     private void center(GuiGraphicsExtractor g,String s,int x,int y,int color){String v=blank(s);g.text(font,v,x-font.width(v)/2,y,color,false);}
@@ -3420,7 +3616,7 @@ public final class SsuDashboardScreen extends Screen {
     @Override public boolean isPauseScreen(){return false;}
 
     private enum SettingsCategory {
-        GENERAL("General"), MINIMAP("Minimap"), WORLD_MAP("World map"), UTILITY_MINING("Mining"), BORDERS("Borders"), MAIL("Mail");
+        GENERAL("General"), IDENTITY("Identity"), COMBAT("Combat"), MINIMAP("Minimap"), WORLD_MAP("World map"), UTILITY_MINING("Mining"), BORDERS("Borders"), MAIL("Mail");
         private final String label;
         SettingsCategory(String label) { this.label = label; }
     }

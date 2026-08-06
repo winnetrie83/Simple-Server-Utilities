@@ -58,6 +58,18 @@ public final class StoragePaths {
         return root.resolve("player_settings");
     }
 
+    public static Path identity(Path root) {
+        return root.resolve("identity");
+    }
+
+    public static Path titleDefinitions(Path root) {
+        return identity(root).resolve("titles.json");
+    }
+
+    public static Path playerIdentities(Path root) {
+        return identity(root).resolve("players");
+    }
+
     public static Path mapMarkers(Path root) {
         return root.resolve("map_markers");
     }
@@ -165,6 +177,18 @@ public final class StoragePaths {
 
     public static Path minigameRecovery(Path root) {
         return minigames(root).resolve("recovery.json");
+    }
+
+    public static Path minigameProgression(Path root) {
+        return minigames(root).resolve("progression.json");
+    }
+
+    public static Path minigameHistory(Path root) {
+        return minigames(root).resolve("history.json");
+    }
+
+    public static Path minigameExports(Path root) {
+        return minigames(root).resolve("exports");
     }
 
     public static Path dungeons(Path root) {

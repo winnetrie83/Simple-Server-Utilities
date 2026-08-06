@@ -2,6 +2,9 @@ package be.winnetrie.mod.simpleserverutilities.protection;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
+import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.ClaimPolicy;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.RegionPolicy;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
@@ -282,7 +285,68 @@ public class ProtectionHelper {
             return true;
         }
 
-        return ClaimPolicy.hasAdminBypass(player) || claim.canBuild(player.getUUID());
+        if (ClaimPolicy.hasAdminBypass(player) || claim.isOwner(player.getUUID())) return true;
+        String permission = switch (action) {
+            case BREAK -> PermissionKeys.CLAIM_CONTEXT_BREAK_BLOCKS;
+            case PLACE -> PermissionKeys.CLAIM_CONTEXT_PLACE_BLOCKS;
+            case INTERACT -> PermissionKeys.CLAIM_CONTEXT_INTERACT_OTHER;
+        };
+        return claimPermission(player, claim, pos, permission, false);
+    }
+
+    public static boolean canOpenClaimContainer(ServerPlayer player, Level level, BlockPos pos) {
+        return canClaimSpecific(player, level, pos, PermissionKeys.CLAIM_CONTEXT_OPEN_CONTAINERS);
+    }
+
+    public static boolean canUseClaimDoor(ServerPlayer player, Level level, BlockPos pos) {
+        return canClaimSpecific(player, level, pos, PermissionKeys.CLAIM_CONTEXT_USE_DOORS);
+    }
+
+    public static boolean canUseClaimSwitch(ServerPlayer player, Level level, BlockPos pos) {
+        return canClaimSpecific(player, level, pos, PermissionKeys.CLAIM_CONTEXT_USE_SWITCHES);
+    }
+
+    public static boolean canModifyClaimNonLiving(ServerPlayer player, Level level, BlockPos pos) {
+        return canClaimSpecific(player, level, pos, PermissionKeys.CLAIM_CONTEXT_MODIFY_NONLIVING);
+    }
+
+    public static boolean canDamageClaimLiving(ServerPlayer player, Level level, BlockPos pos) {
+        return canClaimSpecific(player, level, pos, PermissionKeys.CLAIM_CONTEXT_DAMAGE_LIVING);
+    }
+
+    public static boolean canInteractClaimEntity(ServerPlayer player, Level level, BlockPos pos) {
+        return canClaimSpecific(player, level, pos, PermissionKeys.CLAIM_CONTEXT_INTERACT_ENTITIES);
+    }
+
+    public static boolean canTransferClaimItems(ServerPlayer player, Level level, BlockPos pos) {
+        return canClaimSpecific(player, level, pos, PermissionKeys.CLAIM_CONTEXT_ITEM_TRANSFER);
+    }
+
+    public static boolean canUseClaimHomes(ServerPlayer player, PlayerClaim claim) {
+        if (claim == null) return false;
+        return ClaimPolicy.hasAdminBypass(player) || claim.isOwner(player.getUUID())
+                || claimPermission(player, claim, player.blockPosition(), PermissionKeys.CLAIM_CONTEXT_USE_HOMES, false);
+    }
+
+    private static boolean canClaimSpecific(ServerPlayer player, Level level, BlockPos pos, String permission) {
+        if (getRegionAt(level, pos) != null) return canPlayerInteract(player, level, pos);
+        PlayerClaim claim = getClaimAt(level, pos);
+        if (claim == null) return true;
+        if (ClaimPolicy.hasAdminBypass(player) || claim.isOwner(player.getUUID())) return true;
+        return claimPermission(player, claim, pos, permission, false);
+    }
+
+    private static boolean claimPermission(ServerPlayer player, PlayerClaim claim, BlockPos pos,
+            String permission, boolean fallback) {
+        String role = claim.isCoOwner(player.getUUID()) ? "co_owner"
+                : claim.isTrusted(player.getUUID()) ? "member" : "visitor";
+        String localOverride = claim.getRolePermissionOverride(role, permission);
+        if (localOverride != null) return Boolean.parseBoolean(localOverride);
+        PermissionContext context = PermissionContext.builder(player)
+                .position(pos)
+                .playerClaim(claim)
+                .build();
+        return PermissionService.getBoolean(player, permission, fallback, context);
     }
 
     public static boolean canOwnerlessProjectileHit(Level level, BlockPos pos) {

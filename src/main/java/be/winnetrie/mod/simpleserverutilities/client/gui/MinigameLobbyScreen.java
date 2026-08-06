@@ -57,6 +57,8 @@ public final class MinigameLobbyScreen extends Screen {
                 .bounds(x + 12, y + H - 27, 62, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Close"), ignored -> onClose())
                 .bounds(x + 80, y + H - 27, 50, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Profile"), ignored -> openProfile())
+                .bounds(x + 136, y + H - 27, 58, 20).build());
         MinigameLobbyDataPayload.GameEntry selected = selected();
         if (selected != null) {
             int bx = x + LEFT + 12;
@@ -81,6 +83,12 @@ public final class MinigameLobbyScreen extends Screen {
     private MinigameLobbyDataPayload.GameEntry selected() {
         for (MinigameLobbyDataPayload.GameEntry game : data.games()) if (game.id().equals(selectedId)) return game;
         return data.games().isEmpty() ? null : data.games().getFirst();
+    }
+
+    private void openProfile() {
+        MinigameLobbyDataPayload.GameEntry selected = selected();
+        ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload("profile",
+                selected == null ? "" : selected.id(), preferredRole, nextRequestId++));
     }
 
     private void request(String action, String id) {

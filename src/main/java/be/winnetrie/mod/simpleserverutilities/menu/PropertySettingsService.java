@@ -79,7 +79,7 @@ public final class PropertySettingsService {
         entries.add(editable(bool("allow_ownerless_projectiles", "Ownerless projectiles", s.isAllowOwnerlessProjectiles(), false, "Allows projectiles without a known owner to affect the claim."), canEditFlags));
         entries.add(editable(bool("allow_fire_spread", "Allow fire spread", s.isAllowFireSpread(), false, "Allows fire to spread and burn blocks inside this claim."), canEditFlags));
         entries.add(editable(text("welcome_message", "Welcome message", claim.getWelcomeMessage(), "", "Message shown when a player enters the claim."), owner));
-        entries.add(editable(navigate("trusted_players", "Trusted players (" + claim.getTrustedPlayers().size() + ")", "Manage",
+        entries.add(editable(navigate("trusted_players", "Claim access (" + claim.getTrustedPlayers().size() + ")", "Manage",
                 "Open the dedicated trusted-player manager for this claim."), canTrust));
         int homesInClaim = ClaimHomeSupport.homesInClaim(player.getUUID(), claim).size();
         int maxHomes = HomePolicy.getMaxHomes(player);

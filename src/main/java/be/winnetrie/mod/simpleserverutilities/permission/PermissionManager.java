@@ -251,6 +251,11 @@ public class PermissionManager {
         return Map.copyOf(merged);
     }
 
+    /** Returns the player's direct ranks, or the configured default rank when none are assigned. */
+    public List<String> getAssignedRankNames(UUID playerId) {
+        return List.copyOf(assignedRankNames(playerId));
+    }
+
     private ArrayList<String> assignedRankNames(UUID playerId) {
         ArrayList<String> rankNames = new ArrayList<>();
         PlayerPermissionData playerData = getPlayerData(playerId);
@@ -1102,6 +1107,11 @@ public class PermissionManager {
         changed |= ensurePlayerClaimContextScope("member");
         changed |= ensurePlayerClaimContextScope("visitor");
         changed |= ensurePlayerClaimContextScope("none");
+        changed |= ensureDefaultClaimRolePermissions("owner", true);
+        changed |= ensureDefaultClaimRolePermissions("co_owner", true);
+        changed |= ensureDefaultClaimRolePermissions("member", true);
+        changed |= ensureDefaultClaimRolePermissions("visitor", false);
+        changed |= ensureDefaultClaimRolePermissions("none", false);
 
         return changed;
     }
@@ -1113,6 +1123,29 @@ public class PermissionManager {
 
         data.getPlayerClaimContext().put(roleName, new PermissionScope());
         return true;
+    }
+
+    private boolean ensureDefaultClaimRolePermissions(String roleName, boolean allow) {
+        PermissionScope scope = getOrCreatePlayerClaimContextScope(roleName);
+        boolean changed = false;
+        for (String key : List.of(
+                PermissionKeys.CLAIM_CONTEXT_BREAK_BLOCKS,
+                PermissionKeys.CLAIM_CONTEXT_PLACE_BLOCKS,
+                PermissionKeys.CLAIM_CONTEXT_MODIFY_NONLIVING,
+                PermissionKeys.CLAIM_CONTEXT_OPEN_CONTAINERS,
+                PermissionKeys.CLAIM_CONTEXT_USE_DOORS,
+                PermissionKeys.CLAIM_CONTEXT_USE_SWITCHES,
+                PermissionKeys.CLAIM_CONTEXT_ITEM_TRANSFER,
+                PermissionKeys.CLAIM_CONTEXT_USE_HOMES,
+                PermissionKeys.CLAIM_CONTEXT_DAMAGE_LIVING,
+                PermissionKeys.CLAIM_CONTEXT_INTERACT_ENTITIES,
+                PermissionKeys.CLAIM_CONTEXT_INTERACT_OTHER)) {
+            if (!scope.getPermissions().containsKey(key)) {
+                scope.setPermission(key, Boolean.toString(allow));
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     private boolean fillDefaultRank(PermissionRank rank) {

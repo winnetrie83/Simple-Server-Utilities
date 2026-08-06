@@ -54,8 +54,7 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
                 if (claimLayer) {
                     renderClaimRibbon(entry, camX, camY, camZ, frustum, renderDistance);
                 } else {
-                    renderRegionBoxes(entry, camX, camY, camZ, frustum, renderDistance, renderDistanceSquared);
-                    renderStaticEdges(entry, camX, camY, camZ, renderDistance);
+                    renderRegionStyleEntry(entry, camX, camY, camZ, frustum, renderDistance);
                 }
             }
         }
@@ -110,6 +109,20 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
             line(lowStart, highStart, entry, false);
             line(lowEnd, highEnd, entry, false);
         }
+    }
+
+    /** Renders one box/edge entry with the exact depth, clipping and fill rules used by region borders. */
+    public static void renderRegionStyleEntry(
+            BorderVisualizationPayload.Entry entry,
+            double camX,
+            double camY,
+            double camZ,
+            Frustum frustum,
+            double renderDistance
+    ) {
+        double safeDistance = Math.max(8.0D, renderDistance);
+        renderRegionBoxes(entry, camX, camY, camZ, frustum, safeDistance, safeDistance * safeDistance);
+        renderStaticEdges(entry, camX, camY, camZ, safeDistance);
     }
 
     private static void renderRegionBoxes(

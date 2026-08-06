@@ -3,6 +3,7 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.function.IntSupplier;
+import java.util.function.IntUnaryOperator;
 import java.util.function.Supplier;
 
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText;
@@ -43,8 +44,23 @@ public final class RichTextEditBoxRenderer {
             IntSupplier baseColor,
             Component placeholder
     ) {
+        register(box, document, baseColor,
+                index -> 0xFF000000 | HologramRichText.minecraftColorRgb(index), placeholder);
+    }
+
+    /** Registers a rich-text field with a feature-specific fixed sixteen-colour palette. */
+    public static void register(
+            MultiLineEditBox box,
+            Supplier<HologramRichTextDocument> document,
+            IntSupplier baseColor,
+            IntUnaryOperator paletteColor,
+            Component placeholder
+    ) {
         if (box == null || document == null || baseColor == null) return;
-        REGISTRATIONS.put(box, new Registration(document, baseColor,
+        IntUnaryOperator resolvedPalette = paletteColor == null
+                ? index -> 0xFF000000 | HologramRichText.minecraftColorRgb(index)
+                : paletteColor;
+        REGISTRATIONS.put(box, new Registration(document, baseColor, resolvedPalette,
                 placeholder == null ? Component.empty() : placeholder));
     }
 
@@ -98,13 +114,14 @@ public final class RichTextEditBoxRenderer {
             int y = contentTop + lineNumber * LINE_HEIGHT;
             if (y + LINE_HEIGHT >= clipTop && y <= clipBottom) {
                 drawSelection(graphics, minecraft, document, lineStart, lineEnd,
-                        selectionStart, selectionEnd, innerLeft, y, defaultColor);
-                MutableComponent component = component(document, lineStart, lineEnd, defaultColor);
+                        selectionStart, selectionEnd, innerLeft, y, defaultColor, registration.paletteColor());
+                MutableComponent component = component(document, lineStart, lineEnd, defaultColor,
+                        registration.paletteColor());
                 graphics.text(minecraft.font, component.getVisualOrderText(), innerLeft, y, defaultColor, false);
                 if (box.isFocused() && cursor == anchor && cursor >= lineStart && cursor <= lineEnd
                         && cursorVisible()) {
                     int cursorX = innerLeft + minecraft.font.width(
-                            component(document, lineStart, cursor, defaultColor));
+                            component(document, lineStart, cursor, defaultColor, registration.paletteColor()));
                     graphics.fill(cursorX, y - 1, cursorX + 1, y + LINE_HEIGHT, CURSOR_COLOR);
                 }
             }
@@ -126,13 +143,14 @@ public final class RichTextEditBoxRenderer {
             int selectionEnd,
             int x,
             int y,
-            int defaultColor
+            int defaultColor,
+            IntUnaryOperator paletteColor
     ) {
         int from = Math.max(lineStart, selectionStart);
         int to = Math.min(lineEnd, selectionEnd);
         if (from >= to) return;
-        int left = x + minecraft.font.width(component(document, lineStart, from, defaultColor));
-        int right = left + minecraft.font.width(component(document, from, to, defaultColor));
+        int left = x + minecraft.font.width(component(document, lineStart, from, defaultColor, paletteColor));
+        int right = left + minecraft.font.width(component(document, from, to, defaultColor, paletteColor));
         graphics.fill(left, y - 1, Math.max(left + 1, right), y + LINE_HEIGHT, SELECTION_COLOR);
     }
 
@@ -155,11 +173,22 @@ public final class RichTextEditBoxRenderer {
             int end,
             int baseColor
     ) {
+        return component(document, start, end, baseColor,
+                index -> 0xFF000000 | HologramRichText.minecraftColorRgb(index));
+    }
+
+    public static MutableComponent component(
+            HologramRichTextDocument document,
+            int start,
+            int end,
+            int baseColor,
+            IntUnaryOperator paletteColor
+    ) {
         MutableComponent result = Component.empty();
         for (Segment segment : document.segments(start, end)) {
             CharacterStyle richStyle = segment.style();
             int resolvedColor = richStyle.colorIndex() >= 0
-                    ? 0xFF000000 | HologramRichText.minecraftColorRgb(richStyle.colorIndex())
+                    ? normalizeColor(paletteColor.applyAsInt(richStyle.colorIndex()))
                     : normalizeColor(baseColor);
             result.append(Component.literal(segment.text()).withStyle(style -> style
                     .withColor(resolvedColor & 0xFFFFFF)
@@ -182,6 +211,7 @@ public final class RichTextEditBoxRenderer {
     private record Registration(
             Supplier<HologramRichTextDocument> document,
             IntSupplier baseColor,
+            IntUnaryOperator paletteColor,
             Component placeholder
     ) {
     }

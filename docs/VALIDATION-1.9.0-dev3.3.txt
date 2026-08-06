@@ -1,0 +1,77 @@
+SSU 1.9.0-dev3.3 validation report
+==================================
+
+Base: SSU 1.9.0-dev3.2.1
+Target version: 1.9.0-dev3.3
+Network protocol: 88
+Minigame definition schema: 18
+Minigame recovery schema: 4
+Minigame progression schema: 3
+Match-history schema: 1
+Player UI preference schema: 11
+Title catalogue schema: 1
+Player identity schema: 1
+
+Implemented scope
+-----------------
+- Tank Defensive Field/AOE now uses the vanilla lightning-bolt impact sound without spawning lightning.
+- Global title catalogue and per-player title selection moved to the normal Profile.
+- Administrator title creation/editing/enablement/deletion and acquisition rules.
+- Fixed 16-colour title palette.
+- Rich multi-colour/B/I/U/S rank-prefix editor based on the Mail/Floating Text document model.
+- Styled primary-rank prefixes before normal player names in overhead nameplates and server chat.
+- Personal overhead title/rank visibility settings.
+- Damage/healing indicators with Floating, Hearts and Compact styles.
+- Permission `ssu.damage_indicators.use`, default fallback true.
+
+Static/source checks
+--------------------
+- Java source files scanned: 633.
+- Whole-source Java parser scan: PASS; zero parser/syntax diagnostics.
+  The expected unresolved external-package diagnostics remain because Minecraft/NeoForge dependencies
+  are unavailable without the Gradle environment.
+- JSON files parsed: 15; all valid.
+- Source invariant checks: 86/86 PASS.
+- Exact fixed colour names/order: PASS.
+- Version/protocol/schema invariants: PASS.
+- Tank lightning-impact sound invariant: PASS.
+- Minigame Profile title-selector removal/redirect: PASS.
+- Title acquisition types Free/Minigame Level/Minigame Wins/Rank/Permission/Manual: PASS.
+- Title administration actions Save/Toggle/Delete/Grant/Revoke: PASS.
+- Player Settings actions and GUI controls for title, rank and damage indicators: PASS.
+- Damage-indicator permission registration and default-true runtime fallback: PASS.
+- Three display styles and red/green render invariants: PASS.
+- New network payload registrations and client handlers: PASS.
+- Chat/nameplate/title renderer integration invariants: PASS.
+- Identity storage/lifecycle registration: PASS.
+- No stray generated .args files: PASS.
+
+Focused compile/harness checks
+------------------------------
+- Pure title/palette/player-preference harness: PASS (`DEV33_PURE_HARNESS_OK`).
+  Covered exact palette order, nearest-colour normalization, six migrated defaults, intentional empty
+  catalogue persistence, title ID/colour normalization, no-title identity state, default visibility,
+  default damage-indicator enablement and the three-style cycle.
+- DamageIndicatorEvents compiled against focused NeoForge/Minecraft API stubs: PASS.
+- IdentityEvents/ServerChatEvent bridge compiled against focused API stubs: PASS.
+- IdentityClientEvents/RenderNameTagEvent.CanRender bridge compiled against focused API stubs: PASS.
+- LivingDamageEvent.Post uses the current `getNewDamage()` post-reduction API; obsolete
+  `getInflictedDamage()` is absent: PASS.
+- Periodic identity synchronization no longer rewrites every online player's JSON file unless the
+  identity record actually changed: PASS.
+
+Storage/migration safeguards
+----------------------------
+- Original six minigame titles are installed only when the title catalogue is first created.
+- Existing selected minigame titles migrate into global player identity data on first load.
+- Administrators' later catalogue edits/deletions remain authoritative across restart.
+- Existing UI preferences migrate from schema 10 to 11 with title/rank/damage visibility enabled and
+  Floating damage indicators as the safe defaults.
+- Existing rank data remains compatible because the new rich prefix is an optional bounded field.
+
+Full build limitation
+---------------------
+The Gradle build could not start in this container. Gradle 9.2.1 is not cached and the wrapper cannot
+resolve services.gradle.org (`UnknownHostException`). The container provides Java 21 while the project
+targets Java 25. A local Java 25 `gradlew.bat clean build` and real client/dedicated-server runtime test
+remain required before dev3.3 can be considered build-confirmed or stable.

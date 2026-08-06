@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 
 /** Server-only live match state. Definitions remain immutable while a match runs. */
@@ -23,6 +24,30 @@ public final class MinigameMatch {
     /** Player -> ability ID -> next server tick at which it may be used. */
     public final Map<UUID, Map<String, Long>> roleCooldowns = new LinkedHashMap<>();
     public final Map<UUID, Long> scores = new LinkedHashMap<>();
+    /** Rich per-match performance statistics used by results, quests and balancing. */
+    public final Map<UUID, MinigamePerformance> performance = new LinkedHashMap<>();
+    /** Victim -> attacker -> recent contribution for assist attribution. */
+    public final Map<UUID, Map<UUID, DamageContribution>> recentDamage = new LinkedHashMap<>();
+    /** Last meaningful input/movement tick for AFK detection. */
+    public final Map<UUID, Long> lastActivityTicks = new LinkedHashMap<>();
+    public final Map<UUID, MinigameLocation> lastActivityLocations = new LinkedHashMap<>();
+    public final Set<UUID> afkWarned = new LinkedHashSet<>();
+    /** Temporary disconnect grace without surrendering the match slot. */
+    public final Map<UUID, DisconnectedParticipant> disconnected = new LinkedHashMap<>();
+    /** rematch / next / leave post-game votes. */
+    public final Map<UUID, String> postGameVotes = new LinkedHashMap<>();
+    public boolean overtime;
+    public long overtimeCompletesTick;
+    public boolean resultsPublished;
+    /** Preview values are computed at POST_GAME; definitive settlement happens only after rewards commit. */
+    public final Map<UUID, Integer> experienceGained = new LinkedHashMap<>();
+    public final Map<UUID, Integer> priorLevels = new LinkedHashMap<>();
+    public final Map<UUID, Integer> resultingLevels = new LinkedHashMap<>();
+    /** Progression/history files were flushed and verified after reward delivery. */
+    public boolean experienceSettlementDurable;
+    /** Non-persisted events/statistics were emitted at most once in this server session. */
+    public boolean experienceSideEffectsPublished;
+    public String postGameDecision = "leave";
     public final Set<UUID> eliminated = new LinkedHashSet<>();
     /** CTF/Domination players temporarily spectating until their delayed respawn. */
     public final Map<UUID, PendingRespawn> pendingRespawns = new LinkedHashMap<>();
@@ -53,6 +78,8 @@ public final class MinigameMatch {
     public final Map<UUID, DominationCast> dominationCasts = new LinkedHashMap<>();
     /** Node ID -> delayed ownership transfer after a completed cast. */
     public final Map<String, DominationClaim> dominationClaims = new LinkedHashMap<>();
+    /** Node ID -> player who completed the claim cast, retained until ownership transfers. */
+    public final Map<String, UUID> dominationClaimers = new LinkedHashMap<>();
     public final Map<Integer, Integer> dominationScores = new LinkedHashMap<>();
     public boolean dominationInitialized;
     public long dominationLastScoreTick;
@@ -74,6 +101,8 @@ public final class MinigameMatch {
     public boolean boostsInitialized;
     public final Map<UUID, MinigameLocation> returnLocations = new LinkedHashMap<>();
     public final Map<UUID, MinigamePlayerState> playerStates = new LinkedHashMap<>();
+    /** Exact server-owned inventory/equipment layout captured for immutable match loadouts. */
+    public final Map<UUID, LockedInventory> lockedInventories = new LinkedHashMap<>();
     public final java.util.List<UUID> joinOrder = new java.util.ArrayList<>();
     /** Per-team cursor used to cycle through optional team spawns from a randomized start/order. */
     public final Map<Integer, Integer> teamSpawnCursors = new LinkedHashMap<>();
@@ -101,8 +130,36 @@ public final class MinigameMatch {
     public int team(UUID player) { return teams.getOrDefault(player, 0); }
     public MinigameRole role(UUID player) { return roles.getOrDefault(player, MinigameRole.DPS); }
     public long score(UUID player) { return scores.getOrDefault(player, 0L); }
+    public MinigamePerformance performance(UUID player) {
+        return performance.computeIfAbsent(player, ignored -> new MinigamePerformance());
+    }
     public boolean active(UUID player) {
         return teams.containsKey(player) && !eliminated.contains(player) && !pendingRespawns.containsKey(player);
+    }
+
+    public static final class LockedInventory {
+        public final List<ItemStack> inventory;
+        public final Map<EquipmentSlot, ItemStack> equipment;
+
+        public LockedInventory(List<ItemStack> inventory, Map<EquipmentSlot, ItemStack> equipment) {
+            ArrayList<ItemStack> inventoryCopy = new ArrayList<>();
+            if (inventory != null) for (ItemStack stack : inventory) {
+                inventoryCopy.add(stack == null ? ItemStack.EMPTY : stack.copy());
+            }
+            this.inventory = List.copyOf(inventoryCopy);
+            LinkedHashMap<EquipmentSlot, ItemStack> equipmentCopy = new LinkedHashMap<>();
+            if (equipment != null) for (Map.Entry<EquipmentSlot, ItemStack> entry : equipment.entrySet()) {
+                if (entry.getKey() != null) equipmentCopy.put(entry.getKey(),
+                        entry.getValue() == null ? ItemStack.EMPTY : entry.getValue().copy());
+            }
+            this.equipment = Map.copyOf(equipmentCopy);
+        }
+    }
+
+    public record DamageContribution(long amountHundredths, long lastHitTick) {
+    }
+
+    public record DisconnectedParticipant(long disconnectedTick, long expiresTick) {
     }
 
     public static final class PendingRespawn {

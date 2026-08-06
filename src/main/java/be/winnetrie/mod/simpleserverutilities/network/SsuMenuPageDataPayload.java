@@ -108,12 +108,13 @@ public record SsuMenuPageDataPayload(
         for (LocationEntry v : values) {
             b.writeUtf(v.kind, 16); b.writeUtf(v.name, 64); b.writeUtf(v.dimension, 128);
             b.writeDouble(v.x); b.writeDouble(v.y); b.writeDouble(v.z);
+            b.writeUtf(v.ownerId, 64); b.writeUtf(v.claimId, 64);
         }
     }
     private static List<LocationEntry> readLocations(RegistryFriendlyByteBuf b) {
         int n=size(b,"locations"); List<LocationEntry> r=new ArrayList<>(n);
         for(int i=0;i<n;i++) r.add(new LocationEntry(b.readUtf(16), b.readUtf(64), b.readUtf(128),
-                b.readDouble(), b.readDouble(), b.readDouble()));
+                b.readDouble(), b.readDouble(), b.readDouble(), b.readUtf(64), b.readUtf(64)));
         return r;
     }
 
@@ -214,8 +215,12 @@ public record SsuMenuPageDataPayload(
             boolean borderVisible,String spawn,String trustedPlayers,String flags){
         public ClaimEntry{ id=PayloadBounds.string(id,64);name=PayloadBounds.string(name,64);dimension=PayloadBounds.string(dimension,128);chunkCount=Math.max(0,chunkCount);
             trustedCount=Math.max(0,trustedCount);spawn=PayloadBounds.string(spawn,128);trustedPlayers=PayloadBounds.string(trustedPlayers,512);flags=PayloadBounds.string(flags,256);}}
-    public record LocationEntry(String kind,String name,String dimension,double x,double y,double z){
-        public LocationEntry{kind=PayloadBounds.string(kind,16);name=PayloadBounds.string(name,64);dimension=PayloadBounds.string(dimension,128);}}
+    public record LocationEntry(String kind,String name,String dimension,double x,double y,double z,String ownerId,String claimId){
+        public LocationEntry(String kind, String name, String dimension, double x, double y, double z) {
+            this(kind, name, dimension, x, y, z, "", "");
+        }
+        public LocationEntry{kind=PayloadBounds.string(kind,16);name=PayloadBounds.string(name,64);dimension=PayloadBounds.string(dimension,128);
+            ownerId=PayloadBounds.string(ownerId,64);claimId=PayloadBounds.string(claimId,64);}}
     public record RegionEntry(String name,String dimension,String bounds,boolean visible,boolean rented,boolean rentable,
             boolean rentedByPlayer,String formattedPrice,String periodText,String renterName,String remainingText,
             int managerCount,int memberCount,String managers,String members,String flags,String rentPolicy,int priority,long volume,

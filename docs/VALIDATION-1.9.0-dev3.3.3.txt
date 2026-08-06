@@ -1,0 +1,44 @@
+Simple Server Utilities 1.9.0-dev3.3.3 — source validation
+
+Base:
+- SSU 1.9.0-dev3.3.2
+
+Version state:
+- Mod version: 1.9.0-dev3.3.3
+- Network protocol: 88 (unchanged; no binary payload layout changed)
+- Minigame definition schema: 19
+- Minigame recovery schema: 4
+- Minigame progression schema: 3
+- Minigame match-history schema: 1
+- Player UI preference schema: 11
+- Title catalogue schema: 1
+- Player Identity schema: 1
+
+Implemented source changes:
+- Damage indicators are approximately twice their previous scale.
+- Indicator opacity stays at full strength for most of the 1.7-second lifetime.
+- Added POP and BURST styles; Settings now cycles all five styles.
+- Local-player title rendering is suppressed.
+- Remote title position uses Entity#getPosition(partialTicks).
+- Minigame definitions now default to lockInventory=true.
+- CTF, Domination, Spleef and Generic editors expose an Inventory lock toggle.
+- Exact inventory/equipment snapshots are captured for preparation and live loadouts.
+- Server-side enforcement runs every realtime tick in COUNTDOWN and RUNNING.
+- Inventory slots, armor, offhand and carried cursor state are repaired without retaining moved duplicates.
+- CTF carrier head banners are explicitly exempt from the generic helmet restore and remain managed by CTF visual logic.
+
+Validation performed:
+- 633 Java source files passed delimiter/string/comment lexical integrity scanning.
+- A javac source parser sweep across all Java files produced dependency-resolution diagnostics only; no Java syntax diagnostics were found.
+- 15 JSON files parsed successfully.
+- 30/30 targeted source invariants passed.
+- DamageIndicatorStyle, DamageIndicatorClientState, DamageIndicatorRenderer and PlayerTitleRenderer compiled against focused API stubs.
+- MinigameMatch, including the new locked-inventory snapshot type, compiled against focused API stubs.
+- Confirmed Minecraft/NeoForge API names used by the patch: Entity#getPosition(float), AbstractContainerMenu#getCarried() and setCarried(ItemStack).
+
+Not performed in this environment:
+- Full Gradle/NeoForge compilation. The container has Java 21 while the project requires Java 25, and Gradle 9.2.1 is not locally cached.
+- Minecraft client or dedicated-server runtime testing.
+
+Required local command:
+  gradlew.bat clean build

@@ -6,8 +6,10 @@ import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorRequestPaylo
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupToolConfigurePayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameScoreActionPayload;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
@@ -25,6 +27,10 @@ public final class MinigameAdminScreen extends Screen {
     private String selectedId = "";
     private long nextRequestId = 1L;
     private boolean awaiting;
+    private EditBox scorePlayerBox;
+    private EditBox scoreAmountBox;
+    private String draftScorePlayer = "";
+    private String draftScoreAmount = "1";
 
     public MinigameAdminScreen(MinigameLobbyDataPayload data, Screen parent) {
         super(Component.literal("Minigame Administration"));
@@ -53,6 +59,8 @@ public final class MinigameAdminScreen extends Screen {
                                 "give_tool", selectedId, "",
                                 "arena_bounds", 1, 0, nextRequestId++)))
                 .bounds(x + W - 92, y + 12, 80, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("System health"), ignored -> request("diagnostics", ""))
+                .bounds(x + W - 184, y + 12, 88, 20).build());
 
         var selected = selected();
         if (selected == null) return;
@@ -69,6 +77,26 @@ public final class MinigameAdminScreen extends Screen {
         restore.active = selected.blockedArenas() > 0;
         addRenderableWidget(Button.builder(Component.literal("Delete"), ignored -> request("delete", selected.id()))
                 .bounds(bx + 276, actionY, 48, 20).build());
+
+        int scoreY = y + H - 55;
+        scorePlayerBox = new EditBox(font, bx, scoreY, 112, 20, Component.literal("Player"));
+        scorePlayerBox.setHint(Component.literal("Online player"));
+        scorePlayerBox.setMaxLength(64);
+        scorePlayerBox.setValue(draftScorePlayer);
+        scorePlayerBox.setResponder(value -> draftScorePlayer = value);
+        addRenderableWidget(scorePlayerBox);
+        scoreAmountBox = new EditBox(font, bx + 117, scoreY, 62, 20, Component.literal("Amount"));
+        scoreAmountBox.setHint(Component.literal("Score"));
+        scoreAmountBox.setMaxLength(18);
+        scoreAmountBox.setValue(draftScoreAmount);
+        scoreAmountBox.setResponder(value -> draftScoreAmount = value);
+        addRenderableWidget(scoreAmountBox);
+        Button addScore = addRenderableWidget(Button.builder(Component.literal("Add score"), ignored -> submitScore("add"))
+                .bounds(bx + 184, scoreY, 66, 20).build());
+        Button setScore = addRenderableWidget(Button.builder(Component.literal("Set score"), ignored -> submitScore("set"))
+                .bounds(bx + 255, scoreY, 69, 20).build());
+        addScore.active = selected.runningMatches() > 0;
+        setScore.active = selected.runningMatches() > 0;
     }
 
 
@@ -81,6 +109,18 @@ public final class MinigameAdminScreen extends Screen {
         if (awaiting) return;
         awaiting = true;
         ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, id, nextRequestId++));
+        rebuildWidgets();
+    }
+
+    private void submitScore(String mode) {
+        if (awaiting) return;
+        if (draftScorePlayer == null || draftScorePlayer.isBlank()) return;
+        final long amount;
+        try { amount = Long.parseLong(draftScoreAmount == null ? "" : draftScoreAmount.trim()); }
+        catch (NumberFormatException exception) { return; }
+        awaiting = true;
+        ClientPacketDistributor.sendToServer(new MinigameScoreActionPayload(
+                mode, draftScorePlayer.trim(), amount, nextRequestId++));
         rebuildWidgets();
     }
 
@@ -124,7 +164,11 @@ public final class MinigameAdminScreen extends Screen {
             g.text(font, "No minigames configured.", x + LEFT + 12, y + 52, MUTED, false);
             g.text(font, "Use the Setup Tool to select bounds and create Spleef, CTF or Domination.",
                     x + LEFT + 12, y + 70, MUTED, false);
-        } else drawGame(g, game, x + LEFT + 12, y + 46);
+        } else {
+            drawGame(g, game, x + LEFT + 12, y + 46);
+            g.text(font, game.runningMatches() > 0 ? "Live score correction" : "Live score correction (no active match)",
+                    x + LEFT + 12, y + H - 67, game.runningMatches() > 0 ? ACCENT : MUTED, false);
+        }
         String notice = awaiting ? "Processing…" : data.notice();
         if (!notice.isBlank()) {
             List<FormattedCharSequence> lines = font.split(Component.literal(notice), LEFT - 24);

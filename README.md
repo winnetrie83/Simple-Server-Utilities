@@ -1,3 +1,280 @@
+## Current development build: 1.9.0-dev3.6.4
+
+### Team-specific CTF and Domination capture sounds
+
+- A completed CTF flag score plays the vanilla Ponder goat horn only for the scoring team.
+- The opposing CTF team hears a beacon-deactivation loss cue instead of another horn.
+- A completed Domination base capture uses the same Ponder celebration for the capturing team and the loss cue for every opposing player.
+- Claim-start, flag-theft and defense sounds are unchanged.
+- Network protocol remains `91`; all schemas remain unchanged.
+
+Version state:
+
+- Network protocol: `91`
+- Player Claim storage schema: `3`
+- Region storage schema: `5`
+- Portable selection snapshot format: `1`
+- Minigame definition schema: `19`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `11`
+- Title catalogue schema: `1`
+- Player identity schema: `1`
+
+## Previous development build: 1.9.0-dev3.6.3
+
+### Region Setup Tool polish and world-visible snapshot placement
+
+- Removes the duplicate region-creation button from the `All regions` page. Region creation remains available from the dedicated Selection workflow.
+- Updates `Save full snapshot` immediately while the name is typed and shows live name validation.
+- Reflows the Full snapshots page so fields, buttons, validation feedback and explanatory text do not overlap.
+- Replaces the large in-menu ghost-preview editor with compact transparent controls rendered over the world.
+- Adds preview movement on all three axes, rotation, mirroring, explicit placement confirmation and explicit cancellation.
+- Adds `Free mode`: the preview stays fixed while the administrator walks or flies around it. Left-click returns to edit controls.
+- Blocks normal world actions, inventory containers, item pickup/drop and commands while a preview session is active.
+- Clears preview state safely after placement, cancellation, logout, death or dimension change.
+- Network protocol remains `91`; all schemas remain unchanged.
+
+Version state:
+
+- Network protocol: `91`
+- Player Claim storage schema: `3`
+- Region storage schema: `5`
+- Portable selection snapshot format: `1`
+- Minigame definition schema: `19`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `11`
+- Title catalogue schema: `1`
+- Player identity schema: `1`
+
+## Current development build: 1.9.0-dev3.6.2
+
+### Compact Region Setup Tool and region selection toggle
+
+- Uses a compact 690×400 Region Setup panel and reflows all six pages.
+- Keeps labels and controls in separate layout areas to avoid overlap.
+- Adds `Select region` / `Unselect region` to copy exact region bounds into the active Region Tool selection.
+- Network protocol remains `91`; all schemas remain unchanged.
+
+## Current development build: 1.9.0-dev3.6.1
+
+### Compile hotfix
+
+- Fixes the claim-role Permission Editor lambda capture in `SsuMenuService`.
+- Removes stale `operationCount()` overrides from selection snapshot jobs.
+- Network protocol remains `91`; all schemas remain unchanged.
+
+### Unified Region Setup, remote editing and snapshot previews
+
+- The Region Setup Tool no longer duplicates point-selection buttons. Administrators mark both corners directly in the world with the bound Region Tool.
+- A permanent `All regions` tab lists every editable region, identifies the region at the player's current position and allows remote editing or safe teleportation.
+- `Teleport to region` uses the configured region spawn when available and otherwise searches for a safe destination inside or immediately above the region.
+- The integrated Selection tab can create a region from the current selection, clear it to air, fill it with water/lava or fill it from a weighted mix of inventory block items. Unused percentage becomes air.
+- Full portable selection snapshots preserve blocks, container/block-entity data and structural entities. Snapshots are stored separately from scheduled region-reset snapshots.
+- Loading a full selection snapshot first creates a translucent ghost preview five blocks in front of the administrator. It can be translated along X/Y/Z, rotated or mirrored before placement is confirmed.
+- Preview packets are sampled and bounded for safety; confirmation still places the complete snapshot through the bounded SSU job scheduler and existing cuboid/region resource locks.
+
+Version state:
+
+- Network protocol: `91`
+- Player Claim storage schema: `3`
+- Region storage schema: `5`
+- Portable selection snapshot format: `1`
+- Minigame definition schema: `19`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `11`
+- Title catalogue schema: `1`
+- Player identity schema: `1`
+
+## Current development build: 1.9.0-dev3.5
+
+### GUI completion, advanced ranks and Player Claim access roles
+
+- Adds GUI controls for rank priority and rank inheritance to Rank Management.
+- Changes the player Permission Editor from destructive single-rank assignment to explicit Add/Remove controls, allowing multiple simultaneous ranks per player.
+- Adds a server-wide Claim roles mode to the Permission Editor for Owner, Co-owner, Member, Visitor and no-claim contexts.
+- Expands Claim Settings > Claim access > Manage into one place for assigning Members/Co-owners and configuring per-claim role permission overrides. Owner always has full control and remains the only role that can open Claim Settings.
+- Adds contextual Player Claim permissions for block break/place, non-living entity modification, containers, doors/trapdoors/fence gates, buttons/levers/pressure plates, item pickup/drop, claim-home use, living-entity damage and living-entity interaction.
+- Makes homes linked to a claim available as read-only travel destinations when the player's assigned role allows it. Visitors may use them only while physically inside that claim and when explicitly allowed.
+- Adds Region Rental cancellation refund percentages to the Rent Journal GUI for player cancellations and administrator cancellations.
+- Adds live minigame score Add/Set controls to Minigame Administration.
+- Raises the network protocol to `90` for the expanded dashboard and Claim access payloads.
+- Raises the Player Claim storage schema to `3`; legacy trusted players migrate safely to the Member role.
+
+Version state:
+
+- Network protocol: `90`
+- Player Claim storage schema: `3`
+- Region storage schema: `5`
+- Minigame definition schema: `19`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `11`
+- Title catalogue schema: `1`
+- Player identity schema: `1`
+
+## Current development build: 1.9.0-dev3.4
+
+### Region Setup Tool and scheduled region restoration
+
+- Removes punctuation decorations from Pop and Burst damage indicators. Every damage/healing style now shows only the signed value, except Hearts which retains its heart symbol.
+- Adds a sixth Damage Indicator style, `Drop`: the number originates tightly from the affected entity, pops upward briefly and then falls under a gravity-like curve.
+- Right-clicking the bound Region Tool now opens one server-authoritative Region Setup Tool. Standing inside an editable region opens its full editor; otherwise the same screen guides point selection and region creation.
+- The Region Setup Tool exposes general settings, all existing protection flags, contextual permission overrides, rental/access settings, region spawn/border/messages, redefine/delete controls and scheduled restoration.
+- Adds scheduled region resets with a configurable interval, optional wait-until-empty policy and either a saved region snapshot or a weighted block preset as source.
+- Weighted reset presets are assembled by clicking up to six block items or water/lava buckets in the player's inventory. Percentages may total up to 100%; any remainder becomes air.
+- Scheduled and manual resets run through the bounded SSU job system, respect region/minigame/rental recovery locks and avoid unsafe container drops during preset fills.
+- Region creation validates all submitted values before persisting the new region, preventing partially created regions after invalid rent or preset input.
+
+Version state:
+
+- Network protocol: `89`
+- Region storage schema: `5`
+- Minigame definition schema: `19`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `11`
+- Title catalogue schema: `1`
+- Player identity schema: `1`
+
+## Current development build: 1.9.0-dev3.3.3
+
+### Damage indicators, smooth titles and universal match inventory locking
+
+- Damage/healing indicators are approximately twice as large and stay fully opaque for most of their lifetime.
+- Settings > Combat now offers five display styles: Floating, Hearts, Compact, Pop and Burst.
+- The local player never sees their own selected title above themselves. Remote titles use partial-tick interpolation and move smoothly with their player entity.
+- Match inventory locking is now a definition-level rule that defaults to enabled for every minigame. The CTF, Domination, Spleef and Generic editors expose an `Inventory lock` toggle for explicit exceptions.
+- When inventory locking is enabled, SSU restores the exact server-owned inventory, armor and offhand layout every tick and clears cursor-carried duplicates. A carried CTF flag remains an intentional temporary helmet replacement.
+
+Version state:
+
+- Network protocol: `88`
+- Minigame definition schema: `19`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `11`
+- Title catalogue schema: `1`
+- Player identity schema: `1`
+
+## Current development build: 1.9.0-dev3.3
+
+### Global player identity and combat feedback
+
+- The Tank Defensive Field now uses the vanilla lightning impact sound.
+- Titles are global player-profile cosmetics rather than Minigame Profile selections. The server title catalogue supports the fixed sixteen Minecraft colours and acquisition by free access, minigame level/wins, rank, permission or manual administrator grants.
+- Players can independently show/hide their selected title and styled rank prefix above their name from Settings > Identity.
+- Rank Management includes a rich prefix editor with multi-colour text plus Bold, Italic, Underline and Strikethrough. Rank prefixes appear before the standard player name in nameplates and chat.
+- Settings > Combat now contains personal damage-indicator enablement and Floating, Hearts or Compact styles. Damage is red, healing is green, and `ssu.damage_indicators.use` defaults to allowed.
+
+Version state:
+
+- Network protocol: `88`
+- Minigame definition schema: `18`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `11`
+- Title catalogue schema: `1`
+- Player identity schema: `1`
+
+## Current development build: 1.9.0-dev3.2.1
+
+### Minigame manager API compile hotfix
+
+- Restores the public runtime methods accidentally removed from `MinigameManager` while the Ready system was deleted.
+- Repairs the unresolved calls used by `TeleportPolicy`, `MinigameEvents`, `MinigameCommands` and internal Spleef/disconnect handling.
+- Restored methods: `matchView`, `finishMatch`, `addScore`, `setScore`, `eliminate`, `onPlayerDeath`, `onPlayerRespawn` and `onLogin`.
+- The Ready/Unready system remains removed; preparation-time-only match startup from dev3.2 is unchanged.
+
+Version state:
+
+- Network protocol: `87`
+- Minigame definition schema: `18`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `10`
+
+## Current development build: 1.9.0-dev3.2
+
+### Minigame progression, preparation and match-overview polish
+
+- Makes all three weekly minigame challenges configurable per definition, including enable/disable, required progress and XP rewards.
+- Removes the complete Ready/Unready flow. COUNTDOWN is now solely the configured preparation time and starts automatically when it expires.
+- Shows a large synchronized `10` through `1` preparation countdown with one sound per second, followed by `GO!`.
+- Keeps important cancellation and match-end reasons visible longer and also writes them to chat.
+- Replaces the normal `U` dashboard while participating in a match with a detailed live match overview and confirmed Leave match action.
+- Fixes the Minigame Profile Victory effect label/button overlap.
+- Expands Treecapitator and Veinminer outline selection to the fixed sixteen-colour Minecraft palette: White, Light Gray, Gray, Black, Brown, Red, Orange, Yellow, Lime, Green, Cyan, Light Blue, Blue, Purple, Magenta and Pink.
+
+Version state:
+
+- Network protocol: `87`
+- Minigame definition schema: `18`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `10`
+
+## Current development build: 1.9.0-dev3.1
+
+### MVP validator, boosts, borders and dashboard polish
+
+- Removes Arena Validator false positives for external lobby/spectator areas and temporary End Rod boost markers.
+- Adds reliable Tank radial knockback and configurable Regeneration Boost health-per-second balancing.
+- Rebuilds the CTF/Domination Boosts tabs into a compact, non-overlapping layout.
+- Labels every Match Flow and Progression & Integration numeric field.
+- Makes Minigame/Spectator border visibility affect both runtime and Setup Tool overlays.
+- Uses readable Treecapitator/Veinminer color names, changes the minigame HUD keybind to `J`, and installs the supplied Questbook and My Warps icons.
+
+Version state:
+
+- Network protocol: `86`
+- Minigame definition schema: `17`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `9`
+
+## Current development build: 1.9.0-dev3.0.2
+
+### Reward, border and compact-GUI update
+
+- Repairs missing escrow only for idempotent server-generated SYSTEM, MINIGAME and RECOVERY money attachments, fixing valid reward claims that could report `Insufficient funds` without weakening player/Auction House escrow guarantees.
+- Routes game and spectator bounds through the exact region-border renderer, including clipping, configurable colors, translucent fill and live-match visibility toggles.
+- Reduces the Mailbox and Auction House maximum dimensions by approximately 25% while keeping both centered.
+- Adds the supplied claim-land, travel, wallet, mail and minigame dashboard textures and renders dashboard tile icons at approximately twice their former size.
+- Network protocol remains `85`; Minigame definition schema remains `16`; recovery schema remains `4`; progression schema remains `3`; match-history schema remains `1`; Player UI preference schema remains `9`.
+
+## Current development build: 1.9.0-dev3.0
+
+### Minigame Experience Update
+
+- Detailed match results, kill/objective feed, compact/expanded/hidden HUD modes, reconnect grace, AFK handling, ready checks, overtime, voting and spectator navigation.
+- Rating- and preferred-role-aware team balancing within every configured role minimum and maximum.
+- Cosmetic-only progression with XP, levels, ratings, badges, titles, victory effects and weekly challenges.
+- Arena validation, issue teleporting, safe cloning, JSON export/import and Minigame System Health diagnostics.
+- Shared safe ability components plus integrations with existing quests/events, custom statistics, holograms, mail and configured minigame rewards.
+- Rewards settle first. Progression/history then commit through a bounded idempotency ledger and a verified two-file storage barrier before players are returned. Summary mail is retried with correlation-based duplicate protection.
+
+Version state:
+
+- Network protocol: `85`
+- Minigame definition schema: `16`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `9`
+
 ## Current development build: 1.9.0-dev2.9.3.1
 
 ### Minecraft 26.2 Tank knockback compile hotfix (1.9.0-dev2.9.3.1)

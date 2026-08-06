@@ -18,16 +18,27 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.util.TriState;
 import net.minecraft.world.level.block.SignBlock;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.CommandEvent;
+import net.neoforged.neoforge.event.entity.item.ItemTossEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
+import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
 
 public class RegionInteractionEvents {
 
     private static final Map<UUID, String> LAST_REGION = new HashMap<>();
     private static long nextEnterLeaveTick = 0L;
+    private static long nextResetTick = 0L;
 
     private RegionInteractionEvents() {
     }
@@ -36,12 +47,40 @@ public class RegionInteractionEvents {
         LAST_REGION.clear();
         RegionSelectionSchematicManager.clearRuntimeState();
         nextEnterLeaveTick = 0L;
+        nextResetTick = 0L;
+        RegionResetScheduler.clearRuntime();
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPreviewRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || !RegionSetupToolService.hasActivePreview(player)) return;
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.FAIL);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPreviewRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || !RegionSetupToolService.hasActivePreview(player)) return;
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.FAIL);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPreviewLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || !RegionSetupToolService.hasActivePreview(player)) return;
+        event.setCanceled(true);
     }
 
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        if (RegionSetupToolService.hasActivePreview(player)) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.FAIL);
             return;
         }
 
@@ -54,11 +93,7 @@ public class RegionInteractionEvents {
                 return;
             }
 
-            if (!RegionSelectionToolService.open(player)) {
-                player.sendSystemMessage(Component.literal(
-                        "Set both region points with left-click first, then right-click to open selection actions."
-                ), true);
-            }
+            RegionSetupToolService.openContext(player);
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.SUCCESS);
             return;
@@ -93,17 +128,18 @@ public class RegionInteractionEvents {
     @SubscribeEvent
     public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
         if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
-        if (!(event.getEntity() instanceof ServerPlayer player)
-                || event.getHand() != InteractionHand.MAIN_HAND
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (RegionSetupToolService.hasActivePreview(player)) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.FAIL);
+            return;
+        }
+        if (event.getHand() != InteractionHand.MAIN_HAND
                 || !SimpleServerUtilities.REGION_SELECTION_TOOLS.isBoundTool(player, player.getMainHandItem())
                 || !RegionPolicy.canUseSelectionTool(player)) {
             return;
         }
-        if (!RegionSelectionToolService.open(player)) {
-            player.sendSystemMessage(Component.literal(
-                    "Set both region points with left-click first, then right-click to open selection actions."
-            ), true);
-        }
+        RegionSetupToolService.openContext(player);
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
     }
@@ -113,6 +149,10 @@ public class RegionInteractionEvents {
         if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
         if (event.getAction() != PlayerInteractEvent.LeftClickBlock.Action.START) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+        if (RegionSetupToolService.hasActivePreview(player)) {
+            event.setCanceled(true);
             return;
         }
 
@@ -144,23 +184,95 @@ public class RegionInteractionEvents {
         event.setCanceled(true);
     }
 
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPreviewEntityInteract(PlayerInteractEvent.EntityInteract event) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || !RegionSetupToolService.hasActivePreview(player)) return;
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.FAIL);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPreviewEntityInteractSpecific(PlayerInteractEvent.EntityInteractSpecific event) {
+        if (!(event.getEntity() instanceof ServerPlayer player) || !RegionSetupToolService.hasActivePreview(player)) return;
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.FAIL);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPreviewAttack(AttackEntityEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player && RegionSetupToolService.hasActivePreview(player)) event.setCanceled(true);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPreviewDamage(LivingIncomingDamageEvent event) {
+        if (event.getSource().getEntity() instanceof ServerPlayer player && RegionSetupToolService.hasActivePreview(player)) event.setCanceled(true);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPreviewBreak(BreakBlockEvent event) {
+        if (event.getPlayer() instanceof ServerPlayer player && RegionSetupToolService.hasActivePreview(player)) event.setCanceled(true);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPreviewToss(ItemTossEvent event) {
+        if (!(event.getPlayer() instanceof ServerPlayer player) || !RegionSetupToolService.hasActivePreview(player)) return;
+        ItemStack stack = event.getEntity().getItem().copy();
+        if (!stack.isEmpty() && player.getInventory().add(stack)) {
+            player.getInventory().setChanged();
+            player.containerMenu.broadcastChanges();
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPreviewPickup(ItemEntityPickupEvent.Pre event) {
+        if (event.getPlayer() instanceof ServerPlayer player && RegionSetupToolService.hasActivePreview(player)) event.setCanPickup(TriState.FALSE);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPreviewCommand(CommandEvent event) {
+        if (event.getParseResults().getContext().getSource().getEntity() instanceof ServerPlayer player
+                && RegionSetupToolService.hasActivePreview(player)) {
+            event.setCanceled(true);
+            player.sendSystemMessage(Component.literal("Commands are disabled while a snapshot preview is active."), true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onPreviewDimensionChange(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) RegionSetupToolService.cancelPreview(player, "Snapshot preview cancelled after changing dimension.");
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPreviewDeath(LivingDeathEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) RegionSetupToolService.cancelPreview(player, "Snapshot preview cancelled because you died.");
+    }
+
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         RegionCommands.getSelectionManager().clear(player);
         RegionSelectionSchematicManager.clearClipboard(player.getUUID());
+        RegionSetupToolService.clearPreview(player.getUUID());
         LAST_REGION.remove(player.getUUID());
     }
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
         MinecraftServer server = event.getServer();
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (RegionSetupToolService.hasActivePreview(player) && player.containerMenu != player.inventoryMenu) player.closeContainer();
+        }
+        if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
         long tick = server.getTickCount();
 
         if (tick >= nextEnterLeaveTick) {
             nextEnterLeaveTick = tick + 10L;
             updateRegionMessages(server);
+        }
+        if (tick >= nextResetTick) {
+            nextResetTick = tick + 20L;
+            RegionResetScheduler.tick(server);
         }
     }
 

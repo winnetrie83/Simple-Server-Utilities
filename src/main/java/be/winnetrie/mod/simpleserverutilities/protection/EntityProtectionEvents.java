@@ -5,6 +5,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -35,9 +37,10 @@ public class EntityProtectionEvents {
             return;
         }
 
-        if (ProtectionHelper.canPlayerInteract(player, player.level(), target.blockPosition())) {
-            return;
-        }
+        boolean allowed = target instanceof LivingEntity && !(target instanceof ArmorStand)
+                ? ProtectionHelper.canDamageClaimLiving(player, player.level(), target.blockPosition())
+                : ProtectionHelper.canModifyClaimNonLiving(player, player.level(), target.blockPosition());
+        if (allowed) return;
 
         event.setCanceled(true);
         player.sendSystemMessage(Component.literal("You cannot damage entities here."));
@@ -64,9 +67,10 @@ public class EntityProtectionEvents {
             return;
         }
 
-        if (ProtectionHelper.canPlayerInteract(player, player.level(), target.blockPosition())) {
-            return;
-        }
+        boolean allowed = target instanceof ArmorStand
+                ? ProtectionHelper.canModifyClaimNonLiving(player, player.level(), target.blockPosition())
+                : ProtectionHelper.canDamageClaimLiving(player, player.level(), target.blockPosition());
+        if (allowed) return;
 
         event.setCanceled(true);
         player.sendSystemMessage(Component.literal("You cannot damage entities here."));
@@ -79,9 +83,10 @@ public class EntityProtectionEvents {
         }
         if (SimpleServerUtilities.NPCS.isManagedEntity(event.getTarget().getUUID())) return;
 
-        if (ProtectionHelper.canPlayerInteract(player, player.level(), event.getTarget().blockPosition())) {
-            return;
-        }
+        boolean allowed = event.getTarget() instanceof LivingEntity && !(event.getTarget() instanceof ArmorStand)
+                ? ProtectionHelper.canInteractClaimEntity(player, player.level(), event.getTarget().blockPosition())
+                : ProtectionHelper.canModifyClaimNonLiving(player, player.level(), event.getTarget().blockPosition());
+        if (allowed) return;
 
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.FAIL);
@@ -113,9 +118,10 @@ public class EntityProtectionEvents {
                 return;
             }
 
-            if (ProtectionHelper.canPlayerInteract(player, player.level(), hitEntity.blockPosition())) {
-                return;
-            }
+            boolean allowed = hitEntity instanceof LivingEntity && !(hitEntity instanceof ArmorStand)
+                    ? ProtectionHelper.canDamageClaimLiving(player, player.level(), hitEntity.blockPosition())
+                    : ProtectionHelper.canModifyClaimNonLiving(player, player.level(), hitEntity.blockPosition());
+            if (allowed) return;
 
             event.setCanceled(true);
             return;

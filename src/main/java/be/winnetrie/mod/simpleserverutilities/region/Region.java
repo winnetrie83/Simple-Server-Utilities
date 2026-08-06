@@ -30,6 +30,7 @@ public class Region {
 
     private final RegionSettings settings = new RegionSettings();
     private final RegionRentData rentData = new RegionRentData();
+    private final RegionResetSettings resetSettings = new RegionResetSettings();
 
     /**
      * Optional permission overrides for this specific region.
@@ -142,6 +143,10 @@ public class Region {
 
     public RegionRentData getRentData() {
         return rentData;
+    }
+
+    public RegionResetSettings getResetSettings() {
+        return resetSettings;
     }
 
     public String getWelcomeMessage() {

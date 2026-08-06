@@ -1,0 +1,30 @@
+SSU 1.9.0-dev3.6.2 validation report
+
+Scope
+- UI/selection feature update built directly on SSU 1.9.0-dev3.6.1.
+- Network protocol and all storage/schema versions remain unchanged.
+
+Changes verified
+1. RegionSetupScreen logical panel reduced from 840x480 to 690x400.
+2. All six Region Setup pages were relaid out for the compact panel.
+3. Main tabs, footer controls, labels, status text and notices have dedicated non-overlapping positions.
+4. Reset and Selection weighted mixes use a compact two-column, three-row editor for all six entries.
+5. Snapshot pages show five rows and region pages show six rows to preserve spacing.
+6. Existing region General pages expose Select region / Unselect region.
+7. The server copies exact region min/max bounds and dimension into the active RegionSelection.
+8. Selecting immediately enables the selection border; unselecting clears points and hides the border.
+9. Remote regions use the same server-authoritative selection action.
+
+Static validation
+- 648 Java source files passed delimiter/string/comment lexical integrity checks.
+- All 15 JSON files parsed successfully.
+- RegionSetupScreen compiled against the focused Minecraft/NeoForge GUI API stubs.
+- RegionSetupToolService compiled against the focused server/region/network API stubs.
+- Source invariants confirmed the compact dimensions, new action name, exact bounds assignment, border show/hide and unchanged protocol/schema versions.
+- ZIP integrity test passed.
+
+Full build status
+- A complete Gradle/NeoForge build could not be started in the container.
+- Gradle 9.2.1 is not cached and services.gradle.org is unreachable (UnknownHostException).
+- The container provides Java 21 while SSU requires Java 25.
+- Run gradlew.bat clean build locally with Java 25.

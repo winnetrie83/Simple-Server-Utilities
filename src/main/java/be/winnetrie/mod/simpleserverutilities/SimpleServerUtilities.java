@@ -42,6 +42,10 @@ import be.winnetrie.mod.simpleserverutilities.hologram.HologramModule;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramToolManager;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramToolEvents;
 import be.winnetrie.mod.simpleserverutilities.home.PlayerHomeManager;
+import be.winnetrie.mod.simpleserverutilities.identity.DamageIndicatorEvents;
+import be.winnetrie.mod.simpleserverutilities.identity.IdentityEvents;
+import be.winnetrie.mod.simpleserverutilities.identity.IdentityModule;
+import be.winnetrie.mod.simpleserverutilities.identity.PlayerIdentityManager;
 import be.winnetrie.mod.simpleserverutilities.home.HomeModule;
 import be.winnetrie.mod.simpleserverutilities.menu.SsuMenuService;
 import be.winnetrie.mod.simpleserverutilities.mail.MailEvents;
@@ -167,6 +171,7 @@ public class SimpleServerUtilities {
     public static final BorderVisualizationService BORDER_VISUALIZATIONS = new BorderVisualizationService();
     public static final SsuMenuService MENUS = new SsuMenuService();
     public static final PlayerUiPreferencesManager UI_PREFERENCES = new PlayerUiPreferencesManager();
+    public static final PlayerIdentityManager IDENTITY = new PlayerIdentityManager();
     public static final UtilityMiningManager UTILITY_MINING = new UtilityMiningManager();
     public static final PlacedTreeBlockTracker TREE_PLACEMENTS = new PlacedTreeBlockTracker();
     public static final HologramManager HOLOGRAMS = new HologramManager();
@@ -217,6 +222,7 @@ public class SimpleServerUtilities {
         CORE.modules().register(new NpcShopModule(NPC_SHOPS));
         CORE.modules().register(new QuestModule(QUESTS));
         CORE.modules().register(new MinigameModule(MINIGAMES));
+        CORE.modules().register(new IdentityModule(IDENTITY));
         CORE.modules().register(new DungeonModule(DUNGEONS));
         CORE.modules().register(new BlockInformationModule());
         CORE.initialize();
@@ -255,6 +261,8 @@ public class SimpleServerUtilities {
         NeoForge.EVENT_BUS.register(QuestGameplayEvents.class);
         NeoForge.EVENT_BUS.register(MinigameEvents.class);
         NeoForge.EVENT_BUS.register(MinigameSetupToolEvents.class);
+        NeoForge.EVENT_BUS.register(IdentityEvents.class);
+        NeoForge.EVENT_BUS.register(DamageIndicatorEvents.class);
         NeoForge.EVENT_BUS.register(DungeonEvents.class);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);

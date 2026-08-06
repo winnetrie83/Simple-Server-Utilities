@@ -1,0 +1,34 @@
+SSU 1.9.0-dev3.0 validation summary
+====================================
+
+Release constants
+-----------------
+- Mod version: 1.9.0-dev3.0
+- Network protocol: 85
+- Minigame definition schema: 16
+- Minigame recovery schema: 4
+- Minigame progression schema: 3
+- Minigame match-history schema: 1
+- Player UI preference schema: 9
+
+Transaction and retry checks
+----------------------------
+- The post-game result screen uses a non-mutating XP/level preview.
+- Configured participation/winner rewards are committed before progression settlement.
+- Progression, ratings, weekly challenges and match history use a bounded match UUID settlement ledger.
+- Cleanup pauses until both progression and history files have been flushed and byte-verified.
+- Match-summary mail is sent only after durable settlement and uses a stable correlation key for retry deduplication.
+- Post-settlement statistics and level-up events are guarded against duplicate publication in the same live cleanup.
+
+Automated checks completed
+--------------------------
+- 604 Java source files scanned for merge markers and duplicate imports.
+- 15 JSON files parsed successfully.
+- Pure-Java minigame ability, progression and match-history classes compiled with javac.
+- Progression preview/commit and settlement-ledger harness passed.
+- Critical reward-before-settlement, durable-storage, mail-ordering, protocol and schema invariants passed.
+- Release ZIP integrity tested after packaging.
+
+Unavailable check
+-----------------
+A full Gradle/NeoForge compile could not be run in the container. Gradle 9.2.1 is not cached locally and the wrapper cannot reach services.gradle.org. The project also targets Java 25, while the container runtime is older. Build the source locally with the project's required Java and Gradle environment before publishing.
