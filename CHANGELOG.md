@@ -1,3 +1,285 @@
+# Simple Server Utilities 1.9.0-dev3.16
+
+## King of the Hill v2
+
+- Every KOTH arena now explicitly uses exactly one objective mode: `STATIC` or `ROTATING`. The mode is stored per arena, so different arenas of the same KOTH minigame may use different modes while the existing arena-rotation system remains responsible for choosing the next arena.
+- **STATIC** uses a persistent tug-of-war control bar: 40% red territory, 20% neutral white territory and 40% blue territory. A yellow control marker moves toward the team with the greater live presence inside the hill. The HUD shows the movement direction. Once the marker enters a team's coloured 40% section, that team starts receiving score until the marker is pushed back into neutral or the opposite side.
+- Static control movement is deliberately slower than the original instant-control implementation. `Neutral push (sec)` controls the approximate time for a one-player advantage to move the marker from the centre to the edge of the neutral section.
+- **ROTATING** has no control bar. The Setup Tool supports up to 16 authored hill points; an arena requires at least two. The team with the stronger current presence on the active hill scores, ties score nothing. `Rotate every (sec)` and `Warning (sec)` control relocation timing.
+- The active rotating point advances sequentially and broadcasts a warning before moving. Arena rotation and hill-point rotation remain separate systems.
+- Added a dedicated live KOTH HUD with both team scores, score target, current presence, clear `YOU ARE INSIDE THE HILL` feedback, static control bar/direction, or rotating point/countdown state. Players no longer need to open the match overview to see live KOTH scoring.
+- Added a translucent in-world KOTH half-dome. It is white while neutral, changes to the controlling/scoring team's configured colour, previews in setup, and follows the currently active rotating hill point.
+- The KOTH Setup Tool now places a visible white physical banner at static/rotating hill centres while editing. KOTH team spawn setup banners now use the nearest vanilla banner colour to the configured team colour instead of the generic yellow banner.
+- KOTH setup supports a hill-point slot selector for rotating arenas. Existing v20 KOTH arenas load as `STATIC` by default.
+- KOTH editor input fields now have explicit visible labels and units. Arena pages can cycle through existing arenas, allowing each arena to choose its own STATIC/ROTATING mode.
+- The detailed in-match game overview has been reduced from 720x430 to 576x344 logical pixels (about 20% smaller) and its layout was compacted accordingly.
+
+## Compatibility
+
+- Network protocol increases from `99` to `100` for the new KOTH dome visual payload.
+- Minigame definition schema increases from `20` to `21` for per-arena KOTH mode and rotating hill points.
+- NPC definition schema remains `9`; Mine schema remains `3`; physical Jail schema remains `2`; Server Operations schema remains `3`; all other persistence schemas are unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.15.4
+
+## Jail community-reward hotfix
+
+- Fixed the prisoner who completed a community task sentence being included in the recipient pool for the resulting community-reward mail and item distribution.
+- The completing prisoner is now always excluded from community contribution recipients, even if they qualify as a recently active player.
+- If no other recently active players qualify, no community reward mail/items are generated; the punishment still completes and the prisoner is released normally.
+- No protocol or persistence schema changes.
+
+# Simple Server Utilities 1.9.0-dev3.15.3
+
+## Jail task mining hotfix
+
+- Fixed jailed task prisoners only being able to physically remove Mine blocks that were still needed by the punishment task.
+- While a prisoner has an active task punishment, is inside the configured Jail Task Area, and has both `ssu.mines.use` and the Mine-specific permission, **every block inside an overlapping Mine can now be mined and stays removed until the Mine resets**.
+- Only block types configured in the punishment requirements advance Jail task progress; unrelated Mine blocks are removed normally for the Mine but do not count toward the sentence.
+- Blocks whose required quota is already complete may still be mined from the overlapping Mine, but no additional punishment progress is awarded.
+- Jail-task Mine breaks continue to produce **no physical block drops**, regardless of the Mine's normal drop mode.
+- Mine mined-block statistics are updated for every Mine block physically removed by the prisoner.
+- Physical AIR replacement now succeeds before Mine statistics or Jail task progress are committed.
+- Outside an overlapping Mine, the dedicated Jail Task Area remains requirement-only as before.
+- No protocol or persistence schema changes.
+
+# Simple Server Utilities 1.9.0-dev3.15.2
+
+Compile hotfix on top of dev3.15.1.
+
+- Fixed `MinigameSetupToolService#setHillCenter`: added the missing local `locationInsideRegion(MinigameLocation, Region, double)` helper used to validate that a King of the Hill center lies inside its arena Region.
+- The helper intentionally matches the existing `MinigameManager` containment semantics, including dimension validation and optional vertical margin.
+- Network protocol remains 99; NPC schema remains 9; Minigame definition schema remains 20; no persistence or gameplay format changes.
+
+## Previous: 1.9.0-dev3.15.1
+
+# Simple Server Utilities 1.9.0-dev3.15.1
+
+Compile hotfix on top of dev3.15.
+
+- Fixed `MinigameManager#tickObjectiveTime` for King of the Hill: arena lookup now uses the existing `arena(MinigameDefinition, String)` helper with the active match arena ID.
+- Removed the invalid `MinigameLocation#configured()` call for the KOTH hill center; `MinigameLocation` has no such API and KOTH arena validation already requires a valid hill-center location.
+- Network protocol remains 99; NPC schema remains 9; Minigame definition schema remains 20; no persistence or gameplay format changes.
+
+## Previous: 1.9.0-dev3.15
+
+## NPC redesign
+- Reorganizes the NPC editor around clear Identity, Appearance, Interaction, Behavior, Relations, Stats, Loadout, Schedule and Respawn pages while retaining the existing definition/placement persistence model. Existing schema-8 NPCs migrate in place.
+- Merchant NPCs now expose a direct NPC-managed shop workflow. `Create NPC shop`/`Edit NPC shop` opens the Shop Editor as a child of the NPC editor; technical shared-shop identity/navigation is hidden in this embedded flow, while `Shared shop...` remains available for intentionally reused shops.
+- Embedded shop offer authoring uses the complete administrator inventory without consuming it: left-click copies the complete exact stack, right-click copies one item, and `Save & back` returns to the NPC editor.
+- Adds optional custom player-style skins. `LOCAL` resolves only relative files below the server's `simpleserverutilities/npcs/textures` folder; `URL` accepts HTTPS only. Assets are capped at 512 KiB and must be 64x64 PNG.
+- Custom textures are server-authoritative: the server asynchronously loads/validates/caches the PNG, hashes it and sends only changed visible-NPC assets to clients through a bounded payload. Clients register dynamic textures and override only SSU-managed mannequin skins; missing/malformed assets safely fall back to the vanilla mannequin skin.
+- Supports Wide and Slim skin models, removal/tombstone sync when a custom skin is disabled, cache invalidation on NPC save/delete and safe reload when an administrator replaces an asset at the same configured source.
+- NPC definition schema increases from `8` to `9`.
+
+## King of the Hill
+- Adds a fully implemented two-team King of the Hill mode with configurable score target, hill radius, score interval, points per interval, team names/colours, weapon and friendly-fire rule.
+- The Setup Tool can place the hill center and team spawns. The runtime tracks neutral, contested and controlled states, awards team score only while one team is uncontested on the hill and credits individual objective contribution only to players actually standing on it.
+- Integrates normal SSU preparation, combat needs, death/respawn, results, rewards, victory effects, objective-time statistics, validation and arena snapshot/recovery flow.
+
+## Block Party
+- Adds a fully implemented 2–32 player free-for-all Block Party mode with configurable block palette, starting/minimum round time, per-round speedup, drop duration, tile size and fall-elimination depth.
+- The Setup Tool manages the playfloor plus one spawn per maximum player. Each round paints the floor, announces a non-repeating safe block when possible, eliminates players on the wrong block, removes every unsafe floor block, waits through the drop phase and repaints for the next round.
+- Supports same-round draw handling, last-player-standing victory, fall elimination, per-round survivor score and normal SSU region snapshot restoration after the match.
+- Minigame definition schema increases from `19` to `20`.
+
+## Compatibility
+- Network protocol increases from `98` to `99` because NPC editor/label payloads changed and NPC texture synchronization was added. Client and server must use the exact same dev3.15 build.
+- Server Operations schema remains `3`; Mine definition schema remains `3`; physical Jail definition schema remains `2`; Moderation/Jail sentence schema remains `2`; all unrelated persistence schemas remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.14.1
+
+Compile/runtime hotfix on top of dev3.14.
+
+## Jail task mining
+- Fixed valid Jail task blocks inside a Mine visually/physically reappearing immediately after being mined.
+- Root cause: jailed block breaks are deliberately cancelled to suppress vanilla drops and unrelated break behavior, but the task handler set the block to air inside that cancelled event. Vanilla then resynchronised the original block state after cancellation.
+- Validated Jail task breaks are now coalesced and applied on the next server tick, after the cancelled vanilla event has fully completed.
+- Progress, Mine statistics and task completion are committed together with the actual delayed block removal, so one physical block cannot be counted repeatedly while waiting for removal.
+- Mine permissions remain mandatory (`ssu.mines.use` plus the Mine-specific key); no Jail bypass was introduced.
+- No schema or network protocol changes.
+
+# Simple Server Utilities 1.9.0-dev3.14
+
+## Jail/Mines nesting, administration and permission polish
+
+- Makes dedicated Mines structurally Region-bound. Applying or saving Mine bounds now requires the complete 3D Mine volume to fit inside an existing SSU Region; SSU automatically records the smallest containing Region and invalid/outside Mines no longer operate, teleport, reset or expose status holograms. `Region -> Jail -> Mine` nesting remains valid and Mines stay independent from Jail.
+- Changes the automatic permission convention for newly created Mines to `ssu.mines.use.<mine-id>`. Existing non-empty/custom Mine permission keys are preserved so live servers are not silently broken; the Create Mine editor tracks the entered ID while its permission remains automatic.
+- Removes manual Jail Parent selection. Jail Administration now derives the containing Region from the actual Jail bounds and rejects bounds that are not fully inside a Region. The parent is retained only as internal integrity metadata.
+- Removes `Cell radius` from Jail definitions, GUI and confinement. Solitude prisoners spawn in a configured physical cell; the built cell controls normal movement while the complete Jail bounds remain the anti-escape safety boundary. Legacy schema-1 `cellRadius` data is safely ignored during normalization.
+- Adds dedicated Jail/Task Area 3D border visualization while an admin inspects/edits a Jail, with visually distinct Jail and Task Area colours. Closing Jail Administration clears this editor layer.
+- Replaces all-or-nothing cell maintenance with individual cell management. Admins can select a stable cell entry, inspect dimension/XYZ, move that cell to their current location or delete it. Cells actively assigned to solitude prisoners cannot be moved/deleted; later cell assignments are shifted safely after a deletion.
+- Clarifies punishment time fields with explicit units, including `Time sentence (hours)`, `Task deadline (hours)` and `Share period (days)`.
+- Cleans Mine Administration layout: notices wrap inside the panel, the New Mine action no longer crowds the title, palette previews no longer sit behind buttons and the setup-tool button is removed. Mine and Jail Setup Tools are now obtained centrally from Admin Tools.
+- Fixes nested Jail-task mining permissions. A jailed task prisoner receives no Mine bypass: if the task block lies in a Mine, both `ssu.mines.use` and the Mine-specific `ssu.mines.use.<mine-id>` permission are evaluated through a narrow jail-safe resolver while all unrelated jailed permissions/features remain blocked.
+- Adds `Remove holo` for generated Mine status holograms. Removing one disables its stored generated-hologram state and deletes the generated world hologram rather than leaving an orphan.
+- Adds an administrator Prisoner Overview to Jail Administration with active prisoners, online state, facility, sentence/path, start/remaining time, task progress, buyout state, solitude cell and reason, plus online/path filters, paging, refresh, teleport-to-prisoner, punishment details and release actions.
+- Raises network protocol from `97` to `98` because Jail editor border/category state and administration flows changed. Mine definition schema rises from `2` to `3` for the persisted containing Region; physical Jail definition schema rises from `1` to `2` for parent auto-derivation/cell identity and removal of cell-radius semantics. Server Operations remains schema `3`; Moderation player/Jail sentence remains schema `2`; all unrelated persistence schemas remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.13
+
+## Dedicated Jail system redesign
+
+- Rebuilds Jail as a dedicated SSU subsystem with persistent physical Jail definitions, its own Admin Center page and a two-corner `SSU Jail Setup Tool`. Every Jail must fit completely inside one existing SSU Region; independent Mines may be nested inside a Jail and remain separate systems.
+- Adds clear Jail facility setup for outer bounds, an optional task-work area, intake spawn, task spawn, release exit and up to 32 solitude-cell spawnpoints. Structural bounds/cell deletion is locked while prisoners are active, and time-only prisoners are distributed across the least-used configured cells.
+- Reworks sentencing into three explicit modes: `Buyout or Task`, `Task only`, and `Time / solitude`. Reasons use the shared rich-text editor; task requirements/tools use a real inventory-backed ghost-slot editor instead of JSON fields.
+- `Buyout or Task` gives the prisoner 30 seconds in a forced Jail dashboard. A successful buyout releases immediately; insufficient funds immediately select and lock Task; no choice within 30 seconds also selects and locks Task automatically.
+- Task punishments have a configurable absolute completion deadline (GUI default 168 hours / one week). Missing the deadline produces a durable permanent ban with the exact reason `failed to complete punishment`, including while the prisoner is offline. Completing every configured block requirement now completes/releases the punishment automatically.
+- Time-only punishments place prisoners in solitude. Multiple cell spawns are supported and a configurable cell radius allows normal movement inside the physical cell while enforcing return if the prisoner leaves that cell/dimension.
+- Jailing an online player immediately cancels pending SSU teleportation, exits active minigames/dungeons, closes non-inventory containers, snapshots the restored normal player state, equips only Jail task tools where applicable, teleports to the selected Jail and opens the Jail dashboard.
+- Jail restrictions are enforced continuously: commands, item/block/entity interaction, combat, damage, pickup/toss exploits, normal block breaking, unrelated dashboard pages, SSU teleports and normal permission/admin bypasses are disabled while jailed. Even an operator serving a sentence loses SSU administrator capability until release. All shared dashboard entry points are server-gated back to the Jail dashboard rather than relying only on client navigation.
+- Jail supersedes an existing Freeze state so the old freeze anchor cannot fight the Jail confinement position; trying to freeze an already jailed player is rejected as a conflicting/redundant restriction.
+- Releasing an offline prisoner now keeps the pre-Jail snapshot in a durable pending-restore state. Their inventory/effects/gamemode are restored and they are moved through the configured Jail release exit/fallback on the next valid login instead of losing the backup. Expired time sentences are likewise completed immediately when the player reconnects.
+- Prisoners cannot remain teleported outside their Jail/cell: direct/admin/vanilla teleports are corrected by the confinement tick. Admins instead get a `Teleport to prisoner` action, and Jail Administration has `Teleport to jail`.
+- Jail task mining is independent from Mines. Required blocks are counted only inside the Jail's own work area and produce no normal drops. If an independently configured Mine happens to overlap that area, its block-mined progress is notified so nested-zone bookkeeping stays consistent without making the Jail depend on a Mine.
+- Preserves legacy dev3.12 active Jail records safely: old Region-backed task sentences retain their old task-region mining route, do not gain a surprise one-week deadline, and legacy location fallback remains available only for those older saves.
+- Adds Jail definitions to Server Operations configuration profiles.
+- Adds `ssu.jails.admin`.
+- Raises Player Moderation record/Jail sentence persistence from schema `1` to `2`; new physical Jail definition schema starts at `1`. Moderation settings and inventory snapshot schemas remain `1`.
+- Raises network protocol from `96` to `97` for the redesigned sentencing payload and dedicated Jail Administration payloads. Server Operations schema remains `3`; Mine definition schema remains `2`; all unrelated persistence schemas remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.12
+
+## Dedicated Mines completion pass
+
+- Expands the standalone Mines module beyond the dev3.11 foundation with a real inventory-backed nine-slot reset-palette editor. Admins select a ghost palette slot, click any block item in their inventory to copy it, assign an independent weight and can clear slots without consuming inventory items.
+- Adds a dedicated Mining Rules screen with `NORMAL`, `NONE` and `CUSTOM` drop modes, configurable XP multiplier, independent Fortune/Silk Touch allowance, reset warning output (`ACTIONBAR`, `CHAT`, `TITLE`) and optional warning sound.
+- Custom mine drops are authored from real inventory items into up to nine ghost drop slots. Each slot has independent minimum count, maximum count and percentage chance; custom drops are server-validated and split safely to the item's normal maximum stack size.
+- `NORMAL` drop mode can suppress Fortune and/or Silk Touch for mine drops without altering the player's actual tool. `NONE` suppresses item drops; the XP multiplier remains independently configurable in every mode.
+- Adds generated per-mine status holograms managed from Mines. They can use an automatic mine/spawn position or a custom `Hologram here` position, configurable view range and live mine tokens for name, remaining/mined percentage, block progress, resets and next reset. Mine tokens resolve even when the Custom Statistics module is disabled.
+- Adds dedicated Mine Statistics with current-cycle progress, lifetime blocks mined, teleport/use count, total/manual/automatic resets, last mining/reset timestamps, top miners and most-mined block types with real block icons/tooltips.
+- Threshold-triggered resets now use the configured warning countdown instead of resetting immediately. Timed and mined-threshold reset triggers share the earliest due time; empty-only resets retry safely after 30 seconds while players remain inside.
+- Reset interval edits now restart the interval from the newly saved value instead of retaining a stale timer from the previous interval. Threshold/warning edits safely restart any runtime threshold countdown.
+- Adds paging to the Mines catalogue so more than the first admin/player page of mines remains reachable.
+- Hardens Mine teleport access so the global `ssu.mines.use` permission is enforced server-side even if a client tries to send a teleport action directly.
+- Player/admin Mine payloads now expose the effective next reset due time, including an active mined-threshold countdown, so the Mines UI and statistics screen show the live countdown consistently.
+- Failed/cancelled reset jobs clear the resetting state and use a 30-second safe retry delay instead of immediately re-submitting every tick. Disabled mines also remove their generated status hologram until re-enabled.
+- Mine definition schema rises from `1` to `2` for mining rules, custom drops, hologram settings and lifetime statistics. Legacy schema-1 mines normalize in place and preserve their current mined count as the minimum lifetime counter.
+- Network protocol remains `96`; Server Operations schema remains `3`; all non-Mine persistence schemas remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.11.1
+
+Compile hotfix built on dev3.11.
+
+- Fixed `HologramEditorScreen` compilation by capturing the palette loop index in an effectively-final local before using it in the rich-text colour tooltip style lambda.
+- Updated Mine permission-denial feedback to the Minecraft 26.x `ServerPlayer#sendOverlayMessage(Component)` API.
+- Updated Mine reset warnings to use `sendOverlayMessage` for ACTIONBAR mode and `sendSystemMessage` otherwise, replacing the removed `displayClientMessage(Component, boolean)` call.
+- No network payload, persistence/schema, Mine gameplay, GUI layout or rich-text behavior changes beyond these compile/API corrections.
+- Network protocol remains `96`; Server Operations schema remains `3`; Mine definition schema remains `1`.
+
+# Simple Server Utilities 1.9.0-dev3.11
+
+## GUI polish, support workflow and dedicated Mines foundation
+
+- Compacts the Mail/Wallet/Profile/Kit/Support/Floating Hologram workflows requested during the final Minecraft 26.2 polish pass, while keeping existing gameplay/data semantics unless explicitly noted below.
+- Mail status/feedback notices now wrap inside the mailbox panel instead of running beyond the GUI.
+- Replaces rich-text colour dropdowns with a shared direct 16-colour Minecraft swatch palette. Swatches have no permanent labels; hovering a swatch shows that colour's name rendered in the same colour. Mail compose, shared rich-text editors, Floating Holograms and rank-display rich text use the same reusable palette.
+- Compacts the Floating Hologram editor by roughly 20%, shortens numeric inputs, displays coordinates with two decimals, replaces the custom background hex field with a compact background palette and reduces oversized controls.
+- Reworks Kit Administration and Player Kits into smaller layouts with labelled fields, real item-stack previews and vanilla hover tooltips. The Kit Contents ghost editor draws its inventory/hotbar grids, supports full-stack left click and one-at-a-time right click behaviour, keeps feedback readable and uses Back to return to Kit Administration.
+- Reworks player Support & Reports into a compact ticket overview. New tickets are composed in a separate category/description screen; replies use the shared rich-text editor; closing requires a reason which is retained in ticket history. Closed tickets are automatically removed after a configurable retention period (default 24 hours), independent of read/unread state.
+- Raises Server Operations persistence schema from `2` to `3` for closed-ticket timestamp/reason and retention settings. Legacy schema-2 threaded tickets continue to normalize safely.
+- Compacts Wallet & Transactions by roughly 20%, shortens Search, labels payment Player/Amount fields, adds a server-paged known-player picker that searches the merged permission/economy/online identity set, and repositions transaction details/loading text to avoid overlap.
+- Compacts Profile by roughly 20%, moves Choose title beside the selected title with safe spacing, and removes the redundant minimap/title-help lines.
+- Adds the first dedicated **Mines** module foundation, separate from generic Regions while reusing SSU's bounded jobs/permissions/storage patterns: persistent mine definitions, admin/player GUIs, two-corner Mine Setup Tool, per-mine access permission, weighted reset palette, manual/timed/mined-threshold reset triggers, countdown warnings, safe empty-only or player-evacuation reset handling, remaining/mined progress, teleport spawn/exit, bounded reset jobs and basic use/reset counters. Mine definition schema starts at `1`.
+- The first Mines phase deliberately does **not** yet claim the full advanced roadmap: slot-based palette authoring, custom/no-drop and XP/Fortune/Silk rules, integrated mine holograms and richer dedicated mine statistics remain follow-up work.
+- Adds Mines to configuration-profile data and exposes `ssu.mines.use`, `ssu.mines.admin` plus per-mine `ssu.mines.<id>.use` keys.
+- Raises network protocol from `95` to `96` for the Mines payloads.
+
+# Simple Server Utilities 1.9.0-dev3.10.1
+
+Compile hotfix built on dev3.10.
+
+- Added the missing `ServerOperationsScreen#formatTicketTime(long)` helper used by the threaded Support/Reports conversation renderer.
+- Ticket timestamps now render through the existing `TICKET_TIME` formatter (`dd/MM HH:mm`) and safely fall back to `-` for missing/non-positive timestamps.
+- No network payload, persistence/schema, ticket workflow, rich-text or gameplay behavior changes.
+- Network protocol remains `95`; Server Operations schema remains `2`.
+
+# Simple Server Utilities 1.9.0-dev3.9.1
+
+Compile hotfix built on dev3.9.
+
+- Fixed Minecraft 26.2 `ServerChatEvent#getRawText()` handling: the event already returns a `String`, so the invalid extra `.getString()` call was removed.
+- Fixed scheduler task creation compilation by replacing the lambda capture of a reassigned local task ID with a direct duplicate-ID loop.
+- No network payload, storage/schema, gameplay or Server Operations behavior changes beyond these compile corrections.
+- Network protocol remains `94`; Server Operations schema remains `1`.
+
+# Simple Server Utilities 1.9.0-dev3.9
+
+## Performance-first public-server operations
+
+- Adds `Server Operations` to Admin Center and `Support` to the player dashboard.
+- Adds an intentionally lightweight player activity log for block break/place only. Records are memory-bounded and batch-written to JSONL; minigame/dungeon activity is ignored. Rollback is capped at 5,000 matching changes, runs in bounded batches and restores only the recorded block type's default state when the current block still matches the recorded post-change block.
+- Adds manual world ZIP backups plus optional automatic backups, retention, progress/status, last-backup protection and staged restore. Backup creation flushes SSU storage and best-effort world saving first; restore stops the server, retains a pre-restore world safety directory and attempts rollback if extraction fails.
+- Adds Scheduler tasks with `INTERVAL`, `DAILY` (`daily@HH:mm`) and `ONCE` (`once@yyyy-MM-ddTHH:mm`) schedules. Supported actions are `BACKUP`, `BROADCAST`, `MAINTENANCE_ON`, `MAINTENANCE_OFF`, `SAVE_SSU`, `SSU_RELOAD` and `STOP_SERVER`. Automatic backups are represented by a protected system scheduler task.
+- Adds Maintenance Mode with configurable disconnect text, optional kick of current players and `ssu.maintenance.bypass`.
+- Adds opt-in chat moderation: permanent/temporary mute, slow mode, duplicate suppression, burst/flood limit, caps threshold, link policy, blocked phrases, capped memory-only recent chat and permission-gated `#` staff chat. `ssu.chat.moderation.bypass` bypasses automatic filters but never an explicit mute.
+- Adds a persistent bounded staff-audit JSONL stream and integrates high-value Server Operations, dashboard permission/rank/economy changes, moderation, live/offline inventory edits, kits, managed dimensions, onboarding, region changes/resets and minigame arena administration.
+- Adds a lightweight Health page using the existing `SsuPerformanceMonitor` for TPS/MSPT, heap, online players, active jobs, permission/cache metrics, region lookups and top module timings, avoiding a second continuous profiler.
+- Adds player Support/Report tickets with a maximum of three open tickets per player and admin assignment, staff notes, resolve/reopen/close workflow.
+- Adds per-dimension world-border editing and one bounded chunk-pregeneration job at a time. Pregeneration is limited to 1–4 chunks/tick and automatically pauses above the configured MSPT limit.
+- Reuses and improves the existing Player Info & Profile permission table instead of creating a duplicate Effective Permission Inspector. Permission rows now show the winning personal override/wildcard or rank inheritance path and matched key.
+- Adds on-demand Economy analytics without duplicating Economy Admin: total supply/accounts, loaded transactions, 24h loaded volume, richest accounts, loaded volume by type and configurable large-transaction alerts.
+- Adds configuration-only profile ZIP export/import for ranks/permissions, dimensions, spawns/onboarding, moderation settings, kits, region definitions/templates, economy/Auction/claim-tax settings, titles, holograms, statistics, NPC definitions, quests, minigames, dungeons, visualization and Server Operations settings/tasks. Player balances, mail, moderation player records/inventories, progression and other player-owned data are intentionally excluded.
+- Every configuration-profile import first creates a persistent `pre-import-*` safety profile before copying/reloading configuration.
+- Adds permissions `ssu.server_operations.admin`, `ssu.maintenance.bypass`, `ssu.chat.moderation.bypass`, `ssu.chat.staff` and `ssu.reports.use`, plus their appropriate wildcard catalogue entries.
+- Automatic backups and automatic chat filtering default to OFF; the lightweight block activity log defaults to ON with a 20,000-entry / 14-day cap.
+- Raises network protocol from `93` to `94` for the new Server Operations payloads.
+- Adds Server Operations persistence schema `1`; all previously existing storage/schema versions remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.8
+
+## GUI-first completion, minigame polish and Region Tool workflow
+
+- Dynamically exposes every configured kit permission key in the rank/player Permission Editor, even before that permission has been assigned. Built-in kit access/admin permissions and the `ssu.kits.*` wildcard are also in the catalogue. Conventional stale kit keys remain visible with an explicit obsolete-key description so admins can unset them cleanly.
+- Reworks the Minigame Results table to use fixed shared column anchors for headers and row values, keeping player/team/role/combat/objective/impact statistics aligned.
+- Adds a permanent `Decline & leave` control to mandatory onboarding with a client-side confirmation step. Declining disconnects the player without accepting rules or completing onboarding, so the flow restarts on the next join.
+- Fixes Spleef temporary projectiles under the global minigame inventory lock. Authorized grants update the lock baseline, and vanilla projectile consumption is accepted on the next server tick before lock enforcement so Power projectiles remain finite and usable.
+- Adds `Restore snapshot` to the Minigame Setup Tool. The server only schedules the existing bounded arena-reset job when the selected arena has no active match/reservation, is not already resetting, and has a valid saved arena snapshot.
+- Clarifies the Region Setup Tool with shorter task-oriented tabs (`Region`, `Protection`, `Access & rent`, `Auto reset`, `Selection`, `Browse`), more explicit teleport/spawn/bounds labels, clearer selection build/create actions, and distinct wording for per-region reset snapshots versus portable selection snapshots.
+- Renames the generic bottom action to `Save settings` so editable region pages more clearly communicate when changes are persisted.
+- Network protocol remains `93`; all storage and schema versions remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.7.1
+
+Compile hotfix built on dev3.7.
+
+- Updated newly-added Minecraft 26.2 server access from removed `ServerPlayer#getServer()` calls to the existing `player.level().getServer()` pattern.
+- Updated vanilla/shared spawn lookups from removed `getSharedSpawnPos()` to the current respawn-data API (`getRespawnData()` + world-border adjustment).
+- Fixed warning/onboarding sound delivery to use the current sound packet API. The moderation Call horn is now sent only to the warned player.
+- No network payload, storage, schema, gameplay-balance, onboarding-flow, moderation-policy, jail, inventory-admin or kit behavior changes beyond these API/compile corrections.
+- Network protocol remains 93.
+
+# Simple Server Utilities 1.9.0-dev3.7
+
+## Dimension-aware spawns, onboarding, moderation, jail, live inventories and kits
+
+- Adds a safe `Teleport` action to the Dimensions manager for every selected dimension that is currently loaded.
+- Upgrades the persistent SSU location file to schema `2`, retaining one server-wide spawn and adding one first-join Lobby spawn. Both locations may be stored in any loaded dimension.
+- Adds dimension-aware death fallback: valid personal bed/respawn-anchor destinations remain first, SSU Server Spawn is used when no valid personal destination exists, and vanilla Overworld spawn remains the final fallback.
+- Adds configurable first-join onboarding with Lobby teleport, welcome title/firework presentation, a delayed SSU-key prompt, rich-text Rules with two-step acceptance, and a compact optional/skippable rich-text introduction.
+- Locks movement, inventory containers, commands, combat, item transfer and all normal world interactions until onboarding is completed. Pressing the SSU menu key opens the onboarding flow instead of the normal dashboard.
+- Adds `Onboarding & Spawns` administration for enabling the flow, setting/clearing Server Spawn and Lobby Spawn, editing rich-text Rules and introduction pages, and resetting/completing individual player onboarding states.
+- Adds `Manage` to Player Info & Profile with rich-text warnings, kicks, temporary/permanent bans, unban, freeze/unfreeze, custom whitelist administration, moderation history and recorded name changes.
+- Warning presentation uses a large title/subtitle for a configurable duration and the vanilla Call goat horn.
+- Adds a Jail dashboard and persistent jail sentences with optional time, economy buyout or a community mining task in a configured region.
+- Community tasks support up to sixteen block requirements and nine configured tools. Jail tools are continuously restored, kept effectively unbreakable and cannot be moved or retained outside their assigned slots; mined task blocks are counted virtually instead of entering the prisoner's inventory.
+- Completing a community task distributes the configured block contribution through system mail among players seen within the configured lookback period, restores the prisoner's original inventory and releases them to onboarding or Server Spawn as appropriate.
+- Adds live online/offline administration of player inventory, armor/offhand and ender chest, while retaining a fully usable administrator inventory in the same container screen. Offline changes are applied on the player's next login.
+- Adds permission-aware nine-slot Kits with exact item stacks, previewable contents, cooldown, price, one-time claim, enabled/locked state and a configurable per-kit permission key.
+- Adds player Kits to the dashboard and compact Kit Administration with a ghost inventory editor backed by the administrator inventory.
+- Adds dedicated `KIT_PURCHASE` and `JAIL_BUYOUT` economy transaction types.
+- Raises the network protocol from `92` to `93` for the new payloads and menus. Existing Player Claim, Region, Minigame, UI preference, Title and Player Identity schema versions remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.6.5
+
+## Minigame capture HUD spacing
+
+- Moves the shared CTF/Domination cast instruction (`Do not move, attack, use items, or take damage.`) out of the vanilla action bar and into the custom minigame cast HUD.
+- Renders the instruction as its own centered line 16 logical pixels above the existing capture label, while leaving the capture label and progress bar at their previous positions.
+- Applies the same layout to taking an enemy CTF flag and claiming a Domination base.
+- Raises the network protocol from `91` to `92` because `MinigameCastBarPayload` now carries a bounded instruction line.
+- All storage, snapshot and schema versions remain unchanged.
+
 # Simple Server Utilities 1.9.0-dev3.6.4
 
 ## Team-specific objective capture sounds

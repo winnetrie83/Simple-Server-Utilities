@@ -170,8 +170,8 @@ public final class RegionSetupScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("Refresh"), ignored -> refreshCurrent())
                 .bounds(x + W - 152, y + H - 27, 64, 18).build());
         if (page <= PAGE_RESET && !"SELECT".equals(data.mode())) {
-            addRenderableWidget(Button.builder(Component.literal("Save"), ignored -> save())
-                    .bounds(x + W - 222, y + H - 27, 64, 18).build());
+            addRenderableWidget(Button.builder(Component.literal("Save settings"), ignored -> save())
+                    .bounds(x + W - 246, y + H - 27, 88, 18).build());
         }
 
         switch (page) {
@@ -186,8 +186,8 @@ public final class RegionSetupScreen extends Screen {
     }
 
     private void addMainTabs(int x, int y) {
-        String[] labels = {"General", "Protection", "Rent & access", "Scheduled reset", "Selection", "All regions"};
-        int[] widths = {82, 92, 104, 116, 82, 90};
+        String[] labels = {"Region", "Protection", "Access & rent", "Auto reset", "Selection", "Browse"};
+        int[] widths = {72, 92, 104, 90, 82, 72};
         int cx = x + 14;
         for (int i = 0; i < labels.length; i++) {
             int target = i;
@@ -212,14 +212,14 @@ public final class RegionSetupScreen extends Screen {
         addBox(x + 22, y + 143, 646, "Welcome message", welcome, 256, value -> welcome = value);
         addBox(x + 22, y + 190, 646, "Leave message", leave, 256, value -> leave = value);
         if ("EDIT".equals(data.mode())) {
-            addRenderableWidget(Button.builder(Component.literal("Teleport"), ignored -> action("teleport", ""))
-                    .bounds(x + 22, y + 232, 105, 20).build());
-            addRenderableWidget(Button.builder(Component.literal(isEditedRegionSelected() ? "Unselect region" : "Select region"), ignored -> action("toggle_region_selection", ""))
-                    .bounds(x + 135, y + 232, 130, 20).build());
-            addRenderableWidget(Button.builder(Component.literal(data.hasSpawn() ? "Move spawn here" : "Set spawn here"), ignored -> action("set_spawn", ""))
-                    .bounds(x + 273, y + 232, 130, 20).build());
+            addRenderableWidget(Button.builder(Component.literal("Teleport to region"), ignored -> action("teleport", ""))
+                    .bounds(x + 22, y + 232, 125, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(isEditedRegionSelected() ? "Clear selected bounds" : "Select region bounds"), ignored -> action("toggle_region_selection", ""))
+                    .bounds(x + 155, y + 232, 150, 20).build());
+            addRenderableWidget(Button.builder(Component.literal(data.hasSpawn() ? "Move region spawn here" : "Set region spawn here"), ignored -> action("set_spawn", ""))
+                    .bounds(x + 313, y + 232, 155, 20).build());
             Button clear = addRenderableWidget(Button.builder(Component.literal("Clear spawn"), ignored -> action("clear_spawn", ""))
-                    .bounds(x + 411, y + 232, 100, 20).build());
+                    .bounds(x + 476, y + 232, 100, 20).build());
             clear.active = data.hasSpawn();
             addRenderableWidget(Button.builder(Component.literal(confirmRedefine ? "Confirm redefine" : "Redefine from selection"), ignored -> {
                 if (confirmRedefine) action("redefine", "");
@@ -293,21 +293,21 @@ public final class RegionSetupScreen extends Screen {
         int x = left();
         int y = top();
         addToggle(x + 20, y + 86, 150, "Scheduled reset", () -> scheduledReset, value -> scheduledReset = value);
-        addRenderableWidget(Button.builder(Component.literal("Source: " + resetMode), ignored -> {
+        addRenderableWidget(Button.builder(Component.literal("Reset source: " + ("SNAPSHOT".equals(resetMode) ? "snapshot" : "block preset")), ignored -> {
             resetMode = "SNAPSHOT".equals(resetMode) ? "PRESET" : "SNAPSHOT";
             replacePreset |= "PRESET".equals(resetMode) && !resetMix.isEmpty();
             rebuildWidgets();
-        }).bounds(x + 178, y + 86, 130, 20).build());
-        addBox(x + 316, y + 86, 160, "Interval (10s, 5m, 2h, 1d)", resetInterval, 24, value -> resetInterval = value);
+        }).bounds(x + 178, y + 86, 164, 20).build());
+        addBox(x + 350, y + 86, 126, "Interval (10s, 5m, 2h, 1d)", resetInterval, 24, value -> resetInterval = value);
         addToggle(x + 484, y + 86, 186, "Wait until empty", () -> resetOnlyWhenEmpty, value -> resetOnlyWhenEmpty = value);
         if ("EDIT".equals(data.mode())) {
-            addRenderableWidget(Button.builder(Component.literal("Capture region snapshot"), ignored -> action("capture_snapshot", ""))
+            addRenderableWidget(Button.builder(Component.literal("Save reset snapshot"), ignored -> action("capture_snapshot", ""))
                     .bounds(x + 20, y + 116, 165, 20).build());
-            addRenderableWidget(Button.builder(Component.literal(confirmReset ? "Confirm reset now" : "Reset now"), ignored -> {
+            addRenderableWidget(Button.builder(Component.literal(confirmReset ? "Confirm restore" : "Restore region now"), ignored -> {
                 if (confirmReset) action("reset_now", "");
                 else {
                     confirmReset = true;
-                    setNotice("This immediately replaces the region using the configured reset source. Click again to confirm.", true);
+                    setNotice("This immediately restores the whole region from the selected reset source. Click again to confirm.", true);
                     rebuildWidgets();
                 }
             }).bounds(x + 193, y + 116, 140, 20).build());
@@ -328,20 +328,20 @@ public final class RegionSetupScreen extends Screen {
     private void initSelection() {
         int x = left();
         int y = top();
-        Button actions = addRenderableWidget(Button.builder(Component.literal("Selection actions & block fill"), ignored -> {
+        Button actions = addRenderableWidget(Button.builder(Component.literal("Build, fill & create"), ignored -> {
             selectionSection = 0;
             pendingSelectionOperation = "";
             rebuildWidgets();
-        }).bounds(x + 18, y + 69, 205, 20).build());
+        }).bounds(x + 18, y + 69, 180, 20).build());
         actions.active = selectionSection != 0;
-        Button snapshots = addRenderableWidget(Button.builder(Component.literal("Full snapshots & ghost preview"), ignored -> {
+        Button snapshots = addRenderableWidget(Button.builder(Component.literal("Portable snapshots"), ignored -> {
             selectionSection = 1;
             pendingSelectionOperation = "";
             rebuildWidgets();
-        }).bounds(x + 231, y + 69, 205, 20).build());
+        }).bounds(x + 206, y + 69, 160, 20).build());
         snapshots.active = selectionSection != 1;
-        addRenderableWidget(Button.builder(Component.literal("Refresh selection"), ignored -> requestSelectionContext())
-                .bounds(x + W - 142, y + 69, 124, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Refresh"), ignored -> requestSelectionContext())
+                .bounds(x + W - 96, y + 69, 78, 20).build());
         if (selectionSection == 0) initSelectionActions();
         else initSelectionSnapshots();
     }
@@ -349,11 +349,11 @@ public final class RegionSetupScreen extends Screen {
     private void initSelectionActions() {
         int x = left();
         int y = top();
-        Button create = addRenderableWidget(Button.builder(Component.literal("Create region from selection"), ignored -> requestCreate())
-                .bounds(x + 18, y + 134, 200, 20).build());
+        Button create = addRenderableWidget(Button.builder(Component.literal("Create region"), ignored -> requestCreate())
+                .bounds(x + 18, y + 134, 130, 20).build());
         create.active = data.selectionHasPoint1() && data.selectionHasPoint2() && data.canCreate();
-        addRenderableWidget(Button.builder(Component.literal("Clear selection points"), ignored -> action("clear_selection", ""))
-                .bounds(x + 226, y + 134, 160, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Clear selected bounds"), ignored -> action("clear_selection", ""))
+                .bounds(x + 156, y + 134, 150, 20).build());
         addSelectionConfirmButton(x + 18, y + 163, 115, "Clear to air", "clear_selection_blocks");
         addSelectionConfirmButton(x + 141, y + 163, 115, "Fill water", "fill_selection_water");
         addSelectionConfirmButton(x + 264, y + 163, 115, "Fill lava", "fill_selection_lava");
@@ -664,21 +664,21 @@ public final class RegionSetupScreen extends Screen {
     }
 
     private String headerStatus() {
-        String local = data.localRegionName().isBlank() ? "No region at your position" : "Current position: " + data.localRegionName();
-        if ("EDIT".equals(data.mode())) return "Editing " + data.regionName() + " · " + shortDim(data.dimension()) + " · " + local;
-        if ("CREATE".equals(data.mode())) return "Creating from selection · " + shortDim(data.dimension()) + " · " + data.volume() + " blocks · " + local;
-        return local + " · use the Selection or All regions tabs";
+        String local = data.localRegionName().isBlank() ? "Here: no region" : "Here: " + data.localRegionName();
+        if ("EDIT".equals(data.mode())) return "Mode: EDIT · Target: " + data.regionName() + " · " + shortDim(data.dimension()) + " · " + local;
+        if ("CREATE".equals(data.mode())) return "Mode: CREATE · selected volume " + data.volume() + " blocks · " + shortDim(data.dimension()) + " · " + local;
+        return "Mode: SELECT · " + local + " · use Selection or Browse";
     }
 
     private void renderGeneral(GuiGraphicsExtractor graphics, int x, int y) {
         if ("SELECT".equals(data.mode())) { renderUnavailable(graphics, x, y); return; }
-        graphics.text(font, "General identity, messages, border and physical region controls.", x + 22, y + 73, MUTED, false);
+        graphics.text(font, "Region identity, messages, spawn and bounds. Save applies changed fields.", x + 22, y + 73, MUTED, false);
         if ("CREATE".equals(data.mode())) graphics.text(font, "Unique region name", x + 22, y + 84, MUTED, false);
         graphics.text(font, "Priority", x + 238, y + 84, MUTED, false);
         graphics.text(font, "Welcome message", x + 22, y + 133, MUTED, false);
         graphics.text(font, "Leave message", x + 22, y + 180, MUTED, false);
         if ("EDIT".equals(data.mode())) {
-            graphics.text(font, "Select region copies these exact bounds into the active Region Tool selection.", x + 22, y + 294, MUTED, false);
+            graphics.text(font, "Select region bounds copies this region into the world-edit selection; redefine uses that selection.", x + 22, y + 294, MUTED, false);
             graphics.text(font, "Bounds: " + compact(BlockPos.of(data.point1())) + " → " + compact(BlockPos.of(data.point2())), x + 22, y + 311, TEXT, false);
             graphics.text(font, "Spawn: " + (data.hasSpawn() ? compact(BlockPos.of(data.spawnPos())) : "none"), x + 22, y + 327, MUTED, false);
         }
@@ -692,7 +692,7 @@ public final class RegionSetupScreen extends Screen {
 
     private void renderRent(GuiGraphicsExtractor graphics, int x, int y) {
         if ("SELECT".equals(data.mode())) { renderUnavailable(graphics, x, y); return; }
-        graphics.text(font, "Rental policy and direct manager/member access.", x + 22, y + 73, MUTED, false);
+        graphics.text(font, "Who may manage/use this region and how renting behaves.", x + 22, y + 73, MUTED, false);
         if ("EDIT".equals(data.mode())) {
             graphics.text(font, "Managers: " + data.managerCount() + " · Members: " + data.memberCount(), x + 22, y + 281, TEXT, false);
             graphics.text(font, "Access changes currently resolve exact online player names.", x + 22, y + 297, MUTED, false);
@@ -701,7 +701,7 @@ public final class RegionSetupScreen extends Screen {
 
     private void renderReset(GuiGraphicsExtractor graphics, int x, int y, int mouseX, int mouseY) {
         if ("SELECT".equals(data.mode())) { renderUnavailable(graphics, x, y); return; }
-        graphics.text(font, "Restore the whole region from a saved snapshot or weighted block preset.", x + 20, y + 71, MUTED, false);
+        graphics.text(font, "Automatic/manual reset of this region. This reset snapshot is separate from portable Selection snapshots.", x + 20, y + 71, MUTED, false);
         graphics.text(font, "Snapshot: " + (data.snapshotAvailable() ? "available" : "not captured") + " · Next: " + formatTime(data.nextResetAt()) + " · Last: " + formatTime(data.lastResetAt()), x + 20, y + 148, data.snapshotAvailable() ? GOOD : WARNING, false);
         graphics.text(font, "Preset: " + trim(data.presetSummary(), 70), x + 20, y + 163, MUTED, false);
         graphics.text(font, "New reset preset", x + 20, y + 173, TEXT, true);
@@ -718,9 +718,9 @@ public final class RegionSetupScreen extends Screen {
                 + "   Dimension: " + shortDim(data.selectionDimension())
                 + "   Volume: " + (data.selectionHasPoint1() && data.selectionHasPoint2() ? data.selectionVolume() + " blocks" : "incomplete"),
                 x + 18, y + 99, data.selectionHasPoint1() && data.selectionHasPoint2() ? GOOD : WARNING, false);
-        graphics.text(font, "Corners are selected directly in the world with the Region Tool.", x + 18, y + 114, MUTED, false);
+        graphics.text(font, "Select two corners in the world with the Region Tool. Then choose a build action below.", x + 18, y + 114, MUTED, false);
         if (selectionSection == 0) {
-            graphics.text(font, "Block operations", x + 18, y + 123, TEXT, true);
+            graphics.text(font, "Selection actions", x + 18, y + 123, TEXT, true);
             graphics.text(font, "Inventory block mix", x + 18, y + 200, TEXT, true);
             renderMixGrid(graphics, selectionMix, x + 18, y + 211);
             graphics.text(font, "Inventory — click blocks to add", x + 492, y + 200, TEXT, true);
@@ -728,7 +728,7 @@ public final class RegionSetupScreen extends Screen {
             int total = selectionMix.stream().mapToInt(entry -> entry.percentage).sum();
             graphics.text(font, "Mix: " + total + "% · Air: " + Math.max(0, 100 - total) + "%", x + 365, y + 320, total <= 100 ? GOOD : ERROR, false);
         } else {
-            graphics.text(font, "Save the active selection as a portable snapshot, including block entities and structural entities.",
+            graphics.text(font, "Portable snapshots copy the selected build (blocks, inventories and structural entities) for preview/placement.",
                     x + 18, y + 123, MUTED, false);
             String nameStatus = validSnapshotName(selectionSnapshotName)
                     ? "Snapshot name is valid."
@@ -756,7 +756,7 @@ public final class RegionSetupScreen extends Screen {
 
     private void renderRegions(GuiGraphicsExtractor graphics, int x, int y) {
         graphics.text(font, data.localRegionName().isBlank() ? "You are not standing in a region." : "Detected here: " + data.localRegionName(), x + 18, y + 74, data.localRegionName().isBlank() ? MUTED : GOOD, false);
-        graphics.text(font, "Select a region for remote editing or teleport directly to it.", x + 18, y + 91, MUTED, false);
+        graphics.text(font, "Edit opens a region remotely; Teleport moves you there. HERE marks the region under your feet.", x + 18, y + 91, MUTED, false);
         int perPage = 6;
         int start = regionPage * perPage;
         for (int i = 0; i < perPage && start + i < data.regions().size(); i++) {
@@ -774,7 +774,7 @@ public final class RegionSetupScreen extends Screen {
     }
 
     private void renderUnavailable(GuiGraphicsExtractor graphics, int x, int y) {
-        graphics.text(font, "Choose a region in All regions, or create one from the current selection.", x + 22, y + 92, WARNING, false);
+        graphics.text(font, "Choose a region in Browse, or use Selection to create one from two selected corners.", x + 22, y + 92, WARNING, false);
     }
 
     private void renderMixGrid(GuiGraphicsExtractor graphics, List<MixEntry> target, int startX, int startY) {

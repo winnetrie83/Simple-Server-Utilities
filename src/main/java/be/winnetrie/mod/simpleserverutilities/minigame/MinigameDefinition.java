@@ -10,7 +10,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentId;
 
 /** Data-driven minigame definition. Actual game rules can build on this lifecycle. */
 public final class MinigameDefinition {
-    public static final int SCHEMA_VERSION = 19;
+    public static final int SCHEMA_VERSION = 21;
     public static final int MAX_ARENAS = 32;
     public static final int MAX_REWARDS = 64;
 
@@ -44,6 +44,8 @@ public final class MinigameDefinition {
     public SpleefRules spleef = new SpleefRules();
     public CaptureTheFlagRules captureTheFlag = new CaptureTheFlagRules();
     public DominationRules domination = new DominationRules();
+    public KingOfTheHillRules kingOfTheHill = new KingOfTheHillRules();
+    public BlockPartyRules blockParty = new BlockPartyRules();
     public MinigameExperienceRules experience = new MinigameExperienceRules();
 
     public MinigameDefinition() {
@@ -67,11 +69,18 @@ public final class MinigameDefinition {
             teamCount = maxPlayers;
             victoryMode = "last_team_standing";
             allowLateJoin = false;
-        } else if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION) {
+        } else if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION
+                || type == MinigameGameType.KING_OF_THE_HILL) {
             maxPlayers = Math.min(64, Math.max(2, maxPlayers));
             minPlayers = Math.min(maxPlayers, Math.max(2, minPlayers));
             teamCount = 2;
             victoryMode = "highest_score";
+            allowLateJoin = false;
+        } else if (type == MinigameGameType.BLOCK_PARTY) {
+            maxPlayers = Math.min(32, Math.max(2, maxPlayers));
+            minPlayers = Math.min(maxPlayers, Math.max(2, minPlayers));
+            teamCount = maxPlayers;
+            victoryMode = "last_team_standing";
             allowLateJoin = false;
         }
         countdownSeconds = Math.max(0, Math.min(600, countdownSeconds));
@@ -85,6 +94,10 @@ public final class MinigameDefinition {
         captureTheFlag.normalize();
         if (domination == null) domination = new DominationRules();
         domination.normalize();
+        if (kingOfTheHill == null) kingOfTheHill = new KingOfTheHillRules();
+        kingOfTheHill.normalize();
+        if (blockParty == null) blockParty = new BlockPartyRules();
+        blockParty.normalize();
         if (experience == null) experience = new MinigameExperienceRules();
         experience.normalize();
         if (prerequisites == null) prerequisites = new ContentCondition();

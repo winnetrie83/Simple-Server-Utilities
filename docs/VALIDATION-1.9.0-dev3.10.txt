@@ -1,0 +1,48 @@
+SSU 1.9.0-dev3.10 validation notes
+==================================
+
+Target
+------
+Minecraft 26.2
+NeoForge 26.2.0.7-beta
+Java 25 project target
+Network protocol 95
+Server Operations persistence schema 2
+
+Implemented scope
+-----------------
+- Threaded persistent Support / Reports conversations.
+- Fixed ticket categories: Help, Bug, Player report, Suggestion, Appeal, Other.
+- Dedicated known-player picker for Player report tickets.
+- Rich-text ticket creation and replies for players and staff using SSU's 16-colour + bold/italic/underline/strikethrough editor.
+- Server-side rich-text sanitising and bounded ticket/message payloads.
+- Player/staff unread state and online notifications.
+- Staff assignment, resolve, reopen and close workflow.
+- First staff reply auto-assigns an unassigned ticket.
+- Player reply to a resolved ticket reopens it / returns it to Assigned when an assignee remains.
+- Ticket-list paging, admin status filters and selected-thread paging.
+- Schema-1 message/staffNote migration into schema-2 threaded history.
+
+Checks completed in the build container
+---------------------------------------
+1. JDK-only common support classes compiled successfully with local javac:
+   - SupportRichText.java
+   - SupportTicketCategory.java
+   - ServerOperationsState.java
+
+2. Common support behaviour test passed:
+   - allowed rich formatting is preserved;
+   - obfuscated formatting is stripped;
+   - plain-text decoding works;
+   - Player report category parsing works;
+   - schema-1 message + staffNote migrate exactly once into two thread entries.
+
+3. Java parser/syntax scan found no parser diagnostics in the modified Minecraft/NeoForge-facing classes. Full type resolution cannot be performed by plain javac without the Minecraft/NeoForge/Gson classpath.
+
+4. Full Gradle compile was attempted with:
+   ./gradlew compileJava --no-daemon
+   It could not start because Gradle 9.2.1 is not installed in the container and the wrapper cannot access services.gradle.org (UnknownHostException). This is an environment/network limitation, not a source compiler result.
+
+Runtime status
+--------------
+A real Minecraft 26.2 client + dedicated NeoForge server test is still required. In particular test rich-text selection/formatting, ticket paging, notifications, Player report target selection, schema migration and the complete staff workflow using docs/TESTING-1.9.0-dev3.10.md.

@@ -16,7 +16,9 @@ public enum BorderCategory {
     QUEST_AREA("quest_area", 0xFF9F43),
     MINIGAME_AREA("minigame_area", 0xE056FD),
     MINIGAME_GAME_AREA("minigame_game_area", 0x00BCD4),
-    MINIGAME_SPECTATOR_AREA("minigame_spectator_area", 0xAB47BC);
+    MINIGAME_SPECTATOR_AREA("minigame_spectator_area", 0xAB47BC),
+    JAIL_AREA("jail_area", 0xFF5A5F),
+    JAIL_TASK_AREA("jail_task_area", 0xFFB347);
 
     private final String serializedName;
     private final int defaultRgb;

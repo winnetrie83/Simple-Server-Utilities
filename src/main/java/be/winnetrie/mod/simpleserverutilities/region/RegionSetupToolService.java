@@ -237,6 +237,8 @@ public final class RegionSetupToolService {
             RegionCommands.getSelectionManager().clear(player);
             SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
         }
+        SimpleServerUtilities.SERVER_OPERATIONS.audit(player, create ? "region.create" : "region.save", region.getName(),
+                "priority=" + region.getPriority() + ", reset=" + region.getResetSettings().isEnabled());
         sendEdit(player, region, create ? "Region created and configured." : "Region settings saved.", false, payload.requestId());
     }
 
@@ -290,6 +292,7 @@ public final class RegionSetupToolService {
                 case "capture_snapshot" -> captureSnapshot(player, region, payload.requestId());
                 case "reset_now" -> {
                     RegionResetScheduler.Result result = RegionResetScheduler.triggerNow(player, region);
+                    if (result.success()) SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "region.reset", region.getName(), result.message());
                     sendEdit(player, region, result.message(), !result.success(), payload.requestId());
                 }
                 case "redefine" -> redefine(player, region, payload.requestId());

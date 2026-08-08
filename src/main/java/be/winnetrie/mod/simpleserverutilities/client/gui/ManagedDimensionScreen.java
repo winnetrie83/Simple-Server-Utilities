@@ -128,6 +128,10 @@ public final class ManagedDimensionScreen extends Screen {
         addTabButton(Tab.ENVIRONMENT, rightX + tabW + 4, y + 38, tabW);
         addTabButton(Tab.GENERATOR, rightX + (tabW + 4) * 2, y + 38, tabW);
 
+        boolean selectedLoaded = data.dimensions().stream().anyMatch(entry -> entry.id().equals(data.selectedId()) && entry.loaded());
+        Button teleport = addRenderableWidget(Button.builder(Component.literal("Teleport"), ignored -> teleport())
+                .bounds(x + w - 326, y + h - 30, 76, 20).build());
+        teleport.active = selectedLoaded && !data.selectedId().isBlank();
         if (draft == null) {
             addRenderableWidget(Button.builder(Component.literal("Close"), ignored -> onClose())
                     .bounds(x + w - 86, y + h - 30, 72, 20).build());
@@ -293,6 +297,13 @@ public final class ManagedDimensionScreen extends Screen {
         }
         ClientPacketDistributor.sendToServer(new SsuDimensionManagerSubmitPayload(
                 "delete", originalId, "", nextRequestId++));
+    }
+
+
+    private void teleport() {
+        if (data.selectedId().isBlank()) return;
+        ClientPacketDistributor.sendToServer(new SsuDimensionManagerSubmitPayload(
+                "teleport", data.selectedId(), "", nextRequestId++));
     }
 
     private void request(String selectedId) {

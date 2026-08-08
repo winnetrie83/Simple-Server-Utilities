@@ -10,6 +10,7 @@ import be.winnetrie.mod.simpleserverutilities.npc.NpcFunction;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcInteractionMode;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcRole;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcScheduleEntry;
+import be.winnetrie.mod.simpleserverutilities.npc.NpcTextureSource;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -20,7 +21,7 @@ import net.minecraft.world.item.ItemStack;
 public record NpcEditorOpenPayload(
         boolean editing, String originalInstanceId, String originalDefinitionId, String dimension,
         double x, double y, double z, float yaw, float pitch,
-        String definitionId, String displayName, String entityType, String interactionText, String dialogueId,
+        String definitionId, String displayName, String entityType, String textureSource, String textureValue, String textureModel, String interactionText, String dialogueId,
         String roleId, String shopId, String interactionMode, List<NpcFunction> functions,
         boolean enabled, boolean customNameVisible, boolean noAi, boolean invulnerable, boolean silent, boolean glowing,
         boolean affectedByGravity, boolean canSwim, boolean canFly,
@@ -48,6 +49,9 @@ public record NpcEditorOpenPayload(
         definitionId = PayloadBounds.string(definitionId, 64);
         displayName = PayloadBounds.string(displayName, 64);
         entityType = PayloadBounds.string(entityType, 128);
+        textureSource = NpcTextureSource.parse(textureSource).id();
+        textureValue = PayloadBounds.string(textureValue, 1_024);
+        textureModel = "slim".equalsIgnoreCase(textureModel) ? "slim" : "wide";
         interactionText = PayloadBounds.string(interactionText, 512);
         dialogueId = PayloadBounds.string(dialogueId, 64);
         roleId = NpcRole.parse(roleId).id();
@@ -79,7 +83,7 @@ public record NpcEditorOpenPayload(
     public static NpcEditorOpenPayload create(String dimension, double x, double y, double z, float yaw, float pitch,
             List<String> availableModels, List<Choice> availableShops, List<Choice> availableFactions) {
         return new NpcEditorOpenPayload(false, "", "", dimension, x, y, z, yaw, pitch,
-                "", "NPC", "minecraft:villager", "", "", NpcRole.CITIZEN.id(), "", NpcInteractionMode.DIALOGUE.id(), List.of(),
+                "", "NPC", "minecraft:villager", NpcTextureSource.NONE.id(), "", "wide", "", "", NpcRole.CITIZEN.id(), "", NpcInteractionMode.DIALOGUE.id(), List.of(),
                 true, true, true, true, false, false,
                 true, false, false, "", "", 0, "You have not earned this NPC's trust yet.", 0,
                 NpcAttitude.NEUTRAL.id(), List.of(),
@@ -95,6 +99,7 @@ public record NpcEditorOpenPayload(
         b.writeUtf(p.dimension, 256); b.writeDouble(p.x); b.writeDouble(p.y); b.writeDouble(p.z);
         b.writeFloat(p.yaw); b.writeFloat(p.pitch);
         b.writeUtf(p.definitionId, 64); b.writeUtf(p.displayName, 64); b.writeUtf(p.entityType, 128);
+        b.writeUtf(p.textureSource, 16); b.writeUtf(p.textureValue, 1_024); b.writeUtf(p.textureModel, 8);
         b.writeUtf(p.interactionText, 512); b.writeUtf(p.dialogueId, 64);
         b.writeUtf(p.roleId, 32); b.writeUtf(p.shopId, 64); b.writeUtf(p.interactionMode, 32); writeFunctions(b, p.functions);
         b.writeBoolean(p.enabled); b.writeBoolean(p.customNameVisible); b.writeBoolean(p.noAi);
@@ -129,7 +134,9 @@ public record NpcEditorOpenPayload(
         String originalInstance = b.readUtf(36), originalDefinition = b.readUtf(64), dimension = b.readUtf(256);
         double x = b.readDouble(), y = b.readDouble(), z = b.readDouble();
         float yaw = b.readFloat(), pitch = b.readFloat();
-        String id = b.readUtf(64), name = b.readUtf(64), type = b.readUtf(128), text = b.readUtf(512), dialogue = b.readUtf(64);
+        String id = b.readUtf(64), name = b.readUtf(64), type = b.readUtf(128);
+        String textureSource = b.readUtf(16), textureValue = b.readUtf(1_024), textureModel = b.readUtf(8);
+        String text = b.readUtf(512), dialogue = b.readUtf(64);
         String roleId = b.readUtf(32), shopId = b.readUtf(64), interactionMode = b.readUtf(32); List<NpcFunction> functions = readFunctions(b);
         boolean enabled = b.readBoolean(), visible = b.readBoolean(), noAi = b.readBoolean(), invulnerable = b.readBoolean();
         boolean silent = b.readBoolean(), glowing = b.readBoolean();
@@ -162,7 +169,7 @@ public record NpcEditorOpenPayload(
         List<Choice> shops = readChoices(b, 256);
         List<Choice> factions = readChoices(b, 256);
         return new NpcEditorOpenPayload(editing, originalInstance, originalDefinition, dimension, x, y, z, yaw, pitch,
-                id, name, type, text, dialogue, roleId, shopId, interactionMode, functions,
+                id, name, type, textureSource, textureValue, textureModel, text, dialogue, roleId, shopId, interactionMode, functions,
                 enabled, visible, noAi, invulnerable, silent, glowing,
                 gravity, swim, fly, faction, factionDisplayName, minimumReputation, denied, reputationLoss, playerAttitude, relations,
                 maxHealth, movementSpeed, attackDamage, armor, toughness, followRange, knockback, scale, homeRadius,

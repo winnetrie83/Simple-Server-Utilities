@@ -15,6 +15,8 @@ public enum MinigameSetupAction {
     SPECTATOR_BOUNDS("spectator_bounds", "Set spectator bounds", "Left-click two corners of the area spectators are allowed to move inside.", true, true),
     TEAM_SPAWN("team_spawn", "Set team/player spawn", "Choose a team and slot, then left-click the spawn block.", true, false),
     SPLEEF_FLOOR("spleef_floor", "Set Spleef playfloor", "Left-click two corners of the floor volume. Only blocks inside this area may be broken.", true, true),
+    KOTH_HILL("koth_hill", "Set hill point", "STATIC: set the hill center. ROTATING: choose a hill slot, then left-click its center.", true, false),
+    BLOCK_PARTY_FLOOR("block_party_floor", "Set Block Party floor", "Left-click two corners of the dance-floor volume that SSU may recolor during rounds.", true, true),
     CTF_FLAG("ctf_flag", "Set team flag", "Choose red or blue, then left-click the physical flag block position.", true, false),
     BOOST_SPAWN("boost_spawn", "Set boost spawn", "Choose a boost slot, then left-click the block above which a boost may appear in manual placement mode.", true, false),
     DOMINATION_NODE("domination_node", "Set Domination node", "Choose a node, then left-click its physical capture-banner position.", true, false),
@@ -44,6 +46,8 @@ public enum MinigameSetupAction {
         return switch (this) {
             case NEW_ARENA_BOUNDS -> true;
             case SPLEEF_FLOOR -> type == MinigameGameType.SPLEEF;
+            case KOTH_HILL -> type == MinigameGameType.KING_OF_THE_HILL;
+            case BLOCK_PARTY_FLOOR -> type == MinigameGameType.BLOCK_PARTY;
             case CTF_FLAG -> type == MinigameGameType.CAPTURE_THE_FLAG;
             case BOOST_SPAWN -> type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION;
             case DOMINATION_NODE, DOMINATION_NODE_SPAWN -> type == MinigameGameType.DOMINATION;

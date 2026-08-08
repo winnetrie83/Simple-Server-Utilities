@@ -234,6 +234,53 @@ public class PermissionManager {
         return Map.copyOf(merged);
     }
 
+    /** Explains the exact personal/rank source that wins for one global permission. */
+    public PermissionExplanation explainGlobalPermission(UUID playerId, String key) {
+        if (playerId == null || key == null || key.isBlank()) return null;
+        PlayerPermissionData playerData = getPlayerData(playerId);
+        if (playerData != null) {
+            String matched = matchingPermissionKey(playerData.getPermissions(), key);
+            if (matched == null && PermissionKeys.TELEPORT_REQUIRE_STILL.equals(key))
+                matched = matchingPermissionKey(playerData.getPermissions(), PermissionKeys.TELEPORT_CANCEL_ON_MOVE);
+            if (matched != null) return new PermissionExplanation(playerData.getPermissions().get(matched),
+                    (matched.equals(key) ? "personal override" : "personal wildcard") + " via " + matched);
+        }
+        ArrayList<String> rankNames = new ArrayList<>();
+        if (playerData != null) rankNames.addAll(playerData.getRanks());
+        if (rankNames.isEmpty()) rankNames.add(settings.getDefaultRank());
+        rankNames.sort(Comparator.comparingInt(rankName -> { PermissionRank rank = getRank(rankName); return rank == null ? 0 : rank.getPriority(); }));
+        Map<String, PermissionExplanation> merged = new HashMap<>();
+        for (String rankName : rankNames) mergeRankPermissionSources(rankName, rankName, new HashSet<>(), merged);
+        String matched = matchingPermissionKey(merged, key);
+        if (matched == null && PermissionKeys.TELEPORT_REQUIRE_STILL.equals(key))
+            matched = matchingPermissionKey(merged, PermissionKeys.TELEPORT_CANCEL_ON_MOVE);
+        return matched == null ? null : merged.get(matched);
+    }
+
+    private void mergeRankPermissionSources(String rankName, String path, Set<String> visited, Map<String, PermissionExplanation> merged) {
+        String normalized = normalizeRankName(rankName);
+        if (!visited.add(normalized)) return;
+        PermissionRank rank = getRank(normalized);
+        if (rank == null) return;
+        for (String inherited : rank.getInherits()) mergeRankPermissionSources(inherited, path + " > " + normalizeRankName(inherited), visited, merged);
+        for (Map.Entry<String, String> entry : rank.getPermissions().entrySet())
+            merged.put(entry.getKey(), new PermissionExplanation(entry.getValue(), "rank " + path + " via " + entry.getKey()));
+    }
+
+    private static String matchingPermissionKey(Map<String, ?> permissions, String key) {
+        if (permissions == null || key == null || key.isBlank()) return null;
+        if (permissions.containsKey(key)) return key;
+        String wildcard = key;
+        while (wildcard.contains(".")) {
+            wildcard = wildcard.substring(0, wildcard.lastIndexOf('.'));
+            String candidate = wildcard + ".*";
+            if (permissions.containsKey(candidate)) return candidate;
+        }
+        return permissions.containsKey("*") ? "*" : null;
+    }
+
+    public record PermissionExplanation(String value, String source) { }
+
     /** Returns inherited rank defaults with dimension-specific rank overrides applied. */
     public Map<String, String> getEffectiveRankPermissions(String rankName, String dimensionId) {
         Map<String, String> merged = new HashMap<>(getEffectiveRankPermissions(rankName));
@@ -1251,6 +1298,12 @@ public class PermissionManager {
         changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_ORE_EMERALD, false);
         changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_ORE_LAPIS, false);
         changed |= setDefaultPermission(rank, PermissionKeys.VEINMINER_ORE_DIAMOND, false);
+
+        changed |= setDefaultPermission(rank, PermissionKeys.SERVER_OPERATIONS_ADMIN, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.MAINTENANCE_BYPASS, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.CHAT_MOD_BYPASS, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.STAFF_CHAT, false);
+        changed |= setDefaultPermission(rank, PermissionKeys.REPORTS_USE, true);
 
         return changed;
     }

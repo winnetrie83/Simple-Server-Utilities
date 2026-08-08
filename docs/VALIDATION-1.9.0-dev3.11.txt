@@ -1,0 +1,71 @@
+SSU 1.9.0-dev3.11 validation notes
+==================================
+Target: Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25
+Basis: SSU 1.9.0-dev3.10.1
+Network protocol: 96
+Changed persistence: Server Operations schema 3; Mine definition schema 1
+
+Checks performed in the build container
+---------------------------------------
+1. Gradle compile attempt
+   Command: ./gradlew compileJava --no-daemon
+   Result: NOT EXECUTED TO COMPILER STAGE.
+   The Gradle wrapper needs Gradle 9.2.1 and the container cannot resolve/reach
+   services.gradle.org (java.net.UnknownHostException). This is an environment/network
+   limitation, so a real local Gradle compile remains required.
+
+2. JDK-only compile
+   The Minecraft/NeoForge-independent support/migration/model classes compiled with javac:
+   - SupportRichText
+   - SupportTicketCategory
+   - ServerOperationsState
+   - MineDefinition
+   Result: JDK_ONLY_COMPILE_OK
+
+3. JDK-only behavior harness
+   Checked:
+   - disallowed obfuscated support formatting is removed;
+   - rich support text converts to plain text correctly;
+   - Server Operations schema normalizes to 3 and ticket-retention bounds are enforced;
+   - legacy message/staffNote data migrates once into threaded messages;
+   - legacy CLOSED ticket timestamps normalize to closedAt;
+   - Mine schema/id/bounds/reset-threshold/palette/progress normalization behaves safely.
+   Result: SSU_DEV3_11_COMMON_TEST_OK
+
+4. Java lexical balance scan
+   727 Java source files scanned while ignoring comments, strings, character literals and
+   text blocks; (), [] and {} nesting/balance checked.
+   Result: JAVA_LEXICAL_BALANCE_OK files=727
+
+5. Dependency-less javac parser sanity pass
+   34 Java files changed/added versus dev3.10.1 were passed to javac without the
+   Minecraft/NeoForge/Gson classpath. Missing-type/import diagnostics are expected in this
+   mode. The diagnostic stream was specifically scanned for parser/syntax failures such as
+   '; expected', illegal start, unclosed string, unmatched closing delimiters and
+   end-of-file-while-parsing.
+   Result: DEPENDENCYLESS_JAVAC_SYNTAX_HITS=0
+
+6. Static source/version checks
+   - mod_version = 1.9.0-dev3.11
+   - network registrar version = 96
+   - Server Operations schema = 3
+   - Mine definition schema = 1
+   - ServerOperationsScreen#formatTicketTime(long) present
+   - ssu.mines.* permission catalogue entry present
+   - dynamic kit/mine permission discovery present
+   - no obsolete getSharedSpawnPos usage found
+   - no generated .class/.gradle/build artifacts in the source tree
+
+Runtime status
+--------------
+Not yet confirmed in a real Minecraft 26.2 client + dedicated NeoForge server.
+Use docs/TESTING-1.9.0-dev3.11.md for the runtime test pass.
+
+Mines scope in dev3.11
+----------------------
+This build intentionally delivers Mines phase 1/foundation: persistence, GUI, setup tool,
+permissions, weighted reset palette, bounded resets, interval/mined-threshold triggers,
+warnings, safe player handling, teleport positions and progress/basic counters.
+Advanced roadmap items such as true inventory-slot palette authoring, custom/no-drop rules,
+XP/Fortune/Silk controls, integrated mine holograms and richer dedicated mine statistics
+remain follow-up work and are not claimed as complete in this build.

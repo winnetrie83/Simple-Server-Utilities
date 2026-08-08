@@ -42,6 +42,7 @@ public final class NpcShopEditorScreen extends Screen {
 
     private NpcShopEditorOpenPayload initial;
     private final Screen parent;
+    private final boolean npcEmbedded;
     private NpcShopDefinition draft;
     private int page, offerPage, usagePage, selectedIndex = -1;
     private long nextRequestId;
@@ -80,6 +81,7 @@ public final class NpcShopEditorScreen extends Screen {
         super(Component.literal("NPC Shop Editor"));
         this.initial = initial;
         this.parent = parent;
+        this.npcEmbedded = parent instanceof NpcEditorScreen;
         this.nextRequestId = Math.max(1L, initial.requestId() + 1L);
         this.notice = initial.notice();
         loadDraft(initial.definitionJson(), initial.selectedEntryId());
@@ -131,8 +133,10 @@ public final class NpcShopEditorScreen extends Screen {
     @Override protected void init() {
         rows.clear(); filterRows.clear();
         int left = left(), top = top();
-        String[] names = {"General", "Offers", "Trade rules", "Availability", "Linked NPCs"};
-        int[] widths = {58, 54, 78, 80, 82};
+        String[] names = npcEmbedded
+                ? new String[]{"General", "Offers", "Trade rules", "Availability"}
+                : new String[]{"General", "Offers", "Trade rules", "Availability", "Linked NPCs"};
+        int[] widths = npcEmbedded ? new int[]{58, 54, 78, 80} : new int[]{58, 54, 78, 80, 82};
         int x = left + 10;
         for (int index = 0; index < names.length; index++) {
             int target = index;
@@ -142,16 +146,18 @@ public final class NpcShopEditorScreen extends Screen {
             x += widths[index] + 4;
         }
 
-        Button previousShop = addRenderableWidget(Button.builder(Component.literal("<"), ignored -> browseShop(-1))
-                .bounds(left + 10, top + 34, 26, 18).build());
-        previousShop.active = !awaiting && !initial.originalShopId().isBlank() && initial.shopIndex() > 0;
-        Button shopList = addRenderableWidget(Button.builder(Component.literal("Shop list"), ignored -> openShopList())
-                .bounds(left + 40, top + 34, 76, 18).build());
-        shopList.active = !awaiting;
-        Button nextShop = addRenderableWidget(Button.builder(Component.literal(">"), ignored -> browseShop(1))
-                .bounds(left + 120, top + 34, 26, 18).build());
-        nextShop.active = !awaiting && !initial.originalShopId().isBlank()
-                && initial.shopIndex() >= 0 && initial.shopIndex() + 1 < initial.shopCount();
+        if (!npcEmbedded) {
+            Button previousShop = addRenderableWidget(Button.builder(Component.literal("<"), ignored -> browseShop(-1))
+                    .bounds(left + 10, top + 34, 26, 18).build());
+            previousShop.active = !awaiting && !initial.originalShopId().isBlank() && initial.shopIndex() > 0;
+            Button shopList = addRenderableWidget(Button.builder(Component.literal("Shop list"), ignored -> openShopList())
+                    .bounds(left + 40, top + 34, 76, 18).build());
+            shopList.active = !awaiting;
+            Button nextShop = addRenderableWidget(Button.builder(Component.literal(">"), ignored -> browseShop(1))
+                    .bounds(left + 120, top + 34, 26, 18).build());
+            nextShop.active = !awaiting && !initial.originalShopId().isBlank()
+                    && initial.shopIndex() >= 0 && initial.shopIndex() + 1 < initial.shopCount();
+        }
         addRenderableWidget(Button.builder(Component.literal("×"), ignored -> onClose())
                 .bounds(left + W - 27, top + 8, 18, 18).build());
 
@@ -163,15 +169,21 @@ public final class NpcShopEditorScreen extends Screen {
 
         addRenderableWidget(Button.builder(Component.literal("Cancel"), ignored -> onClose())
                 .bounds(left + 10, top + H - 27, 72, 18).build());
-        Button save = addRenderableWidget(Button.builder(Component.literal("Save shop"), ignored -> submitSave())
-                .bounds(left + W - 94, top + H - 27, 84, 18).build());
+        Button save = addRenderableWidget(Button.builder(Component.literal(npcEmbedded ? "Save & back" : "Save shop"),
+                ignored -> { if (npcEmbedded) submitOperation("save_close", "Saving NPC shop…"); else submitSave(); })
+                .bounds(left + W - 104, top + H - 27, 94, 18).build());
         save.active = !awaiting;
     }
 
     private void initGeneral(int left, int top) {
-        idBox = field(left + 20, top + 92, 210, 64, "Shop ID", draft.id);
-        idBox.setEditable(initial.originalShopId().isBlank());
-        nameBox = field(left + 244, top + 92, 300, 64, "Display name", draft.displayName);
+        if (npcEmbedded) {
+            idBox = null;
+            nameBox = field(left + 20, top + 92, 524, 64, "Display name", draft.displayName);
+        } else {
+            idBox = field(left + 20, top + 92, 210, 64, "Shop ID", draft.id);
+            idBox.setEditable(initial.originalShopId().isBlank());
+            nameBox = field(left + 244, top + 92, 300, 64, "Display name", draft.displayName);
+        }
         enabled = draft.enabled;
         enabledButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> {
             enabled = !enabled; updateToggleLabels();
@@ -295,10 +307,12 @@ public final class NpcShopEditorScreen extends Screen {
     }
 
     private void saveGeneral() {
-        if (idBox == null) return;
-        String id = idBox.getValue().trim();
-        if (id.isBlank()) throw new IllegalArgumentException("Shop ID cannot be empty.");
-        draft.id = id;
+        if (!npcEmbedded) {
+            if (idBox == null) return;
+            String id = idBox.getValue().trim();
+            if (id.isBlank()) throw new IllegalArgumentException("Shop ID cannot be empty.");
+            draft.id = id;
+        }
         draft.displayName = nameBox == null || nameBox.getValue().isBlank() ? "Shop" : nameBox.getValue().trim();
         draft.enabled = enabled;
     }
@@ -395,14 +409,17 @@ public final class NpcShopEditorScreen extends Screen {
         selectedIndex = target; offerPage = target / OFFER_PAGE_SIZE; rebuildWidgets();
     }
 
-    private void captureInventory(int inventorySlot) {
+    private void captureInventory(int inventorySlot, boolean oneItem) {
         if (!saveCurrentPage()) return;
         NpcShopEntry entry = selected();
         if (entry == null || inventorySlot < 0 || inventorySlot >= 36) return;
         awaiting = true;
-        ClientPacketDistributor.sendToServer(new NpcShopEditorSubmitPayload("capture_inventory",
+        ClientPacketDistributor.sendToServer(new NpcShopEditorSubmitPayload(
+                oneItem ? "capture_inventory_one" : "capture_inventory",
                 initial.originalShopId(), draftJson(), entry.id, inventorySlot, nextRequestId++));
-        setNotice("Copying the selected inventory stack from the server…", false); rebuildWidgets();
+        setNotice(oneItem ? "Copying one item from the selected stack…"
+                : "Copying the selected inventory stack from the server…", false);
+        rebuildWidgets();
     }
 
     private void submitSave() { submitOperation("save", "Saving NPC shop…"); }
@@ -439,13 +456,21 @@ public final class NpcShopEditorScreen extends Screen {
 
     private void renderGeneral(GuiGraphicsExtractor g, int left, int top) {
         panel(g, left + 10, top + 60, W - 20, 252);
-        g.text(font, "Shared shop identity", left + 20, top + 68, TEXT, true);
-        g.text(font, "Shop ID", left + 20, top + 81, MUTED, false);
-        g.text(font, "Display name", left + 244, top + 81, MUTED, false);
-        g.text(font, "Every linked NPC reads this one live shop definition.", left + 20, top + 172, GOOD, false);
+        g.text(font, npcEmbedded ? "NPC shop" : "Shared shop identity", left + 20, top + 68, TEXT, true);
+        if (!npcEmbedded) {
+            g.text(font, "Shop ID", left + 20, top + 81, MUTED, false);
+            g.text(font, "Display name", left + 244, top + 81, MUTED, false);
+            g.text(font, "Every linked NPC reads this one live shop definition.", left + 20, top + 172, GOOD, false);
+            g.text(font, "Linked templates: " + initial.usages().size(), left + 20, top + 218, TEXT, false);
+            g.text(font, "Use Linked NPCs to inspect placements using this shop.", left + 20, top + 244, MUTED, false);
+        } else {
+            g.text(font, "Display name", left + 20, top + 81, MUTED, false);
+            g.text(font, "This shop belongs to the NPC editor. Its technical ID is managed automatically.",
+                    left + 20, top + 172, GOOD, false);
+            g.text(font, "Use Offers to copy exact item stacks from your inventory without consuming them.",
+                    left + 20, top + 218, MUTED, false);
+        }
         g.text(font, "Offers: " + draft.entries.size() + "/" + NpcShopDefinition.MAX_ENTRIES, left + 20, top + 198, TEXT, false);
-        g.text(font, "Linked templates: " + initial.usages().size(), left + 20, top + 218, TEXT, false);
-        g.text(font, "Use Linked NPCs to inspect placements using this shop.", left + 20, top + 244, MUTED, false);
     }
 
     private void renderOffers(GuiGraphicsExtractor g, int left, int top, int mouseX, int mouseY) {
@@ -473,7 +498,7 @@ public final class NpcShopEditorScreen extends Screen {
         g.text(font, "Offer ID", x + 8, top + 74, MUTED, false); g.text(font, "Count", x + 182, top + 74, MUTED, false);
         g.text(font, "Stock", x + 8, top + 120, MUTED, false); g.text(font, "Maximum", x + 84, top + 120, MUTED, false);
         g.text(font, "Restock +", x + 160, top + 120, MUTED, false); g.text(font, "Minutes", x + 236, top + 120, MUTED, false);
-        g.text(font, "Inventory — click a stack", x + 8, top + 163, MUTED, false);
+        g.text(font, "Inventory — LMB full stack · RMB one item", x + 8, top + 163, MUTED, false);
         renderEditorInventory(g, x + 8, top + 176, mouseX, mouseY);
         int itemSlotX = x + 186, itemSlotY = top + 176;
         boolean itemHovered = SsuGuiGeometry.inside(mouseX, mouseY, itemSlotX, itemSlotY, 20, 20);
@@ -549,15 +574,18 @@ public final class NpcShopEditorScreen extends Screen {
     }
 
     @Override public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-        if (page == 1 && event.buttonInfo().button() == 0) {
+        if (page == 1 && (event.buttonInfo().button() == 0 || event.buttonInfo().button() == 1)) {
             if (!awaiting && selected() != null) {
                 int slot = editorInventorySlotAt((int) event.x(), (int) event.y());
                 if (slot >= 0) {
-                    if (clientInventoryItem(slot).isEmpty()) setNotice("That inventory slot is empty.", true); else captureInventory(slot);
+                    if (clientInventoryItem(slot).isEmpty()) setNotice("That inventory slot is empty.", true);
+                    else captureInventory(slot, event.buttonInfo().button() == 1);
                     return true;
                 }
             }
-            for (RowBounds row : rows) if (row.contains((int) event.x(), (int) event.y())) { selectOffer(row.index()); return true; }
+            if (event.buttonInfo().button() == 0) {
+                for (RowBounds row : rows) if (row.contains((int) event.x(), (int) event.y())) { selectOffer(row.index()); return true; }
+            }
         }
         if (page == 2 && event.buttonInfo().button() == 0) {
             List<FilterOption> options = filteredOptions();

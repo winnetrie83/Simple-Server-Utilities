@@ -62,7 +62,8 @@ public final class MinigameSelectionCreateScreen extends Screen {
     private void submit() {
         if (awaiting) return;
         int min, max;
-        int maximumAllowed = gameType == MinigameGameType.SPLEEF ? 16 : 64;
+        int maximumAllowed = gameType == MinigameGameType.SPLEEF ? 16
+                : gameType == MinigameGameType.BLOCK_PARTY ? 32 : 64;
         try {
             min = Integer.parseInt(minBox.getValue().trim());
             max = Integer.parseInt(maxBox.getValue().trim());
@@ -87,18 +88,24 @@ public final class MinigameSelectionCreateScreen extends Screen {
                 && "new_capture_the_flag".equals(idBox.getValue()) && "New Capture the Flag".equals(nameBox.getValue());
         boolean oldDominationDefaults = idBox != null && nameBox != null
                 && "new_domination".equals(idBox.getValue()) && "New Domination".equals(nameBox.getValue());
+        boolean oldKothDefaults = idBox != null && nameBox != null
+                && "new_king_of_the_hill".equals(idBox.getValue()) && "New King of the Hill".equals(nameBox.getValue());
+        boolean oldBlockPartyDefaults = idBox != null && nameBox != null
+                && "new_block_party".equals(idBox.getValue()) && "New Block Party".equals(nameBox.getValue());
         gameType = switch (gameType) {
             case SPLEEF -> MinigameGameType.CAPTURE_THE_FLAG;
             case CAPTURE_THE_FLAG -> MinigameGameType.DOMINATION;
+            case DOMINATION -> MinigameGameType.KING_OF_THE_HILL;
+            case KING_OF_THE_HILL -> MinigameGameType.BLOCK_PARTY;
             default -> MinigameGameType.SPLEEF;
         };
-        if (oldSpleefDefaults || oldCtfDefaults || oldDominationDefaults) {
-            if (gameType == MinigameGameType.SPLEEF) {
-                idBox.setValue("new_spleef"); nameBox.setValue("New Spleef");
-            } else if (gameType == MinigameGameType.CAPTURE_THE_FLAG) {
-                idBox.setValue("new_capture_the_flag"); nameBox.setValue("New Capture the Flag");
-            } else {
-                idBox.setValue("new_domination"); nameBox.setValue("New Domination");
+        if (oldSpleefDefaults || oldCtfDefaults || oldDominationDefaults || oldKothDefaults || oldBlockPartyDefaults) {
+            switch (gameType) {
+                case CAPTURE_THE_FLAG -> { idBox.setValue("new_capture_the_flag"); nameBox.setValue("New Capture the Flag"); }
+                case DOMINATION -> { idBox.setValue("new_domination"); nameBox.setValue("New Domination"); }
+                case KING_OF_THE_HILL -> { idBox.setValue("new_king_of_the_hill"); nameBox.setValue("New King of the Hill"); }
+                case BLOCK_PARTY -> { idBox.setValue("new_block_party"); nameBox.setValue("New Block Party"); }
+                default -> { idBox.setValue("new_spleef"); nameBox.setValue("New Spleef"); }
             }
         }
         updateTypeLabel();
@@ -133,6 +140,8 @@ public final class MinigameSelectionCreateScreen extends Screen {
             case SPLEEF -> "Spleef starts disabled. Review lobby, spectator and player spawns before enabling it.";
             case CAPTURE_THE_FLAG -> "Capture the Flag starts disabled. Review team spawns, both physical flags and scoring settings.";
             case DOMINATION -> "Domination starts disabled. Review team spawns, five capture nodes and score settings.";
+            case KING_OF_THE_HILL -> "King of the Hill starts disabled. Review team spawns, hill center and scoring rules.";
+            case BLOCK_PARTY -> "Block Party starts disabled. Review player spawns, dance floor and round timings.";
             default -> "Review all generated arena settings before enabling the minigame.";
         };
         g.text(font, setup, x + 24, y + 154, MUTED, false);

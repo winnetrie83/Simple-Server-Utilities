@@ -7,5 +7,6 @@ public enum BorderLayer {
     CLAIM_FOCUS,
     REGION_FOCUS,
     MINIGAME_GAME,
-    MINIGAME_SPECTATOR
+    MINIGAME_SPECTATOR,
+    JAIL_FOCUS
 }

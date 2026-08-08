@@ -13,7 +13,7 @@ public class ModNetworking {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("91");
+        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("100");
 
         registrar.playToClient(
                 ClaimMapDataPayload.TYPE,
@@ -304,6 +304,11 @@ public class ModNetworking {
         );
 
         registrar.playToClient(
+                NpcTextureSyncPayload.TYPE,
+                NpcTextureSyncPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
                 NpcEditorOpenPayload.TYPE,
                 NpcEditorOpenPayload.STREAM_CODEC
         );
@@ -560,6 +565,11 @@ public class ModNetworking {
         );
 
         registrar.playToClient(
+                MinigameKothVisualPayload.TYPE,
+                MinigameKothVisualPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
                 MinigameCastBarPayload.TYPE,
                 MinigameCastBarPayload.STREAM_CODEC
         );
@@ -806,6 +816,53 @@ public class ModNetworking {
                 DamageIndicatorPayload.TYPE,
                 DamageIndicatorPayload.STREAM_CODEC
         );
+
+        registrar.playToClient(OnboardingStatePayload.TYPE, OnboardingStatePayload.STREAM_CODEC);
+        registrar.playToServer(OnboardingActionPayload.TYPE, OnboardingActionPayload.STREAM_CODEC,
+                (p,c) -> { if (c.player() instanceof net.minecraft.server.level.ServerPlayer player) SimpleServerUtilities.ONBOARDING.handleAction(player,p.action(),p.pageIndex(),p.requestId()); });
+        registrar.playToServer(OnboardingAdminRequestPayload.TYPE, OnboardingAdminRequestPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.onboarding.OnboardingService::handleRequest);
+        registrar.playToServer(OnboardingAdminSavePayload.TYPE, OnboardingAdminSavePayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.onboarding.OnboardingService::handleSave);
+        registrar.playToClient(OnboardingAdminDataPayload.TYPE, OnboardingAdminDataPayload.STREAM_CODEC);
+
+        registrar.playToServer(PlayerManagementRequestPayload.TYPE, PlayerManagementRequestPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.moderation.ModerationService::request);
+        registrar.playToServer(PlayerManagementActionPayload.TYPE, PlayerManagementActionPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.moderation.ModerationService::action);
+        registrar.playToClient(PlayerManagementDataPayload.TYPE, PlayerManagementDataPayload.STREAM_CODEC);
+        registrar.playToClient(JailDashboardPayload.TYPE, JailDashboardPayload.STREAM_CODEC);
+        registrar.playToServer(JailDashboardActionPayload.TYPE, JailDashboardActionPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.moderation.ModerationService::jailAction);
+        registrar.playToServer(PlayerInventoryOpenPayload.TYPE, PlayerInventoryOpenPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.moderation.ModerationService::openInventory);
+
+        registrar.playToServer(KitRequestPayload.TYPE, KitRequestPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.kits.KitService::request);
+        registrar.playToServer(KitActionPayload.TYPE, KitActionPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.kits.KitService::action);
+        registrar.playToClient(KitDataPayload.TYPE, KitDataPayload.STREAM_CODEC);
+        registrar.playToServer(KitContentsSavePayload.TYPE, KitContentsSavePayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.kits.KitEditorService::save);
+        registrar.playToClient(KitContentsResultPayload.TYPE, KitContentsResultPayload.STREAM_CODEC);
+
+        registrar.playToServer(JailAdminRequestPayload.TYPE, JailAdminRequestPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.jail.JailService::request);
+        registrar.playToServer(JailAdminActionPayload.TYPE, JailAdminActionPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.jail.JailService::action);
+        registrar.playToClient(JailAdminDataPayload.TYPE, JailAdminDataPayload.STREAM_CODEC);
+
+        registrar.playToServer(MineRequestPayload.TYPE, MineRequestPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.mine.MineService::request);
+        registrar.playToServer(MineActionPayload.TYPE, MineActionPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.mine.MineService::action);
+        registrar.playToClient(MineDataPayload.TYPE, MineDataPayload.STREAM_CODEC);
+
+        registrar.playToServer(ServerOperationsRequestPayload.TYPE, ServerOperationsRequestPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.serverops.ServerOperationsService::request);
+        registrar.playToServer(ServerOperationsActionPayload.TYPE, ServerOperationsActionPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.serverops.ServerOperationsService::action);
+        registrar.playToClient(ServerOperationsDataPayload.TYPE, ServerOperationsDataPayload.STREAM_CODEC);
 
     }
 }

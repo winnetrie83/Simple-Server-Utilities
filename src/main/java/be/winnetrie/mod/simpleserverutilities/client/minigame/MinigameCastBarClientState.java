@@ -9,6 +9,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 public final class MinigameCastBarClientState {
     private static boolean visible;
     private static String label = "";
+    private static String instruction = "";
     private static float progress;
     private static int color = 0xFFFFFF;
 
@@ -18,6 +19,7 @@ public final class MinigameCastBarClientState {
     public static synchronized void apply(MinigameCastBarPayload payload) {
         visible = payload != null && payload.visible();
         label = payload == null ? "" : payload.label();
+        instruction = payload == null ? "" : payload.instruction();
         progress = payload == null ? 0.0F : payload.progress();
         color = payload == null ? 0xFFFFFF : payload.color();
     }
@@ -25,6 +27,7 @@ public final class MinigameCastBarClientState {
     public static synchronized void clear() {
         visible = false;
         label = "";
+        instruction = "";
         progress = 0.0F;
         color = 0xFFFFFF;
     }
@@ -42,5 +45,9 @@ public final class MinigameCastBarClientState {
         graphics.outline(x, y, width, height, 0xFFE8EEF3);
         int textX = x + (width - minecraft.font.width(label)) / 2;
         graphics.text(minecraft.font, label, textX, y - 12, 0xFFFFFFFF, true);
+        if (!instruction.isBlank()) {
+            int instructionX = (minecraft.getWindow().getGuiScaledWidth() - minecraft.font.width(instruction)) / 2;
+            graphics.text(minecraft.font, instruction, instructionX, y - 28, 0xFFE8EEF3, true);
+        }
     }
 }

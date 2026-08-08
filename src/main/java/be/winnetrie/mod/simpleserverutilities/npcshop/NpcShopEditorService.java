@@ -62,8 +62,10 @@ public final class NpcShopEditorService {
             }
             try {
                 switch (payload.operation()) {
-                    case "capture_inventory" -> captureInventory(player, payload);
+                    case "capture_inventory" -> captureInventory(player, payload, false);
+                    case "capture_inventory_one" -> captureInventory(player, payload, true);
                     case "save" -> saveAndKeepOpen(player, payload);
+                    case "save_close" -> saveAndClose(player, payload);
                     case "save_previous" -> saveAndNavigate(player, payload, -1);
                     case "save_next" -> saveAndNavigate(player, payload, 1);
                     case "save_manager" -> saveAndOpenManager(player, payload);
@@ -138,7 +140,7 @@ public final class NpcShopEditorService {
         }
     }
 
-    private static void captureInventory(ServerPlayer player, NpcShopEditorSubmitPayload payload) {
+    private static void captureInventory(ServerPlayer player, NpcShopEditorSubmitPayload payload, boolean oneItem) {
         int slot = payload.inventorySlot();
         if (slot < 0 || slot >= 36) {
             sendResult(player, false, "Select a valid inventory slot first.", "", false, payload.requestId());
@@ -156,6 +158,7 @@ public final class NpcShopEditorService {
             return;
         }
         ItemStack exactCopy = selected.copy();
+        if (oneItem) exactCopy.setCount(1);
         entry.setItem(player.level().registryAccess(), exactCopy);
         entry.itemCount = Math.max(1, exactCopy.getCount());
         entry.normalize();
@@ -169,6 +172,12 @@ public final class NpcShopEditorService {
         if (saved.entry(selectedEntryId) == null) selectedEntryId = firstEntryId(saved);
         sendEditor(player, saved.id, saved.copy(), selectedEntryId,
                 "Shop '" + saved.displayName + "' saved.", payload.requestId());
+    }
+
+    private static void saveAndClose(ServerPlayer player, NpcShopEditorSubmitPayload payload) {
+        NpcShopDefinition saved = saveDraft(player, payload);
+        if (saved == null) return;
+        sendResult(player, true, "NPC shop '" + saved.displayName + "' saved.", saved.id, true, payload.requestId());
     }
 
     private static void saveAndNavigate(ServerPlayer player, NpcShopEditorSubmitPayload payload, int direction) {

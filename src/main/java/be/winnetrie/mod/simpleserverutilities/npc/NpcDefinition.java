@@ -9,12 +9,18 @@ import com.google.gson.JsonNull;
 
 /** Reusable, persistent NPC template. Runtime placements reference this definition by ID. */
 public final class NpcDefinition {
-    public static final int SCHEMA_VERSION = 8;
+    public static final int SCHEMA_VERSION = 9;
 
     public int schemaVersion = SCHEMA_VERSION;
     public String id = "npc";
     public String displayName = "NPC";
     public String entityType = "minecraft:villager";
+    /** Optional custom player skin source. Custom skins use Minecraft's mannequin renderer. */
+    public String textureSource = NpcTextureSource.NONE.id();
+    /** Relative filename below simpleserverutilities/npcs/textures, or an HTTPS URL. */
+    public String textureValue = "";
+    /** Player skin geometry: wide (Steve) or slim (Alex). */
+    public String textureModel = "wide";
     /** Legacy schema field migrated to a one-node dialogue on load. */
     public String interactionText = "";
     /** Optional reusable dialogue graph ID. Legacy one-line text is migrated into a graph on load. */
@@ -94,6 +100,11 @@ public final class NpcDefinition {
         id = sanitizeId(id);
         displayName = limit(displayName == null || displayName.isBlank() ? "NPC" : displayName.trim(), 64);
         entityType = normalizeRegistryId(entityType, "minecraft:villager", 128);
+        textureSource = NpcTextureSource.parse(textureSource).id();
+        textureValue = limit(textureValue == null ? "" : textureValue.trim(), 1_024);
+        textureModel = "slim".equalsIgnoreCase(textureModel) ? "slim" : "wide";
+        if (textureSource().custom()) entityType = "minecraft:mannequin";
+        else textureValue = "";
         interactionText = limit(interactionText == null ? "" : interactionText.trim(), 512);
         dialogueId = dialogueId == null || dialogueId.isBlank() ? "" : sanitizeId(dialogueId);
         roleId = NpcRole.parse(roleId).id();
@@ -177,6 +188,9 @@ public final class NpcDefinition {
         copy.id = id;
         copy.displayName = displayName;
         copy.entityType = entityType;
+        copy.textureSource = textureSource;
+        copy.textureValue = textureValue;
+        copy.textureModel = textureModel;
         copy.interactionText = interactionText;
         copy.dialogueId = dialogueId;
         copy.roleId = roleId;
@@ -230,6 +244,15 @@ public final class NpcDefinition {
         return copy;
     }
 
+
+
+    public NpcTextureSource textureSource() {
+        return NpcTextureSource.parse(textureSource);
+    }
+
+    public boolean hasCustomTexture() {
+        return textureSource().custom() && textureValue != null && !textureValue.isBlank();
+    }
 
     public String factionLabel() {
         if (factionId == null || factionId.isBlank()) return "";

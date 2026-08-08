@@ -56,12 +56,20 @@ public final class MinigameSetupCreateScreen extends Screen {
         type = switch (type) {
             case SPLEEF -> MinigameGameType.CAPTURE_THE_FLAG;
             case CAPTURE_THE_FLAG -> MinigameGameType.DOMINATION;
+            case DOMINATION -> MinigameGameType.KING_OF_THE_HILL;
+            case KING_OF_THE_HILL -> MinigameGameType.BLOCK_PARTY;
             default -> MinigameGameType.SPLEEF;
         };
-        String suffix = type == MinigameGameType.SPLEEF ? "spleef" : type == MinigameGameType.CAPTURE_THE_FLAG ? "capture_the_flag" : "domination";
+        String suffix = switch (type) {
+            case CAPTURE_THE_FLAG -> "capture_the_flag";
+            case DOMINATION -> "domination";
+            case KING_OF_THE_HILL -> "king_of_the_hill";
+            case BLOCK_PARTY -> "block_party";
+            default -> "spleef";
+        };
         id.setValue("new_" + suffix);
         name.setValue("New " + type.label());
-        maximum.setValue(type == MinigameGameType.DOMINATION ? "20" : "8");
+        maximum.setValue(type == MinigameGameType.DOMINATION ? "20" : type == MinigameGameType.BLOCK_PARTY ? "12" : "8");
         updateType();
     }
 
@@ -70,7 +78,7 @@ public final class MinigameSetupCreateScreen extends Screen {
     private void submit() {
         try {
             int min = Integer.parseInt(minimum.getValue().trim()), max = Integer.parseInt(maximum.getValue().trim());
-            int limit = type == MinigameGameType.SPLEEF ? 16 : 64;
+            int limit = type == MinigameGameType.SPLEEF ? 16 : type == MinigameGameType.BLOCK_PARTY ? 32 : 64;
             if (min < 2 || max < min || max > limit) throw new NumberFormatException();
             awaiting = true; notice = "Creating region and verified reset snapshot…"; error = false;
             ClientPacketDistributor.sendToServer(new MinigameSelectionCreatePayload(id.getValue(), name.getValue(),

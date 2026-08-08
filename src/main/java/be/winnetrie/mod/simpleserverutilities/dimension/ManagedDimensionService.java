@@ -12,6 +12,11 @@ import be.winnetrie.mod.simpleserverutilities.network.SsuDimensionManagerSubmitP
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+import be.winnetrie.mod.simpleserverutilities.teleport.TeleportSafety;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
@@ -58,11 +63,32 @@ public final class ManagedDimensionService {
                     selected = "";
                     notice = "Dimension definition deleted. Restart the server to unload it; existing world data was retained.";
                 }
+                case "teleport" -> {
+                    String id = payload.originalId() == null ? "" : payload.originalId().trim();
+                    if (id.isBlank()) throw new IllegalArgumentException("Select a loaded dimension first.");
+                    var key = ResourceKey.create(Registries.DIMENSION, Identifier.parse(id));
+                    var level = player.level().getServer().getLevel(key);
+                    if (level == null) throw new IllegalArgumentException("That dimension is not loaded. Restart after creating or enabling it.");
+                    var spawn = level.getWorldBorderAdjustedRespawnData(level.getRespawnData()).pos();
+                    var safe = TeleportSafety.findSafeDestination(level, spawn.getX()+0.5D, spawn.getY(), spawn.getZ()+0.5D, 32);
+                    if (safe.isPresent()) {
+                        var d = safe.get();
+                        player.teleportTo(level, d.x(), d.y(), d.z(), java.util.Set.of(), player.getYRot(), player.getXRot(), true);
+                    } else {
+                        player.teleportTo(level, spawn.getX()+0.5D, spawn.getY()+1.0D, spawn.getZ()+0.5D, java.util.Set.of(), player.getYRot(), player.getXRot(), true);
+                    }
+                    selected = id;
+                    notice = "Teleported to " + id + ".";
+                }
                 default -> throw new IllegalArgumentException("Unknown dimension action.");
             }
         } catch (Exception exception) {
             notice = exception.getMessage() == null ? "Dimension action failed safely." : exception.getMessage();
             error = true;
+        }
+        if (!error && !"teleport".equals(payload.action())) {
+            SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "dimension." + payload.action(),
+                    payload.originalId() == null ? selected : payload.originalId(), notice);
         }
         PacketDistributor.sendToPlayer(player, data(player, selected, payload.requestId(), notice, error));
     }

@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportOptions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -71,6 +72,11 @@ public class TeleportManager {
             Function<ServerPlayer, String> guardFailureMessage
     ) {
         MinecraftServer server = player.level().getServer();
+
+        if (SimpleServerUtilities.MODERATION.jailed(player.getUUID())) {
+            player.sendOverlayMessage(Component.literal("Teleport is disabled while jailed."));
+            return 0;
+        }
 
         if (server == null) {
             player.sendSystemMessage(Component.literal("Teleport failed: server not available."));

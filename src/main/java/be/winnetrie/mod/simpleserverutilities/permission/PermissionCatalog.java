@@ -288,6 +288,19 @@ public final class PermissionCatalog {
 
         bool(values, PermissionKeys.PERMISSIONS_ADMIN, "Allows editing rank and player permissions, including per-dimension overrides.");
         bool(values, PermissionKeys.DIMENSIONS_ADMIN, "Allows creating, editing and deleting SSU-managed dimensions.");
+        bool(values, PermissionKeys.ONBOARDING_ADMIN, "Allows configuring onboarding, rules and server/lobby spawn onboarding controls.");
+        bool(values, PermissionKeys.MODERATION_ADMIN, "Allows player moderation such as warnings, kicks, bans, freeze and jail.");
+        bool(values, PermissionKeys.MODERATION_INVENTORY, "Allows live/offline inventory, armor and ender-chest administration.");
+        bool(values, PermissionKeys.KITS_USE, "Allows access to the kits dashboard and claiming permitted kits.");
+        bool(values, PermissionKeys.KITS_ADMIN, "Allows creating, editing and deleting kits.");
+        bool(values, PermissionKeys.MINES_USE, "Allows opening the Mines dashboard and using mines granted by per-mine permissions.");
+        bool(values, PermissionKeys.MINES_ADMIN, "Allows creating, editing, resetting and deleting dedicated mines.");
+        bool(values, PermissionKeys.JAILS_ADMIN, "Allows creating and editing dedicated jail facilities and their setup points.");
+        bool(values, PermissionKeys.SERVER_OPERATIONS_ADMIN, "Allows the Server Operations GUI: backups, scheduler, maintenance, chat moderation, audit, health, reports, world management, economy analytics and configuration profiles.");
+        bool(values, PermissionKeys.MAINTENANCE_BYPASS, "Allows joining and remaining online while SSU maintenance mode is enabled.");
+        bool(values, PermissionKeys.CHAT_MOD_BYPASS, "Bypasses SSU slow-mode, duplicate, burst and blocked-word chat checks; explicit mutes still apply.");
+        bool(values, PermissionKeys.STAFF_CHAT, "Allows reading and sending SSU staff chat with the # prefix.");
+        bool(values, PermissionKeys.REPORTS_USE, "Allows opening the Support GUI and creating support/player-report tickets.");
 
         bool(values, "ssu.*", "Wildcard that grants or denies every SSU permission.");
         bool(values, "ssu.claims.*", "Wildcard for all player-claim permissions.");
@@ -312,6 +325,15 @@ public final class PermissionCatalog {
         bool(values, "ssu.minigames.*", "Wildcard for all minigame access, queue and administration permissions.");
         bool(values, "ssu.dungeons.*", "Wildcard for all dungeon access, queue and administration permissions.");
         bool(values, "ssu.dimensions.*", "Wildcard for SSU dimension creation and administration permissions.");
+        bool(values, "ssu.onboarding.*", "Wildcard for onboarding administration permissions.");
+        bool(values, "ssu.moderation.*", "Wildcard for moderation and inventory-administration permissions.");
+        bool(values, "ssu.kits.*", "Wildcard for kit access, administration and conventional per-kit permission keys.");
+        bool(values, "ssu.mines.*", "Wildcard for Mines access, administration and conventional per-mine permission keys.");
+        bool(values, "ssu.server_operations.*", "Wildcard for Server Operations administration permissions.");
+        bool(values, "ssu.maintenance.*", "Wildcard for maintenance-mode permissions.");
+        bool(values, "ssu.chat.*", "Wildcard for chat moderation and staff-chat permissions.");
+        bool(values, "ssu.reports.*", "Wildcard for support/report permissions.");
+
         bool(values, "ssu.holograms.*", "Wildcard for all floating text, link, scoreboard and image hologram administration permissions.");
         bool(values, "ssu.block_information.*", "Wildcard for block information access.");
         bool(values, "ssu.statistics.*", "Wildcard for custom statistic administration.");

@@ -1,4 +1,212 @@
-## Current development build: 1.9.0-dev3.6.4
+## Current development build: 1.9.0-dev3.16
+
+### King of the Hill v2 (on top of NPC redesign + Block Party)
+
+- Reorganizes the NPC editor into clear Identity, Appearance, Interaction, Behavior, Relations, Stats, Loadout, Schedule and Respawn pages while preserving the existing reusable-definition/placement model.
+- Merchant NPCs now use an NPC-first shop workflow: create/edit the NPC's linked shop directly from Interaction, while intentionally shared shops remain available as an advanced option. The embedded shop editor hides technical shop-library navigation and returns directly to the NPC editor after save.
+- Shop offer authoring copies exact stacks from the administrator inventory without consuming them: left click copies the full stack and right click copies one item.
+- Adds optional custom player-style NPC skins from either a server-local PNG below `simpleserverutilities/npcs/textures` or an HTTPS URL. Custom skins are bounded to 64x64 PNG and 512 KiB, server-validated/cached and distributed to clients by SSU; clients do not need their own local copy. Wide and slim player models are supported.
+- Custom skins use the vanilla mannequin shell, fall back safely when an asset is invalid/unavailable and are explicitly removed client-side when custom texture use is disabled or replaced. Saving an NPC invalidates the server texture cache so replacing a file at the same path/URL can be reloaded.
+- **King of the Hill v2** now stores STATIC/ROTATING mode per arena. STATIC uses a 40% red / 20% neutral / 40% blue tug-of-war control bar with a live yellow marker and direction indicator; ROTATING uses multiple authored hill points with warning/countdown and direct presence scoring. Both modes have a live score HUD, inside-hill feedback and a translucent in-world hill dome that changes from neutral white to the scoring team colour.
+- Adds fully implemented **Block Party**: 2–32 player free-for-all, configurable block palette, round countdown/speedup/drop time/tile size/fall depth, announced safe block, floor removal/repaint loop, elimination, last-player-standing win handling and region snapshot restoration.
+- Both new modes are supported by Minigame creation/editor/setup workflows and arena validation.
+- Network protocol: `100`.
+- NPC definition schema: `9`.
+- Minigame definition schema: `21`.
+- Server Operations schema remains `3`; Mine schema remains `3`; physical Jail schema remains `2`.
+
+Version state:
+
+- Network protocol: `100`
+- Server Operations schema: `3`
+- Mine definition schema: `3`
+- Physical Jail definition schema: `2`
+- Moderation settings schema: `1`
+- Moderation player record / Jail sentence schema: `2`
+- Moderation inventory snapshot schema: `1`
+- Server/Lobby spawn storage schema: `2`
+- Onboarding settings/player schema: `1`
+- Kit definition/player schema: `1`
+- Player Claim storage schema: `3`
+- Region storage schema: `5`
+- Portable selection snapshot format: `1`
+- NPC definition schema: `9`
+- NPC placement schema: `3`
+- NPC dialogue schema: `1`
+- NPC Shop schema: `4`
+- Minigame definition schema: `21`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `11`
+- Title catalogue schema: `1`
+- Player identity schema: `1`
+
+## Previous development build: 1.9.0-dev3.15.4
+
+### Jail task/community hotfix line
+- Jail task prisoners can physically mine every permitted Mine block without drops while only required block types advance punishment progress.
+- The completing prisoner is excluded from their own community reward distribution.
+- Network protocol remained `99`; NPC schema remained `9`; Minigame definition schema remained `20`.
+
+## Previous development build: 1.9.0-dev3.14.1
+
+### Jail/Mines nesting and admin polish
+
+- Mines must now be fully contained by an existing Region. Their containing Region is auto-detected/persisted; Mines can still be nested inside a Jail without depending on Jail.
+- New Mine permission defaults use `ssu.mines.use.<mine-id>`; existing non-empty permission keys are preserved.
+- Jail Parent selection is gone: Jail bounds automatically determine the smallest containing Region.
+- `Cell radius` is removed. Physical solitude cells define normal movement while overall Jail bounds remain the escape safety boundary.
+- Jail Administration shows dedicated 3D Jail/Task Area editor borders and supports individual cell selection, move and delete with active-prisoner safety.
+- Jail punishment time fields show their units explicitly.
+- Mine/Jail Setup Tools are obtained from Admin Tools; Mine Administration layout/notice/palette collisions are cleaned up.
+- Jail task mining inside a Mine still strictly requires both `ssu.mines.use` and the specific Mine permission; a narrow jail-safe permission resolver fixes the prior false denial without opening other SSU features.
+- Mine status holograms can now be explicitly removed.
+- Jail Administration includes a paged/filterable active-prisoner overview with reason, facility, path/mode, remaining time, progress, buyout/cell state and quick moderation actions.
+- Network protocol: `98`.
+- Server Operations persistence schema: `3`.
+- Mine definition schema: `3`.
+- Physical Jail definition schema: `2`.
+- Moderation player/Jail sentence schema: `2`; moderation settings/inventory snapshot schemas remain `1`.
+
+## Previous development build: 1.9.0-dev3.13
+
+### Dedicated Jail system redesign
+
+- Introduced dedicated physical Jail facilities nested inside Regions, independent Mine nesting, punishment choice/task/solitude modes, 30-second choice flow, task deadlines, prisoner dashboard restrictions and safe player-state restoration.
+- Network protocol: `97`; Server Operations schema: `3`; Mine definition schema: `2`; physical Jail definition schema: `1`; Moderation player/Jail sentence schema: `2`.
+
+## Previous development build: 1.9.0-dev3.12
+
+### Dedicated Mines completion pass
+
+- Completed the standalone Mines phase with inventory-backed weighted reset palettes and custom drop authoring.
+- Added `NORMAL`, `NONE` and `CUSTOM` drop modes, XP multipliers, independent Fortune/Silk Touch rules, warning modes/sounds and safer reset countdown/retry behaviour.
+- Added generated live Mine status holograms and dedicated Mine Statistics with progress, lifetime mining, use/reset counters, top miners and block breakdowns.
+- Added Mine paging and server-side teleport permission hardening.
+- Network protocol: `96`; Server Operations schema: `3`; Mine definition schema: `2`.
+
+## Previous development build: 1.9.0-dev3.11.1
+
+### Final 26.2 GUI polish + Support workflow + Mines foundation
+
+- Mail feedback is wrapped inside the panel.
+- Shared rich-text editing uses 16 direct Minecraft colour swatches with coloured hover names.
+- Floating Hologram, Kits, Support, Wallet and Profile screens are compacted and cleaned up.
+- Kits use real item previews/tooltips and a corrected ghost-inventory editor.
+- Support uses a dedicated Create Ticket flow, rich-text replies, required close reasons and configurable closed-ticket retention (24h default).
+- Wallet adds a known-player picker; Profile title controls are compacted.
+- Dedicated Mines phase 1 added persistent mine definitions, setup tool, weighted palettes, progress, permissions, teleport spawn/exit and bounded manual/automatic resets.
+- Network protocol: `96`.
+- Server Operations persistence schema: `3`.
+- Mine definition schema: `1`.
+
+### Performance-first Server Operations suite
+
+SSU now includes a compact, GUI-first Server Operations layer intended to cover the remaining day-to-day needs of a public server without turning normal gameplay into a continuous scan workload.
+
+- Adds a **lightweight player block activity log** for break/place actions only, with bounded retention and a conservative rollback that restores block type/default state only. It intentionally does not log redstone, fluids, pistons, containers or block-entity NBT, and skips active minigame/dungeon gameplay.
+- Adds **manual world backups**, optional automatic backups, retention controls, protected last-backup deletion and staged restore with a pre-restore world safety copy. Automatic backups are opt-in and can be driven by the scheduler.
+- Adds a central **Scheduler / Task Manager** with interval, daily and one-time schedules for backup, broadcast, maintenance on/off, SSU save/reload and controlled server stop actions.
+- Adds **Maintenance Mode** with a custom disconnect message, optional kick of current non-bypass players and `ssu.maintenance.bypass`.
+- Adds **chat moderation** with mute/temporary mute, slow mode, duplicate/flood/caps/link/blocked-phrase controls, capped in-memory recent chat and permission-gated `#` staff chat. Automatic chat filtering is opt-in.
+- Adds a persistent, bounded **Staff Audit Log** and hooks high-value permission/rank/economy, moderation, inventory, kit, dimension, onboarding, region and minigame administration changes.
+- Adds a lightweight **Server Health** dashboard that reuses SSU's existing performance monitor for TPS/MSPT, heap, players, jobs, permission/cache and module timing data instead of running a second profiler.
+- Adds player **Support / Report tickets** with player-created tickets and an admin queue for assignment, notes, resolve/reopen/close.
+- Adds **World management** for per-dimension world borders and throttled chunk pregeneration with 1–4 chunks/tick and automatic pause above a configurable MSPT threshold.
+- Improves the existing **Player Info & Profile permission view** instead of adding a duplicate inspector: effective permission rows now explain the winning personal/rank/wildcard source and inheritance path.
+- Adds read-only **Economy analytics** for money supply, loaded transaction counts/24h volume, richest accounts, loaded volume by transaction type and configurable large-transaction alerts. Existing Economy Admin remains the mutation interface.
+- Adds **configuration profiles** for exporting/importing selected server configuration without player balances/mail/inventories/progression. Every import first creates a persistent `pre-import-*` safety profile and remains confirmation-gated in the GUI.
+- Expensive analytics and filesystem work are on-demand; log writes use one background IO queue; scheduler/health sampling is bounded; no new whole-world/player/entity scans run every tick.
+- Network protocol: `94`.
+- New Server Operations storage schema: `1`.
+- Existing Player Claim, Region, Minigame, UI preference, Title, Identity, Onboarding, Moderation and Kit schemas remain unchanged.
+
+Version state:
+
+- Network protocol: `94`
+- Server Operations schema: `1`
+- Server/Lobby spawn storage schema: `2`
+- Onboarding settings/player schema: `1`
+- Moderation settings/player/inventory schema: `1`
+- Kit definition/player schema: `1`
+- Player Claim storage schema: `3`
+- Region storage schema: `5`
+- Portable selection snapshot format: `1`
+- Minigame definition schema: `19`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `11`
+- Title catalogue schema: `1`
+- Player identity schema: `1`
+
+## Previous development build: 1.9.0-dev3.8
+
+### GUI-first completion, minigame fixes and Region Tool clarity
+
+- Kit permission keys are discovered dynamically by the Permission Editor, including custom per-kit keys.
+- Minigame results use fixed column anchors.
+- Mandatory onboarding offers `Decline & leave`.
+- Spleef temporary projectile grants cooperate with the minigame inventory lock.
+- Minigame Setup has confirmed manual `Restore snapshot` for idle arenas.
+- Region Setup wording/navigation and reset-vs-portable snapshot terminology are clearer.
+- Network protocol: `93`; persistent schemas unchanged.
+
+### Server lifecycle, moderation and player onboarding
+
+- Administrators can teleport directly to loaded managed dimensions.
+- Server Spawn and first-join Lobby Spawn can be set in any dimension.
+- Respawn priority is: valid bed/respawn anchor → SSU Server Spawn → vanilla Overworld spawn.
+- New players can be locked into a configurable rich-text Rules and introduction flow before normal play becomes available.
+- Player Info now opens a compact management hub for warning, kick, ban, whitelist, history, freeze, jail and live inventory/ender-chest administration.
+- Jail sentences support time, buyout and virtual community-mining tasks with system-mail resource distribution.
+- Players can view and claim accessible nine-slot kits; administrators can configure kit contents, price, cooldown, one-time use and permission requirements.
+- Network protocol is `93`.
+
+Version state:
+
+- Network protocol: `93`
+- Server/Lobby spawn storage schema: `2`
+- Onboarding settings/player schema: `1`
+- Moderation settings/player/inventory schema: `1`
+- Kit definition/player schema: `1`
+- Player Claim storage schema: `3`
+- Region storage schema: `5`
+- Portable selection snapshot format: `1`
+- Minigame definition schema: `19`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `11`
+- Title catalogue schema: `1`
+- Player identity schema: `1`
+
+## Previous development build: 1.9.0-dev3.6.5
+
+### CTF and Domination capture HUD spacing
+
+- Keeps the existing capture label and progress bar in their current correct positions.
+- Moves the additional `Do not move, attack, use items, or take damage.` instruction into a separate centered HUD line above them.
+- Uses the same corrected layout for CTF flag taking and Domination base claiming.
+- Network protocol is `92`; all schemas remain unchanged.
+
+Version state:
+
+- Network protocol: `92`
+- Player Claim storage schema: `3`
+- Region storage schema: `5`
+- Portable selection snapshot format: `1`
+- Minigame definition schema: `19`
+- Minigame recovery schema: `4`
+- Minigame progression schema: `3`
+- Minigame match-history schema: `1`
+- Player UI preference schema: `11`
+- Title catalogue schema: `1`
+- Player identity schema: `1`
+
+## Previous development build: 1.9.0-dev3.6.4
+
 
 ### Team-specific CTF and Domination capture sounds
 

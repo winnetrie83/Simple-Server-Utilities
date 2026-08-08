@@ -53,24 +53,6 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
     private static final int BALANCE_X = 268;
     private static final int BALANCE_Y = 231;
 
-    private static final List<ColorPreset> MINECRAFT_COLORS = List.of(
-            new ColorPreset("Black", 0x000000),
-            new ColorPreset("Dark Blue", 0x0000AA),
-            new ColorPreset("Dark Green", 0x00AA00),
-            new ColorPreset("Dark Aqua", 0x00AAAA),
-            new ColorPreset("Dark Red", 0xAA0000),
-            new ColorPreset("Dark Purple", 0xAA00AA),
-            new ColorPreset("Gold", 0xFFAA00),
-            new ColorPreset("Gray", 0xAAAAAA),
-            new ColorPreset("Dark Gray", 0x555555),
-            new ColorPreset("Blue", 0x5555FF),
-            new ColorPreset("Green", 0x55FF55),
-            new ColorPreset("Aqua", 0x55FFFF),
-            new ColorPreset("Red", 0xFF5555),
-            new ColorPreset("Light Purple", 0xFF55FF),
-            new ColorPreset("Yellow", 0xFFFF55),
-            new ColorPreset("White", 0xFFFFFF)
-    );
 
     private EditBox recipient;
     private EditBox subject;
@@ -81,7 +63,6 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
     private boolean updatingBody;
     private int rememberedSelectionStart = -1;
     private int rememberedSelectionEnd = -1;
-    private PaletteTarget paletteTarget = PaletteTarget.NONE;
 
     private String notice = "";
     private boolean noticeError;
@@ -135,10 +116,13 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
                 .bounds(leftPos + 72, topPos + 188, 24, 20).build());
         addRenderableWidget(Button.builder(Component.literal("S"), ignored -> applySelectionFormat('m'))
                 .bounds(leftPos + 100, topPos + 188, 24, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Color ▾"), ignored -> openPalette())
-                .bounds(leftPos + 132, topPos + 188, 82, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Clear style"), ignored -> clearSelectionFormatting())
-                .bounds(leftPos + 220, topPos + 188, 94, 20).build());
+                .bounds(leftPos + 132, topPos + 188, 70, 20).build());
+        for (int index = 0; index < 16; index++) {
+            int colorIndex = index;
+            addRenderableWidget(RichTextPalette.button(leftPos + 208 + index * 11, topPos + 193, 10, index,
+                    ignored -> applySelectionColor(colorIndex)));
+        }
 
         RichTextEditBoxRenderer.register(body, () -> richDocument, () -> TEXT,
                 Component.literal("Message"));
@@ -171,7 +155,6 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
     }
 
     private void togglePlayers() {
-        paletteTarget = PaletteTarget.NONE;
         playersExpanded = !playersExpanded;
         updatePlayersButtonLabel();
         if (playersExpanded) {
@@ -186,7 +169,6 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
     }
 
     private void recipientChanged(String value) {
-        paletteTarget = PaletteTarget.NONE;
         suggestionQuery = value == null ? "" : value.trim();
         dropdownScroll = 0;
         suggestions = List.of();
@@ -288,13 +270,6 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
         formattingApplied(range);
     }
 
-    private void openPalette() {
-        if (selectedRange() == null) return;
-        playersExpanded = false;
-        updatePlayersButtonLabel();
-        paletteTarget = paletteTarget == PaletteTarget.SELECTION_TEXT
-                ? PaletteTarget.NONE : PaletteTarget.SELECTION_TEXT;
-    }
 
     private int[] selectedRange() {
         rememberCurrentSelection();
@@ -367,11 +342,6 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (paletteTarget != PaletteTarget.NONE) {
-            if (event.buttonInfo().button() == 0) handlePaletteClick(event.x(), event.y());
-            else paletteTarget = PaletteTarget.NONE;
-            return true;
-        }
         if (playersExpanded) {
             for (SuggestionBounds bound : suggestionBounds) {
                 if (bound.contains(event.x(), event.y())) {
@@ -439,7 +409,6 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
         rememberCurrentSelection();
         super.extractRenderState(g, mouseX, mouseY, partialTick);
         if (playersExpanded) drawPlayerDropdown(g, mouseX, mouseY);
-        if (paletteTarget != PaletteTarget.NONE) drawPalette(g);
     }
 
     private void drawAttachments(GuiGraphicsExtractor g) {
@@ -545,58 +514,6 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
         }
     }
 
-    private void handlePaletteClick(double mouseX, double mouseY) {
-        int x = paletteX();
-        int y = paletteY();
-        int cellWidth = 88;
-        int cellHeight = 24;
-        int gap = 4;
-        for (int index = 0; index < MINECRAFT_COLORS.size(); index++) {
-            int column = index % 4;
-            int row = index / 4;
-            int left = x + column * (cellWidth + gap);
-            int top = y + row * (cellHeight + gap);
-            if (SsuGuiGeometry.inside(mouseX, mouseY, left, top, cellWidth, cellHeight)) {
-                applySelectionColor(index);
-                paletteTarget = PaletteTarget.NONE;
-                return;
-            }
-        }
-        paletteTarget = PaletteTarget.NONE;
-    }
-
-    private void drawPalette(GuiGraphicsExtractor g) {
-        int x = paletteX();
-        int y = paletteY();
-        int width = 364;
-        g.fill(x - 6, y - 22, x + width + 6, y + 112, 0xFC10161D);
-        g.outline(x - 6, y - 22, width + 12, 134, BORDER);
-        g.text(font, "Apply Minecraft color to selected message text", x, y - 16, TEXT, true);
-
-        int cellWidth = 88;
-        int cellHeight = 24;
-        int gap = 4;
-        for (int index = 0; index < MINECRAFT_COLORS.size(); index++) {
-            ColorPreset preset = MINECRAFT_COLORS.get(index);
-            int column = index % 4;
-            int row = index / 4;
-            int left = x + column * (cellWidth + gap);
-            int top = y + row * (cellHeight + gap);
-            g.fill(left, top, left + cellWidth, top + cellHeight, 0xFF000000 | preset.rgb());
-            g.outline(left, top, cellWidth, cellHeight, 0xFFB6C0C8);
-            g.text(font, preset.name(), left + 5, top + 8, contrastColor(preset.rgb()), true);
-        }
-    }
-
-    private int paletteX() { return leftPos + 16; }
-    private int paletteY() { return topPos + 92; }
-private static int contrastColor(int rgb) {
-        int red = (rgb >>> 16) & 0xFF;
-        int green = (rgb >>> 8) & 0xFF;
-        int blue = rgb & 0xFF;
-        return red * 299 + green * 587 + blue * 114 >= 140_000 ? 0xFF101010 : 0xFFFFFFFF;
-    }
-
     private Rect dropdownBounds() {
         return new Rect(leftPos + 234, topPos + 46, 150, 158);
     }
@@ -633,10 +550,7 @@ private static int contrastColor(int rgb) {
         return value == null ? "" : value;
     }
 
-    private enum PaletteTarget { NONE, SELECTION_TEXT }
 
-    private record ColorPreset(String name, int rgb) {
-    }
 
     private record SuggestionBounds(String name, int x, int y, int width, int height) {
         boolean contains(double mouseX, double mouseY) {

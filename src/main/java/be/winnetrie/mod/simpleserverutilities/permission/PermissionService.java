@@ -58,6 +58,9 @@ public class PermissionService {
             boolean fallback,
             PermissionContext context
     ) {
+        if (isJailed(player)) {
+            return false;
+        }
         if (!Config.ENABLE_PERMISSION_SYSTEM.get()) {
             return fallback;
         }
@@ -72,7 +75,25 @@ public class PermissionService {
         return fallback;
     }
 
+    /**
+     * Resolves the player's actual configured permission while jailed, without granting operator bypass.
+     * This is intentionally narrow and is used only by explicitly permitted Jail gameplay such as
+     * a task that happens to be inside a Mine. Jail restrictions still gate every other action.
+     */
+    public static boolean getBooleanForJailGameplay(ServerPlayer player, String permission, boolean fallback) {
+        if (!Config.ENABLE_PERMISSION_SYSTEM.get()) return fallback;
+        String resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, PermissionContext.global(player));
+        if (resolvedValue != null) {
+            Boolean value = parseBoolean(resolvedValue);
+            if (value != null) return value;
+        }
+        return fallback;
+    }
+
     public static boolean getBoolean(ServerPlayer player, String permission, boolean fallback, PermissionContext context) {
+        if (isJailed(player)) {
+            return false;
+        }
         if (!Config.ENABLE_PERMISSION_SYSTEM.get()) {
             return fallback;
         }
@@ -135,7 +156,7 @@ public class PermissionService {
     }
 
     public static boolean isAdmin(ServerPlayer player) {
-        if (player == null) {
+        if (player == null || isJailed(player)) {
             return false;
         }
 
@@ -146,6 +167,11 @@ public class PermissionService {
         }
 
         return server.getPlayerList().isOp(new NameAndId(player.getGameProfile()));
+    }
+
+    private static boolean isJailed(ServerPlayer player) {
+        return player != null && SimpleServerUtilities.MODERATION != null
+                && SimpleServerUtilities.MODERATION.jailed(player.getUUID());
     }
 
     public static boolean getBuiltInDefault(String permission) {
@@ -189,6 +215,7 @@ public class PermissionService {
                     PermissionKeys.MINIGAMES_QUEUE,
                     PermissionKeys.DUNGEONS_USE,
                     PermissionKeys.DUNGEONS_QUEUE,
+                    PermissionKeys.KITS_USE,
                     PermissionKeys.CROPS_HARVESTING_USE,
                     PermissionKeys.TREECAPITATOR_USE,
                     PermissionKeys.TREECAPITATOR_BLOCKS,

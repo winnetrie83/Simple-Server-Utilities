@@ -1,0 +1,68 @@
+SSU 1.9.0-dev3.7 — Source Validation Report
+Date: 2026-08-07
+Base: SSU 1.9.0-dev3.6.5
+Minecraft: 26.2
+NeoForge: 26.2.0.7-beta
+Required Java: 25
+Network protocol: 93
+
+SCHEMA / FORMAT STATE
+- Server/Lobby spawn storage schema: 2
+- Onboarding settings/player schema: 1
+- Moderation settings/player/inventory schema: 1
+- Kit definition/player schema: 1
+- Player Claim storage schema: 3
+- Region storage schema: 5
+- Portable selection snapshot format: 1
+- Minigame definition/recovery/progression/history: 19/4/3/1
+- Player UI preferences: 11
+- Title catalogue / Player Identity: 1/1
+
+STATIC VALIDATION COMPLETED
+- 701 Java source files passed the custom lexical delimiter/string/comment integrity scan.
+- 15 JSON files across the source tree parsed successfully.
+- All local `be.winnetrie.mod.simpleserverutilities...` imports resolve to source types present in this archive.
+- 34/34 targeted source invariants passed.
+
+TARGETED INVARIANTS COVERED
+- dev3.7 version and protocol 93.
+- Dimension-manager teleport action and client button.
+- One dimension-aware Server Spawn plus one Lobby Spawn in schema 2.
+- Personal bed/anchor preservation, SSU spawn fallback, and vanilla final fallback.
+- First-join onboarding, two-step Rules acceptance, introduction navigation/skip, long-text paging, and normal-dashboard interception.
+- Onboarding movement/action/command/container/item/combat locks.
+- Rich-text administration using the shared fixed-16-color editor.
+- Call goat-horn warning presentation and moderation persistence.
+- Kick, temporary/permanent ban, unban, custom whitelist, freeze, jail, history, and UUID-based name history.
+- Jail dashboard, timed/buyout/task release paths, virtual task mining, inventory backup/restore, and community system-mail distribution.
+- Online/offline inventory, armor/offhand, and ender-chest administration.
+- Nine-slot permission-aware kits, exact contents, price, cooldown, one-time use, lock state, and player ledgers.
+- Dedicated KIT_PURCHASE and JAIL_BUYOUT economy transaction types.
+- Dashboard/menu/payload/event registration for the new systems.
+- Known-invalid API patterns are absent: LivingDamageEvent.Post#getNewDamage(), ServerPlayer#hasPermissions(int), getProfileCache().get(...), and stale SsuJob operationCount() overrides.
+
+ISSUES FOUND AND CORRECTED DURING VALIDATION
+- The onboarding Rules screen originally allowed the confirmation-stage identifier to fall through the generic Rules branch. The screen was rewritten so Rules acceptance always requires two separate server-authoritative steps.
+- Long Rules/introduction documents received explicit page controls so rich text remains readable in the compact screen.
+- Player resolution in onboarding administration was changed away from the uncertain profile-cache API and now uses online lookup plus the persistent moderation identity store.
+- Warning duration now initializes from the server-provided moderation default instead of a hard-coded client value.
+- Kit claims and jail buyouts now use dedicated economy transaction categories rather than unrelated generic categories.
+
+FULL GRADLE / NEOFORGE COMPILATION
+A full compile could not be executed in this container.
+
+Attempted command:
+  ./gradlew compileJava --offline --no-daemon
+
+Result:
+- The Gradle wrapper attempted to fetch Gradle 9.2.1 from services.gradle.org.
+- Network access failed with java.net.UnknownHostException: services.gradle.org.
+- The container only provides OpenJDK 21.0.10, while this project requires Java 25.
+
+Therefore this archive is statically validated but is NOT claimed to be fully Gradle-compiled or runtime-tested here.
+
+REQUIRED LOCAL CHECK
+Run with Java 25 on the development machine:
+  gradlew.bat clean build
+
+Then test the resulting JAR on a dedicated NeoForge 26.2 server with a separate dev3.7 client. Client and server must use the exact same build because protocol 93 is incompatible with dev3.6.5 and earlier clients.

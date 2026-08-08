@@ -10,6 +10,7 @@ import be.winnetrie.mod.simpleserverutilities.npc.NpcFunction;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcInteractionMode;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcRole;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcScheduleEntry;
+import be.winnetrie.mod.simpleserverutilities.npc.NpcTextureSource;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -18,7 +19,7 @@ import net.minecraft.world.item.ItemStack;
 
 public record NpcEditorSubmitPayload(
         String originalInstanceId, String originalDefinitionId, boolean deleteRequested,
-        String definitionId, String displayName, String entityType, String interactionText, String dialogueId,
+        String definitionId, String displayName, String entityType, String textureSource, String textureValue, String textureModel, String interactionText, String dialogueId,
         String roleId, String shopId, String interactionMode, List<NpcFunction> functions,
         double x, double y, double z, float yaw, float pitch,
         boolean enabled, boolean customNameVisible, boolean noAi, boolean invulnerable, boolean silent, boolean glowing,
@@ -43,6 +44,7 @@ public record NpcEditorSubmitPayload(
     public NpcEditorSubmitPayload {
         originalInstanceId = PayloadBounds.string(originalInstanceId, 36); originalDefinitionId = PayloadBounds.string(originalDefinitionId, 64);
         definitionId = PayloadBounds.string(definitionId, 64); displayName = PayloadBounds.string(displayName, 64); entityType = PayloadBounds.string(entityType, 128);
+        textureSource = NpcTextureSource.parse(textureSource).id(); textureValue = PayloadBounds.string(textureValue, 1_024); textureModel = "slim".equalsIgnoreCase(textureModel) ? "slim" : "wide";
         interactionText = PayloadBounds.string(interactionText, 512); dialogueId = PayloadBounds.string(dialogueId, 64);
         roleId = NpcRole.parse(roleId).id(); shopId = PayloadBounds.string(shopId, 64); interactionMode = NpcInteractionMode.parse(interactionMode).id();
         functions = boundedFunctions(functions);
@@ -59,6 +61,7 @@ public record NpcEditorSubmitPayload(
     private static void encode(RegistryFriendlyByteBuf b, NpcEditorSubmitPayload p) {
         b.writeUtf(p.originalInstanceId, 36); b.writeUtf(p.originalDefinitionId, 64); b.writeBoolean(p.deleteRequested);
         b.writeUtf(p.definitionId, 64); b.writeUtf(p.displayName, 64); b.writeUtf(p.entityType, 128);
+        b.writeUtf(p.textureSource, 16); b.writeUtf(p.textureValue, 1_024); b.writeUtf(p.textureModel, 8);
         b.writeUtf(p.interactionText, 512); b.writeUtf(p.dialogueId, 64);
         b.writeUtf(p.roleId, 32); b.writeUtf(p.shopId, 64); b.writeUtf(p.interactionMode, 32); NpcEditorOpenPayload.writeFunctions(b, p.functions);
         b.writeDouble(p.x); b.writeDouble(p.y); b.writeDouble(p.z); b.writeFloat(p.yaw); b.writeFloat(p.pitch);
@@ -86,7 +89,9 @@ public record NpcEditorSubmitPayload(
 
     private static NpcEditorSubmitPayload decode(RegistryFriendlyByteBuf b) {
         String originalInstance = b.readUtf(36), originalDefinition = b.readUtf(64); boolean delete = b.readBoolean();
-        String id = b.readUtf(64), name = b.readUtf(64), type = b.readUtf(128), text = b.readUtf(512), dialogue = b.readUtf(64);
+        String id = b.readUtf(64), name = b.readUtf(64), type = b.readUtf(128);
+        String textureSource = b.readUtf(16), textureValue = b.readUtf(1_024), textureModel = b.readUtf(8);
+        String text = b.readUtf(512), dialogue = b.readUtf(64);
         String roleId = b.readUtf(32), shopId = b.readUtf(64), interactionMode = b.readUtf(32); List<NpcFunction> functions = NpcEditorOpenPayload.readFunctions(b);
         double x = b.readDouble(), y = b.readDouble(), z = b.readDouble(); float yaw = b.readFloat(), pitch = b.readFloat();
         boolean enabled = b.readBoolean(), visible = b.readBoolean(), noAi = b.readBoolean(), invulnerable = b.readBoolean();
@@ -107,7 +112,7 @@ public record NpcEditorSubmitPayload(
         boolean respawnEnabled = b.readBoolean(); int respawnDelay = b.readVarInt(); String respawnDimension = b.readUtf(256);
         double respawnX = b.readDouble(), respawnY = b.readDouble(), respawnZ = b.readDouble();
         float respawnYaw = b.readFloat(), respawnPitch = b.readFloat(); long request = b.readLong();
-        return new NpcEditorSubmitPayload(originalInstance, originalDefinition, delete, id, name, type, text, dialogue,
+        return new NpcEditorSubmitPayload(originalInstance, originalDefinition, delete, id, name, type, textureSource, textureValue, textureModel, text, dialogue,
                 roleId, shopId, interactionMode, functions,
                 x, y, z, yaw, pitch, enabled, visible, noAi, invulnerable, silent, glowing, gravity, swim, fly,
                 faction, factionDisplayName, minimumReputation, denied, reputationLoss, playerAttitude, relations,

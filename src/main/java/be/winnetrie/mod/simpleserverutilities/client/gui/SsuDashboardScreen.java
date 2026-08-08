@@ -29,6 +29,10 @@ import be.winnetrie.mod.simpleserverutilities.network.SsuPermissionEditorRequest
 import be.winnetrie.mod.simpleserverutilities.network.SsuPlayerProfileDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPlayerProfileRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.PlayerManagementRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.KitRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MineRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.OnboardingAdminRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.time.GameCalendar;
 import be.winnetrie.mod.simpleserverutilities.mixin.PlayerSkinWidgetAccessor;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -374,7 +378,7 @@ public final class SsuDashboardScreen extends Screen {
             case RENT_OPERATIONS -> addRentOperationButtons(l);
             case CORE -> addCoreButtons(l);
             case PROFILE -> addProfileButtons(l);
-            case MAIL, AUCTION_HOUSE, QUESTS, MINIGAMES, MINIGAME_ADMIN, DUNGEONS -> { }
+            case MAIL, AUCTION_HOUSE, QUESTS, MINIGAMES, MINIGAME_ADMIN, DUNGEONS, KITS, KIT_ADMIN, MINES, MINE_ADMIN, JAIL_ADMIN, ONBOARDING_ADMIN -> { }
         }
         if (requestInitialRemotePage) {
             requestInitialRemotePage = false;
@@ -407,7 +411,10 @@ public final class SsuDashboardScreen extends Screen {
                 new Module("Travel", "All available homes, warps and server destinations.", ICON_TRAVEL, Page.TRAVEL, true),
                 new Module("My Warps", "Rent, place and control the visibility of your personal warps.", ICON_PORTAL, Page.MY_WARPS, snapshot.moduleSettings().warps()),
                 new Module("Wallet", "Balance, payments and your transaction history.", ICON_WALLET, Page.WALLET, snapshot.economy().enabled()),
-                new Module("Mail", "Inbox, sent mail, items and money attachments.", ICON_MAIL, Page.MAIL, snapshot.moduleSettings().mail())
+                new Module("Mail", "Inbox, sent mail, items and money attachments.", ICON_MAIL, Page.MAIL, snapshot.moduleSettings().mail()),
+                new Module("Kits", "View and claim kits available to your permissions.", ICON_MARKET, Page.KITS, true),
+                new Module("Mines", "View resettable server mines available to your permissions.", ICON_SETTINGS, Page.MINES, true),
+                new Module("Support", "Create and follow help, bug and player-report tickets.", ICON_MAIL, Page.SUPPORT, true)
         ));
         if (snapshot.auctionHouseDashboardVisible()) {
             modules.add(new Module("Auction House", "Browse, buy and sell player-listed items.", ICON_MARKET, Page.AUCTION_HOUSE, true));
@@ -439,6 +446,11 @@ public final class SsuDashboardScreen extends Screen {
                 new Module("Permissions", "Edit global and per-dimension rank/player permissions.", ICON_PLAYERS, Page.PERMISSIONS, snapshot.adminAccess().permissions()),
                 new Module("Ranks", "Create, rename, default and safely remove permission ranks.", ICON_PLAYERS, Page.RANKS, snapshot.adminAccess().permissions()),
                 new Module("Dimensions", "Create and configure custom server dimensions.", ICON_PORTAL, Page.DIMENSIONS, snapshot.administrator()),
+                new Module("Onboarding & spawns", "Configure server/lobby spawn, rules and first-join flow.", ICON_PORTAL, Page.ONBOARDING_ADMIN, snapshot.administrator()),
+                new Module("Kit administration", "Create compact permission-aware player kits.", ICON_MARKET, Page.KIT_ADMIN, snapshot.administrator()),
+                new Module("Mine administration", "Create and manage dedicated resettable mining areas.", ICON_SETTINGS, Page.MINE_ADMIN, snapshot.administrator()),
+                new Module("Jail administration", "Create nested jail facilities, work areas and solitude cells.", ICON_SHIELD, Page.JAIL_ADMIN, snapshot.administrator()),
+                new Module("Server operations", "Backups, scheduler, maintenance, moderation, reports, health and world management.", ICON_SETTINGS, Page.SERVER_OPERATIONS, snapshot.administrator()),
                 new Module("Economics", "Accounts, transactions, taxes and economy journals.", ICON_MARKET, Page.ECONOMICS,
                         snapshot.economy().canAdmin()),
                 new Module("Active jobs", "View progress and cancel server jobs.", ICON_SETTINGS, Page.JOBS, snapshot.adminAccess().core()),
@@ -484,6 +496,8 @@ public final class SsuDashboardScreen extends Screen {
                 new AdminTool("Item Price Catalog", "Edit what players pay and receive for every vanilla and modded item.", "item_prices"),
                 new AdminTool("Quest Editor", "Create and edit quest prerequisites, objectives, rewards and lifecycle settings.", "quest"),
                 new AdminTool("Minigame Setup Tool", "Left-click performs the selected in-world setup action; right-click opens its action and arena menu.", "minigame"),
+                new AdminTool("Mine Setup Tool", "Select Mine bounds in-world; right-click air opens Mine Administration.", "mine"),
+                new AdminTool("Jail Setup Tool", "Select Jail or Task Area bounds in-world; right-click air opens Jail Administration.", "jail"),
                 new AdminTool("Dungeon Editor", "Create region arenas, checkpoints, ordered stages, lives and rewards.", "dungeon")
         );
     }
@@ -1126,19 +1140,33 @@ public final class SsuDashboardScreen extends Screen {
     }
 
     private void addWalletButtons(Layout l) {
-        int top = l.contentTop() + 22;
+        int top = l.contentTop() + 28;
         if (snapshot.economy().canPay()) {
-            int targetW = Math.max(100, l.contentWidth() / 3);
-            payPlayerBox = box(l.contentX(), top, targetW, "Player", draftPayPlayer, value -> draftPayPlayer = value);
-            payAmountBox = box(l.contentX() + targetW + 6, top, 90, "Amount", draftPayAmount,
+            int playerW = Math.max(104, Math.min(138, l.contentWidth() / 3));
+            int pickerW = 28;
+            int amountW = 72;
+            int gap = 5;
+            payPlayerBox = box(l.contentX(), top, playerW, "Player", draftPayPlayer, value -> draftPayPlayer = value);
+            payAmountBox = box(l.contentX() + playerW + pickerW + gap * 2, top, amountW, "Amount", draftPayAmount,
                     value -> draftPayAmount = value);
             addRenderableWidget(payPlayerBox);
+            addRenderableWidget(Button.builder(Component.literal("…"), ignored -> minecraft.setScreenAndShow(
+                            new KnownPlayerPickerScreen(this, value -> {
+                                draftPayPlayer = value;
+                                rebuildWidgets();
+                            })))
+                    .bounds(l.contentX() + playerW + gap, top, pickerW, 20).build());
             addRenderableWidget(payAmountBox);
             addRenderableWidget(Button.builder(Component.literal("Pay"), ignored -> submitPayment())
-                    .bounds(l.contentX() + targetW + 102, top, 56, 20).build());
+                    .bounds(l.contentX() + playerW + pickerW + amountW + gap * 3, top, 50, 20).build());
         }
-        addSearchAt(l, l.contentTop() + 52);
-        addTransactionDetailButtons(l, 78);
+        int searchY = l.contentTop() + 58;
+        int searchW = Math.max(90, l.contentWidth() / 3);
+        searchBox = box(l.contentX(), searchY, searchW, "Search", draftSearch, v -> draftSearch = v);
+        addRenderableWidget(searchBox);
+        addRenderableWidget(Button.builder(Component.literal("Search"), ignored -> { pageIndex = 0; requestPage(false); })
+                .bounds(l.contentX() + searchW + 6, searchY, 62, 20).build());
+        addTransactionDetailButtons(l, 88);
         addPagination(l, 0);
     }
 
@@ -2034,10 +2062,13 @@ public final class SsuDashboardScreen extends Screen {
                 }).bounds(l.contentRight() - 60, l.contentTop() + 28, 60, 20).build());
 
         if (!selectedProfilePlayer.isBlank()) {
+            addRenderableWidget(Button.builder(Component.literal("Manage"), ignored ->
+                            ClientPacketDistributor.sendToServer(new PlayerManagementRequestPayload(selectedProfilePlayer, nextRequestId++)))
+                    .bounds(l.contentRight() - 82, l.footerY(), 82, 20).build());
             if (snapshot.adminAccess().permissions()) {
-                addRenderableWidget(Button.builder(Component.literal("Edit permissions"), ignored ->
+                addRenderableWidget(Button.builder(Component.literal("Permissions"), ignored ->
                                 openPermissionEditorForPlayer(selectedProfilePlayer, selectedProfileLabel))
-                        .bounds(l.contentRight() - 104, l.footerY(), 104, 20).build());
+                        .bounds(l.contentRight() - 172, l.footerY(), 86, 20).build());
             }
             addPlayerProfilePagination(l);
         }
@@ -2144,9 +2175,12 @@ public final class SsuDashboardScreen extends Screen {
                 .bounds(l.contentX() + 106, l.contentTop() + 122, 100, 20).build());
     }
     private void addProfileButtons(Layout l) {
+        String selected = "Selected title: " + blank(snapshot.selectedTitle());
+        int textWidth = font.width(selected);
+        int buttonX = Math.min(l.contentRight() - 96, l.contentX() + textWidth + 18);
         addRenderableWidget(Button.builder(Component.literal("Choose title"), ignored ->
                         ClientPacketDistributor.sendToServer(new TitleManagerRequestPayload(false, nextRequestId++)))
-                .bounds(l.contentX(), l.contentTop() + 196, 112, 20).build());
+                .bounds(buttonX, l.contentTop() + 24, 92, 20).build());
     }
 
     private void addPagination(Layout l, int offset) {
@@ -2390,6 +2424,38 @@ public final class SsuDashboardScreen extends Screen {
         }
         if (target == Page.DIMENSIONS) {
             ClientPacketDistributor.sendToServer(new SsuDimensionManagerRequestPayload("", nextRequestId++));
+            return;
+        }
+        if (target == Page.KITS) {
+            ClientPacketDistributor.sendToServer(new KitRequestPayload(false, "", nextRequestId++));
+            return;
+        }
+        if (target == Page.KIT_ADMIN) {
+            ClientPacketDistributor.sendToServer(new KitRequestPayload(true, "", nextRequestId++));
+            return;
+        }
+        if (target == Page.MINES) {
+            ClientPacketDistributor.sendToServer(new MineRequestPayload(false, "", nextRequestId++));
+            return;
+        }
+        if (target == Page.MINE_ADMIN) {
+            ClientPacketDistributor.sendToServer(new MineRequestPayload(true, "", nextRequestId++));
+            return;
+        }
+        if (target == Page.JAIL_ADMIN) {
+            ClientPacketDistributor.sendToServer(new be.winnetrie.mod.simpleserverutilities.network.JailAdminRequestPayload("", nextRequestId++));
+            return;
+        }
+        if (target == Page.SUPPORT) {
+            ClientPacketDistributor.sendToServer(new be.winnetrie.mod.simpleserverutilities.network.ServerOperationsRequestPayload(false, nextRequestId++));
+            return;
+        }
+        if (target == Page.SERVER_OPERATIONS) {
+            ClientPacketDistributor.sendToServer(new be.winnetrie.mod.simpleserverutilities.network.ServerOperationsRequestPayload(true, nextRequestId++));
+            return;
+        }
+        if (target == Page.ONBOARDING_ADMIN) {
+            ClientPacketDistributor.sendToServer(new OnboardingAdminRequestPayload(nextRequestId++));
             return;
         }
         if (target == page) return;
@@ -2743,7 +2809,7 @@ public final class SsuDashboardScreen extends Screen {
         if (!notice.isBlank()) g.text(font,trim(notice,90),l.contentX(),l.panelBottom()-43,noticeError?ERROR:GOOD,false);
         if (loading || (page == Page.PERMISSIONS && permissionLoading)
                 || (page == Page.PLAYER_INFO && playerProfileLoading)) {
-            g.text(font,"Loading page…",l.contentRight()-85,l.panelY()+26,WARNING,false);
+            g.text(font,"Loading page…",l.contentRight()-85,l.panelY()+38,WARNING,false);
         }
         super.extractRenderState(g,mouseX,mouseY,partialTick);
         if (skin != null && l.sidebarVisible()) {
@@ -2754,7 +2820,7 @@ public final class SsuDashboardScreen extends Screen {
         drawUtilityButton(g, settingsBounds(l), ICON_SETTINGS, page == Page.SETTINGS,
                 mouseX, mouseY, snapshot.settingsAvailable());
         drawUtilityButton(g, adminBounds(l), ICON_SHIELD,
-                page == Page.ADMIN || page == Page.MODULE_SETTINGS || page == Page.ADMIN_TOOLS || page == Page.MINIGAME_ADMIN
+                page == Page.ADMIN || page == Page.MODULE_SETTINGS || page == Page.ADMIN_TOOLS || page == Page.MINIGAME_ADMIN || page == Page.MINE_ADMIN || page == Page.JAIL_ADMIN
                         || page == Page.HOLOGRAMS || page == Page.PERMISSIONS || page == Page.PLAYER_INFO
                         || page == Page.ECONOMICS || page == Page.TRANSACTIONS || page == Page.AUCTION_TAX
                         || page == Page.CLAIM_TAX || page == Page.ACCOUNTS || page == Page.RENT_OPERATIONS,
@@ -3070,6 +3136,12 @@ public final class SsuDashboardScreen extends Screen {
             case MINIGAMES -> g.text(font,"Opening Minigame Lobby…",l.contentX(),l.contentTop(),MUTED,false);
             case MINIGAME_ADMIN -> g.text(font,"Opening Minigame Administration…",l.contentX(),l.contentTop(),MUTED,false);
             case DUNGEONS -> g.text(font,"Opening Dungeon Lobby…",l.contentX(),l.contentTop(),MUTED,false);
+            case KITS -> g.text(font,"Opening Kits…",l.contentX(),l.contentTop(),MUTED,false);
+            case KIT_ADMIN -> g.text(font,"Opening Kit Administration…",l.contentX(),l.contentTop(),MUTED,false);
+            case MINES -> g.text(font,"Opening Mines…",l.contentX(),l.contentTop(),MUTED,false);
+            case MINE_ADMIN -> g.text(font,"Opening Mine Administration…",l.contentX(),l.contentTop(),MUTED,false);
+            case JAIL_ADMIN -> g.text(font,"Opening Jail Administration…",l.contentX(),l.contentTop(),MUTED,false);
+            case ONBOARDING_ADMIN -> g.text(font,"Opening Onboarding & Spawns…",l.contentX(),l.contentTop(),MUTED,false);
         }
     }
 
@@ -3301,7 +3373,13 @@ public final class SsuDashboardScreen extends Screen {
     }
     private void drawWallet(GuiGraphicsExtractor g, Layout l) {
         g.text(font, "Balance: " + snapshot.economy().formattedBalance(), l.contentX(), l.contentTop(), GOOD, false);
-        drawTransactionRows(g, l, 78);
+        if (snapshot.economy().canPay()) {
+            int playerW = Math.max(104, Math.min(138, l.contentWidth() / 3));
+            int pickerW = 28, gap = 5;
+            g.text(font, "Player", l.contentX(), l.contentTop() + 16, MUTED, false);
+            g.text(font, "Amount", l.contentX() + playerW + pickerW + gap * 2, l.contentTop() + 16, MUTED, false);
+        }
+        drawTransactionRows(g, l, 88);
     }
 
     private void drawEconomics(GuiGraphicsExtractor g, Layout l) {
@@ -3492,7 +3570,7 @@ public final class SsuDashboardScreen extends Screen {
             int y = permissionTop + 16 + i * PROFILE_PERMISSION_ROW_HEIGHT;
             g.text(font, trim(line.key() + " = " + line.value(), split < l.contentRight() ? 44 : 70),
                     permissionX, y, TEXT, false);
-            g.text(font, trim(line.source(), 24), permissionX, y + 10, MUTED, false);
+            g.text(font, trim(line.source(), split < l.contentRight() ? 44 : 70), permissionX, y + 10, MUTED, false);
         }
     }
 
@@ -3546,26 +3624,31 @@ public final class SsuDashboardScreen extends Screen {
                 "Permission checks: "+c.permissionChecks()+" | cache "+String.format(Locale.ROOT,"%.1f%%",c.permissionCacheHitPermille()/10D),
                 "Region lookups: "+c.regionLookups()+" | avg candidates "+String.format(Locale.ROOT,"%.2f",c.averageRegionCandidates()),
                 "Region index: "+c.regionIndexCells()+" cells | "+c.regionIndexReferences()+" refs",
-                "Modules: storage, jobs, transactions, economy, claims, permissions, homes, warps, spawn, regions, menu"};for(int i=0;i<lines.length;i++)g.text(font,lines[i],l.contentX(),y+i*18,i==5?GOOD:TEXT,false);}
-    private void drawProfile(GuiGraphicsExtractor g,Layout l){var c=snapshot.core();int y=l.contentTop()+10;
+                "Modules: storage, jobs, transactions, economy, claims, permissions, homes, warps, spawn, regions, mines, menu"};for(int i=0;i<lines.length;i++)g.text(font,lines[i],l.contentX(),y+i*18,i==5?GOOD:TEXT,false);}
+    private void drawProfile(GuiGraphicsExtractor g,Layout l){var c=snapshot.core();int y=l.contentTop()+8;
         g.text(font,"Player: "+snapshot.playerName(),l.contentX(),y,ACCENT,false);
         g.text(font,"Selected title: "+blank(snapshot.selectedTitle()),l.contentX(),y+18,snapshot.selectedTitleColor(),false);
         String[] lines={"Primary rank: "+snapshot.primaryRank(),"Administrator: "+yesNo(snapshot.administrator()),
                 "Claims: "+c.claimCount()+" ("+c.claimedChunkCount()+" chunks)","Homes: "+c.homeCount(),"Warps: "+c.warpCount(),
-                "Active rentals: "+c.activeRentalCount(),"Balance: "+snapshot.economy().formattedBalance(),"Minimap: "+onOff(snapshot.uiSettings().minimapEnabled())};
-        for(int i=0;i<lines.length;i++)g.text(font,lines[i],l.contentX(),y+36+i*18,TEXT,false);
-        g.text(font,"Titles are global and can be earned from minigames, ranks, permissions or admin grants.",
-                l.contentX(),y+180,MUTED,false);}
+                "Active rentals: "+c.activeRentalCount(),"Balance: "+snapshot.economy().formattedBalance()};
+        for(int i=0;i<lines.length;i++)g.text(font,lines[i],l.contentX(),y+48+i*18,TEXT,false);}
 
-    private void detail(GuiGraphicsExtractor g,Layout l,String title,List<String> lines){int w=Math.min(360,l.contentWidth());int x=l.contentRight()-w;int bottom=l.panelBottom()-36;int y=Math.max(l.contentTop()+20,bottom-158);
-        g.fill(x,y,l.contentRight(),bottom,0xF0202832);g.outline(x,y,w,bottom-y,ACCENT);g.text(font,title,x+7,y+7,ACCENT,true);
+    private void detail(GuiGraphicsExtractor g,Layout l,String title,List<String> lines){
+        boolean transactionLike = page == Page.WALLET || page == Page.TRANSACTIONS;
+        int reservedRight = transactionLike ? 70 : 0;
+        int usable = Math.max(160, l.contentWidth() - reservedRight);
+        int w = Math.min(transactionLike ? 300 : 360, usable);
+        int x = l.contentX() + Math.max(0, (usable - w) / 2);
+        int bottom = l.panelBottom() - 38;
+        int y = Math.max(l.contentTop() + (transactionLike ? 92 : 20), bottom - 148);
+        g.fill(x,y,x+w,bottom,0xF0202832);g.outline(x,y,w,bottom-y,ACCENT);g.text(font,title,x+7,y+7,ACCENT,true);
         int visible=Math.max(1,Math.min(7,(bottom-y-28)/13));
-        for(int i=0;i<Math.min(visible,lines.size());i++)g.text(font,trim(lines.get(i),55),x+7,y+23+i*13,MUTED,false);}
+        for(int i=0;i<Math.min(visible,lines.size());i++)g.text(font,trim(lines.get(i),Math.max(24,(w-14)/6)),x+7,y+23+i*13,MUTED,false);}
     private void empty(GuiGraphicsExtractor g,Layout l,String text){g.text(font,text,l.contentX(),l.contentTop()+62,MUTED,false);}
 
     private int rowY(Layout l,int i){return rowY(l,i,58);} private int rowY(Layout l,int i,int offset){return l.contentTop()+offset+i*27;}
     private int rowTextY(Layout l,int i){return rowY(l,i)+6;} private int rowTextY(Layout l,int i,int offset){return rowY(l,i,offset)+6;}
-    private Layout layout(){int pw=Math.max(360,Math.min(680,width-8));int ph=Math.max(250,Math.min(390,height-8));int px=(width-pw)/2;int py=(height-ph)/2;
+    private Layout layout(){boolean compactPage=page==Page.WALLET||page==Page.PROFILE;int maxW=compactPage?544:680;int maxH=compactPage?312:390;int pw=Math.max(360,Math.min(maxW,width-8));int ph=Math.max(250,Math.min(maxH,height-8));int px=(width-pw)/2;int py=(height-ph)/2;
         boolean side=pw>=540;int sx=px+10;int cx=side?sx+112:px+12;int cw=px+pw-12-cx;return new Layout(px,py,pw,ph,sx,cx,cw,side);}
     private static String activationLabel(String value) { return "KEYBIND".equals(value) ? "Keybind" : "Crouch"; }
     private static String nextActivation(String value) { return "KEYBIND".equals(value) ? "SNEAK" : "KEYBIND"; }
@@ -3641,7 +3724,9 @@ public final class SsuDashboardScreen extends Screen {
         REGIONS("Regions","Server-region details, visibility and settings","regions"),
         REGION_ADMIN("Region Maintenance","Snapshots, recovery, selection and rental administration","region_admin"),
         UTILITY_MINING_ADMIN("Utility Mining","Server rules for Treecapitator and Veinminer","utility_mining_admin"), MAINTENANCE("Maintenance","Reload, refresh and visualization defaults","maintenance"), SETTINGS("Settings","Personal settings",""),
-        ADMIN("Admin Center","Paged administrative tools",""), DIMENSIONS("Dimensions","Create and configure custom dimensions",""), MODULE_SETTINGS("Module Settings","Global module switches and render distances",""),
+        ADMIN("Admin Center","Paged administrative tools",""), DIMENSIONS("Dimensions","Create and configure custom dimensions",""),
+        ONBOARDING_ADMIN("Onboarding & Spawns","First-join rules, introduction and dimension-aware destinations",""),
+        KITS("Kits","Available kits and cooldowns",""), KIT_ADMIN("Kit Administration","Create and edit player kits",""), MINES("Mines","Available resettable mines",""), MINE_ADMIN("Mine Administration","Dedicated mine setup and reset controls",""), JAIL_ADMIN("Jail Administration","Nested prison facilities, cells and work areas",""), SUPPORT("Support & Reports","Create and follow support tickets",""), SERVER_OPERATIONS("Server Operations","Backups, scheduler, moderation, health and world tools",""), MODULE_SETTINGS("Module Settings","Global module switches and render distances",""),
         ADMIN_TOOLS("Admin Tools","Purpose-built setup and editing tools",""),
         HOLOGRAMS("Holograms","Remote floating-text and hologram administration","holograms"),
         STATISTICS("Player Statistics","Custom counters, storage and Floating Text sources","statistics"), PLAYER_INFO("Player Info & Profile","Admin player browser and effective permissions",""),

@@ -16,5 +16,10 @@ public final class NpcLabelClientState {
 
     public static List<NpcLabelSyncPayload.Entry> entries() { return entries; }
 
+    public static String definitionIdForEntity(int entityId) {
+        for (NpcLabelSyncPayload.Entry entry : entries) if (entry.entityId() == entityId) return entry.definitionId();
+        return "";
+    }
+
     public static void clear() { entries = List.of(); }
 }

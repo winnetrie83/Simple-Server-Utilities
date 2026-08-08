@@ -9,6 +9,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentId;
 public final class MinigameArenaDefinition {
     public static final int MAX_TEAM_SPAWNS = 64;
     public static final int MAX_BOOST_SPAWNS = 64;
+    public static final int MAX_HILL_POINTS = 16;
 
     public String id = "arena_1";
     public String displayName = "Arena 1";
@@ -21,8 +22,14 @@ public final class MinigameArenaDefinition {
     public MinigameLocation spectator = new MinigameLocation();
     /** Optional movement cuboid for eliminated spectators. */
     public MinigameAreaBounds spectatorBounds = new MinigameAreaBounds();
-    /** Optional Spleef floor volume. Only configured floor blocks are breakable. */
+    /** Optional Spleef / Block Party playfloor volume. */
     public MinigameAreaBounds playFloor = new MinigameAreaBounds();
+    /** Each KOTH arena is exactly one mode: static or rotating. */
+    public String kothMode = "static";
+    /** King of the Hill STATIC objective center and legacy center. */
+    public MinigameLocation hillCenter = new MinigameLocation();
+    /** Authored hill points used by ROTATING King of the Hill. */
+    public List<MinigameLocation> hillPoints = new ArrayList<>();
     public List<MinigameSpawnPoint> teamSpawns = new ArrayList<>();
     public List<MinigameFlagPoint> flagPoints = new ArrayList<>();
     public List<MinigameControlPoint> controlPoints = new ArrayList<>();
@@ -46,8 +53,20 @@ public final class MinigameArenaDefinition {
         spectator.normalize();
         if (spectatorBounds == null) spectatorBounds = new MinigameAreaBounds();
         if (playFloor == null) playFloor = new MinigameAreaBounds();
+        kothMode = "rotating".equalsIgnoreCase(kothMode) ? "rotating" : "static";
+        if (hillCenter == null) hillCenter = new MinigameLocation();
+        if (hillPoints == null) hillPoints = new ArrayList<>();
         spectatorBounds.normalize();
         playFloor.normalize();
+        hillCenter.normalize();
+        ArrayList<MinigameLocation> normalizedHillPoints = new ArrayList<>();
+        for (MinigameLocation point : hillPoints) {
+            if (point == null) continue;
+            point.normalize();
+            normalizedHillPoints.add(point);
+            if (normalizedHillPoints.size() >= MAX_HILL_POINTS) break;
+        }
+        hillPoints = normalizedHillPoints;
         ArrayList<MinigameSpawnPoint> normalized = new ArrayList<>();
         if (teamSpawns != null) {
             for (MinigameSpawnPoint spawn : teamSpawns) {
@@ -90,6 +109,8 @@ public final class MinigameArenaDefinition {
         boostSpawns = normalizedBoostSpawns;
         normalizeControlPointRespawns();
     }
+
+    public boolean rotatingHill() { return "rotating".equals(kothMode); }
 
     private void normalizeControlPointRespawns() {
         if (controlPoints.isEmpty()) return;

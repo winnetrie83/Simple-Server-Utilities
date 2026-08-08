@@ -1,0 +1,17 @@
+SSU 1.9.0-dev3.15.2 validation
+
+Scope
+- Compile-only hotfix on top of dev3.15.1.
+- MinigameSetupToolService King of the Hill hill-center validation path only.
+
+Checks
+- Missing locationInsideRegion helper added to MinigameSetupToolService.
+- Helper semantics match MinigameManager locationInsideRegion.
+- Source archive integrity checked during packaging.
+- Full `./gradlew compileJava --no-daemon` could not reach Java compilation because the wrapper attempted to download Gradle 9.2.1 from services.gradle.org and the environment returned `java.net.UnknownHostException`.
+
+Versions
+- Mod version: 1.9.0-dev3.15.2
+- Network protocol: unchanged (99)
+- NPC definition schema: unchanged (9)
+- Minigame definition schema: unchanged (20)

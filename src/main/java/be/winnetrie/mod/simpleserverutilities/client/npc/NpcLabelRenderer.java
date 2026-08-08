@@ -36,6 +36,7 @@ public final class NpcLabelRenderer implements net.minecraft.client.renderer.deb
         if (minecraft.player == null || minecraft.level == null) return;
         Vec3 playerPosition = minecraft.player.position();
         for (NpcLabelSyncPayload.Entry entry : NpcLabelClientState.entries()) {
+            if (!entry.labelVisible()) continue;
             Entity entity = minecraft.level.getEntity(entry.entityId());
             if (entity == null || entity.isRemoved() || !sameUuid(entity, entry.entityUuid())) continue;
             Vec3 base = entity.position().add(0.0D, entity.getBbHeight() + 0.52D, 0.0D);

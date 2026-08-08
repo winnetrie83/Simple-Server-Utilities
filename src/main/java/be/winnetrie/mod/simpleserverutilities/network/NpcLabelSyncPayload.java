@@ -30,6 +30,8 @@ public record NpcLabelSyncPayload(List<Entry> entries) implements CustomPacketPa
         for (Entry entry : payload.entries) {
             buffer.writeVarInt(entry.entityId);
             buffer.writeUtf(entry.entityUuid, 36);
+            buffer.writeUtf(entry.definitionId, 64);
+            buffer.writeBoolean(entry.labelVisible);
             buffer.writeUtf(entry.displayName, 64);
             buffer.writeUtf(entry.roleId, 32);
             buffer.writeUtf(entry.factionName, 64);
@@ -42,7 +44,7 @@ public record NpcLabelSyncPayload(List<Entry> entries) implements CustomPacketPa
         if (count < 0 || count > MAX_ENTRIES) throw new IllegalArgumentException("Invalid NPC label count: " + count);
         ArrayList<Entry> entries = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
-            entries.add(new Entry(buffer.readVarInt(), buffer.readUtf(36), buffer.readUtf(64),
+            entries.add(new Entry(buffer.readVarInt(), buffer.readUtf(36), buffer.readUtf(64), buffer.readBoolean(), buffer.readUtf(64),
                     buffer.readUtf(32), buffer.readUtf(64), buffer.readUtf(16)));
         }
         return new NpcLabelSyncPayload(entries);
@@ -50,11 +52,12 @@ public record NpcLabelSyncPayload(List<Entry> entries) implements CustomPacketPa
 
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 
-    public record Entry(int entityId, String entityUuid, String displayName,
+    public record Entry(int entityId, String entityUuid, String definitionId, boolean labelVisible, String displayName,
                         String roleId, String factionName, String attitude) {
         public Entry {
             entityId = Math.max(0, entityId);
             entityUuid = PayloadBounds.string(entityUuid, 36);
+            definitionId = PayloadBounds.string(definitionId, 64);
             displayName = PayloadBounds.string(displayName, 64);
             roleId = NpcRole.parse(roleId).id();
             factionName = PayloadBounds.string(factionName, 64);

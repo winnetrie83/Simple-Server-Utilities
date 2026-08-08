@@ -83,11 +83,34 @@ public final class MinigameMatch {
     public final Map<Integer, Integer> dominationScores = new LinkedHashMap<>();
     public boolean dominationInitialized;
     public long dominationLastScoreTick;
+    /** King of the Hill team score and current uncontested controller (0 = neutral/contested). */
+    public final Map<Integer, Integer> kingOfTheHillScores = new LinkedHashMap<>();
+    public int kingOfTheHillOwner;
+    /** STATIC control marker: -1 red extreme, 0 neutral center, +1 blue extreme. */
+    public double kingOfTheHillControl;
+    /** Last movement direction of the STATIC control marker: -1 red, 0 still, +1 blue. */
+    public int kingOfTheHillControlDirection;
+    /** ROTATING active point index and next switch tick. */
+    public int kingOfTheHillPointIndex;
+    public long kingOfTheHillNextRotationTick;
+    public boolean kingOfTheHillRotationWarned;
+    public int kingOfTheHillRedPresent;
+    public int kingOfTheHillBluePresent;
+    public long kingOfTheHillLastScoreTick;
+    public boolean kingOfTheHillInitialized;
+    /** Block Party round state. The arena snapshot remains the authoritative post-match restore. */
+    public int blockPartyRound;
+    public String blockPartySafeBlock = "";
+    public String blockPartyPhase = "idle";
+    public long blockPartyPhaseEndsTick;
+    public boolean blockPartyInitialized;
     /** Spleef: next tick at which each player may fire the infinite projectile. */
     public final Map<UUID, Long> spleefStandardProjectileCooldowns = new LinkedHashMap<>();
     public boolean spleefStandardProjectileUnlocked;
     public boolean spleefBurstScheduleStarted;
     public long spleefNextBurstGrantTick;
+    /** Players whose inventory lock must accept vanilla projectile consumption on the next tick. */
+    public final Set<UUID> spleefInventoryRefreshPending = new LinkedHashSet<>();
 
     /** Shared CTF/Domination boost runtime. */
     public final Map<UUID, ActiveBoost> activeBoosts = new LinkedHashMap<>();

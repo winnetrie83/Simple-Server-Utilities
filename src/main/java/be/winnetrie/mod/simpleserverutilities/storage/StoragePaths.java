@@ -151,6 +151,11 @@ public final class StoragePaths {
         return npcs(root).resolve("shops");
     }
 
+    /** Server-local PNG skins used by custom player-style NPCs. */
+    public static Path npcTextures(Path root) {
+        return npcs(root).resolve("textures");
+    }
+
     public static Path npcItemPrices(Path root) {
         return npcs(root).resolve("item_prices.json");
     }
@@ -233,6 +238,50 @@ public final class StoragePaths {
 
     public static Path serverSpawn(Path root) {
         return root.resolve("spawn").resolve("server_spawn.json");
+    }
+
+    public static Path onboarding(Path root) {
+        return root.resolve("onboarding");
+    }
+
+    public static Path moderation(Path root) {
+        return root.resolve("moderation");
+    }
+
+    public static Path moderationRecords(Path root) {
+        return moderation(root).resolve("players");
+    }
+
+    public static Path playerInventorySnapshots(Path root) {
+        return moderation(root).resolve("inventories");
+    }
+
+    public static Path jails(Path root) {
+        return root.resolve("jails");
+    }
+
+    public static Path jailDefinitions(Path root) {
+        return jails(root).resolve("definitions");
+    }
+
+    public static Path mines(Path root) {
+        return root.resolve("mines");
+    }
+
+    public static Path mineDefinitions(Path root) {
+        return mines(root).resolve("definitions");
+    }
+
+    public static Path kits(Path root) {
+        return root.resolve("kits");
+    }
+
+    public static Path kitDefinitions(Path root) {
+        return kits(root).resolve("definitions");
+    }
+
+    public static Path kitPlayers(Path root) {
+        return kits(root).resolve("players");
     }
 
     public static Path regions(Path root) {
