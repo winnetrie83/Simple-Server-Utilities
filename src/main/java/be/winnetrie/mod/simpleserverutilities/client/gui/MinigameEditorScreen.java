@@ -52,6 +52,8 @@ public abstract class MinigameEditorScreen extends Screen {
         if (type == MinigameGameType.SPLEEF) return new SpleefMinigameEditorScreen(payload, parent);
         if (type == MinigameGameType.CAPTURE_THE_FLAG) return new CaptureTheFlagMinigameEditorScreen(payload, parent);
         if (type == MinigameGameType.DOMINATION) return new DominationMinigameEditorScreen(payload, parent);
+        if (type == MinigameGameType.KING_OF_THE_HILL) return new KingOfTheHillMinigameEditorScreen(payload, parent);
+        if (type == MinigameGameType.BLOCK_PARTY) return new BlockPartyMinigameEditorScreen(payload, parent);
         return new GenericMinigameEditorScreen(payload, parent);
     }
 

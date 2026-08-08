@@ -99,6 +99,7 @@ public final class SsuMenuService {
 
 
     public void open(ServerPlayer player) {
+        if (jailGate(player)) return;
         PlayerBorderPreferences preferences = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID());
         var uiPreferences = SimpleServerUtilities.UI_PREFERENCES.ensurePlayer(player);
         boolean administrator = isAdministrator(player);
@@ -218,6 +219,7 @@ public final class SsuMenuService {
 
     public void handlePageRequest(SsuMenuPageRequestPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)) return;
+        if (jailGate(player)) return;
         String page = payload.page();
         SsuMenuPageDataPayload response;
         try {
@@ -231,6 +233,7 @@ public final class SsuMenuService {
                 case "regions" -> regionsPage(player, payload);
                 case "region_admin" -> regionAdminPage(player, payload);
                 case "wallet_transactions" -> walletTransactionsPage(player, payload);
+                case "known_players" -> knownPlayersPage(player, payload);
                 case "transactions" -> transactionsPage(player, payload);
                 case "auction_tax" -> auctionTaxPage(player, payload);
                 case "claim_tax" -> claimTaxPage(player, payload);
@@ -258,6 +261,7 @@ public final class SsuMenuService {
 
     public void handlePermissionEditorRequest(SsuPermissionEditorRequestPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)) return;
+        if (jailGate(player)) return;
         SsuPermissionEditorDataPayload response;
         try {
             response = permissionEditorData(player, payload);
@@ -271,6 +275,7 @@ public final class SsuMenuService {
 
     public void handlePlayerProfileRequest(SsuPlayerProfileRequestPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)) return;
+        if (jailGate(player)) return;
         SsuPlayerProfileDataPayload response;
         try {
             response = playerProfileData(player, payload);
@@ -284,11 +289,13 @@ public final class SsuMenuService {
 
     public void handlePlayerUiSettingUpdate(PlayerUiSettingUpdatePayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)) return;
+        if (jailGate(player)) return;
         setting(player, payload.key(), payload.value());
     }
 
     public void handleAction(SsuMenuActionPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)) return;
+        if (jailGate(player)) return;
         ActionResult result;
         try {
             result = performAction(player, payload);
@@ -301,9 +308,30 @@ public final class SsuMenuService {
         if (result.success() && affectsPlayerIdentity(payload.action())) {
             SimpleServerUtilities.IDENTITY.syncAll();
         }
+        if (result.success() && isAdministrator(player) && auditDashboardAction(payload.action())) {
+            SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "dashboard." + payload.action(), payload.target(),
+                    "secondary=" + payload.secondary() + ", value=" + payload.value());
+        }
         if (result.refreshShell()) open(player);
     }
 
+
+    private static boolean jailGate(ServerPlayer player) {
+        if (player == null || !SimpleServerUtilities.MODERATION.jailed(player.getUUID())) return false;
+        be.winnetrie.mod.simpleserverutilities.moderation.ModerationService.sendJail(player, "Jail restrictions are active.", false);
+        return true;
+    }
+
+    private static boolean auditDashboardAction(String action) {
+        if (action == null || action.isBlank()) return false;
+        return action.startsWith("permission_") || action.startsWith("rank_") || action.startsWith("economy_")
+                || action.startsWith("admin_claim_") || action.startsWith("region_admin_")
+                || action.startsWith("claim_tax_") || action.startsWith("spawn_")
+                || action.equals("region_rent_refund") || action.equals("region_renting_toggle")
+                || action.equals("auction_tax_set") || action.equals("job_cancel") || action.equals("core_reset")
+                || action.startsWith("module_") || action.startsWith("utility_mining_")
+                || action.startsWith("statistics_") || action.startsWith("maintenance_");
+    }
 
     private static boolean affectsPlayerIdentity(String action) {
         if (action == null || action.isBlank()) return false;
@@ -789,6 +817,20 @@ public final class SsuMenuService {
                 AdminToolService.giveHologramTool(player);
                 yield ActionResult.ok("Hologram Tool added. Right-click to create; right-click existing text to edit.", "");
             }
+            case "mine" -> {
+                if (!PermissionService.getBoolean(player, PermissionKeys.MINES_ADMIN, false)) {
+                    yield ActionResult.fail("You lack Mine administration permission.", "");
+                }
+                SimpleServerUtilities.MINE_SETUP_TOOLS.giveTool(player);
+                yield ActionResult.ok("Mine Setup Tool added. Left-click corner 1, right-click a block for corner 2; right-click air opens Mines.", "");
+            }
+            case "jail" -> {
+                if (!PermissionService.getBoolean(player, PermissionKeys.JAILS_ADMIN, false)) {
+                    yield ActionResult.fail("You lack Jail administration permission.", "");
+                }
+                SimpleServerUtilities.JAIL_SETUP_TOOLS.giveTool(player);
+                yield ActionResult.ok("Jail Setup Tool added. Left-click corner 1, right-click a block for corner 2; right-click air opens Jails.", "");
+            }
             case "npc" -> {
                 if (!Config.ENABLE_NPCS.get()
                         || !PermissionService.getBoolean(player, PermissionKeys.NPCS_ADMIN, false)) {
@@ -1056,7 +1098,18 @@ public final class SsuMenuService {
         String q = request.query().trim().toLowerCase(Locale.ROOT);
         if (!q.isBlank()) all = all.stream().filter(record -> transactionSearch(record).contains(q)).toList();
         List<SsuMenuPageDataPayload.TransactionEntry> entries = page(all, request).stream().map(this::transactionEntry).toList();
-        return data(request, all.size(), List.of(), List.of(), List.of(), entries, List.of(), List.of(), List.of(), List.of());
+        return data(request, all.size(), List.of(), List.of(), List.of(), entries,
+                List.of(), List.of(), List.of(), List.of());
+    }
+
+    private SsuMenuPageDataPayload knownPlayersPage(ServerPlayer player, SsuMenuPageRequestPayload request) {
+        if (!SimpleServerUtilities.ECONOMY.isEnabled()
+                || !PermissionService.getBoolean(player, PermissionKeys.ECONOMY_USE, true)
+                || !PermissionService.getBoolean(player, PermissionKeys.ECONOMY_PAY, true)) return denied(request);
+        List<SsuMenuPageDataPayload.AccountEntry> all = filter(knownPlayerEntries(player), request.query(),
+                entry -> entry.name() + " " + entry.id());
+        List<SsuMenuPageDataPayload.AccountEntry> entries = page(all, request);
+        return data(request, all.size(), List.of(), List.of(), List.of(), List.of(), entries, List.of(), List.of(), List.of());
     }
 
     private SsuMenuPageDataPayload transactionsPage(ServerPlayer player, SsuMenuPageRequestPayload request) {
@@ -1095,6 +1148,30 @@ public final class SsuMenuService {
                         account.getLastKnownName(), MoneyFormat.format(account.getBalanceMinor(),
                         SimpleServerUtilities.ECONOMY.settings()), account.getBalanceMinor(),
                         account.getRevision(), account.getUpdatedAtEpochMilli()))
+                .toList();
+    }
+
+    private List<SsuMenuPageDataPayload.AccountEntry> knownPlayerEntries(ServerPlayer viewer) {
+        Map<UUID, String> known = new LinkedHashMap<>();
+        for (var entry : SimpleServerUtilities.PERMISSIONS.getKnownPlayers()) {
+            if (SimpleServerUtilities.ECONOMY.isSystemAccount(entry.playerId())) continue;
+            String name = entry.name() == null || entry.name().isBlank()
+                    ? entry.playerId().toString().substring(0, 8) : entry.name();
+            known.put(entry.playerId(), name);
+        }
+        for (EconomyAccount account : SimpleServerUtilities.ECONOMY.playerAccounts()) {
+            if (SimpleServerUtilities.ECONOMY.isSystemAccount(account.getPlayerId())) continue;
+            String name = account.getLastKnownName().isBlank()
+                    ? account.getPlayerId().toString().substring(0, 8) : account.getLastKnownName();
+            known.put(account.getPlayerId(), name);
+        }
+        for (ServerPlayer online : viewer.level().getServer().getPlayerList().getPlayers()) {
+            known.put(online.getUUID(), online.getName().getString());
+        }
+        return known.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue(String.CASE_INSENSITIVE_ORDER))
+                .map(entry -> new SsuMenuPageDataPayload.AccountEntry(
+                        entry.getKey().toString(), entry.getValue(), "", 0L, 0L, 0L))
                 .toList();
     }
 
@@ -1449,7 +1526,7 @@ public final class SsuMenuService {
 
         ArrayList<String> extraKeys = new ArrayList<>(directValues.keySet());
         extraKeys.addAll(inheritedValues.keySet());
-        List<PermissionCatalog.Definition> definitions = PermissionCatalog.definitionsIncluding(extraKeys);
+        List<PermissionCatalog.Definition> definitions = permissionDefinitionsIncludingDynamicContent(extraKeys);
         String permissionQuery = request.permissionQuery().toLowerCase(Locale.ROOT);
         if (!permissionQuery.isBlank()) {
             definitions = definitions.stream()
@@ -1578,6 +1655,65 @@ public final class SsuMenuService {
             PermissionKeys.CLAIM_CONTEXT_INTERACT_ENTITIES,
             PermissionKeys.CLAIM_CONTEXT_INTERACT_OTHER
     );
+
+    /** Includes every configured kit/mine permission before a rank/player has an explicit value for it. */
+    private static List<PermissionCatalog.Definition> permissionDefinitionsIncludingDynamicContent(Iterable<String> extraKeys) {
+        LinkedHashSet<String> mergedKeys = new LinkedHashSet<>();
+        if (extraKeys != null) for (String key : extraKeys) {
+            if (key != null && !key.isBlank()) mergedKeys.add(key.trim().toLowerCase(Locale.ROOT));
+        }
+        LinkedHashMap<String, String> kitLabels = new LinkedHashMap<>();
+        for (var kit : SimpleServerUtilities.KITS.definitions()) {
+            String key = kit.permissionKey == null ? "" : kit.permissionKey.trim().toLowerCase(Locale.ROOT);
+            if (key.isBlank()) continue;
+            mergedKeys.add(key);
+            kitLabels.merge(key, kit.displayName, (left, right) -> left.equals(right) ? left : left + ", " + right);
+        }
+        LinkedHashMap<String, String> mineLabels = new LinkedHashMap<>();
+        for (var mine : SimpleServerUtilities.MINES.definitions()) {
+            String key = mine.permissionKey == null ? "" : mine.permissionKey.trim().toLowerCase(Locale.ROOT);
+            if (key.isBlank()) continue;
+            mergedKeys.add(key);
+            mineLabels.merge(key, mine.displayName, (left, right) -> left.equals(right) ? left : left + ", " + right);
+        }
+        ArrayList<PermissionCatalog.Definition> definitions = new ArrayList<>(PermissionCatalog.definitionsIncluding(mergedKeys));
+        for (int index = 0; index < definitions.size(); index++) {
+            PermissionCatalog.Definition definition = definitions.get(index);
+            String kitLabel = kitLabels.get(definition.key());
+            String mineLabel = mineLabels.get(definition.key());
+            boolean reservedKitKey = definition.key().equals(PermissionKeys.KITS_USE)
+                    || definition.key().equals(PermissionKeys.KITS_ADMIN)
+                    || definition.key().equals("ssu.kits.*");
+            boolean reservedMineKey = definition.key().equals(PermissionKeys.MINES_USE)
+                    || definition.key().equals(PermissionKeys.MINES_ADMIN)
+                    || definition.key().equals("ssu.mines.*");
+            if (kitLabel != null && !reservedKitKey) {
+                definitions.set(index, new PermissionCatalog.Definition(definition.key(),
+                        PermissionCatalog.ValueType.BOOLEAN,
+                        "Allows access to kit " + kitLabel + ".", 0, 1));
+            } else if (mineLabel != null && !reservedMineKey) {
+                definitions.set(index, new PermissionCatalog.Definition(definition.key(),
+                        PermissionCatalog.ValueType.BOOLEAN,
+                        "Allows access to mine " + mineLabel + ".", 0, 1));
+            } else if (definition.key().startsWith("ssu.kits.")
+                    && !definition.key().equals(PermissionKeys.KITS_USE)
+                    && !definition.key().equals(PermissionKeys.KITS_ADMIN)
+                    && !definition.key().equals("ssu.kits.*")) {
+                definitions.set(index, new PermissionCatalog.Definition(definition.key(),
+                        PermissionCatalog.ValueType.BOOLEAN,
+                        "No current kit uses this permission key; unset it if it is obsolete.", 0, 1));
+            } else if (definition.key().startsWith("ssu.mines.")
+                    && !definition.key().equals(PermissionKeys.MINES_USE)
+                    && !definition.key().equals(PermissionKeys.MINES_ADMIN)
+                    && !definition.key().equals("ssu.mines.*")) {
+                definitions.set(index, new PermissionCatalog.Definition(definition.key(),
+                        PermissionCatalog.ValueType.BOOLEAN,
+                        "No current mine uses this permission key; unset it if it is obsolete.", 0, 1));
+            }
+        }
+        definitions.sort(Comparator.comparing(PermissionCatalog.Definition::key, String.CASE_INSENSITIVE_ORDER));
+        return List.copyOf(definitions);
+    }
 
     private static String dimensionLabel(
             List<SsuPermissionEditorDataPayload.TargetEntry> dimensions, String dimensionId
@@ -1731,7 +1867,7 @@ public final class SsuMenuService {
                 SimpleServerUtilities.PERMISSIONS.getDefaultRankName());
         ArrayList<String> extraKeys = new ArrayList<>(directValues.keySet());
         extraKeys.addAll(inheritedValues.keySet());
-        List<PermissionCatalog.Definition> definitions = PermissionCatalog.definitionsIncluding(extraKeys);
+        List<PermissionCatalog.Definition> definitions = permissionDefinitionsIncludingDynamicContent(extraKeys);
 
         int totalPermissions = definitions.size();
         int pageCount = Math.max(1, (totalPermissions + request.permissionPageSize() - 1)
@@ -1742,8 +1878,10 @@ public final class SsuMenuService {
         List<SsuPlayerProfileDataPayload.PermissionLine> permissionLines = new ArrayList<>();
         for (PermissionCatalog.Definition definition : definitions.subList(from, to)) {
             PermissionView resolved = resolvePermission(definition, directValues, inheritedValues, moduleDefaults, false);
+            var explanation = SimpleServerUtilities.PERMISSIONS.explainGlobalPermission(selectedId, definition.key());
+            String source = explanation == null ? resolved.source() : explanation.source();
             permissionLines.add(new SsuPlayerProfileDataPayload.PermissionLine(
-                    definition.key(), blank(resolved.effectiveValue()), resolved.source()));
+                    definition.key(), blank(resolved.effectiveValue()), source));
         }
 
         int claimGroups = SimpleServerUtilities.PLAYER_CLAIMS.countClaimGroups(selectedId);

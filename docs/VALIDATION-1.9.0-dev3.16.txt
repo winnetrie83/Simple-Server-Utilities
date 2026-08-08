@@ -1,0 +1,31 @@
+SSU 1.9.0-dev3.16 validation
+
+Build target
+- Minecraft 26.2 / NeoForge 26.2.0.7-beta / Java 25 project target.
+- Mod version: 1.9.0-dev3.16.
+- Network protocol: 100.
+- Minigame definition schema: 21.
+- NPC definition schema remains 9; Mine schema 3; physical Jail schema 2; Server Operations schema 3.
+
+Static/source validation
+- JSON_PARSE_OK files=15.
+- JAVA_LEXICAL_BALANCE_OK files=755.
+- Dependency-less javac parser sanity was run over the 16 changed/new Java files. It produced only expected missing Minecraft/NeoForge/project dependency diagnostics and no parser/syntax-pattern hits.
+- SSU_DEV3_16_STATIC_CHECKS_OK count=15.
+- No stale global KOTH mode references remain; mode is stored on MinigameArenaDefinition.
+- No stale network protocol 99 or Minigame definition schema 20 constants remain in current Java source.
+- No javac.*.args or .class test artifacts remain in the source tree.
+
+Targeted KOTH checks
+- STATIC HUD contains exact 40% red / 20% neutral / 40% blue bar split, yellow marker and direction indicator.
+- STATIC scoring starts outside the +/-0.20 neutral band and requires live presence from the owning team.
+- ROTATING supports up to 16 authored hill points, warning/countdown and sequential point rotation.
+- Live HUD contains both team scores, presence and inside/outside hill feedback.
+- Dedicated KOTH visual payload + translucent half-dome renderer are registered client/server-side.
+- Setup uses a white hill banner and nearest vanilla banner colour for configured KOTH team spawn colours.
+- Detailed match overview is reduced to 576x344 logical pixels (about 20% smaller than 720x430).
+
+Gradle
+- `./gradlew compileJava --no-daemon` was attempted.
+- Compilation could not start because the wrapper needs Gradle 9.2.1 from services.gradle.org and this environment returned java.net.UnknownHostException.
+- Therefore a local real Gradle compile and Minecraft/dedicated-server runtime test remain required.

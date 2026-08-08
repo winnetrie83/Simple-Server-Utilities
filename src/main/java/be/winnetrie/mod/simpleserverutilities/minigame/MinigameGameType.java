@@ -6,9 +6,10 @@ import java.util.Locale;
 public enum MinigameGameType {
     GENERIC("generic", "Generic", true),
     SPLEEF("spleef", "Spleef", true),
-    KING_OF_THE_HILL("king_of_the_hill", "King of the Hill", false),
+    KING_OF_THE_HILL("king_of_the_hill", "King of the Hill", true),
     CAPTURE_THE_FLAG("capture_the_flag", "Capture the Flag", true),
     DOMINATION("domination", "Domination", true),
+    BLOCK_PARTY("block_party", "Block Party", true),
     TEAM_DEATHMATCH("team_deathmatch", "Team Deathmatch", false),
     PARKOUR_RACE("parkour_race", "Parkour Race", false),
     PROP_HUNT("prop_hunt", "Prop Hunt", false);

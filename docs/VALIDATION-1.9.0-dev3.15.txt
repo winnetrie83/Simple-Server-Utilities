@@ -1,0 +1,44 @@
+SSU 1.9.0-dev3.15 static validation
+====================================
+
+Target
+------
+Minecraft: 26.2
+NeoForge: 26.2.0.7-beta
+Java: 25
+Mod version: 1.9.0-dev3.15
+Network protocol: 99
+NPC definition schema: 9
+Minigame definition schema: 20
+
+Checks completed
+----------------
+1. JDK-only NpcTextureSource compile/behavior harness:
+   SSU_DEV3_15_NPC_TEXTURE_SOURCE_OK
+
+2. JSON parse scan under src:
+   JSON_PARSE_OK files=14
+
+3. Whole Java source lexical delimiter scan:
+   JAVA_LEXICAL_BALANCE_OK files=752
+
+4. Dependency-less javac parser sanity for every Java file changed/new versus dev3.14.1:
+   35 changed/new Java files
+   DEPENDENCY_LESS_JAVAC_PARSER_HITS=0
+   The javac process itself exits non-zero because Minecraft, NeoForge and Gson are intentionally not available on a classpath in this container; only syntax/parser diagnostics are used by this check.
+
+5. Targeted static checks:
+   SSU_DEV3_15_STATIC_CHECKS_OK count=20
+   Covered version/protocol/schema constants, texture payload/client/mixin wiring, HTTPS/64x64 validation, texture cache invalidation and one-asset-per-packet sync, embedded Merchant shop flow and RMB-one-item capture, KOTH/Block Party implemented flags/runtime/editor routes and Block Party translated safe-block messaging.
+
+6. Full Gradle compile attempt:
+   ./gradlew compileJava --no-daemon
+   RESULT: could not reach Java compilation.
+   The wrapper attempted to download Gradle 9.2.1 from services.gradle.org and failed with:
+   java.net.UnknownHostException: services.gradle.org
+
+What still requires the user's environment
+-------------------------------------------
+- A real Gradle 9.2.1 compile against the Minecraft 26.2 / NeoForge 26.2.0.7-beta classpath.
+- Minecraft client + dedicated-server runtime validation, especially the ClientMannequin skin mixin/dynamic texture path and full Minigame runtime behavior.
+- The focused runtime checklist is docs/TESTING-1.9.0-dev3.15.md.

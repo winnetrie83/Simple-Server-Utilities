@@ -39,7 +39,7 @@ public final class NpcEditorService {
         PacketDistributor.sendToPlayer(player, new NpcEditorOpenPayload(
                 true, instance.id, definition.id, instance.dimension,
                 instance.x, instance.y, instance.z, instance.yaw, instance.pitch,
-                definition.id, definition.displayName, definition.entityType, definition.interactionText, definition.dialogueId,
+                definition.id, definition.displayName, definition.entityType, definition.textureSource, definition.textureValue, definition.textureModel, definition.interactionText, definition.dialogueId,
                 definition.roleId, definition.shopId, definition.interactionMode, definition.functions,
                 instance.enabled, definition.customNameVisible, definition.noAi, definition.invulnerable,
                 definition.silent, definition.glowing,
@@ -141,6 +141,9 @@ public final class NpcEditorService {
         definition.id = payload.definitionId();
         definition.displayName = payload.displayName();
         definition.entityType = payload.entityType();
+        definition.textureSource = payload.textureSource();
+        definition.textureValue = payload.textureValue();
+        definition.textureModel = payload.textureModel();
         definition.interactionText = payload.interactionText();
         definition.dialogueId = payload.dialogueId();
         definition.roleId = payload.roleId();
@@ -254,8 +257,36 @@ public final class NpcEditorService {
             return Result.fail("Use 1-64 letters, numbers, dots, underscores or dashes for the template ID.");
         }
         if (payload.displayName().trim().isBlank()) return Result.fail("Enter an NPC name.");
-        if (!SimpleServerUtilities.NPCS.isSupportedLivingEntityType(player.level(), payload.entityType())) {
-            return Result.fail("Use a registered living entity type, for example minecraft:villager.");
+        NpcTextureSource textureSource = NpcTextureSource.parse(payload.textureSource());
+        if (textureSource.custom()) {
+            if (payload.textureValue().isBlank()) {
+                return Result.fail(textureSource == NpcTextureSource.LOCAL
+                        ? "Enter a PNG filename relative to simpleserverutilities/npcs/textures."
+                        : "Enter an HTTPS PNG URL.");
+            }
+            if (textureSource == NpcTextureSource.LOCAL) {
+                String value = payload.textureValue().trim().replace('\\', '/');
+                if (value.startsWith("/") || value.startsWith(".") || value.contains("../") || value.contains("/../")
+                        || value.contains(":") || !value.toLowerCase(java.util.Locale.ROOT).endsWith(".png")) {
+                    return Result.fail("Local NPC textures must be relative PNG paths inside simpleserverutilities/npcs/textures.");
+                }
+            } else {
+                try {
+                    java.net.URI uri = java.net.URI.create(payload.textureValue().trim());
+                    if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getHost().isBlank()
+                            || uri.getUserInfo() != null) {
+                        return Result.fail("NPC texture URLs must use HTTPS and may not contain credentials.");
+                    }
+                } catch (RuntimeException exception) {
+                    return Result.fail("Enter a valid HTTPS PNG URL.");
+                }
+            }
+        }
+        String effectiveEntityType = textureSource.custom() ? "minecraft:mannequin" : payload.entityType();
+        if (!SimpleServerUtilities.NPCS.isSupportedLivingEntityType(player.level(), effectiveEntityType)) {
+            return Result.fail(textureSource.custom()
+                    ? "Custom NPC textures require the minecraft:mannequin entity on this server."
+                    : "Use a registered living entity type, for example minecraft:villager.");
         }
         if (!validCoordinates(payload.x(), payload.y(), payload.z())) {
             return Result.fail("Enter coordinates inside the Minecraft world bounds.");

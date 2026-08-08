@@ -76,6 +76,14 @@ import be.winnetrie.mod.simpleserverutilities.minigame.MinigameManager;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameSetupToolEvents;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameSetupToolManager;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameModule;
+import be.winnetrie.mod.simpleserverutilities.mine.MineEvents;
+import be.winnetrie.mod.simpleserverutilities.mine.MineManager;
+import be.winnetrie.mod.simpleserverutilities.mine.MineModule;
+import be.winnetrie.mod.simpleserverutilities.mine.MineSetupToolManager;
+import be.winnetrie.mod.simpleserverutilities.jail.JailEvents;
+import be.winnetrie.mod.simpleserverutilities.jail.JailManager;
+import be.winnetrie.mod.simpleserverutilities.jail.JailModule;
+import be.winnetrie.mod.simpleserverutilities.jail.JailSetupToolManager;
 import be.winnetrie.mod.simpleserverutilities.dungeon.DungeonEvents;
 import be.winnetrie.mod.simpleserverutilities.dungeon.DungeonManager;
 import be.winnetrie.mod.simpleserverutilities.dungeon.DungeonModule;
@@ -112,6 +120,9 @@ import be.winnetrie.mod.simpleserverutilities.settings.PlayerUiPreferencesManage
 import be.winnetrie.mod.simpleserverutilities.settings.UiPreferencesModule;
 import be.winnetrie.mod.simpleserverutilities.spawn.ServerSpawnManager;
 import be.winnetrie.mod.simpleserverutilities.spawn.SpawnModule;
+import be.winnetrie.mod.simpleserverutilities.serverops.ServerOperationsManager;
+import be.winnetrie.mod.simpleserverutilities.serverops.ServerOperationsModule;
+import be.winnetrie.mod.simpleserverutilities.serverops.ServerOperationsEvents;
 import be.winnetrie.mod.simpleserverutilities.statistics.PlayerStatisticsManager;
 import be.winnetrie.mod.simpleserverutilities.statistics.StatisticsEvents;
 import be.winnetrie.mod.simpleserverutilities.statistics.StatisticsModule;
@@ -188,12 +199,22 @@ public class SimpleServerUtilities {
     public static final QuestManager QUESTS = new QuestManager();
     public static final MinigameManager MINIGAMES = new MinigameManager();
     public static final MinigameSetupToolManager MINIGAME_SETUP_TOOLS = new MinigameSetupToolManager();
+    public static final MineManager MINES = new MineManager();
+    public static final MineSetupToolManager MINE_SETUP_TOOLS = new MineSetupToolManager();
+    public static final JailManager JAILS = new JailManager();
+    public static final JailSetupToolManager JAIL_SETUP_TOOLS = new JailSetupToolManager();
     public static final DungeonManager DUNGEONS = new DungeonManager();
+    public static final be.winnetrie.mod.simpleserverutilities.onboarding.OnboardingManager ONBOARDING = new be.winnetrie.mod.simpleserverutilities.onboarding.OnboardingManager();
+    public static final be.winnetrie.mod.simpleserverutilities.moderation.ModerationManager MODERATION = new be.winnetrie.mod.simpleserverutilities.moderation.ModerationManager();
+    public static final be.winnetrie.mod.simpleserverutilities.kits.KitManager KITS = new be.winnetrie.mod.simpleserverutilities.kits.KitManager();
+    public static final ServerOperationsManager SERVER_OPERATIONS = new ServerOperationsManager();
 
     public SimpleServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
         ModMailMenus.MENU_TYPES.register(modEventBus);
         ModAuctionMenus.MENU_TYPES.register(modEventBus);
         ModNpcMenus.MENU_TYPES.register(modEventBus);
+        be.winnetrie.mod.simpleserverutilities.kits.ModKitMenus.MENU_TYPES.register(modEventBus);
+        be.winnetrie.mod.simpleserverutilities.moderation.ModModerationMenus.MENU_TYPES.register(modEventBus);
         CORE.modules().register(new StorageModule(STORAGE));
         CORE.modules().register(new JobSchedulerModule(JOBS));
         CORE.modules().register(new PerformanceModule(PERFORMANCE));
@@ -212,6 +233,11 @@ public class SimpleServerUtilities {
         CORE.modules().register(new RegionModule(REGIONS, REGION_SNAPSHOTS, REGION_RENT_JOURNAL, REGION_SELECTION_TOOLS));
         CORE.modules().register(new TeleportModule(TELEPORTS));
         CORE.modules().register(new SpawnModule(SERVER_SPAWN));
+        CORE.modules().register(new be.winnetrie.mod.simpleserverutilities.onboarding.OnboardingModule(ONBOARDING));
+        CORE.modules().register(new JailModule(JAILS, JAIL_SETUP_TOOLS));
+        CORE.modules().register(new be.winnetrie.mod.simpleserverutilities.moderation.ModerationModule(MODERATION));
+        CORE.modules().register(new be.winnetrie.mod.simpleserverutilities.kits.KitModule(KITS));
+        CORE.modules().register(new ServerOperationsModule(SERVER_OPERATIONS));
         CORE.modules().register(new VisualizationModule(BORDER_SETTINGS, BORDER_VISUALIZATIONS));
         CORE.modules().register(new MenuModule(MENUS));
         CORE.modules().register(new UtilityMiningModule(UTILITY_MINING, TREE_PLACEMENTS));
@@ -222,6 +248,7 @@ public class SimpleServerUtilities {
         CORE.modules().register(new NpcShopModule(NPC_SHOPS));
         CORE.modules().register(new QuestModule(QUESTS));
         CORE.modules().register(new MinigameModule(MINIGAMES));
+        CORE.modules().register(new MineModule(MINES, MINE_SETUP_TOOLS));
         CORE.modules().register(new IdentityModule(IDENTITY));
         CORE.modules().register(new DungeonModule(DUNGEONS));
         CORE.modules().register(new BlockInformationModule());
@@ -261,9 +288,15 @@ public class SimpleServerUtilities {
         NeoForge.EVENT_BUS.register(QuestGameplayEvents.class);
         NeoForge.EVENT_BUS.register(MinigameEvents.class);
         NeoForge.EVENT_BUS.register(MinigameSetupToolEvents.class);
+        NeoForge.EVENT_BUS.register(MineEvents.class);
+        NeoForge.EVENT_BUS.register(JailEvents.class);
         NeoForge.EVENT_BUS.register(IdentityEvents.class);
         NeoForge.EVENT_BUS.register(DamageIndicatorEvents.class);
         NeoForge.EVENT_BUS.register(DungeonEvents.class);
+        NeoForge.EVENT_BUS.register(be.winnetrie.mod.simpleserverutilities.spawn.SpawnEvents.class);
+        NeoForge.EVENT_BUS.register(be.winnetrie.mod.simpleserverutilities.moderation.ModerationEvents.class);
+        NeoForge.EVENT_BUS.register(be.winnetrie.mod.simpleserverutilities.onboarding.OnboardingEvents.class);
+        NeoForge.EVENT_BUS.register(ServerOperationsEvents.class);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
         modContainer.registerConfig(ModConfig.Type.CLIENT, Config.CLIENT_SPEC);

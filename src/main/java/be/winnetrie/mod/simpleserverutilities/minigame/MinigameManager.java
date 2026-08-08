@@ -40,6 +40,7 @@ import be.winnetrie.mod.simpleserverutilities.mail.MailOperationResult;
 import be.winnetrie.mod.simpleserverutilities.mail.MailSource;
 import be.winnetrie.mod.simpleserverutilities.mixin.BlockEntityComponentInvoker;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameHudPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameKothVisualPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameKillFeedPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameResultsPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameProfilePayload;
@@ -125,7 +126,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * It deliberately contains no NPC, quest or dungeon dependency.
  */
 public final class MinigameManager {
-    public static final int DEFINITION_SCHEMA_VERSION = 19;
+    public static final int DEFINITION_SCHEMA_VERSION = 21;
     public static final int RECOVERY_SCHEMA_VERSION = 4;
     public static final int MAX_DEFINITIONS = 256;
     public static final int MAX_SERIALIZED_CHARACTERS = 65_535;
@@ -628,6 +629,20 @@ public final class MinigameManager {
                 }
             }
         }
+        if (gameType == MinigameGameType.KING_OF_THE_HILL) {
+            Identifier weapon = Identifier.parse(definition.kingOfTheHill.weaponItem);
+            if (BuiltInRegistries.ITEM.getOptional(weapon).isEmpty()) {
+                throw new IllegalArgumentException("Unknown King of the Hill weapon item: " + definition.kingOfTheHill.weaponItem);
+            }
+        }
+        if (gameType == MinigameGameType.BLOCK_PARTY) {
+            for (String blockId : definition.blockParty.paletteBlocks) {
+                Identifier parsed = Identifier.parse(blockId);
+                if (BuiltInRegistries.BLOCK.getOptional(parsed).isEmpty()) {
+                    throw new IllegalArgumentException("Unknown Block Party palette block: " + blockId);
+                }
+            }
+        }
         MinigameRoleRules roleRules = roleRules(definition);
         if (roleRules != null && roleRules.enabled) {
             int smallestTeamAtMinimum = definition.minPlayers / 2;
@@ -660,13 +675,34 @@ public final class MinigameManager {
                 catch (RuntimeException exception) { throw new IllegalArgumentException("Arena spectator bounds use an invalid dimension."); }
             }
             if (arena.playFloor != null && arena.playFloor.configured()) {
-                if (gameType != MinigameGameType.SPLEEF) throw new IllegalArgumentException("Only Spleef arenas may define a playfloor.");
+                if (gameType != MinigameGameType.SPLEEF && gameType != MinigameGameType.BLOCK_PARTY)
+                    throw new IllegalArgumentException("Only Spleef and Block Party arenas may define a playfloor.");
                 try { Identifier.parse(arena.playFloor.dimension); }
-                catch (RuntimeException exception) { throw new IllegalArgumentException("Spleef playfloor uses an invalid dimension."); }
+                catch (RuntimeException exception) { throw new IllegalArgumentException("The playfloor uses an invalid dimension."); }
+                if (gameType == MinigameGameType.BLOCK_PARTY && arena.playFloor.volume() > 32_768L) {
+                    throw new IllegalArgumentException("Block Party playfloor is too large; maximum volume is 32768 blocks.");
+                }
             }
             if (arena.teamSpawns.isEmpty()) throw new IllegalArgumentException("Arena '" + arena.id + "' has no team spawns.");
-            if (gameType == MinigameGameType.SPLEEF && arena.teamSpawns.size() < definition.maxPlayers) {
-                throw new IllegalArgumentException("Spleef arena '" + arena.id + "' needs at least one spawn per maximum player.");
+            if ((gameType == MinigameGameType.SPLEEF || gameType == MinigameGameType.BLOCK_PARTY)
+                    && arena.teamSpawns.size() < definition.maxPlayers) {
+                throw new IllegalArgumentException(gameType.label() + " arena '" + arena.id
+                        + "' needs at least one spawn per maximum player.");
+            }
+            if (gameType == MinigameGameType.BLOCK_PARTY && !arena.playFloor.configured()) {
+                throw new IllegalArgumentException("Block Party arena '" + arena.id + "' needs a configured playfloor.");
+            }
+            if (gameType == MinigameGameType.KING_OF_THE_HILL) {
+                if (arena.rotatingHill()) {
+                    if (arena.hillPoints.size() < 2) throw new IllegalArgumentException(
+                            "Rotating King of the Hill arena '" + arena.id + "' needs at least two hill points.");
+                    LinkedHashSet<String> hillCells = new LinkedHashSet<>();
+                    for (MinigameLocation point : arena.hillPoints) {
+                        validateLocation(point, "King of the Hill rotating point");
+                        String cell = point.dimension + ":" + blockPos(point).asLong();
+                        if (!hillCells.add(cell)) throw new IllegalArgumentException("Rotating hill points must occupy different blocks.");
+                    }
+                } else validateLocation(arena.hillCenter, "King of the Hill center");
             }
             if (gameType == MinigameGameType.CAPTURE_THE_FLAG) {
                 if (arena.flagForTeam(1) == null || arena.flagForTeam(2) == null || arena.flagPoints.size() != 2) {
@@ -738,12 +774,12 @@ public final class MinigameManager {
                         }
                     }
                 }
-                if (gameType == MinigameGameType.SPLEEF) {
+                if (gameType == MinigameGameType.SPLEEF || gameType == MinigameGameType.BLOCK_PARTY) {
                     MinigameLocation location = spawn.location;
                     String cell = location.dimension + ":" + (int) Math.floor(location.x) + ":"
                             + (int) Math.floor(location.y) + ":" + (int) Math.floor(location.z);
                     if (!occupiedSpawnBlocks.add(cell)) {
-                        throw new IllegalArgumentException("Spleef player spawns must occupy different blocks.");
+                        throw new IllegalArgumentException(gameType.label() + " player spawns must occupy different blocks.");
                     }
                 }
             }
@@ -755,6 +791,12 @@ public final class MinigameManager {
             }
             if (gameType == MinigameGameType.DOMINATION && definition.enabled && arena.enabled && !arena.resetRegionAfterMatch) {
                 throw new IllegalArgumentException("Enabled Domination arenas require a verified region snapshot reset.");
+            }
+            if (gameType == MinigameGameType.KING_OF_THE_HILL && definition.enabled && arena.enabled && !arena.resetRegionAfterMatch) {
+                throw new IllegalArgumentException("Enabled King of the Hill arenas require a verified region snapshot reset.");
+            }
+            if (gameType == MinigameGameType.BLOCK_PARTY && definition.enabled && arena.enabled && !arena.resetRegionAfterMatch) {
+                throw new IllegalArgumentException("Enabled Block Party arenas require a verified region snapshot reset.");
             }
             if (arena.resetRegionAfterMatch && arena.regionId.isBlank()) {
                 throw new IllegalArgumentException("Arena '" + arena.id + "' enables region reset without a region ID.");
@@ -771,7 +813,18 @@ public final class MinigameManager {
                 }
                 if (arena.playFloor != null && arena.playFloor.configured()
                         && !areaInsideRegion(arena.playFloor, region, 0)) {
-                    throw new IllegalArgumentException("Spleef playfloor for arena '" + arena.id + "' must be inside the arena region.");
+                    throw new IllegalArgumentException("Playfloor for arena '" + arena.id + "' must be inside the arena region.");
+                }
+                if (gameType == MinigameGameType.KING_OF_THE_HILL) {
+                    if (arena.rotatingHill()) {
+                        for (MinigameLocation point : arena.hillPoints) {
+                            if (!locationInsideRegion(point, region, 0.0D)) throw new IllegalArgumentException(
+                                    "Every rotating King of the Hill point for arena '" + arena.id + "' must be inside the arena region.");
+                        }
+                    } else if (!locationInsideRegion(arena.hillCenter, region, 0.0D)) {
+                        throw new IllegalArgumentException("King of the Hill center for arena '" + arena.id
+                                + "' must be inside the arena region.");
+                    }
                 }
                 if (!SimpleServerUtilities.REGION_SNAPSHOTS.hasSnapshot(region.getName())) {
                     throw new IllegalArgumentException("No saved snapshot exists for region '" + region.getName() + "'.");
@@ -843,6 +896,28 @@ public final class MinigameManager {
                         if (blockPos(point.respawn).equals(blockPos(point.location))) {
                             throw new IllegalArgumentException("Linked respawn for Domination node '" + point.displayName
                                     + "' cannot occupy the banner block.");
+                        }
+                    }
+                }
+                if (gameType == MinigameGameType.KING_OF_THE_HILL) {
+                    if (!locationNearRegion(arena.spectator, region, 24.0D, 32.0D)) {
+                        throw new IllegalArgumentException("The spectator point for arena '" + arena.id
+                                + "' must stay close to the arena region.");
+                    }
+                    for (MinigameSpawnPoint spawn : arena.teamSpawns) {
+                        if (!locationInsideRegion(spawn.location, region, 8.0D)) {
+                            throw new IllegalArgumentException("King of the Hill team spawns must be inside the arena footprint.");
+                        }
+                    }
+                }
+                if (gameType == MinigameGameType.BLOCK_PARTY) {
+                    if (!locationNearRegion(arena.spectator, region, 24.0D, 32.0D)) {
+                        throw new IllegalArgumentException("The spectator point for arena '" + arena.id
+                                + "' must stay close to the arena region.");
+                    }
+                    for (MinigameSpawnPoint spawn : arena.teamSpawns) {
+                        if (!locationInsideRegion(spawn.location, region, 8.0D)) {
+                            throw new IllegalArgumentException("Block Party player spawns must be inside the arena footprint.");
                         }
                     }
                 }
@@ -994,6 +1069,21 @@ public final class MinigameManager {
     private void processMatchOverviewRequest(ServerPlayer player, MinigameMatchOverviewRequestPayload payload) {
         if (player == null || payload == null) return;
         String action = payload.action();
+        if (("open".equals(action) || "refresh".equals(action))
+                && SimpleServerUtilities.MODERATION.frozen(player.getUUID())) {
+            player.sendSystemMessage(Component.literal("You are frozen. The SSU dashboard is temporarily unavailable."), true);
+            return;
+        }
+        if (("open".equals(action) || "refresh".equals(action))
+                && SimpleServerUtilities.MODERATION.jailed(player.getUUID())) {
+            be.winnetrie.mod.simpleserverutilities.moderation.ModerationService.sendJail(player, "", false);
+            return;
+        }
+        if (("open".equals(action) || "refresh".equals(action))
+                && SimpleServerUtilities.ONBOARDING.restricted(player.getUUID())) {
+            SimpleServerUtilities.ONBOARDING.handleAction(player, "open", 0, payload.requestId());
+            return;
+        }
         if ("leave".equals(action)) {
             String notice;
             try {
@@ -1110,6 +1200,7 @@ public final class MinigameManager {
         return switch (MinigameGameType.parse(definition.gameType)) {
             case CAPTURE_THE_FLAG -> match.ctfScores.getOrDefault(team, 0);
             case DOMINATION -> match.dominationScores.getOrDefault(team, 0);
+            case KING_OF_THE_HILL -> match.kingOfTheHillScores.getOrDefault(team, 0);
             default -> {
                 long total = 0L;
                 for (Map.Entry<UUID, Integer> entry : match.teams.entrySet()) {
@@ -1125,7 +1216,8 @@ public final class MinigameManager {
         return switch (MinigameGameType.parse(definition.gameType)) {
             case CAPTURE_THE_FLAG -> definition.captureTheFlag.teamName(team);
             case DOMINATION -> definition.domination.teamName(team);
-            case SPLEEF -> {
+            case KING_OF_THE_HILL -> definition.kingOfTheHill.teamName(team);
+            case SPLEEF, BLOCK_PARTY -> {
                 String name = "Player " + team;
                 for (Map.Entry<UUID, Integer> entry : match.teams.entrySet()) {
                     if (entry.getValue() == team) {
@@ -1168,6 +1260,31 @@ public final class MinigameManager {
                     }
                 }
             }
+            case KING_OF_THE_HILL -> {
+                lines.add(definition.kingOfTheHill.teamName(1) + ": "
+                        + match.kingOfTheHillScores.getOrDefault(1, 0) + "/" + definition.kingOfTheHill.scoreToWin);
+                lines.add(definition.kingOfTheHill.teamName(2) + ": "
+                        + match.kingOfTheHillScores.getOrDefault(2, 0) + "/" + definition.kingOfTheHill.scoreToWin);
+                if (arena != null && arena.rotatingHill()) {
+                    long remaining = match.kingOfTheHillNextRotationTick <= 0L ? 0L
+                            : Math.max(0L, (match.kingOfTheHillNextRotationTick - serverTicks + 19L) / 20L);
+                    lines.add("Active hill: " + (match.kingOfTheHillPointIndex + 1) + "/" + Math.max(1, arena.hillPoints.size())
+                            + " • " + remaining + "s");
+                    lines.add("Presence: " + match.kingOfTheHillRedPresent + " vs " + match.kingOfTheHillBluePresent);
+                } else {
+                    String state = match.kingOfTheHillOwner == 0 ? "Neutral zone"
+                            : definition.kingOfTheHill.teamName(match.kingOfTheHillOwner) + " scoring";
+                    lines.add("Control: " + state);
+                    lines.add("Presence: " + match.kingOfTheHillRedPresent + " vs " + match.kingOfTheHillBluePresent);
+                }
+            }
+            case BLOCK_PARTY -> {
+                int alive = 0;
+                for (UUID playerId : match.teams.keySet()) if (!match.eliminated.contains(playerId)) alive++;
+                lines.add("Round " + Math.max(1, match.blockPartyRound) + " • " + alive + " alive");
+                if (!match.blockPartySafeBlock.isBlank()) lines.add("Target: " + match.blockPartySafeBlock);
+                lines.add("Phase: " + match.blockPartyPhase);
+            }
             case SPLEEF -> {
                 int alive = 0;
                 for (UUID playerId : match.teams.keySet()) if (!match.eliminated.contains(playerId)) alive++;
@@ -1209,6 +1326,16 @@ public final class MinigameManager {
                 lines.add("Right-click and hold position to claim bases.");
                 lines.add("Owned bases generate score for your team.");
                 lines.add("First team to " + definition.domination.scoreToWin + " points wins.");
+            }
+            case KING_OF_THE_HILL -> {
+                lines.add("Stay inside the visible hill dome to influence or score the objective.");
+                lines.add("STATIC arenas use a red/neutral/blue control bar; ROTATING arenas switch authored hill points.");
+                lines.add("First team to " + definition.kingOfTheHill.scoreToWin + " points wins.");
+            }
+            case BLOCK_PARTY -> {
+                lines.add("Move onto the announced block before time expires.");
+                lines.add("Every other floor block disappears each round.");
+                lines.add("Last player standing wins.");
             }
             case SPLEEF -> {
                 lines.add("Break the floor beneath opponents.");
@@ -1732,7 +1859,8 @@ public final class MinigameManager {
             MinigameGameType activeType = activeDefinition == null ? MinigameGameType.GENERIC
                     : MinigameGameType.parse(activeDefinition.gameType);
             boolean ctf = activeType == MinigameGameType.CAPTURE_THE_FLAG;
-            boolean respawnTeamMode = ctf || activeType == MinigameGameType.DOMINATION;
+            boolean respawnTeamMode = ctf || activeType == MinigameGameType.DOMINATION
+                    || activeType == MinigameGameType.KING_OF_THE_HILL;
             if (ctf && activeArena != null) {
                 interruptCtfCast(activeMatch, playerId, "Flag capture interrupted because you left the match.");
                 returnFlagsCarriedBy(activeMatch, activeDefinition, activeArena, playerId,
@@ -1830,7 +1958,8 @@ public final class MinigameManager {
             }
         } else if (definition != null) {
             MinigameGameType teamMode = MinigameGameType.parse(definition.gameType);
-            if (teamMode != MinigameGameType.CAPTURE_THE_FLAG && teamMode != MinigameGameType.DOMINATION) return;
+            if (teamMode != MinigameGameType.CAPTURE_THE_FLAG && teamMode != MinigameGameType.DOMINATION
+                    && teamMode != MinigameGameType.KING_OF_THE_HILL) return;
             LinkedHashSet<Integer> occupiedTeams = new LinkedHashSet<>(match.teams.values());
             if (occupiedTeams.size() == 1) {
                 match.winningTeams = Set.copyOf(occupiedTeams);
@@ -1896,17 +2025,22 @@ public final class MinigameManager {
             if (match.state != MinigameMatchState.COUNTDOWN && match.state != MinigameMatchState.RUNNING) continue;
             MinigameDefinition definition = definitions.get(match.minigameId);
             if (definition == null) continue;
-            if (definition.lockInventory) tickLockedInventories(match);
+            if (definition.lockInventory) {
+                refreshPendingSpleefInventoryLocks(match);
+                tickLockedInventories(match);
+            }
             if (match.state != MinigameMatchState.RUNNING) continue;
             MinigameArenaDefinition arena = arena(definition, match.arenaId);
             if (arena == null) continue;
             MinigameGameType type = MinigameGameType.parse(definition.gameType);
-            if (type == MinigameGameType.DOMINATION || type == MinigameGameType.CAPTURE_THE_FLAG) {
+            if (type == MinigameGameType.DOMINATION || type == MinigameGameType.CAPTURE_THE_FLAG
+                    || type == MinigameGameType.KING_OF_THE_HILL) {
                 enforceRespawnModeNeeds(match);
                 tickPendingRespawns(match, definition, arena);
             }
             if (type == MinigameGameType.DOMINATION) tickDominationRealtime(match, definition, arena);
             else if (type == MinigameGameType.CAPTURE_THE_FLAG) tickCtfRealtime(match, definition, arena);
+            else if (type == MinigameGameType.BLOCK_PARTY) tickBlockPartyRealtime(match, definition, arena);
             if (type == MinigameGameType.DOMINATION || type == MinigameGameType.CAPTURE_THE_FLAG) {
                 tickBoosts(match, definition, arena);
             }
@@ -2014,6 +2148,264 @@ public final class MinigameManager {
         if (player == null) return;
         player.connection.send(new ClientboundSetTitleTextPacket(Component.empty()));
         player.connection.send(new ClientboundSetSubtitleTextPacket(Component.empty()));
+    }
+
+    private boolean initializeKingOfTheHill(MinigameMatch match, MinigameDefinition definition,
+                                                MinigameArenaDefinition arena) {
+        if (match == null || definition == null || arena == null) return false;
+        MinigameLocation active = arena.rotatingHill() && !arena.hillPoints.isEmpty()
+                ? arena.hillPoints.getFirst() : arena.hillCenter;
+        ServerLevel level = resolveLevel(active.dimension);
+        if (level == null) return false;
+        match.kingOfTheHillScores.clear();
+        match.kingOfTheHillScores.put(1, 0);
+        match.kingOfTheHillScores.put(2, 0);
+        match.kingOfTheHillOwner = 0;
+        match.kingOfTheHillControl = 0.0D;
+        match.kingOfTheHillControlDirection = 0;
+        match.kingOfTheHillPointIndex = 0;
+        match.kingOfTheHillRedPresent = 0;
+        match.kingOfTheHillBluePresent = 0;
+        match.kingOfTheHillLastScoreTick = serverTicks;
+        match.kingOfTheHillNextRotationTick = arena.rotatingHill()
+                ? serverTicks + definition.kingOfTheHill.rotationIntervalSeconds * 20L : 0L;
+        match.kingOfTheHillRotationWarned = false;
+        match.kingOfTheHillInitialized = true;
+        announce(match, arena.rotatingHill()
+                ? "Rotating Hill active. Score while your team has the strongest presence inside the dome."
+                : "Static Hill active. Push the control marker into your team color to start scoring.");
+        return true;
+    }
+
+    private MinigameLocation activeKingOfTheHillPoint(MinigameMatch match, MinigameDefinition definition,
+                                                       MinigameArenaDefinition arena) {
+        if (arena == null || definition == null) return null;
+        if (!arena.rotatingHill() || arena.hillPoints.isEmpty()) return arena.hillCenter;
+        int index = Math.floorMod(match == null ? 0 : match.kingOfTheHillPointIndex, arena.hillPoints.size());
+        return arena.hillPoints.get(index);
+    }
+
+    private boolean isInsideKingOfTheHill(ServerPlayer player, MinigameLocation hill, double radius) {
+        if (player == null || hill == null || !player.level().dimension().identifier().toString().equals(hill.dimension)) return false;
+        double dx = player.getX() - hill.x, dz = player.getZ() - hill.z;
+        double dy = player.getY() - hill.y;
+        return dx * dx + dz * dz <= radius * radius && dy >= -1.5D && dy <= Math.max(3.0D, radius);
+    }
+
+    private void tickKingOfTheHill(MinigameMatch match, MinigameDefinition definition,
+                                   MinigameArenaDefinition arena) {
+        if (match == null || definition == null || arena == null || !match.kingOfTheHillInitialized) return;
+        KingOfTheHillRules rules = definition.kingOfTheHill;
+        if (arena.rotatingHill() && arena.hillPoints.size() >= 2) {
+            long warningTicks = rules.rotationWarningSeconds * 20L;
+            long remaining = match.kingOfTheHillNextRotationTick - serverTicks;
+            if (!match.kingOfTheHillRotationWarned && warningTicks > 0L && remaining <= warningTicks && remaining > 0L) {
+                match.kingOfTheHillRotationWarned = true;
+                announce(match, "Hill moves in " + Math.max(1L, (remaining + 19L) / 20L) + " seconds!");
+            }
+            if (serverTicks >= match.kingOfTheHillNextRotationTick) {
+                match.kingOfTheHillPointIndex = (match.kingOfTheHillPointIndex + 1) % arena.hillPoints.size();
+                match.kingOfTheHillNextRotationTick = serverTicks + rules.rotationIntervalSeconds * 20L;
+                match.kingOfTheHillRotationWarned = false;
+                match.kingOfTheHillOwner = 0;
+                match.kingOfTheHillLastScoreTick = serverTicks;
+                announce(match, "The hill moved to point " + (match.kingOfTheHillPointIndex + 1) + "!");
+            }
+        }
+
+        MinigameLocation hill = activeKingOfTheHillPoint(match, definition, arena);
+        if (hill == null) return;
+        LinkedHashSet<UUID> redOnHill = new LinkedHashSet<>();
+        LinkedHashSet<UUID> blueOnHill = new LinkedHashSet<>();
+        for (UUID playerId : match.teams.keySet()) {
+            if (!match.active(playerId)) continue;
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (!isInsideKingOfTheHill(player, hill, rules.hillRadius)) continue;
+            if (match.team(playerId) == 1) redOnHill.add(playerId);
+            else if (match.team(playerId) == 2) blueOnHill.add(playerId);
+        }
+        int red = redOnHill.size(), blue = blueOnHill.size();
+        match.kingOfTheHillRedPresent = red;
+        match.kingOfTheHillBluePresent = blue;
+        int previousOwner = match.kingOfTheHillOwner;
+        int owner;
+
+        if (arena.rotatingHill()) {
+            owner = red > blue ? 1 : blue > red ? 2 : 0;
+            match.kingOfTheHillControlDirection = owner == 1 ? -1 : owner == 2 ? 1 : 0;
+        } else {
+            int advantage = blue - red;
+            match.kingOfTheHillControlDirection = Integer.compare(advantage, 0);
+            if (advantage != 0) {
+                double perTick = 0.20D / Math.max(40.0D, rules.controlSweepSeconds * 20.0D);
+                match.kingOfTheHillControl = Math.max(-1.0D, Math.min(1.0D,
+                        match.kingOfTheHillControl + advantage * perTick));
+            }
+            owner = match.kingOfTheHillControl < -0.20D ? 1 : match.kingOfTheHillControl > 0.20D ? 2 : 0;
+        }
+        match.kingOfTheHillOwner = owner;
+        if (owner != previousOwner) {
+            if (owner == 0) announce(match, arena.rotatingHill() ? "The hill is contested!" : "Control moved into the neutral zone.");
+            else announce(match, rules.teamName(owner) + (arena.rotatingHill() ? " controls the active hill!" : " pushed control into scoring territory!"));
+        }
+
+        long interval = Math.max(20L, rules.scoreIntervalSeconds * 20L);
+        if (serverTicks - match.kingOfTheHillLastScoreTick < interval) return;
+        match.kingOfTheHillLastScoreTick = serverTicks;
+        if (owner <= 0) return;
+        // STATIC ownership is persistent, but a team must still physically hold at least one
+        // player inside the hill to generate score. This keeps the tug-of-war state without
+        // allowing an abandoned captured hill to score forever. ROTATING already derives
+        // ownership from live presence, so the same guard is harmless there.
+        if (owner == 1 && red <= 0 || owner == 2 && blue <= 0) return;
+        int next = Math.min(Integer.MAX_VALUE,
+                match.kingOfTheHillScores.getOrDefault(owner, 0) + rules.pointsPerInterval);
+        match.kingOfTheHillScores.put(owner, next);
+        Set<UUID> scoringPlayers = owner == 1 ? redOnHill : blueOnHill;
+        for (UUID playerId : scoringPlayers) {
+            match.scores.merge(playerId, (long) rules.pointsPerInterval, MinigameManager::safeAdd);
+        }
+        if (next >= rules.scoreToWin) {
+            match.winningTeams = Set.of(owner);
+            finish(match, rules.teamName(owner) + " controlled the hill to victory.");
+        }
+    }
+
+    private boolean initializeBlockParty(MinigameMatch match, MinigameDefinition definition,
+                                         MinigameArenaDefinition arena) {
+        if (match == null || definition == null || arena == null || arena.playFloor == null
+                || !arena.playFloor.configured()) return false;
+        ServerLevel level = resolveLevel(arena.playFloor.dimension);
+        if (level == null) return false;
+        match.blockPartyRound = 1;
+        match.blockPartyInitialized = true;
+        return startBlockPartyRound(match, definition, arena, level);
+    }
+
+    private boolean startBlockPartyRound(MinigameMatch match, MinigameDefinition definition,
+                                         MinigameArenaDefinition arena, ServerLevel level) {
+        BlockPartyRules rules = definition.blockParty;
+        if (rules.paletteBlocks.size() < 2) return false;
+        long salt = match.id.getMostSignificantBits() ^ match.id.getLeastSignificantBits()
+                ^ serverTicks ^ ((long) match.blockPartyRound * 0x9E3779B97F4A7C15L);
+        int paletteIndex = Math.floorMod(Long.hashCode(salt), rules.paletteBlocks.size());
+        if (rules.paletteBlocks.size() > 1
+                && rules.paletteBlocks.get(paletteIndex).equals(match.blockPartySafeBlock)) {
+            paletteIndex = (paletteIndex + 1) % rules.paletteBlocks.size();
+        }
+        match.blockPartySafeBlock = rules.paletteBlocks.get(paletteIndex);
+        List<Block> palette = new ArrayList<>();
+        for (String id : rules.paletteBlocks) {
+            Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(id)).orElse(null);
+            if (block == null) return false;
+            palette.add(block);
+        }
+        int safeIndex = paletteIndex;
+        Block safeBlock = palette.get(safeIndex);
+        Component safeBlockName = Component.translatable(safeBlock.getDescriptionId());
+        int tile = Math.max(1, rules.tileSize);
+        MinigameAreaBounds floor = arena.playFloor;
+        for (int y = floor.minY; y <= floor.maxY; y++) {
+            for (int x = floor.minX; x <= floor.maxX; x++) {
+                for (int z = floor.minZ; z <= floor.maxZ; z++) {
+                    int tx = Math.floorDiv(x - floor.minX, tile);
+                    int tz = Math.floorDiv(z - floor.minZ, tile);
+                    int index = Math.floorMod(tx * 31 + tz * 17 + y * 7 + match.blockPartyRound * 13,
+                            palette.size());
+                    if (x == floor.minX && z == floor.minZ) index = safeIndex;
+                    level.setBlock(new BlockPos(x, y, z), palette.get(index).defaultBlockState(), 3);
+                }
+            }
+        }
+        double roundSeconds = Math.max(rules.minimumRoundSeconds,
+                rules.initialRoundSeconds - (match.blockPartyRound - 1) * rules.speedupSecondsPerRound);
+        long countdownTicks = Math.max(20L, Math.round(roundSeconds * 20.0D));
+        match.blockPartyPhase = "choose";
+        match.blockPartyPhaseEndsTick = safeAdd(serverTicks, countdownTicks);
+        for (UUID playerId : match.teams.keySet()) {
+            if (!match.active(playerId)) continue;
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player == null) continue;
+            player.connection.send(new ClientboundSetTitlesAnimationPacket(5, 30, 5));
+            player.connection.send(new ClientboundSetTitleTextPacket(Component.literal("Find the block!")));
+            player.connection.send(new ClientboundSetSubtitleTextPacket(safeBlockName));
+            player.sendSystemMessage(Component.literal("Round " + match.blockPartyRound + ": stand on ")
+                    .append(safeBlockName).append(Component.literal(".")), true);
+        }
+        return true;
+    }
+
+    private void tickBlockPartyRealtime(MinigameMatch match, MinigameDefinition definition,
+                                        MinigameArenaDefinition arena) {
+        if (match == null || definition == null || arena == null || !match.blockPartyInitialized
+                || match.state != MinigameMatchState.RUNNING) return;
+        ServerLevel level = resolveLevel(arena.playFloor.dimension);
+        if (level == null) {
+            finish(match, "Block Party floor dimension became unavailable.");
+            return;
+        }
+        BlockPartyRules rules = definition.blockParty;
+        double eliminateBelow = arena.playFloor.minY - Math.max(1, rules.eliminationDepth);
+        for (UUID playerId : List.copyOf(match.teams.keySet())) {
+            if (!match.active(playerId)) continue;
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player != null && player.getY() < eliminateBelow) eliminate(playerId, "You fell from the Block Party floor.");
+        }
+        if (serverTicks < match.blockPartyPhaseEndsTick) return;
+        if ("choose".equals(match.blockPartyPhase)) {
+            ArrayList<UUID> wrong = new ArrayList<>();
+            for (UUID playerId : match.teams.keySet()) {
+                if (!match.active(playerId)) continue;
+                ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                if (player == null || !player.level().dimension().identifier().toString().equals(arena.playFloor.dimension)) {
+                    wrong.add(playerId);
+                    continue;
+                }
+                BlockPos below = player.blockPosition().below();
+                if (!arena.playFloor.contains(player.level().dimension(), below)) {
+                    wrong.add(playerId);
+                    continue;
+                }
+                Identifier standing = BuiltInRegistries.BLOCK.getKey(level.getBlockState(below).getBlock());
+                if (!match.blockPartySafeBlock.equals(standing.toString())) wrong.add(playerId);
+            }
+            for (UUID playerId : wrong) eliminate(playerId, "Wrong block! You were eliminated.");
+            for (int y = arena.playFloor.minY; y <= arena.playFloor.maxY; y++) {
+                for (int x = arena.playFloor.minX; x <= arena.playFloor.maxX; x++) {
+                    for (int z = arena.playFloor.minZ; z <= arena.playFloor.maxZ; z++) {
+                        BlockPos pos = new BlockPos(x, y, z);
+                        Identifier id = BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock());
+                        if (!match.blockPartySafeBlock.equals(id.toString())) {
+                            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                        }
+                    }
+                }
+            }
+            match.blockPartyPhase = "drop";
+            match.blockPartyPhaseEndsTick = safeAdd(serverTicks, Math.max(20L, rules.dropSeconds * 20L));
+            for (UUID playerId : match.teams.keySet()) if (match.active(playerId)) {
+                match.scores.merge(playerId, 1L, MinigameManager::safeAdd);
+            }
+            Block remainingBlock = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(match.blockPartySafeBlock))
+                    .orElse(Blocks.AIR);
+            announce(match, "Only " + Component.translatable(remainingBlock.getDescriptionId()).getString() + " remains!");
+        } else if ("drop".equals(match.blockPartyPhase)) {
+            Set<Integer> survivingTeams = activeTeams(match);
+            if (survivingTeams.isEmpty()) {
+                match.winningTeams = Set.of();
+                finish(match, "Everyone was eliminated on the same Block Party round.");
+                return;
+            }
+            if (survivingTeams.size() == 1) {
+                match.winningTeams = Set.copyOf(survivingTeams);
+                finish(match, "Last player standing on the Block Party floor.");
+                return;
+            }
+            match.blockPartyRound++;
+            if (!startBlockPartyRound(match, definition, arena, level)) {
+                finish(match, "Block Party could not prepare the next round.");
+            }
+        }
     }
 
     private void tickDominationRealtime(MinigameMatch match, MinigameDefinition definition,
@@ -2255,6 +2647,9 @@ public final class MinigameManager {
         } else if (startingType == MinigameGameType.DOMINATION) {
             match.dominationScores.put(1, 0);
             match.dominationScores.put(2, 0);
+        } else if (startingType == MinigameGameType.KING_OF_THE_HILL) {
+            match.kingOfTheHillScores.put(1, 0);
+            match.kingOfTheHillScores.put(2, 0);
         }
         matches.put(match.id, match);
         String reservedArenaKey = arenaKey(definition.id, arena.id);
@@ -2387,7 +2782,8 @@ public final class MinigameManager {
         }
         MinigameGameType type = MinigameGameType.parse(definition.gameType);
         if (type == MinigameGameType.SPLEEF || type == MinigameGameType.CAPTURE_THE_FLAG
-                || type == MinigameGameType.DOMINATION) {
+                || type == MinigameGameType.DOMINATION || type == MinigameGameType.KING_OF_THE_HILL
+                || type == MinigameGameType.BLOCK_PARTY) {
             if (!Config.ENABLE_ADMIN_REGIONS.get() || !SimpleServerUtilities.CORE.modules().isActive("regions")) return false;
             Region region = SimpleServerUtilities.REGIONS.get(arena.regionId);
             if (region == null || server.getLevel(region.getDimension()) == null) return false;
@@ -2406,6 +2802,13 @@ public final class MinigameManager {
                             || resolveLevel(point.respawn.dimension) == null) return false;
                 }
             }
+            if (type == MinigameGameType.KING_OF_THE_HILL) {
+                MinigameLocation hill = arena.rotatingHill() && !arena.hillPoints.isEmpty()
+                        ? arena.hillPoints.getFirst() : arena.hillCenter;
+                if (hill == null || resolveLevel(hill.dimension) == null) return false;
+            }
+            if (type == MinigameGameType.BLOCK_PARTY
+                    && (!arena.playFloor.configured() || resolveLevel(arena.playFloor.dimension) == null)) return false;
         }
         return true;
     }
@@ -2453,6 +2856,16 @@ public final class MinigameManager {
                         finish(match, "Domination capture nodes could not be initialized.");
                         return;
                     }
+                    if (startingType == MinigameGameType.KING_OF_THE_HILL
+                            && !initializeKingOfTheHill(match, definition, arena)) {
+                        finish(match, "King of the Hill objective could not be initialized.");
+                        return;
+                    }
+                    if (startingType == MinigameGameType.BLOCK_PARTY
+                            && !initializeBlockParty(match, definition, arena)) {
+                        finish(match, "Block Party floor could not be initialized.");
+                        return;
+                    }
                     for (UUID playerId : List.copyOf(match.teams.keySet())) {
                         ServerPlayer participant = server.getPlayerList().getPlayer(playerId);
                         if (participant != null) beginParticipant(participant, definition, arena, match);
@@ -2475,6 +2888,9 @@ public final class MinigameManager {
                     if (match.state != MinigameMatchState.RUNNING) return;
                 } else if (runningType == MinigameGameType.DOMINATION) {
                     tickDomination(match, definition, arena);
+                    if (match.state != MinigameMatchState.RUNNING) return;
+                } else if (runningType == MinigameGameType.KING_OF_THE_HILL) {
+                    tickKingOfTheHill(match, definition, arena);
                     if (match.state != MinigameMatchState.RUNNING) return;
                 }
                 enforceSpectatorsNearArena(match, arena);
@@ -3146,7 +3562,11 @@ public final class MinigameManager {
         if (type == MinigameGameType.DOMINATION && match.winningTeams.size() == 1) {
             return definition.domination.teamName(match.winningTeams.iterator().next()) + " won";
         }
-        if (type == MinigameGameType.SPLEEF && match.winningTeams.size() == 1) {
+        if (type == MinigameGameType.KING_OF_THE_HILL && match.winningTeams.size() == 1) {
+            return definition.kingOfTheHill.teamName(match.winningTeams.iterator().next()) + " won";
+        }
+        if ((type == MinigameGameType.SPLEEF || type == MinigameGameType.BLOCK_PARTY)
+                && match.winningTeams.size() == 1) {
             int winningTeam = match.winningTeams.iterator().next();
             for (Map.Entry<UUID, Integer> entry : match.teams.entrySet()) {
                 if (entry.getValue() != winningTeam) continue;
@@ -3173,7 +3593,13 @@ public final class MinigameManager {
             int team = match.winningTeams.iterator().next();
             title = definition.domination.teamName(team) + " wins!";
             subtitle = definition.displayName;
-        } else if (MinigameGameType.parse(definition.gameType) == MinigameGameType.SPLEEF
+        } else if (MinigameGameType.parse(definition.gameType) == MinigameGameType.KING_OF_THE_HILL
+                && match.winningTeams.size() == 1) {
+            int team = match.winningTeams.iterator().next();
+            title = definition.kingOfTheHill.teamName(team) + " wins!";
+            subtitle = definition.displayName;
+        } else if ((MinigameGameType.parse(definition.gameType) == MinigameGameType.SPLEEF
+                || MinigameGameType.parse(definition.gameType) == MinigameGameType.BLOCK_PARTY)
                 && match.winningTeams.size() == 1) {
             int team = match.winningTeams.iterator().next();
             String winnerName = "Player " + team;
@@ -3205,7 +3631,9 @@ public final class MinigameManager {
             int color = winnerType == MinigameGameType.CAPTURE_THE_FLAG
                     ? definition.captureTheFlag.color(entry.getValue())
                     : winnerType == MinigameGameType.DOMINATION
-                    ? definition.domination.color(entry.getValue()) : 0xFFD700;
+                    ? definition.domination.color(entry.getValue())
+                    : winnerType == MinigameGameType.KING_OF_THE_HILL
+                    ? definition.kingOfTheHill.color(entry.getValue()) : 0xFFD700;
             roleBurst(winner, color, 2.4D);
             roleVerticalBurst(winner, color, 2.0D);
             playRoleSound(match, winner, "minecraft:entity.firework_rocket.launch", 1.35F, 1.0F);
@@ -3240,6 +3668,12 @@ public final class MinigameManager {
         if (definition != null && MinigameGameType.parse(definition.gameType) == MinigameGameType.DOMINATION) {
             int team1 = match.dominationScores.getOrDefault(1, 0);
             int team2 = match.dominationScores.getOrDefault(2, 0);
+            if (team1 == team2) return Set.of();
+            return Set.of(team1 > team2 ? 1 : 2);
+        }
+        if (definition != null && MinigameGameType.parse(definition.gameType) == MinigameGameType.KING_OF_THE_HILL) {
+            int team1 = match.kingOfTheHillScores.getOrDefault(1, 0);
+            int team2 = match.kingOfTheHillScores.getOrDefault(2, 0);
             if (team1 == team2) return Set.of();
             return Set.of(team1 > team2 ? 1 : 2);
         }
@@ -3605,6 +4039,35 @@ public final class MinigameManager {
         }
     }
 
+    /** GUI-first manual arena restore using the same bounded snapshot job as post-match cleanup. */
+    public synchronized String restoreArenaSnapshot(String rawMinigameId, String rawArenaId) {
+        String minigameId = ContentId.require(rawMinigameId, "Minigame ID");
+        String arenaId = ContentId.require(rawArenaId, "Arena ID");
+        MinigameDefinition definition = definitions.get(minigameId);
+        if (definition == null) throw new IllegalArgumentException("Unknown minigame: " + minigameId);
+        MinigameArenaDefinition arena = arena(definition, arenaId);
+        if (arena == null) throw new IllegalArgumentException("Unknown arena: " + arenaId);
+        String key = arenaKey(definition.id, arena.id);
+        boolean activeMatch = matches.values().stream().anyMatch(match -> match.minigameId.equals(definition.id)
+                && match.arenaId.equals(arena.id) && match.state != MinigameMatchState.FINISHED);
+        if (activeMatch || arenaReservations.containsKey(key)) {
+            throw new IllegalArgumentException("This arena is in use by a match. Stop the match before restoring its snapshot.");
+        }
+        if (resettingArenas.contains(key)) {
+            throw new IllegalArgumentException("This arena is already being restored.");
+        }
+        Region region = SimpleServerUtilities.REGIONS.get(arena.regionId);
+        if (region == null) throw new IllegalArgumentException("The arena region is unavailable.");
+        if (!SimpleServerUtilities.REGION_SNAPSHOTS.hasSnapshot(region.getName())) {
+            throw new IllegalArgumentException("No saved arena snapshot exists yet. Save the arena snapshot first.");
+        }
+        if (server == null || server.getLevel(region.getDimension()) == null) {
+            throw new IllegalArgumentException("The arena dimension is unavailable.");
+        }
+        scheduleArenaReset(definition, arena);
+        return "Arena snapshot restoration scheduled for " + definition.displayName + " / " + arena.displayName + ".";
+    }
+
     private void restorePhysicalModeMarkers(MinigameDefinition definition, MinigameArenaDefinition arena) {
         if (definition == null || arena == null) return;
         MinigameGameType type = MinigameGameType.parse(definition.gameType);
@@ -3672,11 +4135,13 @@ public final class MinigameManager {
                                         MinigameArenaDefinition arena, MinigameMatch match) {
         MinigameGameType type = MinigameGameType.parse(definition.gameType);
         if (type == MinigameGameType.SPLEEF || type == MinigameGameType.CAPTURE_THE_FLAG
-                || type == MinigameGameType.DOMINATION) {
+                || type == MinigameGameType.DOMINATION || type == MinigameGameType.KING_OF_THE_HILL
+                || type == MinigameGameType.BLOCK_PARTY) {
             player.setGameMode(GameType.ADVENTURE);
             clearMatchInventory(player);
             player.setHealth(player.getMaxHealth());
-            if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION) {
+            if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION
+                    || type == MinigameGameType.KING_OF_THE_HILL) {
                 setCombatNeeds(player);
             } else {
                 player.getFoodData().setFoodLevel(20);
@@ -3693,12 +4158,18 @@ public final class MinigameManager {
                                   MinigameArenaDefinition arena, MinigameMatch match) {
         MinigameGameType type = MinigameGameType.parse(definition.gameType);
         if (type == MinigameGameType.SPLEEF || type == MinigameGameType.CAPTURE_THE_FLAG
-                || type == MinigameGameType.DOMINATION) {
+                || type == MinigameGameType.DOMINATION || type == MinigameGameType.KING_OF_THE_HILL
+                || type == MinigameGameType.BLOCK_PARTY) {
             clearMatchInventory(player);
             player.setGameMode(GameType.SURVIVAL);
             int team = match.team(player.getUUID());
             if (type == MinigameGameType.SPLEEF) {
                 giveRegistryItem(player, definition.spleef.toolItem);
+            } else if (type == MinigameGameType.BLOCK_PARTY) {
+                // Movement-only elimination game: no combat loadout.
+            } else if (type == MinigameGameType.KING_OF_THE_HILL) {
+                equipCosmeticTeamArmor(player, definition, team);
+                giveRegistryItem(player, definition.kingOfTheHill.weaponItem);
             } else {
                 equipCosmeticTeamArmor(player, definition, team);
                 MinigameRoleRules roles = roleRules(definition);
@@ -3717,7 +4188,8 @@ public final class MinigameManager {
             player.getInventory().setChanged();
             player.containerMenu.broadcastChanges();
             player.setHealth(player.getMaxHealth());
-            if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION) {
+            if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION
+                    || type == MinigameGameType.KING_OF_THE_HILL) {
                 setCombatNeeds(player);
             } else {
                 player.getFoodData().setFoodLevel(20);
@@ -3795,6 +4267,7 @@ public final class MinigameManager {
         int color = switch (MinigameGameType.parse(definition.gameType)) {
             case CAPTURE_THE_FLAG -> definition.captureTheFlag.color(team);
             case DOMINATION -> definition.domination.color(team);
+            case KING_OF_THE_HILL -> definition.kingOfTheHill.color(team);
             default -> 0xA06540;
         };
         player.setItemSlot(EquipmentSlot.HEAD, cosmeticLeather(Items.LEATHER_HELMET, color, ROLE_TEAM_HELMET));
@@ -4074,6 +4547,16 @@ public final class MinigameManager {
             objectivePlayers.addAll(match.ctfCasts.keySet());
         } else if (type == MinigameGameType.DOMINATION) {
             objectivePlayers.addAll(match.dominationCasts.keySet());
+        } else if (type == MinigameGameType.KING_OF_THE_HILL) {
+            MinigameArenaDefinition arena = arena(definition, match.arenaId);
+            MinigameLocation hill = activeKingOfTheHillPoint(match, definition, arena);
+            if (hill != null) {
+                for (UUID playerId : match.teams.keySet()) {
+                    if (!match.active(playerId)) continue;
+                    ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+                    if (isInsideKingOfTheHill(player, hill, definition.kingOfTheHill.hillRadius)) objectivePlayers.add(playerId);
+                }
+            }
         }
         for (UUID playerId : objectivePlayers) {
             if (!match.active(playerId)) continue;
@@ -4293,8 +4776,6 @@ public final class MinigameManager {
                     player.getX(), player.getY(), player.getZ()));
         }
         String flagName = definition.captureTheFlag.teamName(flagTeam);
-        player.sendSystemMessage(Component.literal("Taking the " + flagName
-                + " flag. Do not move, attack, use items, or take damage."), true);
         sendCtfCastBar(player, flagName, definition.captureTheFlag.color(playerTeam), 0.0F);
         return true;
     }
@@ -4402,8 +4883,6 @@ public final class MinigameManager {
                     point.id, team, serverTicks, serverTicks + durationTicks,
                     player.getX(), player.getY(), player.getZ()));
         }
-        player.sendSystemMessage(Component.literal("Claiming " + point.displayName
-                + ". Do not move, attack, use items, or take damage."), true);
         sendDominationCastBar(player, point.displayName, definition.domination.teamName(team),
                 definition.domination.color(team), 0.0F);
         return true;
@@ -4680,7 +5159,8 @@ public final class MinigameManager {
         if (player == null) return;
         int percent = Math.round(Math.max(0.0F, Math.min(1.0F, progress)) * 100.0F);
         PacketDistributor.sendToPlayer(player, new MinigameCastBarPayload(true,
-                "Claiming " + pointName + " for " + teamName + " · " + percent + "%", progress, color));
+                "Claiming " + pointName + " for " + teamName + " · " + percent + "%",
+                "Do not move, attack, use items, or take damage.", progress, color));
     }
 
     private static void clearCastBar(ServerPlayer player) {
@@ -4700,7 +5180,8 @@ public final class MinigameManager {
         if (player == null) return;
         int percent = Math.round(Math.max(0.0F, Math.min(1.0F, progress)) * 100.0F);
         PacketDistributor.sendToPlayer(player, new MinigameCastBarPayload(true,
-                "Taking " + flagName + " flag · " + percent + "%", progress, color));
+                "Taking " + flagName + " flag · " + percent + "%",
+                "Do not move, attack, use items, or take damage.", progress, color));
     }
 
     private void interruptCtfCast(MinigameMatch match, UUID playerId, String reason) {
@@ -5141,7 +5622,8 @@ public final class MinigameManager {
         MinigameGameType type = definition == null ? MinigameGameType.GENERIC
                 : MinigameGameType.parse(definition.gameType);
         if (match == null || definition == null || arena == null
-                || (type != MinigameGameType.CAPTURE_THE_FLAG && type != MinigameGameType.DOMINATION)
+                || (type != MinigameGameType.CAPTURE_THE_FLAG && type != MinigameGameType.DOMINATION
+                && type != MinigameGameType.KING_OF_THE_HILL)
                 || match.state != MinigameMatchState.RUNNING) return false;
         if (match.pendingRespawns.containsKey(player.getUUID())) return true;
 
@@ -5155,7 +5637,7 @@ public final class MinigameManager {
             interruptCtfCast(match, player.getUUID(), "Flag capture interrupted because you were defeated.");
             dropFlagsCarriedBy(match, definition, arena, player.getUUID(), deathLocation,
                     player.getName().getString() + " dropped the carried flag.");
-        } else {
+        } else if (type == MinigameGameType.DOMINATION) {
             interruptDominationCast(match, player.getUUID(), "Capture interrupted because you were defeated.");
         }
 
@@ -5558,6 +6040,16 @@ public final class MinigameManager {
         LinkedHashMap<EquipmentSlot, ItemStack> equipment = new LinkedHashMap<>();
         for (EquipmentSlot slot : LOCKED_EQUIPMENT_SLOTS) equipment.put(slot, player.getItemBySlot(slot).copy());
         match.lockedInventories.put(player.getUUID(), new MinigameMatch.LockedInventory(inventory, equipment));
+    }
+
+    private void refreshPendingSpleefInventoryLocks(MinigameMatch match) {
+        if (match == null || match.spleefInventoryRefreshPending.isEmpty()) return;
+        for (UUID playerId : List.copyOf(match.spleefInventoryRefreshPending)) {
+            match.spleefInventoryRefreshPending.remove(playerId);
+            if (!match.active(playerId)) continue;
+            ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+            if (player != null) captureLockedInventory(match, player);
+        }
     }
 
     private void tickLockedInventories(MinigameMatch match) {
@@ -6110,11 +6602,13 @@ public final class MinigameManager {
                 ServerPlayer player = server.getPlayerList().getPlayer(playerId);
                 if (player == null) continue;
                 int standardCount = countNamedMatchItem(player, Items.SNOWBALL, "Infinite Spleef Projectile");
+                boolean authorizedInventoryChange = false;
                 if (standardCount <= 0) {
-                    giveNamedMatchItem(player, Items.SNOWBALL, 1, "Infinite Spleef Projectile");
+                    authorizedInventoryChange = giveNamedMatchItem(player, Items.SNOWBALL, 1, "Infinite Spleef Projectile");
                 } else if (standardCount > 1) {
-                    trimNamedMatchItemCount(player, Items.SNOWBALL, "Infinite Spleef Projectile", 1);
+                    authorizedInventoryChange = trimNamedMatchItemCount(player, Items.SNOWBALL, "Infinite Spleef Projectile", 1);
                 }
+                if (authorizedInventoryChange && definition.lockInventory) captureLockedInventory(match, player);
             }
         }
         if (!rules.burstProjectileEnabled) return;
@@ -6135,6 +6629,7 @@ public final class MinigameManager {
         if (!eligible.isEmpty()) {
             ServerPlayer recipient = eligible.get(randomInt(match, 0, eligible.size() - 1, (int) serverTicks));
             if (giveNamedMatchItem(recipient, Items.EGG, 1, "Power Spleef Projectile")) {
+                if (definition.lockInventory) captureLockedInventory(match, recipient);
                 recipient.sendSystemMessage(Component.literal("You received a Power Spleef Projectile. It breaks a five-block cross."), true);
             }
         }
@@ -6171,9 +6666,9 @@ public final class MinigameManager {
     }
 
     /** Keeps a temporary match item at an exact upper bound after vanilla use processing. */
-    private static void trimNamedMatchItemCount(ServerPlayer player, net.minecraft.world.item.Item item,
-                                                String expectedName, int maximum) {
-        if (player == null) return;
+    private static boolean trimNamedMatchItemCount(ServerPlayer player, net.minecraft.world.item.Item item,
+                                                   String expectedName, int maximum) {
+        if (player == null) return false;
         int remaining = Math.max(0, maximum);
         boolean changed = false;
         for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
@@ -6192,6 +6687,7 @@ public final class MinigameManager {
             }
         }
         if (changed) syncInventory(player);
+        return changed;
     }
 
     private static boolean giveNamedMatchItem(ServerPlayer player, net.minecraft.world.item.Item item,
@@ -6338,6 +6834,10 @@ public final class MinigameManager {
                 syncInventory(player);
             }
         }
+        // Vanilla may consume the thrown item after EntityJoinLevelEvent returns. Mark the
+        // player so the next server tick accepts the post-consumption layout before the
+        // general inventory lock runs. This keeps Power projectiles finite.
+        if (definition.lockInventory) match.spleefInventoryRefreshPending.add(player.getUUID());
     }
 
     /** Breaks only configured Spleef floor blocks when one of SSU's temporary projectiles impacts. */
@@ -6524,7 +7024,8 @@ public final class MinigameManager {
             MinigameDefinition definition = definitions.get(match.minigameId);
             if (definition == null) return false;
             MinigameGameType type = MinigameGameType.parse(definition.gameType);
-            return type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION;
+            return type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION
+                    || type == MinigameGameType.KING_OF_THE_HILL;
         }
     }
 
@@ -6553,6 +7054,11 @@ public final class MinigameManager {
             return !definition.domination.allowFriendlyFire
                     && victimMatch.team(victim.getUUID()) == victimMatch.team(attacker.getUUID());
         }
+        if (type == MinigameGameType.KING_OF_THE_HILL) {
+            return !definition.kingOfTheHill.allowFriendlyFire
+                    && victimMatch.team(victim.getUUID()) == victimMatch.team(attacker.getUUID());
+        }
+        if (type == MinigameGameType.BLOCK_PARTY) return true;
         return false;
     }
 
@@ -6716,13 +7222,50 @@ public final class MinigameManager {
                             + definition.domination.teamName(entry.getValue().claimingTeam()) + " ("
                             + formatSeconds(seconds) + ")");
                 }
+            } else if (type == MinigameGameType.KING_OF_THE_HILL) {
+                KingOfTheHillRules rules = definition.kingOfTheHill;
+                MinigameArenaDefinition kothArena = arena(definition, match.arenaId);
+                MinigameLocation hill = activeKingOfTheHillPoint(match, definition, kothArena);
+                boolean insideHill = isInsideKingOfTheHill(player, hill, rules.hillRadius);
+                int redScore = match.kingOfTheHillScores.getOrDefault(1, 0);
+                int blueScore = match.kingOfTheHillScores.getOrDefault(2, 0);
+                long rotateSeconds = kothArena != null && kothArena.rotatingHill() && match.kingOfTheHillNextRotationTick > 0L
+                        ? Math.max(0L, (match.kingOfTheHillNextRotationTick - serverTicks + 19L) / 20L) : 0L;
+                lines.add(rules.teamName(1) + ": " + redScore + " · " + rules.teamName(2) + ": " + blueScore);
+                lines.add(insideHill ? "Hill range: INSIDE" : "Hill range: outside");
+                if (kothArena != null && kothArena.rotatingHill()) lines.add("Active hill: " + (match.kingOfTheHillPointIndex + 1) + "/"
+                        + Math.max(1, kothArena == null ? 1 : kothArena.hillPoints.size()) + " · moves in " + rotateSeconds + "s");
+                else lines.add("Control: " + (match.kingOfTheHillOwner == 0 ? "Neutral" : rules.teamName(match.kingOfTheHillOwner)));
+                String marker = "@koth|" + (kothArena != null && kothArena.rotatingHill() ? "R" : "S") + "|" + redScore + "|" + blueScore
+                        + "|" + rules.scoreToWin + "|" + String.format(Locale.ROOT, "%.4f", match.kingOfTheHillControl)
+                        + "|" + match.kingOfTheHillControlDirection + "|" + match.kingOfTheHillRedPresent + "|"
+                        + match.kingOfTheHillBluePresent + "|" + (insideHill ? 1 : 0) + "|" + match.kingOfTheHillOwner
+                        + "|" + rotateSeconds + "|" + match.kingOfTheHillPointIndex + "|"
+                        + Math.max(1, kothArena == null ? 1 : kothArena.hillPoints.size()) + "|"
+                        + safeKothHudName(rules.teamName(1)) + "|" + safeKothHudName(rules.teamName(2)) + "|"
+                        + String.format(Locale.ROOT, "%06X", rules.color(1)) + "|"
+                        + String.format(Locale.ROOT, "%06X", rules.color(2));
+                lines.add(marker);
+                if (hill != null) {
+                    int domeRgb = match.kingOfTheHillOwner == 0 ? 0xF5F5F5 : rules.color(match.kingOfTheHillOwner);
+                    String label = kothArena != null && kothArena.rotatingHill() ? "Hill " + (match.kingOfTheHillPointIndex + 1)
+                            : match.kingOfTheHillOwner == 0 ? "Static Hill" : rules.teamName(match.kingOfTheHillOwner);
+                    PacketDistributor.sendToPlayer(player, new MinigameKothVisualPayload(true, hill.dimension, hill.x, hill.y, hill.z,
+                            rules.hillRadius, domeRgb, label));
+                }
             } else {
                 lines.add("Alive: " + alive + " / " + match.teams.size());
                 lines.add(match.eliminated.contains(playerId) ? "You are spectating" : "Position: active");
             }
             PacketDistributor.sendToPlayer(player, new MinigameHudPayload(true, definition.displayName, lines));
+            if (type != MinigameGameType.KING_OF_THE_HILL) PacketDistributor.sendToPlayer(player, MinigameKothVisualPayload.clear());
             syncRuntimeBorders(player, false);
         }
+    }
+
+    private static String safeKothHudName(String value) {
+        String safe = value == null ? "Team" : value.replace('|', '/').trim();
+        return safe.length() <= 18 ? safe : safe.substring(0, 18);
     }
 
     private static String formatSeconds(long seconds) {
@@ -6732,6 +7275,7 @@ public final class MinigameManager {
 
     private void clearHud(ServerPlayer player) {
         PacketDistributor.sendToPlayer(player, MinigameHudPayload.clear());
+        PacketDistributor.sendToPlayer(player, MinigameKothVisualPayload.clear());
         PacketDistributor.sendToPlayer(player, MinigameCastBarPayload.clear());
         clearRespawnTitle(player);
         clearRuntimeBorders(player);

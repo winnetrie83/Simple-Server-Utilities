@@ -19,6 +19,7 @@ import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupToolConfigurePayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupToolOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupVisualPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameKothVisualPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameValidationPayload;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
@@ -150,6 +151,16 @@ public final class MinigameSetupToolService {
                     MinigameArenaDefinition arena = targetArena(definition, session);
                     sendValidation(player, definition, arena, payload.requestId());
                 }
+                case "restore_snapshot" -> {
+                    MinigameDefinition definition = targetDefinition(session);
+                    MinigameArenaDefinition arena = targetArena(definition, session);
+                    if (PENDING_SNAPSHOTS.contains(definition.id + ":" + arena.id)) {
+                        throw new IllegalArgumentException("Wait for the arena snapshot capture to finish first.");
+                    }
+                    String result = SimpleServerUtilities.MINIGAMES.restoreArenaSnapshot(definition.id, arena.id);
+                    SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "minigame.arena_restore", definition.id + "/" + arena.id, result);
+                    open(player, result, false, payload.requestId());
+                }
                 case "teleport_issue" -> {
                     MinigameDefinition definition = targetDefinition(session);
                     MinigameArenaDefinition arena = targetArena(definition, session);
@@ -162,12 +173,14 @@ public final class MinigameSetupToolService {
                     MinigameArenaDefinition clone = cloneArena(definition, source);
                     saveTarget(definition);
                     session.configure(definition.id, clone.id, MinigameSetupAction.ARENA_BOUNDS, 1, 0);
+                    SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "minigame.arena_clone", definition.id + "/" + source.id, clone.id);
                     open(player, "Arena template cloned. Link or create a new region before enabling it.", false, payload.requestId());
                 }
                 case "export_arena" -> {
                     MinigameDefinition definition = targetDefinition(session);
                     MinigameArenaDefinition arena = targetArena(definition, session);
                     Path exported = exportArena(player.level().getServer(), definition, arena);
+                    SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "minigame.arena_export", definition.id + "/" + arena.id, exported.getFileName().toString());
                     open(player, "Arena exported to " + exported.getFileName() + ".", false, payload.requestId());
                 }
                 case "import_arena" -> {
@@ -176,6 +189,7 @@ public final class MinigameSetupToolService {
                     MinigameArenaDefinition imported = importArena(player.level().getServer(), definition, selectedArena);
                     saveTarget(definition);
                     session.configure(definition.id, imported.id, MinigameSetupAction.ARENA_BOUNDS, 1, 0);
+                    SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "minigame.arena_import", definition.id, imported.id);
                     open(player, "Arena import added as a disabled template. Configure a unique region before enabling it.",
                             false, payload.requestId());
                 }
@@ -206,9 +220,11 @@ public final class MinigameSetupToolService {
                 case SAVE_SNAPSHOT -> saveSnapshot(player, session, definition, arena);
                 case LOBBY -> updateLocation(player, definition, arena, "lobby", clicked.above());
                 case SPECTATOR_SPAWN -> updateLocation(player, definition, arena, "spectator", clicked.above());
-                case SPECTATOR_BOUNDS -> selectAreaCorner(player, session, definition, arena, clicked, false);
+                case SPECTATOR_BOUNDS -> selectAreaCorner(player, session, definition, arena, clicked, false, "Spectator area");
                 case TEAM_SPAWN -> setTeamSpawn(player, session, definition, arena, clicked.above());
-                case SPLEEF_FLOOR -> selectAreaCorner(player, session, definition, arena, clicked, true);
+                case SPLEEF_FLOOR -> selectAreaCorner(player, session, definition, arena, clicked, true, "Spleef playfloor");
+                case BLOCK_PARTY_FLOOR -> selectAreaCorner(player, session, definition, arena, clicked, true, "Block Party floor");
+                case KOTH_HILL -> setHillCenter(player, session, definition, arena, clicked.above());
                 case CTF_FLAG -> setFlag(player, session, definition, arena, clicked.above());
                 case BOOST_SPAWN -> setBoostSpawn(player, session, definition, arena, clicked.above());
                 case DOMINATION_NODE -> setNode(player, session, definition, arena, clicked.above());
@@ -258,11 +274,11 @@ public final class MinigameSetupToolService {
 
     private static void selectAreaCorner(ServerPlayer player, MinigameSetupToolManager.Session session,
                                          MinigameDefinition definition, MinigameArenaDefinition arena,
-                                         BlockPos clicked, boolean playFloor) {
+                                         BlockPos clicked, boolean playFloor, String label) {
+        String areaLabel = label == null || label.isBlank() ? (playFloor ? "Playfloor" : "Spectator area") : label;
         if (session.firstPoint == null) {
             session.setFirst(player.level().dimension().identifier().toString(), clicked);
-            player.sendSystemMessage(Component.literal((playFloor ? "Playfloor" : "Spectator area")
-                    + " corner 1 set. Left-click the opposite corner."), true);
+            player.sendSystemMessage(Component.literal(areaLabel + " corner 1 set. Left-click the opposite corner."), true);
             return;
         }
         if (!session.firstDimension.equals(player.level().dimension().identifier().toString())) {
@@ -273,14 +289,37 @@ public final class MinigameSetupToolService {
         session.clearPoint();
         Region region = requireRegion(arena);
         if (!insideRegion(bounds, region, playFloor ? 0 : 32)) {
-            throw new IllegalArgumentException((playFloor ? "The Spleef playfloor" : "The spectator bounds")
-                    + " must stay inside or directly around the arena.");
+            throw new IllegalArgumentException("The " + areaLabel.toLowerCase(java.util.Locale.ROOT)
+                    + (playFloor ? " must stay inside the arena." : " must stay inside or directly around the arena."));
         }
         if (playFloor) arena.playFloor = bounds;
         else arena.spectatorBounds = bounds;
         saveTarget(definition);
-        player.sendSystemMessage(Component.literal((playFloor ? "Spleef playfloor" : "Spectator bounds")
-                + " saved: " + bounds.compact()), true);
+        player.sendSystemMessage(Component.literal(areaLabel + " saved: " + bounds.compact()), true);
+    }
+
+    private static void setHillCenter(ServerPlayer player, MinigameSetupToolManager.Session session,
+                                      MinigameDefinition definition, MinigameArenaDefinition arena, BlockPos position) {
+        Region region = requireRegion(arena);
+        MinigameLocation location = location(player, position);
+        if (!locationInsideRegion(location, region, 0.0D)) {
+            throw new IllegalArgumentException("The hill point must be inside the arena region.");
+        }
+        if (arena.rotatingHill()) {
+            int index = Math.max(0, Math.min(MinigameArenaDefinition.MAX_HILL_POINTS - 1, session.index));
+            while (arena.hillPoints.size() <= index) arena.hillPoints.add(location.copy());
+            removePhysicalSetupMarker(player.level().getServer(), definition, arena, arena.hillPoints.get(index));
+            arena.hillPoints.set(index, location);
+            if (index == 0) arena.hillCenter = location.copy();
+            saveTarget(definition);
+            player.sendSystemMessage(Component.literal("Rotating hill point " + (index + 1) + " set to "
+                    + compact(position) + "."), true);
+        } else {
+            removePhysicalSetupMarker(player.level().getServer(), definition, arena, arena.hillCenter);
+            arena.hillCenter = location;
+            saveTarget(definition);
+            player.sendSystemMessage(Component.literal("Static hill center set to " + compact(position) + "."), true);
+        }
     }
 
     private static void updateLocation(ServerPlayer player, MinigameDefinition definition,
@@ -707,7 +746,9 @@ public final class MinigameSetupToolService {
                 Region region = SimpleServerUtilities.REGIONS.get(arena.regionId);
                 String bounds = region == null ? "Missing region" : region.getBoundsText();
                 int special = type == MinigameGameType.CAPTURE_THE_FLAG ? arena.flagPoints.size()
-                        : type == MinigameGameType.DOMINATION ? arena.controlPoints.size() : 0;
+                        : type == MinigameGameType.DOMINATION ? arena.controlPoints.size()
+                        : type == MinigameGameType.KING_OF_THE_HILL
+                        ? (arena.rotatingHill() ? arena.hillPoints.size() : 1) : 0;
                 arenas.add(new MinigameSetupToolOpenPayload.ArenaEntry(arena.id, arena.displayName, arena.regionId,
                         arena.enabled, bounds, arena.playFloor.compact(), arena.spectatorBounds.compact(),
                         arena.teamSpawns.size(), special));
@@ -724,6 +765,11 @@ public final class MinigameSetupToolService {
                 team2Name = definition.domination.team2Name;
                 team1Color = definition.domination.team1Color;
                 team2Color = definition.domination.team2Color;
+            } else if (type == MinigameGameType.KING_OF_THE_HILL) {
+                team1Name = definition.kingOfTheHill.team1Name;
+                team2Name = definition.kingOfTheHill.team2Name;
+                team1Color = definition.kingOfTheHill.team1Color;
+                team2Color = definition.kingOfTheHill.team2Color;
             }
             games.add(new MinigameSetupToolOpenPayload.GameEntry(definition.id, definition.displayName,
                     definition.gameType, team1Name, team2Name, team1Color, team2Color, arenas));
@@ -817,13 +863,14 @@ public final class MinigameSetupToolService {
 
     private static void sendSetupVisuals(ServerPlayer player, MinigameSetupToolManager.Session session) {
         if (player == null || session == null || !session.hasTarget()) {
-            if (player != null) PacketDistributor.sendToPlayer(player, MinigameSetupVisualPayload.clear());
+            if (player != null) { PacketDistributor.sendToPlayer(player, MinigameSetupVisualPayload.clear()); PacketDistributor.sendToPlayer(player, MinigameKothVisualPayload.clear()); }
             return;
         }
         MinigameDefinition definition = SimpleServerUtilities.MINIGAMES.definition(session.minigameId);
         MinigameArenaDefinition arena = definition == null ? null : arena(definition, session.arenaId);
         if (definition == null || arena == null) {
             PacketDistributor.sendToPlayer(player, MinigameSetupVisualPayload.clear());
+            PacketDistributor.sendToPlayer(player, MinigameKothVisualPayload.clear());
             return;
         }
         if (!SimpleServerUtilities.MINIGAMES.hasActiveRuntimeFor(definition.id)) {
@@ -845,7 +892,7 @@ public final class MinigameSetupToolService {
             int color = teamColor(definition, spawn.team);
             int teamSlot = spawn.team >= 0 && spawn.team < teamSpawnNumbers.length
                     ? ++teamSpawnNumbers[spawn.team] : spawnNumber;
-            String label = type == MinigameGameType.SPLEEF
+            String label = type == MinigameGameType.SPLEEF || type == MinigameGameType.BLOCK_PARTY
                     ? "Player spawn " + spawnNumber
                     : teamName(definition, spawn.team) + " spawn " + teamSlot;
             addMarker(markers, spawn.location, label, color, MinigameSetupVisualPayload.Entry.SPAWN);
@@ -863,6 +910,16 @@ public final class MinigameSetupToolService {
                         MinigameSetupVisualPayload.Entry.NODE);
                 addMarker(markers, point.respawn, point.displayName + " respawn", 0xFFB300,
                         MinigameSetupVisualPayload.Entry.NODE_SPAWN);
+            }
+        } else if (type == MinigameGameType.KING_OF_THE_HILL) {
+            if (arena.rotatingHill()) {
+                for (int i = 0; i < arena.hillPoints.size(); i++) {
+                    addMarker(markers, arena.hillPoints.get(i), "Hill point " + (i + 1), 0xF5F5F5,
+                            MinigameSetupVisualPayload.Entry.NODE);
+                }
+            } else {
+                addMarker(markers, arena.hillCenter, "Static hill center", 0xF5F5F5,
+                        MinigameSetupVisualPayload.Entry.NODE);
             }
         }
         if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION) {
@@ -895,8 +952,19 @@ public final class MinigameSetupToolService {
         if (type == MinigameGameType.SPLEEF) {
             addBounds(bounds, arena.playFloor, "Spleef floor", 0xFFB300,
                     MinigameSetupVisualPayload.Bounds.SPLEEF_FLOOR);
+        } else if (type == MinigameGameType.BLOCK_PARTY) {
+            addBounds(bounds, arena.playFloor, "Block Party floor", 0x26C6DA,
+                    MinigameSetupVisualPayload.Bounds.SPLEEF_FLOOR);
         }
         PacketDistributor.sendToPlayer(player, new MinigameSetupVisualPayload(true, markers, bounds));
+        if (type == MinigameGameType.KING_OF_THE_HILL) {
+            MinigameLocation preview = arena.rotatingHill() && !arena.hillPoints.isEmpty()
+                    ? arena.hillPoints.get(Math.min(Math.max(0, session.index), arena.hillPoints.size() - 1))
+                    : arena.hillCenter;
+            PacketDistributor.sendToPlayer(player, new MinigameKothVisualPayload(true, preview.dimension, preview.x, preview.y, preview.z,
+                    definition.kingOfTheHill.hillRadius, 0xF5F5F5,
+                    arena.rotatingHill() ? "Hill point " + (Math.min(Math.max(0, session.index), Math.max(0, arena.hillPoints.size() - 1)) + 1) : "Static hill"));
+        } else PacketDistributor.sendToPlayer(player, MinigameKothVisualPayload.clear());
     }
 
 
@@ -919,6 +987,7 @@ public final class MinigameSetupToolService {
             String blockId = switch (type) {
                 case CAPTURE_THE_FLAG -> definition.captureTheFlag.flagBlock(spawn.team);
                 case DOMINATION -> definition.domination.bannerBlock(spawn.team);
+                case KING_OF_THE_HILL -> bannerForRgb(definition.kingOfTheHill.color(spawn.team));
                 default -> PLAYER_SETUP_BANNER;
             };
             placeSetupBanner(server, definition, arena, spawn.location, blockId);
@@ -926,6 +995,21 @@ public final class MinigameSetupToolService {
         if (type == MinigameGameType.DOMINATION) {
             for (MinigameControlPoint point : arena.controlPoints) {
                 if (point != null) placeSetupBanner(server, definition, arena, point.respawn, NODE_RESPAWN_SETUP_BANNER);
+            }
+        } else if (type == MinigameGameType.KING_OF_THE_HILL) {
+            if (arena.rotatingHill()) {
+                boolean centerIsPoint = false;
+                BlockPos centerPos = blockPos(arena.hillCenter);
+                for (MinigameLocation point : arena.hillPoints) {
+                    if (centerPos != null && centerPos.equals(blockPos(point))) centerIsPoint = true;
+                    placeSetupBanner(server, definition, arena, point, "minecraft:white_banner");
+                }
+                if (!centerIsPoint) removePhysicalSetupMarker(server, definition, arena, arena.hillCenter);
+            } else {
+                for (MinigameLocation point : arena.hillPoints) {
+                    if (!blockPos(point).equals(blockPos(arena.hillCenter))) removePhysicalSetupMarker(server, definition, arena, point);
+                }
+                placeSetupBanner(server, definition, arena, arena.hillCenter, "minecraft:white_banner");
             }
         }
         if (type == MinigameGameType.CAPTURE_THE_FLAG || type == MinigameGameType.DOMINATION) {
@@ -951,10 +1035,14 @@ public final class MinigameSetupToolService {
         for (MinigameSpawnPoint spawn : arena.teamSpawns) {
             if (spawn != null) removePhysicalSetupMarker(server, definition, arena, spawn.location);
         }
-        if (MinigameGameType.parse(definition.gameType) == MinigameGameType.DOMINATION) {
+        MinigameGameType cleanupType = MinigameGameType.parse(definition.gameType);
+        if (cleanupType == MinigameGameType.DOMINATION) {
             for (MinigameControlPoint point : arena.controlPoints) {
                 if (point != null) removePhysicalSetupMarker(server, definition, arena, point.respawn);
             }
+        } else if (cleanupType == MinigameGameType.KING_OF_THE_HILL) {
+            removePhysicalSetupMarker(server, definition, arena, arena.hillCenter);
+            for (MinigameLocation point : arena.hillPoints) removePhysicalSetupMarker(server, definition, arena, point);
         }
         for (MinigameLocation boostSpawn : arena.boostSpawns) {
             removePhysicalBoostMarker(server, boostSpawn);
@@ -1028,6 +1116,16 @@ public final class MinigameSetupToolService {
         return false;
     }
 
+    private static String bannerForRgb(int rgb) {
+        String[] ids = {"white","orange","magenta","light_blue","yellow","lime","pink","gray",
+                "light_gray","cyan","purple","blue","brown","green","red","black"};
+        int[] colors = {0xF9FFFE,0xF9801D,0xC74EBD,0x3AB3DA,0xFED83D,0x80C71F,0xF38BAA,0x474F52,
+                0x9D9D97,0x169C9C,0x8932B8,0x3C44AA,0x835432,0x5E7C16,0xB02E26,0x1D1D21};
+        int r=(rgb>>16)&255,g=(rgb>>8)&255,b=rgb&255,best=0;long dist=Long.MAX_VALUE;
+        for(int i=0;i<colors.length;i++){int c=colors[i],dr=r-((c>>16)&255),dg=g-((c>>8)&255),db=b-(c&255);long d=(long)dr*dr+(long)dg*dg+(long)db*db;if(d<dist){dist=d;best=i;}}
+        return "minecraft:" + ids[best] + "_banner";
+    }
+
     private static ServerLevel level(MinecraftServer server, String dimension) {
         if (server == null || dimension == null || dimension.isBlank()) return null;
         for (ServerLevel candidate : server.getAllLevels()) {
@@ -1082,6 +1180,7 @@ public final class MinigameSetupToolService {
         MinigameGameType type = MinigameGameType.parse(definition.gameType);
         if (type == MinigameGameType.CAPTURE_THE_FLAG) return definition.captureTheFlag.teamName(team);
         if (type == MinigameGameType.DOMINATION) return definition.domination.teamName(team);
+        if (type == MinigameGameType.KING_OF_THE_HILL) return definition.kingOfTheHill.teamName(team);
         return "Team " + team;
     }
 
@@ -1089,6 +1188,7 @@ public final class MinigameSetupToolService {
         MinigameGameType type = MinigameGameType.parse(definition.gameType);
         if (type == MinigameGameType.CAPTURE_THE_FLAG) return definition.captureTheFlag.color(team);
         if (type == MinigameGameType.DOMINATION) return definition.domination.color(team);
+        if (type == MinigameGameType.KING_OF_THE_HILL) return definition.kingOfTheHill.color(team);
         return 0x26C6DA;
     }
 
@@ -1131,6 +1231,15 @@ public final class MinigameSetupToolService {
                 && bounds.minX >= region.getMinX() - margin && bounds.maxX <= region.getMaxX() + margin
                 && bounds.minY >= region.getMinY() - margin && bounds.maxY <= region.getMaxY() + margin
                 && bounds.minZ >= region.getMinZ() - margin && bounds.maxZ <= region.getMaxZ() + margin;
+    }
+
+    private static boolean locationInsideRegion(MinigameLocation location, Region region, double verticalMargin) {
+        if (location == null || region == null) return false;
+        if (!region.getDimension().identifier().toString().equals(location.dimension)) return false;
+        return location.x >= region.getMinX() && location.x < region.getMaxX() + 1.0D
+                && location.z >= region.getMinZ() && location.z < region.getMaxZ() + 1.0D
+                && location.y >= region.getMinY() - verticalMargin
+                && location.y <= region.getMaxY() + verticalMargin;
     }
 
     private static boolean near(MinigameLocation location, Region region, double horizontal, double vertical) {

@@ -10,6 +10,7 @@ import be.winnetrie.mod.simpleserverutilities.network.NpcEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcEditorSubmitPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcLoadoutOpenRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcShopAdminActionPayload;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcAttitude;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcFactionRelation;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcFunction;
@@ -17,6 +18,7 @@ import be.winnetrie.mod.simpleserverutilities.npc.NpcInteractionMode;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcRole;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcLoadoutMenu;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcScheduleEntry;
+import be.winnetrie.mod.simpleserverutilities.npc.NpcTextureSource;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -30,7 +32,7 @@ public final class NpcEditorScreen extends Screen {
     private static final int W = 510, H = 350;
     private static final int PANEL = 0xF0161D25, BORDER = 0xFF586978, TEXT = 0xFFF3F5F7;
     private static final int MUTED = 0xFFAAB5BE, GOOD = 0xFF83E39A, ERROR = 0xFFFF8585;
-    private enum Page { IDENTITY, FUNCTIONS, BEHAVIOR, RELATIONS, STATS, LOADOUT, SCHEDULE, RESPAWN }
+    private enum Page { IDENTITY, APPEARANCE, INTERACTION, BEHAVIOR, RELATIONS, STATS, LOADOUT, SCHEDULE, RESPAWN }
 
     private final NpcEditorOpenPayload initial;
     private final Screen parent;
@@ -38,7 +40,7 @@ public final class NpcEditorScreen extends Screen {
     private final List<String> services;
     private Page page = Page.IDENTITY;
 
-    private String definitionIdValue, displayNameValue, entityTypeValue, interactionTextValue, dialogueIdValue;
+    private String definitionIdValue, displayNameValue, entityTypeValue, textureSourceValue, textureValueValue, textureModelValue, interactionTextValue, dialogueIdValue;
     private String roleId, shopIdValue, interactionMode;
     private final List<NpcFunction> functions = new ArrayList<>();
     private int functionIndex;
@@ -61,7 +63,7 @@ public final class NpcEditorScreen extends Screen {
     private String scheduleActivity = NpcScheduleEntry.ACTIVITY_IDLE;
     private String respawnDelayValue, respawnDimensionValue, respawnXValue, respawnYValue, respawnZValue, respawnYawValue;
 
-    private EditBox definitionId, displayName, dialogueId, xField, yField, zField, yawField;
+    private EditBox definitionId, displayName, textureValueField, dialogueId, xField, yField, zField, yawField;
     private EditBox functionId, functionLabel, functionTarget;
     private EditBox factionId, factionDisplayName, minimumReputation, reputationDeniedText, reputationLoss;
     private EditBox maxHealth, movementSpeed, attackDamage, armor, armorToughness, followRange, knockback, scale, homeRadius;
@@ -78,7 +80,7 @@ public final class NpcEditorScreen extends Screen {
         this.initial = initial; this.parent = parent; this.models = initial.availableModels();
         this.services = initial.availableServices().stream().filter(value -> !"shop".equals(value)).toList();
         definitionIdValue = initial.definitionId(); displayNameValue = initial.displayName();
-        entityTypeValue = initial.entityType(); interactionTextValue = initial.interactionText(); dialogueIdValue = initial.dialogueId();
+        entityTypeValue = initial.entityType(); textureSourceValue = NpcTextureSource.parse(initial.textureSource()).id(); textureValueValue = initial.textureValue(); textureModelValue = initial.textureModel(); interactionTextValue = initial.interactionText(); dialogueIdValue = initial.dialogueId();
         roleId = NpcRole.parse(initial.roleId()).id(); shopIdValue = initial.shopId(); interactionMode = NpcInteractionMode.parse(initial.interactionMode()).id();
         for (NpcFunction function : initial.functions()) functions.add(function.copy());
         loadFunction();
@@ -105,17 +107,18 @@ public final class NpcEditorScreen extends Screen {
 
     @Override protected void init() {
         clearRefs(); int x = px(), y = py();
-        Page[] pages = Page.values(); String[] labels = {"Identity", "Functions", "Behavior", "Relations", "Stats", "Loadout", "Schedule", "Respawn"};
+        Page[] pages = Page.values(); String[] labels = {"Identity", "Appearance", "Interaction", "Behavior", "Relations", "Stats", "Loadout", "Schedule", "Respawn"};
         for (int i = 0; i < pages.length; i++) {
-            int col = i % 4, row = i / 4;
+            int col = i % 5, row = i / 5;
             Page targetPage = pages[i];
             Button button = addRenderableWidget(Button.builder(Component.literal(labels[i]), b -> switchPage(targetPage))
-                    .bounds(x + 12 + col * 121, y + 30 + row * 21, 115, 18).build());
+                    .bounds(x + 12 + col * 97, y + 30 + row * 21, 91, 18).build());
             button.active = targetPage != page;
         }
         switch (page) {
             case IDENTITY -> initIdentity(x, y);
-            case FUNCTIONS -> initFunctions(x, y);
+            case APPEARANCE -> initAppearance(x, y);
+            case INTERACTION -> initInteraction(x, y);
             case BEHAVIOR -> initBehavior(x, y);
             case RELATIONS -> initRelations(x, y);
             case STATS -> initStats(x, y);
@@ -132,55 +135,89 @@ public final class NpcEditorScreen extends Screen {
     }
 
     private void initIdentity(int x, int y) {
-        definitionId = field(x + 12, y + 88, 145, 64, definitionIdValue);
+        definitionId = field(x + 12, y + 88, 230, 64, definitionIdValue);
         definitionId.setEditable(!initial.editing());
-        displayName = field(x + 165, y + 88, 155, 64, displayNameValue);
-        addRenderableWidget(Button.builder(Component.literal(trim(entityTypeValue, 23)), b -> {
-            savePage(); if (minecraft != null) minecraft.setScreenAndShow(new NpcModelPickerScreen(this, models, entityTypeValue));
-        }).bounds(x + 328, y + 88, 170, 18).build());
-        dialogueId = field(x + 12, y + 132, 308, 64, dialogueIdValue);
-        Button dialogue = addRenderableWidget(Button.builder(Component.literal("Dialogue editor"), b -> {
-            savePage(); ClientPacketDistributor.sendToServer(new NpcDialogueEditorRequestPayload(initial.originalInstanceId()));
-        }).bounds(x + 328, y + 132, 170, 18).build()); dialogue.active = initial.editing();
+        displayName = field(x + 250, y + 88, 248, 64, displayNameValue);
         addRenderableWidget(Button.builder(Component.literal("<"), b -> cycleRole(-1))
-                .bounds(x + 12, y + 166, 28, 18).build());
+                .bounds(x + 12, y + 132, 28, 18).build());
         addRenderableWidget(Button.builder(Component.literal("Role: " + NpcRole.parse(roleId).label()), b -> cycleRole(1))
-                .bounds(x + 44, y + 166, 220, 18).build());
+                .bounds(x + 44, y + 132, 220, 18).build());
         addRenderableWidget(Button.builder(Component.literal(">"), b -> cycleRole(1))
-                .bounds(x + 268, y + 166, 28, 18).build());
-        xField = field(x + 12, y + 212, 95, 20, xValue); yField = field(x + 115, y + 212, 95, 20, yValue);
-        zField = field(x + 218, y + 212, 95, 20, zValue); yawField = field(x + 321, y + 212, 95, 16, yawValue);
-        toggle(x + 12, y + 254, 145, "Enabled", enabled, () -> enabled = !enabled);
-        toggle(x + 165, y + 254, 155, "Name visible", nameVisible, () -> nameVisible = !nameVisible);
-        toggle(x + 328, y + 254, 170, "Glow", glowing, () -> glowing = !glowing);
+                .bounds(x + 268, y + 132, 28, 18).build());
+        xField = field(x + 12, y + 190, 95, 20, xValue); yField = field(x + 115, y + 190, 95, 20, yValue);
+        zField = field(x + 218, y + 190, 95, 20, zValue); yawField = field(x + 321, y + 190, 95, 16, yawValue);
+        toggle(x + 12, y + 232, 145, "Enabled", enabled, () -> enabled = !enabled);
+        toggle(x + 165, y + 232, 155, "Name visible", nameVisible, () -> nameVisible = !nameVisible);
         setInitialFocus(definitionId);
     }
 
-    private void initFunctions(int x, int y) {
+    private void initAppearance(int x, int y) {
+        NpcTextureSource source = NpcTextureSource.parse(textureSourceValue);
+        addRenderableWidget(Button.builder(Component.literal("Model: " + trim(entityTypeValue, 28)), b -> {
+            savePage(); if (minecraft != null) minecraft.setScreenAndShow(new NpcModelPickerScreen(this, models, entityTypeValue));
+        }).bounds(x + 12, y + 88, 238, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("Texture: " + source.label()), b -> cycleTextureSource())
+                .bounds(x + 258, y + 88, 240, 18).build());
+        if (source.custom()) {
+            textureValueField = field(x + 12, y + 142, 486, 1_024, textureValueValue);
+            addRenderableWidget(Button.builder(Component.literal("Model shape: " + ("slim".equals(textureModelValue) ? "Slim" : "Wide")), b -> {
+                savePage(); textureModelValue = "slim".equals(textureModelValue) ? "wide" : "slim"; rebuildWidgets();
+            }).bounds(x + 12, y + 178, 180, 18).build());
+        }
+        toggle(x + 12, y + 224, 145, "Glow", glowing, () -> glowing = !glowing);
+    }
+
+    private void initInteraction(int x, int y) {
         NpcInteractionMode mode = NpcInteractionMode.parse(interactionMode);
         addRenderableWidget(Button.builder(Component.literal("Mode: " + mode.label()), b -> cycleInteractionMode())
                 .bounds(x + 12, y + 88, 220, 18).build());
-        addRenderableWidget(Button.builder(Component.literal("Shop: " + trim(choiceLabel(initial.availableShops(), shopIdValue, "None"), 36)), b -> {
-            savePage(); if (minecraft != null) minecraft.setScreenAndShow(new NpcChoicePickerScreen(this,
-                    NpcChoicePickerScreen.Kind.SHOP, initial.availableShops(), shopIdValue));
-        }).bounds(x + 240, y + 88, 258, 18).build());
+        dialogueId = field(x + 240, y + 88, 150, 64, dialogueIdValue);
+        Button dialogue = addRenderableWidget(Button.builder(Component.literal("Edit dialogue"), b -> {
+            savePage(); ClientPacketDistributor.sendToServer(new NpcDialogueEditorRequestPayload(initial.originalInstanceId()));
+        }).bounds(x + 398, y + 88, 100, 18).build());
+        dialogue.active = initial.editing();
+
+        boolean merchant = NpcRole.parse(roleId) == NpcRole.MERCHANT;
+        if (merchant) {
+            addRenderableWidget(Button.builder(Component.literal(shopIdValue.isBlank() ? "Create NPC shop" : "Edit NPC shop"),
+                    b -> openOrCreateNpcShop()).bounds(x + 12, y + 126, 210, 18).build());
+            addRenderableWidget(Button.builder(Component.literal("Shared shop…"), b -> {
+                savePage(); if (minecraft != null) minecraft.setScreenAndShow(new NpcChoicePickerScreen(this,
+                        NpcChoicePickerScreen.Kind.SHOP, initial.availableShops(), shopIdValue));
+            }).bounds(x + 230, y + 126, 130, 18).build());
+            Button unlinkShop = addRenderableWidget(Button.builder(Component.literal("Unlink shop"), b -> {
+                savePage(); shopIdValue = ""; notice = "NPC shop unlinked."; noticeError = false; rebuildWidgets();
+            }).bounds(x + 368, y + 126, 130, 18).build());
+            unlinkShop.active = !shopIdValue.isBlank();
+        } else {
+            addRenderableWidget(Button.builder(Component.literal("Optional shop: "
+                    + trim(choiceLabel(initial.availableShops(), shopIdValue, "None"), 27)), b -> {
+                savePage(); if (minecraft != null) minecraft.setScreenAndShow(new NpcChoicePickerScreen(this,
+                        NpcChoicePickerScreen.Kind.SHOP, initial.availableShops(), shopIdValue));
+            }).bounds(x + 12, y + 126, 250, 18).build());
+            Button editShop = addRenderableWidget(Button.builder(Component.literal("Edit shop"), b -> openLinkedShop())
+                    .bounds(x + 270, y + 126, 100, 18).build());
+            editShop.active = !shopIdValue.isBlank();
+            addRenderableWidget(Button.builder(Component.literal("New shop"), b -> createLinkedShop())
+                    .bounds(x + 378, y + 126, 120, 18).build());
+        }
 
         Button previous = addRenderableWidget(Button.builder(Component.literal("‹"), b -> functionMove(-1))
-                .bounds(x + 12, y + 132, 28, 18).build()); previous.active = functionIndex > 0;
+                .bounds(x + 12, y + 166, 28, 18).build()); previous.active = functionIndex > 0;
         Button next = addRenderableWidget(Button.builder(Component.literal("›"), b -> functionMove(1))
-                .bounds(x + 44, y + 132, 28, 18).build()); next.active = functionIndex + 1 < functions.size();
-        addRenderableWidget(Button.builder(Component.literal("Add"), b -> addFunction()).bounds(x + 80, y + 132, 54, 18).build());
+                .bounds(x + 44, y + 166, 28, 18).build()); next.active = functionIndex + 1 < functions.size();
+        addRenderableWidget(Button.builder(Component.literal("Add action"), b -> addFunction()).bounds(x + 80, y + 166, 76, 18).build());
         Button remove = addRenderableWidget(Button.builder(Component.literal("Delete"), b -> deleteFunction())
-                .bounds(x + 140, y + 132, 60, 18).build()); remove.active = !functions.isEmpty();
+                .bounds(x + 164, y + 166, 60, 18).build()); remove.active = !functions.isEmpty();
         if (functions.isEmpty()) return;
 
         NpcFunction current = functions.get(functionIndex);
-        functionId = field(x + 12, y + 184, 145, 64, functionIdValue);
-        functionLabel = field(x + 165, y + 184, 155, 64, functionLabelValue);
+        functionId = field(x + 12, y + 210, 145, 64, functionIdValue);
+        functionLabel = field(x + 165, y + 210, 155, 64, functionLabelValue);
         addRenderableWidget(Button.builder(Component.literal("Service: " + trim(current.service.isBlank() ? "none" : current.service, 22)),
-                b -> cycleFunctionService()).bounds(x + 328, y + 184, 170, 18).build());
-        functionTarget = field(x + 12, y + 238, 308, 256, functionTargetValue);
-        toggle(x + 328, y + 238, 170, "Function enabled", current.enabled, () -> current.enabled = !current.enabled);
+                b -> cycleFunctionService()).bounds(x + 328, y + 210, 170, 18).build());
+        functionTarget = field(x + 12, y + 258, 308, 256, functionTargetValue);
+        toggle(x + 328, y + 258, 170, "Action enabled", current.enabled, () -> current.enabled = !current.enabled);
     }
 
     private void initBehavior(int x, int y) {
@@ -279,6 +316,7 @@ public final class NpcEditorScreen extends Screen {
 
     private void savePage() {
         if (definitionId != null) definitionIdValue = definitionId.getValue(); if (displayName != null) displayNameValue = displayName.getValue();
+        if (textureValueField != null) textureValueValue = textureValueField.getValue();
         if (dialogueId != null) dialogueIdValue = dialogueId.getValue();
         saveFunction();
         if (xField != null) xValue = xField.getValue(); if (yField != null) yValue = yField.getValue(); if (zField != null) zValue = zField.getValue(); if (yawField != null) yawValue = yawField.getValue();
@@ -302,7 +340,7 @@ public final class NpcEditorScreen extends Screen {
             for (NpcFactionRelation relation : relations) if (relation.copy().normalize().configured()) savedRelations.add(relation.copy().normalize());
             List<NpcEditorLootSlot> loot = initial.loot();
             ClientPacketDistributor.sendToServer(new NpcEditorSubmitPayload(initial.originalInstanceId(), initial.originalDefinitionId(), deleteRequested,
-                    definitionIdValue.trim(), displayNameValue.trim(), entityTypeValue, interactionTextValue, dialogueIdValue.trim(),
+                    definitionIdValue.trim(), displayNameValue.trim(), entityTypeValue, textureSourceValue, textureValueValue.trim(), textureModelValue, interactionTextValue, dialogueIdValue.trim(),
                     roleId, shopIdValue.trim(), interactionMode, copiedFunctions(),
                     parse(xValue, -30_000_000, 30_000_000, "X"), parse(yValue, -4096, 4096, "Y"), parse(zValue, -30_000_000, 30_000_000, "Z"),
                     (float) parse(yawValue, -360, 360, "yaw"), initial.pitch(), enabled, nameVisible, noAi, invulnerable, silent, glowing,
@@ -395,6 +433,52 @@ public final class NpcEditorScreen extends Screen {
         rebuildWidgets();
     }
 
+    private void cycleTextureSource() {
+        savePage();
+        NpcTextureSource next = NpcTextureSource.parse(textureSourceValue).next();
+        textureSourceValue = next.id();
+        if (next == NpcTextureSource.NONE) textureValueValue = "";
+        rebuildWidgets();
+    }
+
+    private void openOrCreateNpcShop() {
+        savePage();
+        if (!shopIdValue.isBlank()) {
+            openLinkedShop();
+            return;
+        }
+        String proposed = automaticNpcShopId();
+        shopIdValue = proposed;
+        ClientPacketDistributor.sendToServer(new NpcShopAdminActionPayload(
+                "new", "", proposed, "", 0, nextRequestId++));
+        notice = "Creating the NPC-managed shop…"; noticeError = false;
+    }
+
+    private String automaticNpcShopId() {
+        String base = definitionIdValue == null ? "npc" : definitionIdValue.trim().toLowerCase(Locale.ROOT);
+        base = base.replaceAll("[^a-z0-9._-]", "_");
+        if (base.isBlank()) base = "npc";
+        return (base + "_shop").substring(0, Math.min(64, (base + "_shop").length()));
+    }
+
+    private void openLinkedShop() {
+        savePage();
+        if (shopIdValue.isBlank()) {
+            notice = "Select a linked shop first."; noticeError = true; return;
+        }
+        ClientPacketDistributor.sendToServer(new NpcShopAdminActionPayload(
+                "open", shopIdValue, "", "", 0, nextRequestId++));
+    }
+
+    private void createLinkedShop() {
+        savePage();
+        String proposed = automaticNpcShopId();
+        shopIdValue = proposed;
+        ClientPacketDistributor.sendToServer(new NpcShopAdminActionPayload(
+                "new", "", proposed, "", 0, nextRequestId++));
+        notice = "New shared shop linked: " + proposed; noticeError = false;
+    }
+
     private void cycleRole(int delta) {
         savePage();
         roleId = NpcRole.parse(roleId).offset(delta).id();
@@ -464,8 +548,23 @@ public final class NpcEditorScreen extends Screen {
 
     private void renderLabels(GuiGraphicsExtractor g, int x, int y) {
         switch (page) {
-            case IDENTITY -> { label(g,"Template ID",x+12,y+77);label(g,"Display name",x+165,y+77);label(g,"Model",x+328,y+77);label(g,"Dialogue ID",x+12,y+121);label(g,"Role / occupation",x+12,y+155);label(g,"X",x+12,y+201);label(g,"Y",x+115,y+201);label(g,"Z",x+218,y+201);label(g,"Yaw",x+321,y+201); }
-            case FUNCTIONS -> { label(g,"Interaction mode",x+12,y+77);label(g,"Linked shop",x+240,y+77);label(g,"Configured advanced functions " + (functions.isEmpty()?"0/0":(functionIndex+1)+"/"+functions.size()),x+12,y+121); if(!functions.isEmpty()){label(g,"Function ID",x+12,y+173);label(g,"Button label",x+165,y+173);label(g,"Service",x+328,y+173);label(g,"Target (warp, quest, game, dungeon…)",x+12,y+227);} g.text(font,"Shop contents are managed centrally in Admin Center → Shop Manager.",x+12,y+302,MUTED,false); }
+            case IDENTITY -> { label(g,"Template ID",x+12,y+77);label(g,"Display name",x+250,y+77);label(g,"Role / occupation",x+12,y+121);label(g,"X",x+12,y+179);label(g,"Y",x+115,y+179);label(g,"Z",x+218,y+179);label(g,"Yaw",x+321,y+179); }
+            case APPEARANCE -> {
+                label(g,"Entity model",x+12,y+77); label(g,"Texture source",x+258,y+77);
+                NpcTextureSource source = NpcTextureSource.parse(textureSourceValue);
+                if (source.custom()) {
+                    label(g, source == NpcTextureSource.LOCAL ? "Relative PNG path" : "HTTPS PNG URL", x+12,y+131);
+                    g.text(font,"Custom skins use the player-style mannequin renderer. PNG must be 64x64 and ≤ 512 KiB.",x+12,y+204,MUTED,false);
+                    if (source == NpcTextureSource.LOCAL) g.text(font,"Server folder: simpleserverutilities/npcs/textures",x+12,y+216,MUTED,false);
+                    else g.text(font,"HTTPS only; failures safely fall back to the vanilla mannequin skin.",x+12,y+216,MUTED,false);
+                } else g.text(font,"Use Local or URL for a custom player-style skin, or leave Vanilla for normal entity rendering.",x+12,y+134,MUTED,false);
+            }
+            case INTERACTION -> {
+                label(g,"Interaction mode",x+12,y+77); label(g,"Dialogue ID",x+240,y+77);
+                label(g, NpcRole.parse(roleId) == NpcRole.MERCHANT ? "NPC shop" : "Optional linked shop", x+12,y+115);
+                label(g,"Advanced actions " + (functions.isEmpty()?"0/0":(functionIndex+1)+"/"+functions.size()),x+12,y+155);
+                if(!functions.isEmpty()){label(g,"Action ID",x+12,y+199);label(g,"Button label",x+165,y+199);label(g,"Service",x+328,y+199);label(g,"Target (warp, quest, game, dungeon…)",x+12,y+247);}
+            }
             case BEHAVIOR -> { label(g,"Home radius (0 = none)",x+12,y+167); g.text(font,"Gravity is applied even to static/no-AI NPCs.",x+12,y+222,MUTED,false); }
             case RELATIONS -> { label(g,"Faction ID",x+12,y+77); label(g,"Faction name",x+165,y+77); label(g,"Attitude to players",x+328,y+77); label(g,"Minimum reputation",x+12,y+121); label(g,"Loss when attacked",x+165,y+121); label(g,"Denied message",x+12,y+165); label(g,"Faction relation " + (relations.isEmpty()?"0/0":(relationIndex+1)+"/"+relations.size()) + " — choose from known factions",x+12,y+221); }
             case STATS -> { label(g,"Max health (blank=native)",x+12,y+77); label(g,"Movement speed",x+165,y+77); label(g,"Attack damage",x+328,y+77); label(g,"Armor",x+12,y+131); label(g,"Armor toughness",x+165,y+131); label(g,"Follow range",x+328,y+131); label(g,"Knockback resistance",x+12,y+185); label(g,"Scale",x+165,y+185); }
@@ -483,7 +582,7 @@ public final class NpcEditorScreen extends Screen {
         return safe + " (missing)";
     }
 
-    private void clearRefs() { definitionId=displayName=dialogueId=xField=yField=zField=yawField=null; functionId=functionLabel=functionTarget=null; factionId=factionDisplayName=minimumReputation=reputationDeniedText=reputationLoss=null; maxHealth=movementSpeed=attackDamage=armor=armorToughness=followRange=knockback=scale=homeRadius=null; scheduleTime=scheduleX=scheduleY=scheduleZ=scheduleYaw=scheduleSpeed=null; respawnDelay=respawnDimension=respawnX=respawnY=respawnZ=respawnYaw=null; }
+    private void clearRefs() { definitionId=displayName=textureValueField=dialogueId=xField=yField=zField=yawField=null; functionId=functionLabel=functionTarget=null; factionId=factionDisplayName=minimumReputation=reputationDeniedText=reputationLoss=null; maxHealth=movementSpeed=attackDamage=armor=armorToughness=followRange=knockback=scale=homeRadius=null; scheduleTime=scheduleX=scheduleY=scheduleZ=scheduleYaw=scheduleSpeed=null; respawnDelay=respawnDimension=respawnX=respawnY=respawnZ=respawnYaw=null; }
     private int px() { return (width - W) / 2; } private int py() { return (height - H) / 2; }
     private static ItemStack copy(ItemStack stack) { return stack == null || stack.isEmpty() ? ItemStack.EMPTY : stack.copy(); }
     private static int parseInt(String raw, int min, int max, String label) { try { int v=Integer.parseInt(raw.trim()); if(v<min||v>max)throw new NumberFormatException(); return v; } catch(Exception e){throw new IllegalArgumentException("Enter a valid "+label+" ("+min+" to "+max+").");} }

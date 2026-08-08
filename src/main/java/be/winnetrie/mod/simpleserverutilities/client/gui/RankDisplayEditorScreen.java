@@ -6,8 +6,6 @@ import be.winnetrie.mod.simpleserverutilities.mixin.MultiLineEditBoxAccessor;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultilineTextFieldAccessor;
 import be.winnetrie.mod.simpleserverutilities.network.RankDisplayDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RankDisplaySavePayload;
-import be.winnetrie.mod.simpleserverutilities.settings.MinecraftColorPalette;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.MultiLineEditBox;
@@ -71,18 +69,10 @@ public final class RankDisplayEditorScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("Clear style"), ignored -> clear()).bounds(x + 142, toolY, 88, 20).build());
 
         int paletteY = y + 162;
-        for (int index = 0; index < MinecraftColorPalette.COLORS.size(); index++) {
+        for (int index = 0; index < 16; index++) {
             int paletteIndex = index;
-            var color = MinecraftColorPalette.COLORS.get(index);
-            int column = index % 4, row = index / 4;
-            addRenderableWidget(new PaletteButton(
-                    x + 18 + column * 138,
-                    paletteY + row * 25,
-                    130,
-                    21,
-                    color.name(),
-                    color.argb(),
-                    ignored -> applyColor(paletteIndex)
+            addRenderableWidget(RichTextPalette.button(
+                    x + 18 + index * 26, paletteY, 22, paletteIndex, ignored -> applyColor(paletteIndex)
             ));
         }
 
@@ -92,8 +82,7 @@ public final class RankDisplayEditorScreen extends Screen {
                 .bounds(x + W - 116, y + H - 30, 98, 20).build());
 
         RichTextEditBoxRenderer.register(text, () -> document, () -> 0xFFFFFFFF,
-                index -> MinecraftColorPalette.COLORS.get(Math.max(0, Math.min(15, index))).argb(),
-                Component.literal("Example: [Admin] "));
+                RichTextPalette::argb, Component.literal("Example: [Admin] "));
     }
 
     private void save() {
@@ -110,7 +99,7 @@ public final class RankDisplayEditorScreen extends Screen {
     private void applyColor(int paletteIndex) {
         int[] range = selection(); if (range == null) return;
         document.setColor(range[0], range[1], paletteIndex); restore(range);
-        notice = MinecraftColorPalette.COLORS.get(paletteIndex).name() + " applied."; noticeError = false;
+        notice = RichTextPalette.name(paletteIndex) + " applied."; noticeError = false;
     }
 
     private void clear() {
@@ -161,33 +150,6 @@ public final class RankDisplayEditorScreen extends Screen {
         super.extractRenderState(g, mouseX, mouseY, partialTick);
     }
 
-
-    /** A real colour swatch button, while retaining the readable fixed palette name. */
-    private static final class PaletteButton extends Button {
-        private final int color;
-
-        private PaletteButton(int x, int y, int width, int height, String name, int color, OnPress onPress) {
-            super(x, y, width, height, Component.literal(name), onPress, DEFAULT_NARRATION);
-            this.color = color;
-        }
-
-        @Override
-        protected void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-            extractDefaultSprite(graphics);
-            graphics.fill(getX() + 3, getY() + 3, getRight() - 3, getBottom() - 3, color);
-            graphics.outline(getX() + 2, getY() + 2, getWidth() - 4, getHeight() - 4,
-                    isHoveredOrFocused() ? 0xFFFFFFFF : 0xFF20242B);
-            graphics.centeredText(Minecraft.getInstance().font, getMessage().getString(),
-                    getX() + getWidth() / 2, getY() + 6, contrastText(color));
-        }
-
-        private static int contrastText(int argb) {
-            int red = argb >>> 16 & 0xFF;
-            int green = argb >>> 8 & 0xFF;
-            int blue = argb & 0xFF;
-            return red * 299 + green * 587 + blue * 114 >= 150_000 ? 0xFF101010 : 0xFFFFFFFF;
-        }
-    }
 
     @Override public void removed() { RichTextEditBoxRenderer.unregister(text); super.removed(); }
     @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }

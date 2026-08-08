@@ -11,10 +11,12 @@ import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramImageCache
 import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramClientState;
 import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramRenderer;
 import be.winnetrie.mod.simpleserverutilities.client.npc.NpcLabelClientState;
+import be.winnetrie.mod.simpleserverutilities.client.npc.NpcCustomTextureClientState;
 import be.winnetrie.mod.simpleserverutilities.client.npc.NpcLabelRenderer;
 import be.winnetrie.mod.simpleserverutilities.client.gui.ManagedDimensionScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.ClaimMapScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.SsuDashboardScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.KnownPlayerPickerScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.PropertySettingsScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.TrustedPlayersScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.RegionPermissionScreen;
@@ -58,6 +60,8 @@ import be.winnetrie.mod.simpleserverutilities.client.gui.MinigameDiagnosticsScre
 import be.winnetrie.mod.simpleserverutilities.client.gui.TitleManagerScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.RankDisplayEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.minigame.MinigameHudClientState;
+import be.winnetrie.mod.simpleserverutilities.client.minigame.KingOfTheHillVisualClientState;
+import be.winnetrie.mod.simpleserverutilities.client.minigame.KingOfTheHillVisualRenderer;
 import be.winnetrie.mod.simpleserverutilities.client.minigame.CaptureTheFlagClientState;
 import be.winnetrie.mod.simpleserverutilities.client.minigame.DominationClientState;
 import be.winnetrie.mod.simpleserverutilities.client.minigame.DominationRenderer;
@@ -87,6 +91,7 @@ import be.winnetrie.mod.simpleserverutilities.network.HologramEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.HologramEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcLabelSyncPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcTextureSyncPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcLoadoutResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcAdminListPayload;
@@ -106,6 +111,7 @@ import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameHudPayload;
+import be.winnetrie.mod.simpleserverutilities.network.MinigameKothVisualPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameCastBarPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameDominationVisualPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameCtfVisualPayload;
@@ -295,6 +301,10 @@ public class SimpleServerUtilitiesClient {
         event.register(ModMailMenus.MAIL_COMPOSE.get(), MailComposeScreen::new);
         event.register(ModAuctionMenus.AUCTION_SELL.get(), AuctionSellScreen::new);
         event.register(ModNpcMenus.NPC_LOADOUT.get(), NpcLoadoutScreen::new);
+        event.register(be.winnetrie.mod.simpleserverutilities.kits.ModKitMenus.KIT_EDITOR.get(),
+                be.winnetrie.mod.simpleserverutilities.client.gui.KitEditorScreen::new);
+        event.register(be.winnetrie.mod.simpleserverutilities.moderation.ModModerationMenus.PLAYER_INVENTORY.get(),
+                be.winnetrie.mod.simpleserverutilities.client.gui.PlayerInventoryAdminScreen::new);
     }
 
     @SubscribeEvent
@@ -341,6 +351,8 @@ public class SimpleServerUtilitiesClient {
                     Minecraft minecraft = Minecraft.getInstance();
                     if (minecraft.gui.screen() instanceof SsuDashboardScreen screen) {
                         screen.acceptPageData(payload);
+                    } else if (minecraft.gui.screen() instanceof KnownPlayerPickerScreen picker) {
+                        picker.accept(payload);
                     }
                 })
         );
@@ -523,6 +535,10 @@ public class SimpleServerUtilitiesClient {
 
         event.register(NpcLabelSyncPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> NpcLabelClientState.apply(payload))
+        );
+
+        event.register(NpcTextureSyncPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> NpcCustomTextureClientState.apply(payload))
         );
 
         event.register(NpcEditorOpenPayload.TYPE, (payload, context) ->
@@ -727,6 +743,10 @@ public class SimpleServerUtilitiesClient {
 
         event.register(MinigameHudPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> MinigameHudClientState.apply(payload))
+        );
+
+        event.register(MinigameKothVisualPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> KingOfTheHillVisualClientState.apply(payload))
         );
 
         event.register(MinigameCastBarPayload.TYPE, (payload, context) ->
@@ -943,6 +963,59 @@ public class SimpleServerUtilitiesClient {
                     }
                 })
         );
+
+        event.register(be.winnetrie.mod.simpleserverutilities.network.OnboardingStatePayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft m=Minecraft.getInstance();
+                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.OnboardingScreen screen) screen.accept(payload);
+                    else if (!"complete".equals(payload.stage())) m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.OnboardingScreen(payload));
+                }));
+        event.register(be.winnetrie.mod.simpleserverutilities.network.OnboardingAdminDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft m=Minecraft.getInstance();
+                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.OnboardingAdminScreen screen) screen.accept(payload);
+                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.OnboardingAdminScreen(payload,m.gui.screen()));
+                }));
+        event.register(be.winnetrie.mod.simpleserverutilities.network.PlayerManagementDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft m=Minecraft.getInstance();
+                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.PlayerManagementScreen screen) screen.accept(payload);
+                    else if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.JailPunishmentScreen screen) screen.accept(payload);
+                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.PlayerManagementScreen(payload,m.gui.screen()));
+                }));
+        event.register(be.winnetrie.mod.simpleserverutilities.network.JailDashboardPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft m=Minecraft.getInstance();
+                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.JailDashboardScreen screen) screen.accept(payload);
+                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.JailDashboardScreen(payload));
+                }));
+        event.register(be.winnetrie.mod.simpleserverutilities.network.KitDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft m=Minecraft.getInstance();
+                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.KitScreen screen) screen.accept(payload);
+                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.KitScreen(payload,m.gui.screen()));
+                }));
+        event.register(be.winnetrie.mod.simpleserverutilities.network.KitContentsResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {Minecraft m=Minecraft.getInstance();if(m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.KitEditorScreen screen)screen.accept(payload);}));
+        event.register(be.winnetrie.mod.simpleserverutilities.network.JailAdminDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft m=Minecraft.getInstance();
+                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.JailAdministrationScreen screen) screen.accept(payload);
+                    else if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.JailPrisonerOverviewScreen screen) screen.accept(payload);
+                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.JailAdministrationScreen(payload,m.gui.screen()));
+                }));
+        event.register(be.winnetrie.mod.simpleserverutilities.network.MineDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft m=Minecraft.getInstance();
+                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.MineScreen screen) screen.accept(payload);
+                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.MineScreen(payload,m.gui.screen()));
+                }));
+        event.register(be.winnetrie.mod.simpleserverutilities.network.ServerOperationsDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft m=Minecraft.getInstance();
+                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.ServerOperationsScreen screen) screen.accept(payload);
+                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.ServerOperationsScreen(payload,m.gui.screen()));
+                }));
     }
 
     @SubscribeEvent
@@ -960,6 +1033,7 @@ public class SimpleServerUtilitiesClient {
         event.register(MapMarkerRenderer::new);
         event.register(DominationRenderer::new);
         event.register(MinigameSetupVisualRenderer::new);
+        event.register(KingOfTheHillVisualRenderer::new);
         event.register(PlayerTitleRenderer::new);
         event.register(DamageIndicatorRenderer::new);
         event.register(RegionSnapshotPreviewRenderer::new);
@@ -1020,8 +1094,10 @@ public class SimpleServerUtilitiesClient {
         UtilityMiningClientState.clear();
         HologramClientState.clear();
         NpcLabelClientState.clear();
+        NpcCustomTextureClientState.clear();
         MapMarkerClientState.clear();
         MinigameHudClientState.clear();
+        KingOfTheHillVisualClientState.clear();
         CaptureTheFlagClientState.clear();
         DominationClientState.clear();
         MinigameCastBarClientState.clear();

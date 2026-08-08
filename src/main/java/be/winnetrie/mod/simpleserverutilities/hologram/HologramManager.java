@@ -38,6 +38,7 @@ public final class HologramManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Pattern STAT_VALUE_PATTERN = Pattern.compile("\\{\\{stat:([a-zA-Z0-9._-]{1,64})}}", Pattern.CASE_INSENSITIVE);
     private static final Pattern STAT_RANK_PATTERN = Pattern.compile("\\{\\{rank:([a-zA-Z0-9._-]{1,64})}}", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MINE_TOKEN_PATTERN = Pattern.compile("\\{mine:([a-zA-Z0-9._-]{1,64}):(name|remaining|mined|reset|blocks|resets)}", Pattern.CASE_INSENSITIVE);
 
     private final Map<String, HologramDefinition> holograms = new LinkedHashMap<>();
     private final Map<String, Map<Long, Set<String>>> spatialIndex = new HashMap<>();
@@ -449,14 +450,27 @@ public final class HologramManager {
         if (!Config.ENABLE_CUSTOM_STATISTICS.get()
                 || !SimpleServerUtilities.CORE.modules().isActive("statistics")) {
             value = replaceStatisticPattern(value, STAT_VALUE_PATTERN, ignored -> "-");
-            return replaceStatisticPattern(value, STAT_RANK_PATTERN, ignored -> "-");
+            value = replaceStatisticPattern(value, STAT_RANK_PATTERN, ignored -> "-");
+        } else {
+            value = replaceStatisticPattern(value, STAT_VALUE_PATTERN, id ->
+                    SimpleServerUtilities.STATISTICS.formattedValue(player.getUUID(), id));
+            value = replaceStatisticPattern(value, STAT_RANK_PATTERN, id -> {
+                int rank = SimpleServerUtilities.STATISTICS.rank(player.getUUID(), id);
+                return rank <= 0 ? "-" : Integer.toString(rank);
+            });
         }
-        value = replaceStatisticPattern(value, STAT_VALUE_PATTERN, id ->
-                SimpleServerUtilities.STATISTICS.formattedValue(player.getUUID(), id));
-        return replaceStatisticPattern(value, STAT_RANK_PATTERN, id -> {
-            int rank = SimpleServerUtilities.STATISTICS.rank(player.getUUID(), id);
-            return rank <= 0 ? "-" : Integer.toString(rank);
-        });
+        return replaceMineTokens(value);
+    }
+
+    private static String replaceMineTokens(String input) {
+        Matcher matcher = MINE_TOKEN_PATTERN.matcher(input == null ? "" : input);
+        StringBuffer result = new StringBuffer();
+        while (matcher.find()) {
+            String value = SimpleServerUtilities.MINES.statusToken(matcher.group(1), matcher.group(2));
+            matcher.appendReplacement(result, Matcher.quoteReplacement(value == null ? "" : value));
+        }
+        matcher.appendTail(result);
+        return result.toString();
     }
 
     private static String replaceStatisticPattern(String input, Pattern pattern,

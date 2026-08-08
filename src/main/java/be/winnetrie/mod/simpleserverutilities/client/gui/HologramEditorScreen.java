@@ -1,6 +1,5 @@
 package be.winnetrie.mod.simpleserverutilities.client.gui;
 
-import java.util.List;
 import java.util.Locale;
 
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText;
@@ -25,8 +24,8 @@ import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 /** Custom creation and rich-text editing GUI for persistent SSU holograms. */
 public final class HologramEditorScreen extends Screen {
-    private static final int PANEL_WIDTH = 560;
-    private static final int PANEL_HEIGHT = 450;
+    private static final int PANEL_WIDTH = 448;
+    private static final int PANEL_HEIGHT = 360;
     private static final int PANEL = 0xF0161D25;
     private static final int BORDER = 0xFF586978;
     private static final int TEXT = 0xFFF3F5F7;
@@ -35,24 +34,6 @@ public final class HologramEditorScreen extends Screen {
     private static final int ERROR = 0xFFFF8585;
     private static final int DEFAULT_BACKGROUND_ALPHA = 0xA0;
 
-    private static final List<ColorPreset> MINECRAFT_COLORS = List.of(
-            new ColorPreset("Black", 0x000000),
-            new ColorPreset("Dark Blue", 0x0000AA),
-            new ColorPreset("Dark Green", 0x00AA00),
-            new ColorPreset("Dark Aqua", 0x00AAAA),
-            new ColorPreset("Dark Red", 0xAA0000),
-            new ColorPreset("Dark Purple", 0xAA00AA),
-            new ColorPreset("Gold", 0xFFAA00),
-            new ColorPreset("Gray", 0xAAAAAA),
-            new ColorPreset("Dark Gray", 0x555555),
-            new ColorPreset("Blue", 0x5555FF),
-            new ColorPreset("Green", 0x55FF55),
-            new ColorPreset("Aqua", 0x55FFFF),
-            new ColorPreset("Red", 0xFF5555),
-            new ColorPreset("Light Purple", 0xFF55FF),
-            new ColorPreset("Yellow", 0xFFFF55),
-            new ColorPreset("White", 0xFFFFFF)
-    );
 
     private final HologramEditorOpenPayload initial;
     private final Screen parent;
@@ -76,7 +57,7 @@ public final class HologramEditorScreen extends Screen {
     private MultiLineEditBox text;
     private HologramRichTextDocument richDocument;
     private EditBox source;
-    private EditBox backgroundColor;
+    private int backgroundArgb;
     private EditBox scale;
     private EditBox viewDistance;
     private EditBox objective;
@@ -96,26 +77,27 @@ public final class HologramEditorScreen extends Screen {
         this.type = initial.hologramType();
         this.scoreboardMode = initial.scoreboardMode();
         this.seeThrough = initial.seeThrough();
+        this.backgroundArgb = initial.backgroundColor();
     }
 
     @Override
     protected void init() {
         int x = panelX();
         int y = panelY();
-        int right = x + 372;
+        int right = x + 304;
 
-        id = field(x + 16, y + 36, 196, "Unique ID", 64, initial.id());
+        id = field(x + 14, y + 30, 158, "Unique ID", 64, initial.id());
         typeButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> cycleType())
-                .bounds(x + 220, y + 36, 132, 20).build());
+                .bounds(x + 178, y + 30, 108, 20).build());
 
-        coordinateX = field(x + 16, y + 72, 102, "X", 24, formatDouble(initial.x()));
-        coordinateY = field(x + 126, y + 72, 102, "Y", 24, formatDouble(initial.y()));
-        coordinateZ = field(x + 236, y + 72, 116, "Z", 24, formatDouble(initial.z()));
+        coordinateX = field(x + 14, y + 62, 82, "X", 16, formatDouble(initial.x()));
+        coordinateY = field(x + 102, y + 62, 82, "Y", 16, formatDouble(initial.y()));
+        coordinateZ = field(x + 190, y + 62, 96, "Z", 16, formatDouble(initial.z()));
 
-        text = MultiLineEditBox.builder().setX(x + 16).setY(y + 116)
+        text = MultiLineEditBox.builder().setX(x + 14).setY(y + 100)
                 .setPlaceholder(Component.literal("Visible text / scoreboard title"))
                 .setShowBackground(true).setShowDecorations(true)
-                .build(font, 336, 126, Component.literal("Text"));
+                .build(font, 272, 96, Component.literal("Text"));
         text.setCharacterLimit(HologramRichText.MAX_VISIBLE_CHARACTERS + HologramRichText.MAX_LINES);
         String migratedText = HologramRichText.migrateWholeTextStyles(
                 initial.text(), initial.bold(), initial.italic(), initial.underlined(), initial.strikethrough());
@@ -125,59 +107,47 @@ public final class HologramEditorScreen extends Screen {
         text.setValueListener(this::onTextChanged);
         addRenderableWidget(text);
 
-        addRenderableWidget(Button.builder(Component.literal("B"), ignored -> applySelectionFormat('l'))
-                .bounds(x + 16, y + 248, 24, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("I"), ignored -> applySelectionFormat('o'))
-                .bounds(x + 44, y + 248, 24, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("U"), ignored -> applySelectionFormat('n'))
-                .bounds(x + 72, y + 248, 24, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("S"), ignored -> applySelectionFormat('m'))
-                .bounds(x + 100, y + 248, 24, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Color ▾"),
-                        ignored -> openPalette(PaletteTarget.SELECTION_TEXT))
-                .bounds(x + 132, y + 248, 82, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Clear style"), ignored -> clearSelectionFormatting())
-                .bounds(x + 220, y + 248, 94, 20).build());
+        int toolbarY = y + 202;
+        addRenderableWidget(Button.builder(Component.literal("B"), ignored -> applySelectionFormat('l')).bounds(x + 14, toolbarY, 20, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("I"), ignored -> applySelectionFormat('o')).bounds(x + 38, toolbarY, 20, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("U"), ignored -> applySelectionFormat('n')).bounds(x + 62, toolbarY, 20, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("S"), ignored -> applySelectionFormat('m')).bounds(x + 86, toolbarY, 20, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("Clear"), ignored -> clearSelectionFormatting()).bounds(x + 110, toolbarY, 48, 18).build());
+        for (int index = 0; index < 16; index++) {
+            int colorIndex = index;
+            addRenderableWidget(RichTextPalette.button(x + 164 + index * 8, toolbarY + 4, 7, index,
+                    ignored -> applySelectionColor(colorIndex)));
+        }
 
-        source = field(x + 16, y + 302, 336, "Website URL or direct PNG/GIF/JPG source", 2048,
-                initial.urlOrImageSource());
-        objective = field(x + 16, y + 340, 336, "Objective or ssu:stat-id", 64, initial.objective());
+        source = field(x + 14, y + 230, 272, "Website URL / image source", 2048, initial.urlOrImageSource());
+        objective = field(x + 14, y + 262, 272, "Objective or ssu:stat-id", 64, initial.objective());
 
-        backgroundColor = field(right, y + 116, 78, "AARRGGBB", 8,
-                String.format(Locale.ROOT, "%08X", initial.backgroundColor()));
-        addRenderableWidget(Button.builder(Component.literal("Presets ▾"),
-                        ignored -> openPalette(PaletteTarget.BACKGROUND))
-                .bounds(right + 84, y + 116, 88, 20).build());
-
-        scale = field(right, y + 154, 78, "Scale", 12, Float.toString(initial.scale()));
-        viewDistance = field(right + 84, y + 154, 88, "Range", 12, formatDouble(initial.viewDistance()));
-        imageWidth = field(right, y + 192, 78, "Width", 12, Float.toString(initial.imageWidth()));
-        imageHeight = field(right + 84, y + 192, 88, "Height", 12, Float.toString(initial.imageHeight()));
-        maxLines = field(right, y + 230, 78, "Rows", 8, Integer.toString(initial.maxLines()));
-        interval = field(right + 84, y + 230, 88, "Seconds", 12,
-                formatSeconds(initial.updateIntervalTicks()));
+        addRenderableWidget(Button.builder(Component.literal("Background"), ignored -> openPalette(PaletteTarget.BACKGROUND))
+                .bounds(right, y + 100, 126, 20).build());
+        scale = field(right, y + 140, 54, "Scale", 12, Float.toString(initial.scale()));
+        viewDistance = field(right + 62, y + 140, 64, "Range", 12, formatDouble(initial.viewDistance()));
+        imageWidth = field(right, y + 174, 54, "Width", 12, Float.toString(initial.imageWidth()));
+        imageHeight = field(right + 62, y + 174, 64, "Height", 12, Float.toString(initial.imageHeight()));
+        maxLines = field(right, y + 208, 54, "Rows", 8, Integer.toString(initial.maxLines()));
+        interval = field(right + 62, y + 208, 64, "Seconds", 12, formatSeconds(initial.updateIntervalTicks()));
         modeButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> {
-            scoreboardMode = scoreboardMode == HologramScoreboardMode.TOP
-                    ? HologramScoreboardMode.SELF : HologramScoreboardMode.TOP;
+            scoreboardMode = scoreboardMode == HologramScoreboardMode.TOP ? HologramScoreboardMode.SELF : HologramScoreboardMode.TOP;
             updateLabels();
-        }).bounds(right, y + 268, 172, 20).build());
+        }).bounds(right, y + 244, 126, 20).build());
         seeThroughButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> {
             seeThrough = !seeThrough;
             updateLabels();
-        }).bounds(right, y + 304, 172, 20).build());
+        }).bounds(right, y + 270, 126, 20).build());
 
-        addRenderableWidget(Button.builder(Component.literal("Cancel"), ignored -> onClose())
-                .bounds(x + 16, y + 402, 86, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Cancel"), ignored -> onClose()).bounds(x + 14, y + 326, 70, 20).build());
         if (initial.editing()) {
-            deleteButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> requestDelete())
-                    .bounds(x + 110, y + 402, 132, 20).build());
+            deleteButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> requestDelete()).bounds(x + 90, y + 326, 104, 20).build());
         }
-        addRenderableWidget(Button.builder(Component.literal(initial.editing() ? "Save changes" : "Create hologram"),
-                        ignored -> submit(false))
-                .bounds(x + 398, y + 402, 146, 20).build());
+        addRenderableWidget(Button.builder(Component.literal(initial.editing() ? "Save changes" : "Create hologram"), ignored -> submit(false))
+                .bounds(x + PANEL_WIDTH - 124, y + 326, 110, 20).build());
 
         RichTextEditBoxRenderer.register(text, () -> richDocument, this::currentEditorTextColor,
-                Component.literal("Visible text / scoreboard title"));
+                RichTextPalette::argb, Component.literal("Visible text / scoreboard title"));
         updateLabels();
         setInitialFocus(id);
     }
@@ -353,7 +323,7 @@ public final class HologramEditorScreen extends Screen {
         }
         try {
             int parsedColor = initial.color();
-            int parsedBackground = parseBackgroundColor(backgroundColor.getValue());
+            int parsedBackground = backgroundArgb;
             double parsedX = parseDouble(coordinateX.getValue(), -30_000_000.0D, 30_000_000.0D, "X coordinate");
             double parsedY = parseDouble(coordinateY.getValue(), -4_096.0D, 4_096.0D, "Y coordinate");
             double parsedZ = parseDouble(coordinateZ.getValue(), -30_000_000.0D, 30_000_000.0D, "Z coordinate");
@@ -411,23 +381,22 @@ public final class HologramEditorScreen extends Screen {
     private void handlePaletteClick(double mouseX, double mouseY) {
         int x = paletteX();
         int y = paletteY();
-        int cellWidth = 99;
-        int cellHeight = 24;
-        int gap = 4;
-        for (int index = 0; index < MINECRAFT_COLORS.size(); index++) {
-            int column = index % 4;
-            int row = index / 4;
-            int left = x + column * (cellWidth + gap);
-            int top = y + row * (cellHeight + gap);
-            if (SsuGuiGeometry.inside(mouseX, mouseY, left, top, cellWidth, cellHeight)) {
-                applyPreset(index, MINECRAFT_COLORS.get(index).rgb());
+        int cell = 18;
+        int gap = 3;
+        for (int index = 0; index < 16; index++) {
+            int column = index % 8;
+            int row = index / 8;
+            int left = x + column * (cell + gap);
+            int top = y + row * (cell + gap);
+            if (SsuGuiGeometry.inside(mouseX, mouseY, left, top, cell, cell)) {
+                applyPreset(index, RichTextPalette.rgb(index));
                 paletteTarget = PaletteTarget.NONE;
                 return;
             }
         }
         if (paletteTarget == PaletteTarget.BACKGROUND
-                && SsuGuiGeometry.inside(mouseX, mouseY, x, y + 112, 408, 20)) {
-            backgroundColor.setValue("00000000");
+                && SsuGuiGeometry.inside(mouseX, mouseY, x, y + 46, 165, 18)) {
+            backgroundArgb = 0;
         }
         paletteTarget = PaletteTarget.NONE;
     }
@@ -438,97 +407,63 @@ public final class HologramEditorScreen extends Screen {
             return;
         }
         int alpha = currentBackgroundAlpha();
-        backgroundColor.setValue(String.format(Locale.ROOT, "%08X", (alpha << 24) | (rgb & 0xFFFFFF)));
+        backgroundArgb = (alpha << 24) | (rgb & 0xFFFFFF);
     }
 
     private int currentBackgroundAlpha() {
-        try {
-            String hex = cleanHex(backgroundColor.getValue());
-            if (hex.length() == 8) {
-                int alpha = (int) (Long.parseUnsignedLong(hex, 16) >>> 24);
-                if (alpha > 0) return alpha;
-            }
-        } catch (Exception ignored) {
-        }
-        return DEFAULT_BACKGROUND_ALPHA;
+        int alpha = backgroundArgb >>> 24 & 0xFF;
+        return alpha > 0 ? alpha : DEFAULT_BACKGROUND_ALPHA;
     }
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
-        // Capture the selection every frame before a toolbar button receives focus.
-        // MultiLineEditBox may temporarily collapse its live selection on focus change.
         rememberCurrentSelection();
         int x = panelX();
         int y = panelY();
-        int right = x + 372;
+        int right = x + 304;
         g.fill(0, 0, width, height, 0xA5000000);
         g.fill(x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, PANEL);
         g.outline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
-        g.text(font, initial.editing() ? "Edit Floating Hologram" : "Create Floating Hologram",
-                x + 16, y + 12, TEXT, true);
-        g.text(font, "Dimension: " + shortDimension(initial.dimension()), x + 372, y + 14, MUTED, false);
-        g.text(font, "Coordinates (editable)", x + 16, y + 61, MUTED, false);
-        g.text(font, "X", x + 18, y + 64, MUTED, false);
-        g.text(font, "Y", x + 128, y + 64, MUTED, false);
-        g.text(font, "Z", x + 238, y + 64, MUTED, false);
-        g.text(font, "Text / title — automatic new line after 40 visible characters",
-                x + 16, y + 104, MUTED, false);
-        g.text(font, "Select text, then apply B / I / U / S or one of the 16 colors",
-                x + 16, y + 274, MUTED, false);
-        g.text(font, type == HologramType.LINK ? "Website URL"
-                        : type == HologramType.IMAGE ? "Direct PNG/GIF/JPG URL or resource ID" : "Source (not used)",
-                x + 16, y + 290, MUTED, false);
-        g.text(font, "Scoreboard objective or ssu:<stat-id>", x + 16, y + 328, MUTED, false);
-        g.text(font, "Text tokens: {{stat:id}} = your value, {{rank:id}} = your rank",
-                x + 16, y + 374, MUTED, false);
-        g.text(font, "One shared background", right, y + 104, MUTED, false);
-        g.text(font, "Scale / range", right, y + 142, MUTED, false);
-        g.text(font, "Image W/H", right, y + 180, MUTED, false);
+        g.text(font, initial.editing() ? "Edit Floating Hologram" : "Create Floating Hologram", x + 14, y + 11, TEXT, true);
+        g.text(font, "Dimension: " + shortDimension(initial.dimension()), right, y + 12, MUTED, false);
+        g.text(font, "Coordinates", x + 14, y + 51, MUTED, false);
+        g.text(font, "Text / title", x + 14, y + 89, MUTED, false);
+        g.text(font, "Source", x + 14, y + 220, MUTED, false);
+        g.text(font, "Scoreboard objective", x + 14, y + 252, MUTED, false);
+        g.text(font, "{{stat:id}} value • {{rank:id}} rank", x + 14, y + 287, MUTED, false);
+        g.text(font, "Background", right, y + 89, MUTED, false);
+        g.text(font, "Scale / range", right, y + 130, MUTED, false);
+        g.text(font, "Image W/H", right, y + 164, MUTED, false);
         int scoreboardLabelColor = type == HologramType.SCOREBOARD ? MUTED : 0xFF68737C;
-        g.text(font, "Score rows", right, y + 218, scoreboardLabelColor, false);
-        g.text(font, "Refresh sec", right + 84, y + 218, scoreboardLabelColor, false);
-        if (!notice.isBlank()) {
-            g.text(font, trim(notice, 82), x + 16, y + 431, noticeError ? ERROR : GOOD, false);
-        }
+        g.text(font, "Rows / refresh", right, y + 198, scoreboardLabelColor, false);
+        if (!notice.isBlank()) g.text(font, trim(notice, 66), x + 14, y + 311, noticeError ? ERROR : GOOD, false);
         super.extractRenderState(g, mouseX, mouseY, partialTick);
-        if (paletteTarget != PaletteTarget.NONE) drawPalette(g);
+        if (paletteTarget != PaletteTarget.NONE) drawPalette(g, mouseX, mouseY);
     }
 
-    private void drawPalette(GuiGraphicsExtractor g) {
+    private void drawPalette(GuiGraphicsExtractor g, int mouseX, int mouseY) {
         int x = paletteX();
         int y = paletteY();
-        int paletteHeight = paletteTarget == PaletteTarget.BACKGROUND ? 140 : 112;
-        g.fill(x - 8, y - 24, x + 416, y + paletteHeight, 0xFC10161D);
-        g.outline(x - 8, y - 24, 424, paletteHeight + 24, BORDER);
-        String title = switch (paletteTarget) {
-            case SELECTION_TEXT -> "Apply Minecraft color to selected text";
-            case BACKGROUND -> "Minecraft background colors";
-            case NONE -> "";
-        };
-        g.text(font, title, x, y - 17, TEXT, true);
-
-        int cellWidth = 99;
-        int cellHeight = 24;
-        int gap = 4;
-        for (int index = 0; index < MINECRAFT_COLORS.size(); index++) {
-            ColorPreset preset = MINECRAFT_COLORS.get(index);
-            int column = index % 4;
-            int row = index / 4;
-            int left = x + column * (cellWidth + gap);
-            int top = y + row * (cellHeight + gap);
-            int swatch = 0xFF000000 | preset.rgb();
-            g.fill(left, top, left + cellWidth, top + cellHeight, swatch);
-            g.outline(left, top, cellWidth, cellHeight, 0xFFB6C0C8);
-            g.text(font, preset.name(), left + 6, top + 8, contrastColor(preset.rgb()), true);
+        g.fill(x - 6, y - 22, x + 171, y + 70, 0xFC10161D);
+        g.outline(x - 6, y - 22, 177, 92, BORDER);
+        g.text(font, "Background color", x, y - 16, TEXT, true);
+        int cell = 18, gap = 3;
+        for (int index = 0; index < 16; index++) {
+            int left = x + (index % 8) * (cell + gap);
+            int top = y + (index / 8) * (cell + gap);
+            g.fill(left, top, left + cell, top + cell, RichTextPalette.argb(index));
+            g.outline(left, top, cell, cell, 0xFFB6C0C8);
+            if (SsuGuiGeometry.inside(mouseX, mouseY, left, top, cell, cell)) {
+                int paletteIndex = index;
+                g.setComponentTooltipForNextFrame(font,
+                        java.util.List.of(Component.literal(RichTextPalette.name(paletteIndex)).withStyle(style -> style.withColor(RichTextPalette.rgb(paletteIndex)))),
+                        mouseX, mouseY);
+            }
         }
-        if (paletteTarget == PaletteTarget.BACKGROUND) {
-            int top = y + 112;
-            g.fill(x, top, x + 408, top + 20, 0xFF202A33);
-            g.outline(x, top, 408, 20, 0xFFB6C0C8);
-            g.text(font, "No background (transparent)", x + 114, top + 6, TEXT, false);
-        }
+        g.fill(x, y + 46, x + 165, y + 64, 0xFF202A33);
+        g.outline(x, y + 46, 165, 18, 0xFFB6C0C8);
+        g.text(font, "Transparent", x + 52, y + 51, TEXT, false);
     }
-
 
     private int currentEditorTextColor() {
         // Kept only as a backwards-compatible fallback for older holograms that
@@ -554,8 +489,8 @@ public final class HologramEditorScreen extends Screen {
 
     private int panelX() { return (width - PANEL_WIDTH) / 2; }
     private int panelY() { return (height - PANEL_HEIGHT) / 2; }
-    private int paletteX() { return panelX() + 76; }
-    private int paletteY() { return panelY() + 150; }
+    private int paletteX() { return panelX() + 268; }
+    private int paletteY() { return panelY() + 122; }
     private static String onOff(boolean value) { return value ? "ON" : "OFF"; }
     private static String trim(String value, int max) {
         return value.length() <= max ? value : value.substring(0, max - 1) + "…";
@@ -565,39 +500,11 @@ public final class HologramEditorScreen extends Screen {
         return i < 0 ? value : value.substring(i + 1);
     }
     private static String formatDouble(double value) {
-        return value == Math.rint(value) ? Long.toString((long) value) : Double.toString(value);
+        return String.format(Locale.ROOT, "%.2f", value);
     }
     private static String formatSeconds(int ticks) {
         double seconds = Math.max(10, ticks) / 20.0D;
         return formatDouble(seconds);
-    }
-private static int contrastColor(int rgb) {
-        int red = (rgb >>> 16) & 0xFF;
-        int green = (rgb >>> 8) & 0xFF;
-        int blue = rgb & 0xFF;
-        return red * 299 + green * 587 + blue * 114 >= 140_000 ? 0xFF101010 : 0xFFFFFFFF;
-    }
-
-    private static int parseBackgroundColor(String raw) {
-        try {
-            String hex = cleanHex(raw);
-            if (hex.isBlank() || "none".equalsIgnoreCase(raw.trim())
-                    || "transparent".equalsIgnoreCase(raw.trim())) return 0;
-            if (hex.length() != 6 && hex.length() != 8) throw new NumberFormatException();
-            long value = Long.parseUnsignedLong(hex, 16);
-            return hex.length() == 6
-                    ? (int) ((long) DEFAULT_BACKGROUND_ALPHA << 24 | value)
-                    : (int) value;
-        } catch (Exception exception) {
-            throw new IllegalArgumentException("Background must be RRGGBB, AARRGGBB, or 00000000 for none.");
-        }
-    }
-
-    private static String cleanHex(String raw) {
-        String value = raw == null ? "" : raw.trim();
-        if (value.startsWith("#")) value = value.substring(1);
-        if (value.startsWith("0x") || value.startsWith("0X")) value = value.substring(2);
-        return value;
     }
 
     private static float parseFloat(String raw, float min, float max, String label) {
@@ -641,6 +548,4 @@ private static int contrastColor(int rgb) {
         BACKGROUND
     }
 
-    private record ColorPreset(String name, int rgb) {
-    }
 }

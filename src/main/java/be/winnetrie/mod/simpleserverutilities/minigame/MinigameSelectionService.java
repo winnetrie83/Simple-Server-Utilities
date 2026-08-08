@@ -60,7 +60,8 @@ public final class MinigameSelectionService {
             if (!canCreate(player)) throw new IllegalArgumentException("Minigame administrator permission is required.");
             MinigameGameType type = MinigameGameType.parse(payload.gameType());
             if (type != MinigameGameType.SPLEEF && type != MinigameGameType.CAPTURE_THE_FLAG
-                    && type != MinigameGameType.DOMINATION) {
+                    && type != MinigameGameType.DOMINATION && type != MinigameGameType.KING_OF_THE_HILL
+                    && type != MinigameGameType.BLOCK_PARTY) {
                 throw new IllegalArgumentException("That minigame type is not available in the Minigame Setup Tool yet.");
             }
             minigameId = ContentId.require(payload.minigameId(), "Minigame ID");
@@ -113,6 +114,8 @@ public final class MinigameSelectionService {
             MinigameDefinition definition = switch (type) {
                 case CAPTURE_THE_FLAG -> captureTheFlagDefinition(player, payload, minigameId, regionName, bounds);
                 case DOMINATION -> dominationDefinition(player, payload, minigameId, regionName, bounds);
+                case KING_OF_THE_HILL -> kingOfTheHillDefinition(player, payload, minigameId, regionName, bounds);
+                case BLOCK_PARTY -> blockPartyDefinition(player, payload, minigameId, regionName, bounds);
                 default -> spleefDefinition(player, payload, minigameId, regionName, bounds);
             };
             // Persist an intentionally disabled draft before snapshot capture. A crash can
@@ -361,6 +364,110 @@ public final class MinigameSelectionService {
         arena.controlPoints.add(dominationPoint("blacksmith", "Blacksmith", dimension, centerX, y, centerZ, centerX, centerZ));
         arena.controlPoints.add(dominationPoint("mine", "Mine", dimension, minX, y, maxZ, centerX, centerZ));
         arena.controlPoints.add(dominationPoint("stables", "Stables", dimension, maxX, y, maxZ, centerX, centerZ));
+        definition.arenas.add(arena);
+        definition.normalize();
+        return definition;
+    }
+
+    private static MinigameDefinition kingOfTheHillDefinition(ServerPlayer player,
+                                                               MinigameSelectionCreatePayload payload,
+                                                               String id, String regionName,
+                                                               RegionSelectionSchematicManager.Bounds bounds) {
+        MinigameDefinition definition = new MinigameDefinition();
+        definition.id = id;
+        definition.displayName = payload.displayName().isBlank() ? title(id) : payload.displayName();
+        definition.description = "Hold the central hill uncontested to generate points for your team.";
+        definition.iconItem = "minecraft:golden_helmet";
+        definition.gameType = MinigameGameType.KING_OF_THE_HILL.id();
+        definition.minPlayers = Math.max(2, payload.minPlayers());
+        definition.maxPlayers = Math.max(definition.minPlayers, payload.maxPlayers());
+        definition.teamCount = 2;
+        definition.victoryMode = "highest_score";
+        definition.allowLateJoin = false;
+        definition.countdownSeconds = 10;
+        definition.matchDurationSeconds = 600;
+        definition.postGameSeconds = 10;
+        definition.arenas.clear();
+
+        MinigameArenaDefinition arena = new MinigameArenaDefinition();
+        arena.id = "arena_1";
+        arena.displayName = definition.displayName + " Arena";
+        arena.regionId = regionName;
+        arena.enabled = true;
+        arena.managedRegion = true;
+        arena.lobby = MinigameLocation.of(player);
+        arena.spectator = MinigameLocation.of(player);
+        arena.teamSpawns.clear();
+        String dimension = player.level().dimension().identifier().toString();
+        double centerX = (bounds.minX() + bounds.maxX() + 1.0D) / 2.0D;
+        double centerZ = (bounds.minZ() + bounds.maxZ() + 1.0D) / 2.0D;
+        double y = Math.max(bounds.minY() + 1.0D, Math.min(player.getY(), bounds.maxY() + 1.0D));
+        arena.hillCenter = new MinigameLocation(dimension, centerX, y, centerZ, 0.0F, 0.0F);
+        int sizeX = bounds.maxX() - bounds.minX() + 1;
+        int sizeZ = bounds.maxZ() - bounds.minZ() + 1;
+        if (sizeX >= sizeZ) {
+            arena.teamSpawns.add(new MinigameSpawnPoint(1,
+                    new MinigameLocation(dimension, bounds.minX() + 1.5D, y, centerZ, -90.0F, 0.0F)));
+            arena.teamSpawns.add(new MinigameSpawnPoint(2,
+                    new MinigameLocation(dimension, bounds.maxX() - 0.5D, y, centerZ, 90.0F, 0.0F)));
+        } else {
+            arena.teamSpawns.add(new MinigameSpawnPoint(1,
+                    new MinigameLocation(dimension, centerX, y, bounds.minZ() + 1.5D, 0.0F, 0.0F)));
+            arena.teamSpawns.add(new MinigameSpawnPoint(2,
+                    new MinigameLocation(dimension, centerX, y, bounds.maxZ() - 0.5D, 180.0F, 0.0F)));
+        }
+        definition.arenas.add(arena);
+        definition.normalize();
+        return definition;
+    }
+
+    private static MinigameDefinition blockPartyDefinition(ServerPlayer player,
+                                                            MinigameSelectionCreatePayload payload,
+                                                            String id, String regionName,
+                                                            RegionSelectionSchematicManager.Bounds bounds) {
+        MinigameDefinition definition = new MinigameDefinition();
+        definition.id = id;
+        definition.displayName = payload.displayName().isBlank() ? title(id) : payload.displayName();
+        definition.description = "Find the announced block before the rest of the dance floor disappears.";
+        definition.iconItem = "minecraft:lime_concrete";
+        definition.gameType = MinigameGameType.BLOCK_PARTY.id();
+        definition.minPlayers = Math.max(2, payload.minPlayers());
+        definition.maxPlayers = Math.min(32, Math.max(definition.minPlayers, payload.maxPlayers()));
+        definition.teamCount = definition.maxPlayers;
+        definition.victoryMode = "last_team_standing";
+        definition.allowLateJoin = false;
+        definition.countdownSeconds = 10;
+        definition.matchDurationSeconds = 900;
+        definition.postGameSeconds = 8;
+        definition.arenas.clear();
+
+        MinigameArenaDefinition arena = new MinigameArenaDefinition();
+        arena.id = "arena_1";
+        arena.displayName = definition.displayName + " Dance Floor";
+        arena.regionId = regionName;
+        arena.enabled = true;
+        arena.managedRegion = true;
+        arena.lobby = MinigameLocation.of(player);
+        arena.spectator = MinigameLocation.of(player);
+        String dimension = player.level().dimension().identifier().toString();
+        int floorY = bounds.minY();
+        arena.playFloor = new MinigameAreaBounds(dimension,
+                new BlockPos(bounds.minX(), floorY, bounds.minZ()),
+                new BlockPos(bounds.maxX(), floorY, bounds.maxZ()));
+        arena.teamSpawns.clear();
+        int columns = (int) Math.ceil(Math.sqrt(definition.maxPlayers));
+        int rows = (int) Math.ceil((double) definition.maxPlayers / columns);
+        double usableX = Math.max(1.0D, bounds.maxX() - bounds.minX());
+        double usableZ = Math.max(1.0D, bounds.maxZ() - bounds.minZ());
+        double spawnY = floorY + 1.0D;
+        for (int index = 0; index < definition.maxPlayers; index++) {
+            int column = index % columns;
+            int row = index / columns;
+            double x = bounds.minX() + 0.5D + usableX * (column + 0.5D) / columns;
+            double z = bounds.minZ() + 0.5D + usableZ * (row + 0.5D) / rows;
+            arena.teamSpawns.add(new MinigameSpawnPoint(index + 1,
+                    new MinigameLocation(dimension, x, spawnY, z, 0.0F, 0.0F)));
+        }
         definition.arenas.add(arena);
         definition.normalize();
         return definition;

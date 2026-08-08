@@ -208,11 +208,14 @@ public final class MailScreen extends Screen {
         int pageX = Math.min(l.left() + 304, l.right() - 84);
         g.text(font, "Page " + (data.pageIndex() + 1) + "/" + pageCount(), pageX, l.bottom() - 21, MUTED, false);
         if (!data.notice().isBlank()) {
-            int noticeX = l.width() >= 620 ? l.left() + 390 : l.detailLeft() + 8;
-            int noticeY = l.width() >= 620 ? l.bottom() - 21 : l.top() + 65;
-            int noticeChars = l.width() >= 620 ? 80 : 42;
-            g.text(font, trim(data.notice(), noticeChars), noticeX, noticeY,
-                    data.error() ? ERROR : GOOD, false);
+            int noticeX = Math.max(l.left() + 304, l.detailLeft() + 8);
+            int noticeWidth = Math.max(120, l.right() - noticeX - 10);
+            List<FormattedCharSequence> noticeLines = font.split(Component.literal(data.notice()), noticeWidth);
+            int shown = Math.min(2, noticeLines.size());
+            int noticeY = l.bottom() - 35;
+            for (int line = 0; line < shown; line++) {
+                g.text(font, noticeLines.get(line), noticeX, noticeY + line * 11, data.error() ? ERROR : GOOD, false);
+            }
         }
 
         super.extractRenderState(g, mouseX, mouseY, partialTick);

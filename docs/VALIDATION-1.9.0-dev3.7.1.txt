@@ -1,0 +1,34 @@
+SSU 1.9.0-dev3.7.1 — Compile Hotfix Validation
+
+Base: 1.9.0-dev3.7
+Network protocol: 93 (unchanged)
+Storage/schema versions: unchanged
+
+User-provided Gradle compile result for dev3.7:
+- compileJava reached the Java compiler successfully.
+- 22 errors were reported.
+- Affected files: ManagedDimensionService.java, ModerationManager.java, ModerationService.java,
+  PlayerInventoryAdminService.java, OnboardingManager.java, OnboardingService.java and SpawnEvents.java.
+
+Corrections:
+1. Removed ServerPlayer#getServer() usages introduced in dev3.7 and used player.level().getServer().
+2. Replaced removed Level/ServerLevel#getSharedSpawnPos() calls with current respawn-data lookup plus
+   world-border adjustment.
+3. Corrected warning/onboarding sounds to use ClientboundSoundPacket with Holder<SoundEvent>, matching
+   the packet pattern already used elsewhere in SSU. The moderation Call horn is targeted to the warned player.
+
+Static validation in the build workspace:
+- 701 Java source files scanned for balanced delimiters, comments and string literals: PASS.
+- All local be.winnetrie.mod.simpleserverutilities imports resolve to source types: PASS.
+- JSON resources parsed: PASS.
+- No getSharedSpawnPos() remains in Java source: PASS.
+- No direct ServerPlayer#getServer() remains in the seven compiler-reported files: PASS.
+- No Level.playSound(...) call passes BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound): PASS.
+- Current RespawnData API is used by dimension teleport, onboarding fallback and vanilla spawn fallback: PASS.
+- Network protocol remains 93: PASS.
+- 16/16 focused source invariants: PASS.
+
+Full Gradle verification inside this container:
+- NOT AVAILABLE. The wrapper attempted to download Gradle 9.2.1 from services.gradle.org but DNS/network
+  access is unavailable (UnknownHostException). The container also provides Java 21 while SSU requires Java 25.
+- The authoritative next check is therefore the user's local Java 25 `gradlew.bat clean compileJava` / `build`.

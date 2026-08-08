@@ -1,0 +1,10 @@
+SSU 1.9.0-dev3.14.1 validation notes
+
+- Runtime hotfix only; protocol/schema versions unchanged.
+- Jail task block removal is deferred one server tick so cancelled BreakBlockEvent resync cannot restore the block.
+- Duplicate attempts for the same dimension/block position are coalesced while pending.
+- Progress/statistics are committed only when the delayed physical removal is applied.
+- Full Gradle compile may still require the local Gradle 9.2.1 environment.
+- Dependency-less javac parser sanity on ModerationManager: no syntax/parser hits.
+- Lexical delimiter balance on ModerationManager: OK.
+- `./gradlew compileJava --no-daemon` could not reach Java compilation because Gradle 9.2.1 download failed with `java.net.UnknownHostException: services.gradle.org`.

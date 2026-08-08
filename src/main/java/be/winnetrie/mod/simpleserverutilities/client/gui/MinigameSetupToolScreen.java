@@ -19,10 +19,11 @@ import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 public final class MinigameSetupToolScreen extends Screen {
     private static final int W = 520, H = 358;
     private static final int PANEL = 0xF0161D25, BORDER = 0xFF586978, TEXT = 0xFFF3F5F7,
-            MUTED = 0xFFAAB5BE, GOOD = 0xFF83E39A, ERROR = 0xFFFF8585, ACCENT = 0xFF7FC8FF;
+            MUTED = 0xFFAAB5BE, GOOD = 0xFF83E39A, WARNING = 0xFFFFD36A, ERROR = 0xFFFF8585, ACCENT = 0xFF7FC8FF;
     private MinigameSetupToolOpenPayload data;
     private long nextRequestId;
     private boolean awaiting;
+    private boolean confirmRestore;
 
     public MinigameSetupToolScreen(MinigameSetupToolOpenPayload data) {
         super(Component.literal("Minigame Setup Tool"));
@@ -43,8 +44,10 @@ public final class MinigameSetupToolScreen extends Screen {
             addCycle(x + 18, y + 174, 144, "Team", () -> changeTeam(-1), () -> changeTeam(1), teamLabel());
         }
         if (action == MinigameSetupAction.TEAM_SPAWN || action == MinigameSetupAction.DOMINATION_NODE
-                || action == MinigameSetupAction.DOMINATION_NODE_SPAWN || action == MinigameSetupAction.BOOST_SPAWN) {
+                || action == MinigameSetupAction.DOMINATION_NODE_SPAWN || action == MinigameSetupAction.BOOST_SPAWN
+                || action == MinigameSetupAction.KOTH_HILL) {
             String indexLabel = action == MinigameSetupAction.BOOST_SPAWN ? "Boost slot"
+                    : action == MinigameSetupAction.KOTH_HILL ? "Hill point"
                     : (action == MinigameSetupAction.DOMINATION_NODE || action == MinigameSetupAction.DOMINATION_NODE_SPAWN) ? "Node" : "Spawn slot";
             addCycle(x + 174, y + 174, 144, indexLabel,
                     () -> changeIndex(-1), () -> changeIndex(1), Integer.toString(data.index() + 1));
@@ -63,10 +66,20 @@ public final class MinigameSetupToolScreen extends Screen {
         Button importButton = addRenderableWidget(Button.builder(Component.literal("Import"), ignored -> send("import_arena",
                 data.selectedMinigameId(), data.selectedArenaId(), data.action(), data.team(), data.index()))
                 .bounds(x + 248, y + H - 60, 68, 20).build());
+        Button restore = addRenderableWidget(Button.builder(Component.literal(confirmRestore ? "Confirm restore" : "Restore snapshot"), ignored -> {
+            if (!confirmRestore) {
+                confirmRestore = true;
+                rebuildWidgets();
+                return;
+            }
+            confirmRestore = false;
+            send("restore_snapshot", data.selectedMinigameId(), data.selectedArenaId(), data.action(), data.team(), data.index());
+        }).bounds(x + 322, y + H - 60, 116, 20).build());
         validate.active = targetSelected && !awaiting;
         clone.active = targetSelected && !awaiting;
         export.active = targetSelected && !awaiting;
         importButton.active = targetSelected && !awaiting;
+        restore.active = targetSelected && !awaiting;
 
         Button create = addRenderableWidget(Button.builder(Component.literal("Create new game"), ignored -> {
             if (minecraft != null) minecraft.setScreenAndShow(new MinigameSetupCreateScreen(data, this));
@@ -133,13 +146,18 @@ public final class MinigameSetupToolScreen extends Screen {
     }
 
     private void changeTeam(int delta) {
-        int maximum = game() == null ? 2 : Math.max(1, MinigameGameType.parse(game().gameType()) == MinigameGameType.SPLEEF ? 16 : 2);
+        MinigameGameType type = game() == null ? null : MinigameGameType.parse(game().gameType());
+        int maximum = type == null ? 2 : Math.max(1,
+                type == MinigameGameType.SPLEEF ? 16
+                        : type == MinigameGameType.BLOCK_PARTY ? 32 : 2);
         int team = Math.floorMod((data.team() - 1) + delta, maximum) + 1;
         send("select", data.selectedMinigameId(), data.selectedArenaId(), data.action(), team, data.index());
     }
 
     private void changeIndex(int delta) {
-        int maximum = (MinigameSetupAction.parse(data.action()) == MinigameSetupAction.DOMINATION_NODE || MinigameSetupAction.parse(data.action()) == MinigameSetupAction.DOMINATION_NODE_SPAWN) ? 9 : 64;
+        MinigameSetupAction action = MinigameSetupAction.parse(data.action());
+        int maximum = (action == MinigameSetupAction.DOMINATION_NODE || action == MinigameSetupAction.DOMINATION_NODE_SPAWN)
+                ? 9 : action == MinigameSetupAction.KOTH_HILL ? 16 : 64;
         int index = Math.floorMod(data.index() + delta, maximum);
         send("select", data.selectedMinigameId(), data.selectedArenaId(), data.action(), data.team(), index);
     }
@@ -155,6 +173,7 @@ public final class MinigameSetupToolScreen extends Screen {
     public void accept(MinigameSetupToolOpenPayload payload) {
         if (payload == null) return;
         data = payload; awaiting = false;
+        confirmRestore = false;
         nextRequestId = Math.max(nextRequestId, payload.requestId() + 1L);
         rebuildWidgets();
     }
@@ -207,8 +226,10 @@ public final class MinigameSetupToolScreen extends Screen {
         if (action == MinigameSetupAction.TEAM_SPAWN || action == MinigameSetupAction.CTF_FLAG)
             g.text(font, "Team", x + 18, y + 163, MUTED, false);
         if (action == MinigameSetupAction.TEAM_SPAWN || action == MinigameSetupAction.DOMINATION_NODE
-                || action == MinigameSetupAction.DOMINATION_NODE_SPAWN || action == MinigameSetupAction.BOOST_SPAWN) {
+                || action == MinigameSetupAction.DOMINATION_NODE_SPAWN || action == MinigameSetupAction.BOOST_SPAWN
+                || action == MinigameSetupAction.KOTH_HILL) {
             String indexLabel = action == MinigameSetupAction.BOOST_SPAWN ? "Boost slot"
+                    : action == MinigameSetupAction.KOTH_HILL ? "Hill point"
                     : (action == MinigameSetupAction.DOMINATION_NODE || action == MinigameSetupAction.DOMINATION_NODE_SPAWN) ? "Node" : "Spawn slot";
             g.text(font, indexLabel, x + 174, y + 163, MUTED, false);
         }
@@ -230,7 +251,10 @@ public final class MinigameSetupToolScreen extends Screen {
                     + " -> " + p2.getX() + "," + p2.getY() + "," + p2.getZ(), x + 18, infoY + 45, GOOD, false);
             g.text(font, data.selectionVolume() + " selected blocks", x + 18, infoY + 58, GOOD, false);
         } else g.text(font, "To create a game, select New arena bounds and left-click two corners.", x + 18, infoY + 45, MUTED, false);
-        if (!data.notice().isBlank()) g.text(font, trim(data.notice(), 76), x + 18, y + H - 80,
+        if (confirmRestore) {
+            g.text(font, trim("Restore replaces the arena with its saved snapshot. It is blocked while this arena has an active match.", 76),
+                    x + 18, y + H - 80, WARNING, false);
+        } else if (!data.notice().isBlank()) g.text(font, trim(data.notice(), 76), x + 18, y + H - 80,
                 data.error() ? ERROR : GOOD, false);
         super.extractRenderState(g, mouseX, mouseY, partialTick);
     }

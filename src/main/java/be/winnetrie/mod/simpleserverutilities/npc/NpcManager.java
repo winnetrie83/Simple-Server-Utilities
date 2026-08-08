@@ -21,6 +21,7 @@ import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.network.NpcLabelSyncPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcTextureSyncPayload;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import be.winnetrie.mod.simpleserverutilities.time.GameCalendar;
@@ -90,6 +91,8 @@ public final class NpcManager {
     private final Set<UUID> scheduledInstances = new LinkedHashSet<>();
     private final Set<UUID> relationInstances = new LinkedHashSet<>();
     private final Map<UUID, List<NpcLabelSyncPayload.Entry>> lastLabelSnapshots = new LinkedHashMap<>();
+    private final Map<UUID, Map<String, String>> lastTextureSnapshots = new LinkedHashMap<>();
+    private final NpcTextureAssetService textureAssets = new NpcTextureAssetService();
     private boolean labelsEnabledLastTick;
     private List<String> supportedModelCache = List.of();
 
@@ -112,6 +115,8 @@ public final class NpcManager {
         scheduledInstances.clear();
         relationInstances.clear();
         lastLabelSnapshots.clear();
+        lastTextureSnapshots.clear();
+        textureAssets.configure(server);
         labelsEnabledLastTick = Config.ENABLE_NPCS.get();
         supportedModelCache = List.of();
         definitionStore.reset();
@@ -274,6 +279,8 @@ public final class NpcManager {
                 if (originalId.equals(instance.definitionId)) instance.definitionId = value.id;
             }
         }
+        if (!originalId.isBlank()) textureAssets.invalidate(originalId);
+        textureAssets.invalidate(value.id);
         definitions.put(value.id, value);
         if (respawnRuntime) respawnDefinition(value.id);
         else refreshDefinition(value.id);
@@ -399,6 +406,7 @@ public final class NpcManager {
             nextCombatAttackTick.remove(value.uuid());
         }
         definitions.remove(id);
+        textureAssets.invalidate(id);
         saveAll();
         syncAllLabels(true);
         return true;
@@ -1105,6 +1113,8 @@ public final class NpcManager {
         scheduledInstances.clear();
         relationInstances.clear();
         lastLabelSnapshots.clear();
+        lastTextureSnapshots.clear();
+        textureAssets.clear();
         labelsEnabledLastTick = false;
         supportedModelCache = List.of();
     }
@@ -1115,7 +1125,10 @@ public final class NpcManager {
     }
 
     public synchronized void forgetLabelViewer(UUID playerId) {
-        if (playerId != null) lastLabelSnapshots.remove(playerId);
+        if (playerId != null) {
+            lastLabelSnapshots.remove(playerId);
+            lastTextureSnapshots.remove(playerId);
+        }
     }
 
     private void syncAllLabels(boolean force) {
@@ -1126,15 +1139,47 @@ public final class NpcManager {
             syncLabels(player, force);
         }
         lastLabelSnapshots.keySet().removeIf(uuid -> !online.contains(uuid));
+        lastTextureSnapshots.keySet().removeIf(uuid -> !online.contains(uuid));
     }
 
     private void syncLabels(ServerPlayer player, boolean force) {
         if (player == null) return;
         List<NpcLabelSyncPayload.Entry> entries = buildLabelSnapshot(player);
         List<NpcLabelSyncPayload.Entry> previous = lastLabelSnapshots.get(player.getUUID());
-        if (!force && entries.equals(previous)) return;
-        lastLabelSnapshots.put(player.getUUID(), entries);
-        PacketDistributor.sendToPlayer(player, new NpcLabelSyncPayload(entries));
+        if (force || !entries.equals(previous)) {
+            lastLabelSnapshots.put(player.getUUID(), entries);
+            PacketDistributor.sendToPlayer(player, new NpcLabelSyncPayload(entries));
+        }
+        syncTextures(player, entries, force);
+    }
+
+    private void syncTextures(ServerPlayer player, List<NpcLabelSyncPayload.Entry> labels, boolean force) {
+        LinkedHashMap<String, String> hashes = new LinkedHashMap<>();
+        ArrayList<NpcTextureSyncPayload.Entry> changed = new ArrayList<>();
+        LinkedHashSet<String> visibleDefinitions = new LinkedHashSet<>();
+        for (NpcLabelSyncPayload.Entry label : labels) visibleDefinitions.add(label.definitionId());
+        Map<String, String> previous = lastTextureSnapshots.getOrDefault(player.getUUID(), Map.of());
+        for (String definitionId : visibleDefinitions) {
+            NpcDefinition definition = definitions.get(definitionId);
+            if (definition == null || !definition.hasCustomTexture()) continue;
+            NpcTextureAssetService.Asset asset = textureAssets.asset(definition);
+            if (asset == null) continue;
+            hashes.put(definitionId, asset.hash());
+            if (force || !asset.hash().equals(previous.get(definitionId))) {
+                changed.add(new NpcTextureSyncPayload.Entry(definitionId, asset.hash(), asset.model(), asset.bytes()));
+            }
+        }
+        for (String previousDefinition : previous.keySet()) {
+            if (!hashes.containsKey(previousDefinition)) {
+                changed.add(new NpcTextureSyncPayload.Entry(previousDefinition, "", "wide", new byte[0]));
+            }
+        }
+        lastTextureSnapshots.put(player.getUUID(), Map.copyOf(hashes));
+        // Keep each binary skin asset in its own packet. A single valid PNG can be hundreds of KiB,
+        // so batching many textures into one custom payload would create avoidably large packets.
+        for (NpcTextureSyncPayload.Entry entry : changed) {
+            PacketDistributor.sendToPlayer(player, new NpcTextureSyncPayload(List.of(entry)));
+        }
     }
 
     private List<NpcLabelSyncPayload.Entry> buildLabelSnapshot(ServerPlayer player) {
@@ -1144,11 +1189,11 @@ public final class NpcManager {
         for (NpcInstance placement : instances.values()) {
             if (!placement.enabled || placement.dead || !dimension.equals(placement.dimension)) continue;
             NpcDefinition definition = definitions.get(placement.definitionId);
-            if (definition == null || !definition.enabled || !definition.customNameVisible) continue;
+            if (definition == null || !definition.enabled) continue;
             Entity entity = findRuntime(placement);
             if (entity == null || entity.isRemoved()) continue;
-            entries.add(new NpcLabelSyncPayload.Entry(entity.getId(), entity.getUUID().toString(),
-                    definition.displayName, definition.roleId, definition.factionLabel(), definition.playerAttitude));
+            entries.add(new NpcLabelSyncPayload.Entry(entity.getId(), entity.getUUID().toString(), definition.id,
+                    definition.customNameVisible, definition.displayName, definition.roleId, definition.factionLabel(), definition.playerAttitude));
         }
         entries.sort(Comparator.comparingInt(NpcLabelSyncPayload.Entry::entityId));
         return List.copyOf(entries);
@@ -1159,6 +1204,9 @@ public final class NpcManager {
         return left.id.equals(right.id)
                 && left.displayName.equals(right.displayName)
                 && left.entityType.equals(right.entityType)
+                && left.textureSource.equals(right.textureSource)
+                && left.textureValue.equals(right.textureValue)
+                && left.textureModel.equals(right.textureModel)
                 && left.interactionText.equals(right.interactionText)
                 && left.dialogueId.equals(right.dialogueId)
                 && left.roleId.equals(right.roleId)

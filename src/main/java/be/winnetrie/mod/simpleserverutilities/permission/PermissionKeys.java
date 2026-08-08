@@ -105,6 +105,19 @@ public final class PermissionKeys {
 
     public static final String PERMISSIONS_ADMIN = "ssu.permissions.admin";
     public static final String DIMENSIONS_ADMIN = "ssu.dimensions.admin";
+    public static final String ONBOARDING_ADMIN = "ssu.onboarding.admin";
+    public static final String MODERATION_ADMIN = "ssu.moderation.admin";
+    public static final String MODERATION_INVENTORY = "ssu.moderation.inventory";
+    public static final String KITS_USE = "ssu.kits.use";
+    public static final String KITS_ADMIN = "ssu.kits.admin";
+    public static final String MINES_USE = "ssu.mines.use";
+    public static final String MINES_ADMIN = "ssu.mines.admin";
+    public static final String JAILS_ADMIN = "ssu.jails.admin";
+    public static final String SERVER_OPERATIONS_ADMIN = "ssu.server_operations.admin";
+    public static final String MAINTENANCE_BYPASS = "ssu.maintenance.bypass";
+    public static final String CHAT_MOD_BYPASS = "ssu.chat.moderation.bypass";
+    public static final String STAFF_CHAT = "ssu.chat.staff";
+    public static final String REPORTS_USE = "ssu.reports.use";
 
     public static final String MAIL_ACCESS = "ssu.mail.access";
     public static final String MAIL_SEND = "ssu.mail.send";
@@ -293,6 +306,19 @@ public final class PermissionKeys {
 
             PERMISSIONS_ADMIN,
             DIMENSIONS_ADMIN,
+            ONBOARDING_ADMIN,
+            MODERATION_ADMIN,
+            MODERATION_INVENTORY,
+            KITS_USE,
+            KITS_ADMIN,
+            MINES_USE,
+            MINES_ADMIN,
+            JAILS_ADMIN,
+            SERVER_OPERATIONS_ADMIN,
+            MAINTENANCE_BYPASS,
+            CHAT_MOD_BYPASS,
+            STAFF_CHAT,
+            REPORTS_USE,
 
             MAIL_ACCESS,
             MAIL_SEND,
@@ -385,6 +411,13 @@ public final class PermissionKeys {
             "ssu.minigames.*",
             "ssu.dungeons.*",
             "ssu.dimensions.*",
+            "ssu.onboarding.*",
+            "ssu.moderation.*",
+            "ssu.kits.*",
+            "ssu.server_operations.*",
+            "ssu.maintenance.*",
+            "ssu.chat.*",
+            "ssu.reports.*",
             "ssu.holograms.*",
             "ssu.block_information.*",
             "ssu.statistics.*",
@@ -411,6 +444,7 @@ public final class PermissionKeys {
         String normalized = key.trim().toLowerCase(Locale.ROOT);
         return KNOWN_KEYS.contains(normalized)
                 || normalized.startsWith("ssu.treecapitator.block.")
-                || normalized.startsWith("ssu.veinminer.block.");
+                || normalized.startsWith("ssu.veinminer.block.")
+                || normalized.startsWith("ssu.kits.");
     }
 }
