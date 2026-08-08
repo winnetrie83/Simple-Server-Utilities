@@ -1,0 +1,14 @@
+Simple Server Utilities 1.9.0-dev3.24 - static validation
+
+Scope:
+- Four supplied 16x16 RGBA textures integrated.
+- Achievement and Minigame dashboard icon references updated.
+- Cosmetics player-dashboard placeholder tile added without backend/network/storage logic.
+- Minimap procedural player marker replaced by textured arrow.
+
+Compatibility:
+- Network protocol: 105 (unchanged)
+- Player UI Preferences schema: 13 (unchanged)
+- Persistence schemas: unchanged
+
+A full Gradle/NeoForge compile still requires the local Java 25 / Gradle 9.2.1 environment.

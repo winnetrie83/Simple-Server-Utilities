@@ -4,7 +4,7 @@ import java.util.Locale;
 
 /** Persistent administrator-defined statistic rule. */
 public final class PlayerStatisticDefinition {
-    public static final int CURRENT_SCHEMA = 1;
+    public static final int CURRENT_SCHEMA = 2;
 
     public int schemaVersion = CURRENT_SCHEMA;
     public String id = "statistic";
@@ -18,6 +18,7 @@ public final class PlayerStatisticDefinition {
     public long updatedAtEpochMilli;
 
     public PlayerStatisticDefinition normalize() {
+        if (schemaVersion > CURRENT_SCHEMA) throw new IllegalStateException("Statistic definition schema " + schemaVersion + " is newer than supported schema " + CURRENT_SCHEMA + ".");
         schemaVersion = CURRENT_SCHEMA;
         id = sanitizeId(id);
         displayName = limit(displayName == null || displayName.isBlank() ? id : displayName.trim(), 64);

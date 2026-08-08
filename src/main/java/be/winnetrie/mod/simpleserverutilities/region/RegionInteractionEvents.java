@@ -21,6 +21,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.util.TriState;
 import net.minecraft.world.level.block.SignBlock;
+import net.minecraft.world.phys.HitResult;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.CommandEvent;
@@ -46,6 +47,7 @@ public class RegionInteractionEvents {
     public static void clearRuntimeState() {
         LAST_REGION.clear();
         RegionSelectionSchematicManager.clearRuntimeState();
+        WorldEditHistoryManager.clearAll();
         nextEnterLeaveTick = 0L;
         nextResetTick = 0L;
         RegionResetScheduler.clearRuntime();
@@ -88,12 +90,41 @@ public class RegionInteractionEvents {
             return;
         }
 
-        if (SimpleServerUtilities.REGION_SELECTION_TOOLS.isBoundTool(player, player.getMainHandItem())) {
-            if (!RegionPolicy.canUseSelectionTool(player)) {
-                return;
+        ItemStack heldSelectionTool = player.getMainHandItem();
+        if (SimpleServerUtilities.REGION_SELECTION_TOOLS.isWorldEditTool(player, heldSelectionTool)) {
+            if (!RegionPolicy.canUseSelectionTool(player)) return;
+            RegionSelectionManager manager = RegionCommands.getSelectionManager();
+            RegionSelection selection = manager.getSelection(player);
+            if (selection.getPoint1() == null || selection.getDimension() == null
+                    || !selection.getDimension().equals(player.level().dimension())) {
+                player.sendSystemMessage(Component.literal("Set World Edit Point 1 with left-click first."), true);
+            } else {
+                manager.setPoint2(player, event.getPos());
+                SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, manager.getSelection(player));
+                player.sendSystemMessage(Component.literal(
+                        "World Edit point 2 set to " + formatPos(event.getPos()) + ". Right-click the air for the full editor or use the compact-tools key."
+                ), true);
             }
-
-            RegionSetupToolService.openContext(player);
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (SimpleServerUtilities.REGION_SELECTION_TOOLS.isRegionTool(player, heldSelectionTool)) {
+            if (!RegionPolicy.canUseSelectionTool(player)) return;
+            RegionSelectionManager manager = RegionCommands.getSelectionManager();
+            RegionSelection selection = manager.getSelection(player);
+            if (selection.getPoint1() == null || selection.getDimension() == null
+                    || !selection.getDimension().equals(player.level().dimension())) {
+                player.sendSystemMessage(Component.literal("Set Region Point 1 with left-click first."), true);
+            } else {
+                manager.setPoint2(player, event.getPos());
+                SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, manager.getSelection(player));
+                player.sendSystemMessage(Component.literal(
+                        "Region point 2 set to " + formatPos(event.getPos()) + ". Right-click the air to open the Region menu."
+                ), true);
+            }
+            // A block-targeted right click belongs exclusively to Point 2 selection.
+            // Consuming it here prevents the same input from opening the Region GUI.
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.SUCCESS);
             return;
@@ -134,12 +165,19 @@ public class RegionInteractionEvents {
             event.setCancellationResult(InteractionResult.FAIL);
             return;
         }
-        if (event.getHand() != InteractionHand.MAIN_HAND
-                || !SimpleServerUtilities.REGION_SELECTION_TOOLS.isBoundTool(player, player.getMainHandItem())
-                || !RegionPolicy.canUseSelectionTool(player)) {
-            return;
-        }
-        RegionSetupToolService.openContext(player);
+        if (event.getHand() != InteractionHand.MAIN_HAND || !RegionPolicy.canUseSelectionTool(player)) return;
+        ItemStack heldSelectionTool = player.getMainHandItem();
+        if (SimpleServerUtilities.REGION_SELECTION_TOOLS.isWorldEditTool(player, heldSelectionTool)) {
+            if (!RegionSelectionToolService.open(player)) {
+                player.sendSystemMessage(Component.literal("Set World Edit point 1 with left-click and point 2 with right-click on a block first."), true);
+            }
+        } else if (SimpleServerUtilities.REGION_SELECTION_TOOLS.isRegionTool(player, heldSelectionTool)) {
+            // RightClickItem can be emitted by the interaction pipeline after a block
+            // interaction on some paths. Only an actual MISS is allowed to open the GUI.
+            HitResult target = player.pick(Math.max(0.0D, player.blockInteractionRange()), 1.0F, false);
+            if (target.getType() != HitResult.Type.MISS) return;
+            RegionSetupToolService.openContext(player);
+        } else return;
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
     }
@@ -156,7 +194,7 @@ public class RegionInteractionEvents {
             return;
         }
 
-        if (!SimpleServerUtilities.REGION_SELECTION_TOOLS.isBoundTool(player, player.getMainHandItem())) {
+        if (!SimpleServerUtilities.REGION_SELECTION_TOOLS.isSelectionTool(player, player.getMainHandItem())) {
             return;
         }
 
@@ -165,19 +203,22 @@ public class RegionInteractionEvents {
         }
 
         RegionSelectionManager manager = RegionCommands.getSelectionManager();
+        boolean worldEdit = SimpleServerUtilities.REGION_SELECTION_TOOLS.isWorldEditTool(player, player.getMainHandItem());
         RegionSelection selection = manager.getSelection(player);
-        if (selection.getPoint1() == null || selection.isComplete()) {
-            if (selection.isComplete()) {
-                manager.clear(player);
-            }
+        if (worldEdit) {
+            // World Edit intentionally has deterministic mouse controls: left = P1, right block = P2.
+            manager.clear(player);
             manager.setPoint1(player, event.getPos());
             player.sendSystemMessage(Component.literal(
-                    "Region point 1 set to " + formatPos(event.getPos()) + ". Left-click point 2 next."
+                    "World Edit point 1 set to " + formatPos(event.getPos()) + ". Right-click a block for point 2."
             ), true);
         } else {
-            manager.setPoint2(player, event.getPos());
+            // Region Tool mirrors the World Edit Tool: left block = Point 1,
+            // right block = Point 2, right-click air = open Region GUI.
+            manager.clear(player);
+            manager.setPoint1(player, event.getPos());
             player.sendSystemMessage(Component.literal(
-                    "Region point 2 set to " + formatPos(event.getPos()) + ". Right-click to choose an action."
+                    "Region point 1 set to " + formatPos(event.getPos()) + ". Right-click a block for point 2."
             ), true);
         }
         SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, manager.getSelection(player));
@@ -253,6 +294,7 @@ public class RegionInteractionEvents {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         RegionCommands.getSelectionManager().clear(player);
         RegionSelectionSchematicManager.clearClipboard(player.getUUID());
+        WorldEditHistoryManager.clear(player.getUUID());
         RegionSetupToolService.clearPreview(player.getUUID());
         LAST_REGION.remove(player.getUUID());
     }

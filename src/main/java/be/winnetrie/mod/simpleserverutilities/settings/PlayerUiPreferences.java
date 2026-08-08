@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.utilitymining.MiningActivationMode
 /** Persistent player-side UI choices, validated by the server. */
 public final class PlayerUiPreferences {
 
-    public static final int CURRENT_SCHEMA = 11;
+    public static final int CURRENT_SCHEMA = 13;
 
     private int schema = CURRENT_SCHEMA;
     private String uuid = "";
@@ -17,6 +17,8 @@ public final class PlayerUiPreferences {
     private int minimapSize = 96;
     private MinimapShape minimapShape = MinimapShape.CIRCLE;
     private MinimapPosition minimapPosition = MinimapPosition.TOP_RIGHT;
+    /** Use the optional supplied textured minimap frame instead of the legacy border. */
+    private boolean minimapTexturedFrame;
     private boolean minimapNorthUp = true;
     private boolean minimapShowClaims = true;
     private boolean minimapShowRegions = true;
@@ -50,6 +52,11 @@ public final class PlayerUiPreferences {
     private boolean rankVisible = true;
     private boolean damageIndicatorsEnabled = true;
     private DamageIndicatorStyle damageIndicatorStyle = DamageIndicatorStyle.FLOATING;
+    /** Personal living-entity nametag overlay. Server permission remains the hard gate. */
+    private boolean entityInsightEnabled = true;
+    private boolean entityInsightShowHealth = true;
+    private int entityInsightRange = 16;
+    private int entityInsightMaxEntities = 20;
 
     public PlayerUiPreferences() {
         // Required for Gson.
@@ -114,6 +121,17 @@ public final class PlayerUiPreferences {
             damageIndicatorsEnabled = true;
             damageIndicatorStyle = DamageIndicatorStyle.FLOATING;
         }
+        if (previousSchema < 12) {
+            // Entity Insight is a conservative default-on QoL overlay.
+            entityInsightEnabled = true;
+            entityInsightShowHealth = true;
+            entityInsightRange = 16;
+            entityInsightMaxEntities = 20;
+        }
+        if (previousSchema < 13) {
+            // Preserve the pre-dev3.23 minimap appearance unless the player opts in.
+            minimapTexturedFrame = false;
+        }
         schema = CURRENT_SCHEMA;
         minimapSize = Math.max(64, Math.min(256, minimapSize));
         if (minimapShape == null) {
@@ -135,6 +153,8 @@ public final class PlayerUiPreferences {
         veinminerOutlineBrightness = clampPercent(veinminerOutlineBrightness);
         markerBeamDistance = Math.max(16, Math.min(512, markerBeamDistance));
         mapLiveUpdateRadiusChunks = Math.max(1, Math.min(32, mapLiveUpdateRadiusChunks));
+        entityInsightRange = Math.max(0, Math.min(32, entityInsightRange));
+        entityInsightMaxEntities = Math.max(1, Math.min(50, entityInsightMaxEntities));
         treecapitatorOutlineColor = MinecraftColorPalette.nearest(treecapitatorOutlineColor);
         veinminerOutlineColor = MinecraftColorPalette.nearest(veinminerOutlineColor);
     }
@@ -193,6 +213,14 @@ public final class PlayerUiPreferences {
 
     public void setMinimapPosition(MinimapPosition minimapPosition) {
         this.minimapPosition = minimapPosition == null ? MinimapPosition.TOP_RIGHT : minimapPosition;
+    }
+
+    public boolean isMinimapTexturedFrame() {
+        return minimapTexturedFrame;
+    }
+
+    public void setMinimapTexturedFrame(boolean minimapTexturedFrame) {
+        this.minimapTexturedFrame = minimapTexturedFrame;
     }
 
     public boolean isMinimapNorthUp() {
@@ -453,6 +481,38 @@ public final class PlayerUiPreferences {
 
     public void setDamageIndicatorStyle(DamageIndicatorStyle damageIndicatorStyle) {
         this.damageIndicatorStyle = damageIndicatorStyle == null ? DamageIndicatorStyle.FLOATING : damageIndicatorStyle;
+    }
+
+    public boolean isEntityInsightEnabled() {
+        return entityInsightEnabled;
+    }
+
+    public void setEntityInsightEnabled(boolean entityInsightEnabled) {
+        this.entityInsightEnabled = entityInsightEnabled;
+    }
+
+    public boolean isEntityInsightShowHealth() {
+        return entityInsightShowHealth;
+    }
+
+    public void setEntityInsightShowHealth(boolean entityInsightShowHealth) {
+        this.entityInsightShowHealth = entityInsightShowHealth;
+    }
+
+    public int getEntityInsightRange() {
+        return Math.max(0, Math.min(32, entityInsightRange));
+    }
+
+    public void setEntityInsightRange(int entityInsightRange) {
+        this.entityInsightRange = Math.max(0, Math.min(32, entityInsightRange));
+    }
+
+    public int getEntityInsightMaxEntities() {
+        return Math.max(1, Math.min(50, entityInsightMaxEntities));
+    }
+
+    public void setEntityInsightMaxEntities(int entityInsightMaxEntities) {
+        this.entityInsightMaxEntities = Math.max(1, Math.min(50, entityInsightMaxEntities));
     }
 
 }

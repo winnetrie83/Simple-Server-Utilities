@@ -13,7 +13,7 @@ public class ModNetworking {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("100");
+        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("105");
 
         registrar.playToClient(
                 ClaimMapDataPayload.TYPE,
@@ -46,6 +46,11 @@ public class ModNetworking {
         registrar.playToClient(
                 SsuMenuSnapshotPayload.TYPE,
                 SsuMenuSnapshotPayload.STREAM_CODEC
+        );
+
+        registrar.playToClient(
+                EntityInsightPayload.TYPE,
+                EntityInsightPayload.STREAM_CODEC
         );
 
         registrar.playToServer(
@@ -863,6 +868,16 @@ public class ModNetworking {
         registrar.playToServer(ServerOperationsActionPayload.TYPE, ServerOperationsActionPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.serverops.ServerOperationsService::action);
         registrar.playToClient(ServerOperationsDataPayload.TYPE, ServerOperationsDataPayload.STREAM_CODEC);
+
+        registrar.playToServer(AchievementMenuRequestPayload.TYPE, AchievementMenuRequestPayload.STREAM_CODEC,
+                (payload, context) -> SimpleServerUtilities.ACHIEVEMENTS.handleRequest(payload, context));
+        registrar.playToClient(AchievementMenuDataPayload.TYPE, AchievementMenuDataPayload.STREAM_CODEC);
+        registrar.playToServer(AchievementEditorRequestPayload.TYPE, AchievementEditorRequestPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.achievement.AchievementEditorService::handleRequest);
+        registrar.playToClient(AchievementEditorOpenPayload.TYPE, AchievementEditorOpenPayload.STREAM_CODEC);
+        registrar.playToServer(AchievementEditorSubmitPayload.TYPE, AchievementEditorSubmitPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.achievement.AchievementEditorService::handleSubmit);
+        registrar.playToClient(AchievementEditorResultPayload.TYPE, AchievementEditorResultPayload.STREAM_CODEC);
 
     }
 }

@@ -19,7 +19,19 @@ public final class ContentAction {
 
     public ContentAction normalize() {
         type = ContentId.require(type, "Action type");
-        parameters = ContentDataMap.normalize(parameters, 64, 512);
+        LinkedHashMap<String, String> normalized = new LinkedHashMap<>();
+        if (parameters != null) {
+            for (Map.Entry<String, String> entry : parameters.entrySet()) {
+                if (normalized.size() >= 64 || entry.getKey() == null) break;
+                String key = ContentId.normalize(entry.getKey());
+                if (key.isBlank()) continue;
+                String value = entry.getValue() == null ? "" : entry.getValue().trim();
+                int maximum = "stack_json".equals(key) ? 8192 : 512;
+                if (value.length() > maximum) value = value.substring(0, maximum);
+                normalized.put(key, value);
+            }
+        }
+        parameters = normalized;
         return this;
     }
 

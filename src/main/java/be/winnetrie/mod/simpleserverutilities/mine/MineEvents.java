@@ -36,16 +36,24 @@ public final class MineEvents {
         if(event.getAction()!=PlayerInteractEvent.LeftClickBlock.Action.START||!(event.getEntity() instanceof ServerPlayer player))return;
         if(!SimpleServerUtilities.MINE_SETUP_TOOLS.isTool(player,player.getMainHandItem()))return;
         if(!canAdmin(player))return;
-        String dim=player.level().dimension().identifier().toString();SimpleServerUtilities.MINE_SETUP_TOOLS.selection(player).setPoint1(dim,event.getPos());
-        player.sendSystemMessage(Component.literal("Mine corner 1 set to "+format(event.getPos())+" in "+dim+"."));event.setCanceled(true);
+        String dim=player.level().dimension().identifier().toString();
+        MineSetupToolManager.Selection selection=SimpleServerUtilities.MINE_SETUP_TOOLS.selection(player);
+        if(selection.point1==null||selection.complete()||(!selection.dimension.isBlank()&&!selection.dimension.equals(dim))){
+            selection.clear();selection.setPoint1(dim,event.getPos());
+            player.sendSystemMessage(Component.literal("Mine point 1 set to "+format(event.getPos())+" in "+dim+". Left-click point 2 next."),true);
+        }else{
+            selection.setPoint2(dim,event.getPos());
+            player.sendSystemMessage(Component.literal("Mine point 2 set to "+format(event.getPos())+". Right-click to open Mine Administration."),true);
+        }
+        event.setCanceled(true);
     }
 
     @SubscribeEvent(priority=EventPriority.HIGHEST)
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event){
         if(!(event.getEntity() instanceof ServerPlayer player)||event.getHand()!=InteractionHand.MAIN_HAND)return;
         if(!SimpleServerUtilities.MINE_SETUP_TOOLS.isTool(player,player.getMainHandItem())||!canAdmin(player))return;
-        String dim=player.level().dimension().identifier().toString();SimpleServerUtilities.MINE_SETUP_TOOLS.selection(player).setPoint2(dim,event.getPos());
-        player.sendSystemMessage(Component.literal("Mine corner 2 set to "+format(event.getPos())+". Open Mines to apply the selection."));event.setCanceled(true);event.setCancellationResult(InteractionResult.SUCCESS);
+        MineService.send(player,true,"",0L,"",false);
+        event.setCanceled(true);event.setCancellationResult(InteractionResult.SUCCESS);
     }
 
     @SubscribeEvent(priority=EventPriority.HIGHEST)

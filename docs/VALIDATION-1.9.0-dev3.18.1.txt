@@ -1,0 +1,23 @@
+SSU 1.9.0-dev3.18.1 validation notes
+
+Scope:
+- Player Dashboard icon polish for Support, Kits and Mines.
+- Remove the new Entity Insight mutation command branch; keep GUI configuration.
+
+Version:
+- mod_version: 1.9.0-dev3.18.1
+- network protocol: 101 (unchanged from dev3.18)
+- Player UI preferences schema: 12 (unchanged from dev3.18)
+
+Static validation performed:
+- 761 Java source files checked for balanced (), [] and {} after comment/string stripping: PASS (0 errors).
+- Dashboard mappings reference dedicated ICON_TICKET, ICON_KITS and ICON_MINES resources: PASS.
+- Exact uploaded assets copied into dashboard resources: PASS.
+- No Commands.literal("entity_insight") remains: PASS.
+- GUI action keys entity_insight_enabled, entity_insight_health, entity_insight_range and entity_insight_max_entities remain wired client->server: PASS.
+- Resource PNG metadata readable: PASS (ticket 16x15 RGBA; kits 16x16 RGBA; mines 16x16 RGBA).
+- JSON parse check for project resource JSON files: PASS (0 errors).
+
+Compile status:
+- `./gradlew compileJava --no-daemon` could not start because the Gradle 9.2.1 wrapper distribution is not cached locally and this environment cannot resolve services.gradle.org.
+- A local Gradle compile plus Minecraft client/dedicated-server runtime test is still required before treating this build as confirmed stable.

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -19,6 +20,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.content.ContentEvent;
+import be.winnetrie.mod.simpleserverutilities.content.ContentEventTypes;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyResult;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyTransactionType;
@@ -478,9 +481,43 @@ public final class AuctionHouseManager {
         }
         record.setStatus(AuctionPurchaseRecord.Status.COMMITTED);
         savePurchase(record);
+        if (!record.isContentEventsPublished()) {
+            publishPurchaseContentEvents(record);
+            record.setContentEventsPublished(true);
+            savePurchase(record);
+        }
         AuctionListing listing = listings.get(record.getListingId());
         if (listing != null && listing.getRemainingQuantity() <= 0) deleteListing(listing.getId());
         return PurchaseOutcome.complete();
+    }
+
+    private void publishPurchaseContentEvents(AuctionPurchaseRecord record) {
+        if (record == null || server == null) return;
+        ItemStack stack = MailItemCodec.decode(server.registryAccess(), record.getItem());
+        String itemId = stack.isEmpty() ? "minecraft:air" : BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+        Map<String, String> common = Map.of(
+                "durable_event", "true",
+                "purchase_id", record.getId().toString(),
+                "listing_id", record.getListingId().toString(),
+                "item", itemId,
+                "quantity", Integer.toString(record.getQuantity()));
+        publishDurableAuctionEvent(record, ContentEventTypes.AUCTION_PURCHASE, record.getBuyerId(), itemId,
+                record.getQuantity(), common);
+        publishDurableAuctionEvent(record, ContentEventTypes.AUCTION_SALE, record.getSellerId(), itemId,
+                record.getQuantity(), common);
+        if (record.getNetMinor() > 0L) {
+            publishDurableAuctionEvent(record, ContentEventTypes.AUCTION_REVENUE, record.getSellerId(), itemId,
+                    record.getNetMinor(), common);
+        }
+    }
+
+    private void publishDurableAuctionEvent(AuctionPurchaseRecord record, String type, UUID playerId,
+                                            String subject, long amount, Map<String, String> metadata) {
+        if (playerId == null || amount <= 0L) return;
+        UUID eventId = UUID.nameUUIDFromBytes(("ssu:auction:" + record.getId() + ":" + type + ":" + playerId)
+                .getBytes(StandardCharsets.UTF_8));
+        SimpleServerUtilities.CONTENT_EVENTS.publish(server, new ContentEvent(eventId, type, playerId,
+                "auction_house", record.getId().toString(), subject, amount, metadata, System.currentTimeMillis()));
     }
 
     private PurchaseOutcome rollbackPurchase(AuctionPurchaseRecord record, String reason) {
@@ -844,6 +881,11 @@ public final class AuctionHouseManager {
         }
         sessions.entrySet().removeIf(entry -> entry.getValue() < now);
         for (AuctionPurchaseRecord record : new ArrayList<>(purchases.values())) {
+            if (record.getStatus() == AuctionPurchaseRecord.Status.COMMITTED && !record.isContentEventsPublished()) {
+                publishPurchaseContentEvents(record);
+                record.setContentEventsPublished(true);
+                savePurchase(record);
+            }
             if ((record.getStatus() == AuctionPurchaseRecord.Status.COMMITTED
                     || record.getStatus() == AuctionPurchaseRecord.Status.ROLLED_BACK)
                     && now - record.getCreatedAtEpochMilli() > PURCHASE_RETENTION_MILLIS) {

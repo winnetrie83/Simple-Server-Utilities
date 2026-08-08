@@ -21,6 +21,8 @@ final class RichTextPalette {
 
     static int rgb(int index) { return HologramRichText.minecraftColorRgb(Math.max(0, Math.min(15, index))); }
     static int argb(int index) { return 0xFF000000 | rgb(index); }
+    /** Tooltip labels normally preview their color; Black uses white so the label remains readable. */
+    static int labelRgb(int index) { return Math.max(0, Math.min(15, index)) == 0 ? 0xFFFFFF : rgb(index); }
     static String name(int index) { return NAMES.get(Math.max(0, Math.min(15, index))); }
 
     static SwatchButton button(int x, int y, int size, int index, Button.OnPress press) {
@@ -34,7 +36,7 @@ final class RichTextPalette {
             super(x, y, size, size, Component.empty(), press, DEFAULT_NARRATION);
             this.swatch = argb(index);
             Component tooltipText = Component.literal(name(index))
-                    .withStyle(style -> style.withColor(rgb(index)));
+                    .withStyle(style -> style.withColor(labelRgb(index)));
             setTooltip(Tooltip.create(tooltipText));
         }
 

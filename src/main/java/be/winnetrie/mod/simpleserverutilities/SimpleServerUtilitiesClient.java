@@ -4,6 +4,8 @@ import com.mojang.blaze3d.platform.InputConstants;
 import be.winnetrie.mod.simpleserverutilities.client.identity.DamageIndicatorClientState;
 import be.winnetrie.mod.simpleserverutilities.client.identity.DamageIndicatorRenderer;
 import be.winnetrie.mod.simpleserverutilities.client.identity.IdentityClientEvents;
+import be.winnetrie.mod.simpleserverutilities.client.identity.EntityInsightClientEvents;
+import be.winnetrie.mod.simpleserverutilities.client.identity.EntityInsightClientState;
 import be.winnetrie.mod.simpleserverutilities.client.identity.PlayerIdentityClientState;
 import be.winnetrie.mod.simpleserverutilities.client.identity.PlayerTitleRenderer;
 import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramClientEvents;
@@ -25,6 +27,7 @@ import be.winnetrie.mod.simpleserverutilities.client.gui.RegionSetupScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.RegionSnapshotPreviewScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.RegionSelectionToolScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.RegionSelectionEditScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.WorldEditCompactOverlayScreen;
 import be.winnetrie.mod.simpleserverutilities.client.region.RegionSelectionClientStorage;
 import be.winnetrie.mod.simpleserverutilities.client.region.RegionSnapshotPreviewClientState;
 import be.winnetrie.mod.simpleserverutilities.client.region.RegionSnapshotPreviewRenderer;
@@ -46,6 +49,8 @@ import be.winnetrie.mod.simpleserverutilities.client.gui.NpcShopEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.NpcItemPriceCatalogScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.QuestBookScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.QuestEditorScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.AchievementMenuScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.AchievementEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.MinigameLobbyScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.MinigameAdminScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.MinigameSetupToolScreen;
@@ -82,6 +87,7 @@ import be.winnetrie.mod.simpleserverutilities.client.visualization.ClaimRegionBo
 import be.winnetrie.mod.simpleserverutilities.client.utilitymining.UtilityMiningClientState;
 import be.winnetrie.mod.simpleserverutilities.client.utilitymining.UtilityMiningOutlineRenderer;
 import be.winnetrie.mod.simpleserverutilities.network.BorderVisualizationPayload;
+import be.winnetrie.mod.simpleserverutilities.network.EntityInsightPayload;
 import be.winnetrie.mod.simpleserverutilities.network.BlockInformationContentPayload;
 import be.winnetrie.mod.simpleserverutilities.network.BlockInformationStatePayload;
 import be.winnetrie.mod.simpleserverutilities.network.StatisticEditorOpenPayload;
@@ -107,6 +113,9 @@ import be.winnetrie.mod.simpleserverutilities.network.NpcItemPriceCatalogDataPay
 import be.winnetrie.mod.simpleserverutilities.network.QuestBookDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.QuestEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.QuestEditorResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.AchievementMenuDataPayload;
+import be.winnetrie.mod.simpleserverutilities.network.AchievementEditorOpenPayload;
+import be.winnetrie.mod.simpleserverutilities.network.AchievementEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorResultPayload;
@@ -167,6 +176,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.item.Items;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -206,6 +216,12 @@ public class SimpleServerUtilitiesClient {
             "key.simpleserverutilities.open_world_map",
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_M,
+            SSU_CATEGORY
+    );
+    private static final KeyMapping WORLD_EDIT_COMPACT = new KeyMapping(
+            "key.simpleserverutilities.world_edit_compact",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_W,
             SSU_CATEGORY
     );
     private static final KeyMapping ACTIVATE_TREECAPITATOR = new KeyMapping(
@@ -250,6 +266,8 @@ public class SimpleServerUtilitiesClient {
         NeoForge.EVENT_BUS.addListener(SimpleServerUtilitiesClient::onClientTick);
         NeoForge.EVENT_BUS.register(HologramClientEvents.class);
         NeoForge.EVENT_BUS.register(IdentityClientEvents.class);
+        NeoForge.EVENT_BUS.register(EntityInsightClientEvents.class);
+        NeoForge.EVENT_BUS.addListener(RegionSnapshotPreviewRenderer::onSubmitCustomGeometry);
     }
 
     @SubscribeEvent
@@ -257,6 +275,7 @@ public class SimpleServerUtilitiesClient {
         event.registerCategory(SSU_CATEGORY);
         event.register(OPEN_MENU);
         event.register(OPEN_WORLD_MAP);
+        event.register(WORLD_EDIT_COMPACT);
         event.register(ACTIVATE_TREECAPITATOR);
         event.register(ACTIVATE_VEINMINER);
         event.register(TOGGLE_MINIGAME_HUD);
@@ -533,6 +552,10 @@ public class SimpleServerUtilitiesClient {
                 })
         );
 
+        event.register(EntityInsightPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> EntityInsightClientState.apply(payload))
+        );
+
         event.register(NpcLabelSyncPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> NpcLabelClientState.apply(payload))
         );
@@ -705,6 +728,26 @@ public class SimpleServerUtilitiesClient {
                 })
         );
 
+        event.register(AchievementMenuDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof AchievementMenuScreen screen) screen.accept(payload);
+                    else minecraft.setScreenAndShow(new AchievementMenuScreen(payload, minecraft.gui.screen()));
+                })
+        );
+        event.register(AchievementEditorOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.setScreenAndShow(new AchievementEditorScreen(payload, minecraft.gui.screen()));
+                })
+        );
+        event.register(AchievementEditorResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof AchievementEditorScreen screen) screen.acceptResult(payload);
+                })
+        );
+
 
         event.register(MinigameLobbyDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
@@ -871,7 +914,10 @@ public class SimpleServerUtilitiesClient {
         event.register(RegionSetupOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof RegionSetupScreen screen) screen.accept(payload);
+                    if (minecraft.gui.screen() instanceof RegionSelectionEditScreen worldEdit
+                            && "SELECT".equalsIgnoreCase(payload.mode())) {
+                        worldEdit.acceptSetupContext(payload);
+                    } else if (minecraft.gui.screen() instanceof RegionSetupScreen screen) screen.accept(payload);
                     else minecraft.setScreenAndShow(new RegionSetupScreen(payload));
                 })
         );
@@ -909,13 +955,17 @@ public class SimpleServerUtilitiesClient {
 
 
         event.register(RegionSelectionToolOpenPayload.TYPE, (payload, context) ->
-                context.enqueueWork(() -> Minecraft.getInstance().setScreenAndShow(new RegionSelectionToolScreen(payload)))
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.setScreenAndShow(new RegionSelectionEditScreen(payload, minecraft.gui.screen()));
+                })
         );
 
         event.register(RegionSelectionActionResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
                     if (minecraft.gui.screen() instanceof RegionSelectionEditScreen screen) screen.acceptResult(payload);
+                    else if (minecraft.gui.screen() instanceof WorldEditCompactOverlayScreen screen) screen.acceptResult(payload);
                     else if (minecraft.gui.screen() instanceof RegionSelectionToolScreen screen) screen.acceptResult(payload);
                     else if (minecraft.gui.screen() instanceof RegionSetupScreen screen) screen.acceptSelectionResult(payload);
                 })
@@ -949,10 +999,6 @@ public class SimpleServerUtilitiesClient {
         event.register(RegionSelectionClientTemplatePayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof RegionSelectionEditScreen screen) {
-                        screen.acceptClientTemplate(payload.name(), payload.data(), payload.requestId());
-                        return;
-                    }
                     try {
                         RegionSelectionClientStorage.save(payload.name(), payload.data());
                         if (minecraft.player != null) minecraft.player.sendSystemMessage(
@@ -1048,6 +1094,14 @@ public class SimpleServerUtilitiesClient {
             DamageIndicatorClientState.tick();
             return;
         }
+        while (WORLD_EDIT_COMPACT.consumeClick()) {
+            if (minecraft.player != null && minecraft.level != null
+                    && isHoldingWorldEditTool(minecraft)
+                    && (minecraft.gui.screen() == null || minecraft.gui.screen() instanceof WorldEditCompactOverlayScreen)) {
+                if (minecraft.gui.screen() instanceof WorldEditCompactOverlayScreen) minecraft.setScreenAndShow(null);
+                else minecraft.setScreenAndShow(new WorldEditCompactOverlayScreen());
+            }
+        }
         tickUtilityMining(minecraft);
         while (OPEN_MENU.consumeClick()) {
             if (minecraft.player != null && minecraft.gui.screen() == null) {
@@ -1086,6 +1140,13 @@ public class SimpleServerUtilitiesClient {
         }
     }
 
+    private static boolean isHoldingWorldEditTool(Minecraft minecraft) {
+        if (minecraft.player == null) return false;
+        var stack = minecraft.player.getMainHandItem();
+        return !stack.isEmpty() && stack.is(Items.GOLDEN_AXE)
+                && "SSU World Edit Tool".equals(stack.getHoverName().getString());
+    }
+
     private static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         BorderVisualizationClientState.clear();
         BlockInformationClientState.clear();
@@ -1104,6 +1165,7 @@ public class SimpleServerUtilitiesClient {
         MinigameKillFeedClientState.clear();
         PlayerIdentityClientState.clear();
         DamageIndicatorClientState.clear();
+        EntityInsightClientState.clear();
         RegionSnapshotPreviewClientState.clear();
         utilityMiningTick = 0;
         lastTreeHeld = false;

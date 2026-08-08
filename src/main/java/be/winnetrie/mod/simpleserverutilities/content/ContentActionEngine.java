@@ -22,10 +22,12 @@ public final class ContentActionEngine {
     private final Map<String, ContentActionHandler> handlers = new LinkedHashMap<>();
     private final ContentProgressionManager progression;
     private final SsuTransactionManager transactions;
+    private final ContentRewardLedger rewardLedger;
 
-    public ContentActionEngine(ContentProgressionManager progression, SsuTransactionManager transactions) {
+    public ContentActionEngine(ContentProgressionManager progression, SsuTransactionManager transactions, ContentRewardLedger rewardLedger) {
         this.progression = Objects.requireNonNull(progression, "progression");
         this.transactions = Objects.requireNonNull(transactions, "transactions");
+        this.rewardLedger = Objects.requireNonNull(rewardLedger, "rewardLedger");
         registerBuiltIns();
     }
 
@@ -76,10 +78,31 @@ public final class ContentActionEngine {
         String source = context == null || context.sourceId().isBlank() ? "actions" : context.sourceId();
         String rawKey = context == null ? "" : context.idempotencyKey();
         String key = rawKey.isBlank() ? "" : namespacedTransactionKey(module, source, rawKey);
+        if (!key.isBlank()) {
+            ContentRewardLedger.Decision decision = rewardLedger.begin(key, module, source);
+            if (decision == ContentRewardLedger.Decision.ALREADY_COMMITTED) {
+                transactions.rememberCommitted(key);
+                return new ExecutionResult(true, "duplicate", "Reward/action list was already durably committed.", null);
+            }
+            if (decision == ContentRewardLedger.Decision.RECOVERY_REQUIRED) {
+                return new ExecutionResult(false, "recovery_required",
+                        "A previous reward/action attempt was interrupted. It was not replayed to prevent duplication.", null);
+            }
+            if (decision == ContentRewardLedger.Decision.STORAGE_FAILED) {
+                return new ExecutionResult(false, "storage_failed",
+                        "The durable reward journal could not be written.", null);
+            }
+        }
         SsuTransactionManager.TransactionResult result = transactions.execute(
                 module, source, key, prepared.stream().map(PreparedContentAction::step).toList());
         boolean committed = result.status() == SsuTransactionManager.Status.SUCCESS
                 || result.status() == SsuTransactionManager.Status.DUPLICATE;
+        if (!key.isBlank()) {
+            if (committed) rewardLedger.commit(key);
+            else if (result.status() == SsuTransactionManager.Status.FAILED
+                    || result.status() == SsuTransactionManager.Status.BUSY) rewardLedger.abort(key);
+            else rewardLedger.fail(key, result.error());
+        }
         return new ExecutionResult(committed, result.status().name().toLowerCase(Locale.ROOT), result.error(), result);
     }
 

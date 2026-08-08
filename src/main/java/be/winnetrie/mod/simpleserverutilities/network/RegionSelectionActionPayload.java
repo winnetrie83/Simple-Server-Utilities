@@ -17,7 +17,7 @@ public record RegionSelectionActionPayload(
         List<Integer> percentages,
         long requestId
 ) implements CustomPacketPayload {
-    public static final int MAX_MIX_ENTRIES = 9;
+    public static final int MAX_MIX_ENTRIES = 64;
     public static final Type<RegionSelectionActionPayload> TYPE = new Type<>(
             Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_selection_action")
     );

@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.identity;
 
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument;
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument;
 import be.winnetrie.mod.simpleserverutilities.settings.MinecraftColorPalette;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -13,8 +14,8 @@ public final class RichTextComponents {
     public static MutableComponent fromEncoded(String encoded) {
         HologramRichTextDocument document = new HologramRichTextDocument(encoded, RichTextComponents::normalize, 256);
         MutableComponent result = Component.empty();
-        for (HologramRichTextDocument.Segment segment : document.segments(0, document.plainText().length())) {
-            HologramRichTextDocument.CharacterStyle style = segment.style();
+        for (SsuRichTextDocument.Segment segment : document.segments(0, document.plainText().length())) {
+            SsuRichTextDocument.CharacterStyle style = segment.style();
             int color = style.colorIndex() >= 0
                     ? MinecraftColorPalette.COLORS.get(style.colorIndex()).argb()
                     : MinecraftColorPalette.COLORS.getFirst().argb();

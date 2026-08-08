@@ -57,7 +57,7 @@ public final class RegionSetupToolService {
     }
 
     private static RegionSnapshotPreviewPayload clearPreviewPayload() {
-        return new RegionSnapshotPreviewPayload(false, "", "", 0L, 0, 0, 0, 0, false, List.of());
+        return RegionSnapshotPreviewPayload.clear();
     }
 
     public static boolean openContext(ServerPlayer player) {
@@ -469,38 +469,93 @@ public final class RegionSetupToolService {
 
     private static void confirmPreview(ServerPlayer player, PreviewSession session, long requestId) {
         if (!RegionPolicy.canEditRegion(player)) {
-            sendCurrent(player, "Region editing permission is required.", true, requestId);
-            return;
+            sendCurrent(player, "Region editing permission is required.", true, requestId); return;
         }
         if (!player.level().dimension().identifier().toString().equals(session.dimension)) {
             sendCurrent(player, "Travel to the preview dimension before placing the snapshot.", true, requestId); return;
         }
-        RegionSelectionSnapshotManager.PasteJob job;
-        try { job = RegionSelectionSnapshotManager.createPasteJob(player.level(), session.origin, session.template); }
+        RegionSelectionSnapshotManager.PasteJob placement;
+        try { placement = RegionSelectionSnapshotManager.createPasteJob(player.level(), session.origin, session.template); }
         catch (IllegalArgumentException exception) { sendCurrent(player, exception.getMessage(), true, requestId); return; }
-        PREVIEWS.remove(player.getUUID());
-        PacketDistributor.sendToPlayer(player, clearPreviewPayload());
-        RegionSelectionSnapshotManager.Bounds destination = job.destination();
+        RegionSelectionSnapshotManager.Bounds raw = placement.destination();
+        RegionSelectionSchematicManager.Bounds affected = new RegionSelectionSchematicManager.Bounds(
+                raw.minX(), raw.minY(), raw.minZ(), raw.maxX(), raw.maxY(), raw.maxZ());
         RegionSelectionManager selections = RegionCommands.getSelectionManager();
-        selections.setPoint1(player, new BlockPos(destination.minX(), destination.minY(), destination.minZ()));
-        selections.setPoint2(player, new BlockPos(destination.maxX(), destination.maxY(), destination.maxZ()));
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, selections.getSelection(player));
-        scheduleSelectionJob(player, job, "Snapshot placement", requestId);
+        RegionSelection before = selections.getSelection(player);
+        RegionSelectionSchematicManager.Bounds restoreSelection = before.isComplete()
+                ? RegionSelectionSchematicManager.bounds(before) : affected;
+        RegionSelection destinationSelection = new RegionSelection();
+        destinationSelection.setPoint1(player.level().dimension(), new BlockPos(raw.minX(), raw.minY(), raw.minZ()));
+        destinationSelection.setPoint2(player.level().dimension(), new BlockPos(raw.maxX(), raw.maxY(), raw.maxZ()));
+        RegionSelectionSnapshotManager.CaptureJob undoCapture;
+        try { undoCapture = RegionSelectionSnapshotManager.createCaptureJob(player.level(), destinationSelection); }
+        catch (IllegalArgumentException exception) { sendCurrent(player, exception.getMessage(), true, requestId); return; }
+        MinecraftServer server = player.level().getServer(); UUID actor = player.getUUID();
+        UUID historyJob = SimpleServerUtilities.JOBS.submit(undoCapture, completed -> {
+            ServerPlayer online = server.getPlayerList().getPlayer(actor);
+            if (online == null) return;
+            if (completed.status() != be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler.Status.COMPLETED
+                    || undoCapture.template() == null) {
+                sendCurrent(online, "Snapshot placement undo capture " + completed.status().name().toLowerCase(Locale.ROOT)
+                        + suffix(completed.error()), true, requestId); return;
+            }
+            WorldEditHistoryManager.pushUndo(actor, new WorldEditHistoryManager.Entry(
+                    online.level().dimension(), affected, restoreSelection, undoCapture.template()));
+            PREVIEWS.remove(actor);
+            PacketDistributor.sendToPlayer(online, clearPreviewPayload());
+            selections.setPoint1(online, new BlockPos(raw.minX(), raw.minY(), raw.minZ()));
+            selections.setPoint2(online, new BlockPos(raw.maxX(), raw.maxY(), raw.maxZ()));
+            SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(online, selections.getSelection(online));
+            RegionSelectionSnapshotManager.PasteJob actual = RegionSelectionSnapshotManager.createPasteJob(
+                    online.level(), session.origin, session.template);
+            scheduleSelectionJob(online, actual, "Snapshot placement", requestId);
+        });
+        sendCurrent(player, "Snapshot placement safety capture scheduled as job " + historyJob + ".", false, requestId);
     }
 
     private static void sendPreview(ServerPlayer player, PreviewSession session) {
-        List<RegionSnapshotPreviewPayload.PreviewBlock> preview = new ArrayList<>();
         List<RegionSelectionSnapshotManager.SnapshotBlock> blocks = session.template.blocks();
-        int step = Math.max(1, (int)Math.ceil(blocks.size() / (double)RegionSnapshotPreviewPayload.MAX_BLOCKS));
-        for (int i = 0; i < blocks.size() && preview.size() < RegionSnapshotPreviewPayload.MAX_BLOCKS; i += step) {
-            var block = blocks.get(i);
-            String palette = session.template.palette().get(block.paletteIndex());
-            int rgb = 0x303030 | (palette.hashCode() & 0x00CFCFCF);
-            preview.add(new RegionSnapshotPreviewPayload.PreviewBlock(block.relativeIndex(), 0x50000000 | rgb));
+        List<String> palette = session.template.palette();
+        if (palette.size() > RegionSnapshotPreviewPayload.MAX_PALETTE) {
+            player.sendSystemMessage(Component.literal("Snapshot preview palette is too large to stream safely."), true);
+            return;
         }
-        PacketDistributor.sendToPlayer(player, new RegionSnapshotPreviewPayload(true, session.name, session.dimension,
-                session.origin.asLong(), session.template.sizeX(), session.template.sizeY(), session.template.sizeZ(),
-                blocks.size(), step > 1, preview));
+        int palettePerChunk = RegionSnapshotPreviewPayload.MAX_PALETTE_PER_CHUNK;
+        int paletteChunks = palette.isEmpty() ? 0 : (palette.size() + palettePerChunk - 1) / palettePerChunk;
+        int blockPerChunk = RegionSnapshotPreviewPayload.MAX_BLOCKS_PER_CHUNK;
+        int blockChunks = blocks.isEmpty() ? 0 : (blocks.size() + blockPerChunk - 1) / blockPerChunk;
+        int chunkCount = Math.max(1, paletteChunks + blockChunks);
+        int packet = 0;
+
+        for (int paletteChunk = 0; paletteChunk < paletteChunks; paletteChunk++, packet++) {
+            int from = paletteChunk * palettePerChunk;
+            int to = Math.min(palette.size(), from + palettePerChunk);
+            PacketDistributor.sendToPlayer(player, new RegionSnapshotPreviewPayload(
+                    true, packet == 0, session.name, session.dimension, session.origin.asLong(),
+                    session.template.sizeX(), session.template.sizeY(), session.template.sizeZ(), blocks.size(),
+                    packet, chunkCount, from, palette.size(), palette.subList(from, to), List.of()));
+        }
+
+        for (int blockChunk = 0; blockChunk < blockChunks; blockChunk++, packet++) {
+            int from = blockChunk * blockPerChunk;
+            int to = Math.min(blocks.size(), from + blockPerChunk);
+            List<RegionSnapshotPreviewPayload.PreviewBlock> preview = new ArrayList<>(to - from);
+            for (int i = from; i < to; i++) {
+                var block = blocks.get(i);
+                preview.add(new RegionSnapshotPreviewPayload.PreviewBlock(block.relativeIndex(), block.paletteIndex()));
+            }
+            PacketDistributor.sendToPlayer(player, new RegionSnapshotPreviewPayload(
+                    true, packet == 0, session.name, session.dimension, session.origin.asLong(),
+                    session.template.sizeX(), session.template.sizeY(), session.template.sizeZ(), blocks.size(),
+                    packet, chunkCount, 0, palette.size(), List.of(), preview));
+        }
+
+        if (packet == 0) {
+            PacketDistributor.sendToPlayer(player, new RegionSnapshotPreviewPayload(
+                    true, true, session.name, session.dimension, session.origin.asLong(),
+                    session.template.sizeX(), session.template.sizeY(), session.template.sizeZ(), 0,
+                    0, 1, 0, palette.size(), palette, List.of()));
+        }
     }
 
     private static void teleportToRegion(ServerPlayer player, Region region, long requestId) {

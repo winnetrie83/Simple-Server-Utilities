@@ -141,7 +141,7 @@ public final class SsuMenuService {
                 new SsuMenuSnapshotPayload.UiSettingsSummary(
                         uiPreferences.isDashboardHints(), uiPreferences.isMinimapEnabled(),
                         uiPreferences.getMinimapSize(), uiPreferences.getMinimapShape().name(),
-                        uiPreferences.getMinimapPosition().name(), uiPreferences.isMinimapNorthUp(),
+                        uiPreferences.isMinimapTexturedFrame(), uiPreferences.getMinimapPosition().name(), uiPreferences.isMinimapNorthUp(),
                         uiPreferences.isMinimapShowClaims(), uiPreferences.isMinimapShowRegions(),
                         uiPreferences.isWorldMapShowClaims(), uiPreferences.isWorldMapShowRegions(),
                         uiPreferences.isWorldMapShowMarkers(), uiPreferences.isMinimapShowMarkers(),
@@ -169,7 +169,11 @@ public final class SsuMenuService {
                         uiPreferences.isTitleVisible(),
                         uiPreferences.isRankVisible(),
                         uiPreferences.isDamageIndicatorsEnabled(),
-                        uiPreferences.getDamageIndicatorStyle().name()
+                        uiPreferences.getDamageIndicatorStyle().name(),
+                        uiPreferences.isEntityInsightEnabled(),
+                        uiPreferences.isEntityInsightShowHealth(),
+                        uiPreferences.getEntityInsightRange(),
+                        uiPreferences.getEntityInsightMaxEntities()
                 ),
                 administrator,
                 Config.ENABLE_CROPS_HARVESTING.get(),
@@ -185,6 +189,7 @@ public final class SsuMenuService {
                         Config.ENABLE_HOLOGRAMS.get(),
                         Config.ENABLE_BLOCK_INFORMATION.get(),
                         Config.ENABLE_CUSTOM_STATISTICS.get(),
+                        Config.ENABLE_ACHIEVEMENTS.get(),
                         Config.ENABLE_MAIL.get(),
                         Config.ENABLE_AUCTION_HOUSE.get(),
                         Config.ENABLE_NPCS.get(),
@@ -633,6 +638,7 @@ public final class SsuMenuService {
             case "holograms" -> setAndSave(Config.ENABLE_HOLOGRAMS, enabled);
             case "block_information" -> setAndSave(Config.ENABLE_BLOCK_INFORMATION, enabled);
             case "statistics" -> setAndSave(Config.ENABLE_CUSTOM_STATISTICS, enabled);
+            case "achievements" -> setAndSave(Config.ENABLE_ACHIEVEMENTS, enabled);
             case "mail" -> setAndSave(Config.ENABLE_MAIL, enabled);
             case "auction_house" -> setAndSave(Config.ENABLE_AUCTION_HOUSE, enabled);
             case "npcs" -> setAndSave(Config.ENABLE_NPCS, enabled);
@@ -740,6 +746,7 @@ public final class SsuMenuService {
             case "holograms" -> "Floating Text & Holograms";
             case "block_information" -> "Block Information";
             case "statistics" -> "Player Statistics";
+            case "achievements" -> "Achievements";
             case "mail" -> "Mail";
             case "auction_house" -> "Auction House";
             case "npcs" -> "NPCs";
@@ -807,7 +814,19 @@ public final class SsuMenuService {
                     yield ActionResult.fail("You do not have permission to use the region selection tool.", "");
                 }
                 AdminToolService.giveRegionTool(player);
-                yield ActionResult.ok("Region Tool added. Left-click point 1 and point 2, then right-click to open selection actions.", "");
+                yield ActionResult.ok("Region Tool added. Left-click a block for Point 1, right-click a block for Point 2, then right-click the air to configure/create Regions.", "");
+            }
+            case "world_edit" -> {
+                if (!Config.ENABLE_ADMIN_REGIONS.get()) {
+                    yield ActionResult.fail("The Regions / World Edit module is disabled.", "");
+                }
+                if (!RegionPolicy.canUseSelectionTool(player) || !RegionPolicy.canEditRegion(player)) {
+                    yield ActionResult.fail("You do not have permission to use World Edit.", "");
+                }
+                if (!AdminToolService.giveWorldEditTool(player)) {
+                    yield ActionResult.fail("World Edit Tool could not be issued.", "");
+                }
+                yield ActionResult.ok("World Edit Tool added. Left-click sets point 1, right-click a block sets point 2, right-click air opens World Edit; compact tools use the configured World Edit key (default W).", "");
             }
             case "hologram" -> {
                 if (!Config.ENABLE_HOLOGRAMS.get()
@@ -822,7 +841,7 @@ public final class SsuMenuService {
                     yield ActionResult.fail("You lack Mine administration permission.", "");
                 }
                 SimpleServerUtilities.MINE_SETUP_TOOLS.giveTool(player);
-                yield ActionResult.ok("Mine Setup Tool added. Left-click corner 1, right-click a block for corner 2; right-click air opens Mines.", "");
+                yield ActionResult.ok("Mine Setup Tool added. Left-click point 1, then left-click point 2; right-click opens Mines.", "");
             }
             case "jail" -> {
                 if (!PermissionService.getBoolean(player, PermissionKeys.JAILS_ADMIN, false)) {
@@ -2045,6 +2064,7 @@ public final class SsuMenuService {
                 case "minimap_enabled" -> prefs.setMinimapEnabled(strictBoolean(value));
                 case "minimap_size" -> prefs.setMinimapSize(Integer.parseInt(value));
                 case "minimap_shape" -> prefs.setMinimapShape(MinimapShape.valueOf(value.toUpperCase(Locale.ROOT)));
+                case "minimap_frame" -> prefs.setMinimapTexturedFrame(strictBoolean(value));
                 case "minimap_position" -> prefs.setMinimapPosition(MinimapPosition.valueOf(value.toUpperCase(Locale.ROOT)));
                 case "minimap_northup" -> prefs.setMinimapNorthUp(strictBoolean(value));
                 case "minimap_claims" -> prefs.setMinimapShowClaims(strictBoolean(value));
@@ -2127,6 +2147,17 @@ public final class SsuMenuService {
                 case "damage_indicator_style" -> prefs.setDamageIndicatorStyle(
                         be.winnetrie.mod.simpleserverutilities.settings.DamageIndicatorStyle.valueOf(
                                 value.toUpperCase(Locale.ROOT)));
+                case "entity_insight_enabled" -> {
+                    boolean enabled = strictBoolean(value);
+                    if (enabled && !PermissionService.getBooleanWithoutOperatorBypass(
+                            player, PermissionKeys.ENTITY_INSIGHT_USE, true)) {
+                        return ActionResult.fail("You do not have permission to use Entity Insight.", "");
+                    }
+                    prefs.setEntityInsightEnabled(enabled);
+                }
+                case "entity_insight_health" -> prefs.setEntityInsightShowHealth(strictBoolean(value));
+                case "entity_insight_range" -> prefs.setEntityInsightRange(Integer.parseInt(value));
+                case "entity_insight_max_entities" -> prefs.setEntityInsightMaxEntities(Integer.parseInt(value));
                 default -> { return ActionResult.fail("Unknown setting.", ""); }
             }
         } catch (Exception e) { return ActionResult.fail("Invalid setting value.", ""); }
@@ -2134,6 +2165,7 @@ public final class SsuMenuService {
         BlockInformationService.syncPlayer(player);
         MapMarkerService.sync(player);
         SimpleServerUtilities.IDENTITY.syncAll();
+        be.winnetrie.mod.simpleserverutilities.identity.EntityInsightService.sync(player);
         return ActionResult.shell("Setting saved.");
     }
 

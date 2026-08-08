@@ -8,7 +8,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument;
-import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument.Format;
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument.Format;
 import be.winnetrie.mod.simpleserverutilities.mail.MailComposeMenu;
 import be.winnetrie.mod.simpleserverutilities.mail.MailRichText;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultiLineEditBoxAccessor;
@@ -34,7 +34,7 @@ import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 /** Larger inventory-backed mail composer with multiline body and player picker. */
 public final class MailComposeScreen extends AbstractContainerScreen<MailComposeMenu> {
     private static final int SCREEN_WIDTH = 400;
-    private static final int SCREEN_HEIGHT = 430;
+    private static final int SCREEN_HEIGHT = 350;
 
     private static final int PANEL = 0xF0181E25;
     private static final int SUBPANEL = 0xB010151A;
@@ -120,7 +120,9 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
                 .bounds(leftPos + 132, topPos + 188, 70, 20).build());
         for (int index = 0; index < 16; index++) {
             int colorIndex = index;
-            addRenderableWidget(RichTextPalette.button(leftPos + 208 + index * 11, topPos + 193, 10, index,
+            int column = index % 8;
+            int row = index / 8;
+            addRenderableWidget(RichTextPalette.button(leftPos + 208 + column * 11, topPos + 188 + row * 11, 10, index,
                     ignored -> applySelectionColor(colorIndex)));
         }
 
@@ -133,10 +135,10 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
         addRenderableWidget(playersButton);
 
         addRenderableWidget(Button.builder(Component.literal("Back"), ignored -> backToMailbox())
-                .bounds(leftPos + 16, topPos + 402, 70, 20)
+                .bounds(leftPos + 16, topPos + 326, 70, 20)
                 .build());
         addRenderableWidget(Button.builder(Component.literal("Send mail"), ignored -> send())
-                .bounds(leftPos + 296, topPos + 402, 88, 20)
+                .bounds(leftPos + 296, topPos + 326, 88, 20)
                 .build());
 
         setInitialFocus(recipient);
@@ -398,8 +400,11 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
                 leftPos + BALANCE_X, topPos + BALANCE_Y, MUTED, false);
 
         if (!notice.isBlank()) {
-            g.text(font, trim(notice, 56), leftPos + 16, topPos + 382,
-                    noticeError ? ERROR : GOOD, false);
+            var lines = font.split(Component.literal(notice), 92);
+            for (int i = 0; i < Math.min(3, lines.size()); i++) {
+                g.text(font, lines.get(i), leftPos + 16, topPos + 266 + i * 10,
+                        noticeError ? ERROR : GOOD, false);
+            }
         }
     }
 
@@ -431,7 +436,7 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
         g.text(font, "Inventory", inventoryPanel.x, inventoryPanel.y - 12, MUTED, false);
         drawSlotPanel(g, inventoryPanel);
 
-        g.text(font, "Hotbar", hotbarPanel.x, hotbarPanel.y - 16, MUTED, false);
+        g.text(font, "Hotbar", hotbarPanel.x, hotbarPanel.y - 10, MUTED, false);
         drawSlotPanel(g, hotbarPanel);
     }
 

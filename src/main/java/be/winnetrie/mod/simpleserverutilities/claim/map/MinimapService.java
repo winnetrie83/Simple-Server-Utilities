@@ -50,6 +50,7 @@ public final class MinimapService {
                 enabled,
                 preferences.getMinimapSize(),
                 preferences.getMinimapShape().name(),
+                preferences.isMinimapTexturedFrame(),
                 preferences.getMinimapPosition().name(),
                 preferences.isMinimapNorthUp(),
                 preferences.isMinimapShowClaims(),

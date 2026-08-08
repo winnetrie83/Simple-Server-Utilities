@@ -1,0 +1,26 @@
+SSU 1.9.0-dev3.18.2 validation notes
+
+Scope:
+- Compile hotfix for SsuDashboardScreen.IntSettingSlider and EntityInsightService.
+
+Version:
+- mod_version: 1.9.0-dev3.18.2
+- network protocol: 101 (unchanged)
+- Player UI preferences schema: 12 (unchanged)
+
+Hotfixes:
+- IntSettingSlider overrides AbstractSliderButton#applyValue().
+- EntityInsightService imports net.minecraft.world.entity.TamableAnimal.
+- EntityInsightService uses Entity#entityTags() for SSU NPC exclusion.
+
+Static validation:
+- Whole-tree Java lexical delimiter/string/comment scan: PASS.
+- No EntityInsightService import of net.minecraft.world.entity.animal.TamableAnimal remains.
+- No EntityInsightService#getTags() call remains.
+- IntSettingSlider contains exactly one applyValue() override and no apply() override.
+- Project JSON resources parse successfully (15 files).
+- `ModNetworking` remains versioned at protocol `101`.
+
+Compile status:
+- `./gradlew compileJava --no-daemon` could not start because Gradle 9.2.1 is not cached and this environment cannot resolve services.gradle.org.
+- Local Gradle compile remains the definitive compile check.

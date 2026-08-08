@@ -4,7 +4,7 @@ import java.util.Locale;
 
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument;
-import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument.Format;
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument.Format;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramScoreboardMode;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramType;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultiLineEditBoxAccessor;
@@ -90,9 +90,9 @@ public final class HologramEditorScreen extends Screen {
         typeButton = addRenderableWidget(Button.builder(Component.empty(), ignored -> cycleType())
                 .bounds(x + 178, y + 30, 108, 20).build());
 
-        coordinateX = field(x + 14, y + 62, 82, "X", 16, formatDouble(initial.x()));
-        coordinateY = field(x + 102, y + 62, 82, "Y", 16, formatDouble(initial.y()));
-        coordinateZ = field(x + 190, y + 62, 96, "Z", 16, formatDouble(initial.z()));
+        coordinateX = field(x + 28, y + 62, 58, "X", 16, formatDouble(initial.x()));
+        coordinateY = field(x + 116, y + 62, 58, "Y", 16, formatDouble(initial.y()));
+        coordinateZ = field(x + 204, y + 62, 58, "Z", 16, formatDouble(initial.z()));
 
         text = MultiLineEditBox.builder().setX(x + 14).setY(y + 100)
                 .setPlaceholder(Component.literal("Visible text / scoreboard title"))
@@ -107,7 +107,7 @@ public final class HologramEditorScreen extends Screen {
         text.setValueListener(this::onTextChanged);
         addRenderableWidget(text);
 
-        int toolbarY = y + 202;
+        int toolbarY = y + 204;
         addRenderableWidget(Button.builder(Component.literal("B"), ignored -> applySelectionFormat('l')).bounds(x + 14, toolbarY, 20, 18).build());
         addRenderableWidget(Button.builder(Component.literal("I"), ignored -> applySelectionFormat('o')).bounds(x + 38, toolbarY, 20, 18).build());
         addRenderableWidget(Button.builder(Component.literal("U"), ignored -> applySelectionFormat('n')).bounds(x + 62, toolbarY, 20, 18).build());
@@ -115,12 +115,14 @@ public final class HologramEditorScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("Clear"), ignored -> clearSelectionFormatting()).bounds(x + 110, toolbarY, 48, 18).build());
         for (int index = 0; index < 16; index++) {
             int colorIndex = index;
-            addRenderableWidget(RichTextPalette.button(x + 164 + index * 8, toolbarY + 4, 7, index,
+            int column = index % 8;
+            int row = index / 8;
+            addRenderableWidget(RichTextPalette.button(x + 164 + column * 16, toolbarY - 4 + row * 16, 14, index,
                     ignored -> applySelectionColor(colorIndex)));
         }
 
-        source = field(x + 14, y + 230, 272, "Website URL / image source", 2048, initial.urlOrImageSource());
-        objective = field(x + 14, y + 262, 272, "Objective or ssu:stat-id", 64, initial.objective());
+        source = field(x + 14, y + 246, 272, "Website URL / image source", 2048, initial.urlOrImageSource());
+        objective = field(x + 14, y + 278, 272, "Objective or ssu:stat-id", 64, initial.objective());
 
         addRenderableWidget(Button.builder(Component.literal("Background"), ignored -> openPalette(PaletteTarget.BACKGROUND))
                 .bounds(right, y + 100, 126, 20).build());
@@ -426,17 +428,19 @@ public final class HologramEditorScreen extends Screen {
         g.outline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
         g.text(font, initial.editing() ? "Edit Floating Hologram" : "Create Floating Hologram", x + 14, y + 11, TEXT, true);
         g.text(font, "Dimension: " + shortDimension(initial.dimension()), right, y + 12, MUTED, false);
-        g.text(font, "Coordinates", x + 14, y + 51, MUTED, false);
+        g.text(font, "X:", x + 14, y + 68, MUTED, false);
+        g.text(font, "Y:", x + 102, y + 68, MUTED, false);
+        g.text(font, "Z:", x + 190, y + 68, MUTED, false);
         g.text(font, "Text / title", x + 14, y + 89, MUTED, false);
-        g.text(font, "Source", x + 14, y + 220, MUTED, false);
-        g.text(font, "Scoreboard objective", x + 14, y + 252, MUTED, false);
-        g.text(font, "{{stat:id}} value • {{rank:id}} rank", x + 14, y + 287, MUTED, false);
+        g.text(font, "Source", x + 14, y + 236, MUTED, false);
+        g.text(font, "Scoreboard objective", x + 14, y + 268, MUTED, false);
+        g.text(font, "{{stat:id}} value • {{rank:id}} rank", x + 14, y + 303, MUTED, false);
         g.text(font, "Background", right, y + 89, MUTED, false);
         g.text(font, "Scale / range", right, y + 130, MUTED, false);
         g.text(font, "Image W/H", right, y + 164, MUTED, false);
         int scoreboardLabelColor = type == HologramType.SCOREBOARD ? MUTED : 0xFF68737C;
         g.text(font, "Rows / refresh", right, y + 198, scoreboardLabelColor, false);
-        if (!notice.isBlank()) g.text(font, trim(notice, 66), x + 14, y + 311, noticeError ? ERROR : GOOD, false);
+        if (!notice.isBlank()) g.text(font, trim(notice, 66), x + 14, y + 314, noticeError ? ERROR : GOOD, false);
         super.extractRenderState(g, mouseX, mouseY, partialTick);
         if (paletteTarget != PaletteTarget.NONE) drawPalette(g, mouseX, mouseY);
     }
@@ -456,7 +460,7 @@ public final class HologramEditorScreen extends Screen {
             if (SsuGuiGeometry.inside(mouseX, mouseY, left, top, cell, cell)) {
                 int paletteIndex = index;
                 g.setComponentTooltipForNextFrame(font,
-                        java.util.List.of(Component.literal(RichTextPalette.name(paletteIndex)).withStyle(style -> style.withColor(RichTextPalette.rgb(paletteIndex)))),
+                        java.util.List.of(Component.literal(RichTextPalette.name(paletteIndex)).withStyle(style -> style.withColor(RichTextPalette.labelRgb(paletteIndex)))),
                         mouseX, mouseY);
             }
         }

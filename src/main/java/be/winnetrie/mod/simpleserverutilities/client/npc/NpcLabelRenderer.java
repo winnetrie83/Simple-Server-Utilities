@@ -11,13 +11,15 @@ import net.minecraft.gizmos.Gizmos;
 import net.minecraft.gizmos.TextGizmo;
 import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
 
 /** Renders role, NPC name and colored faction as one camera-facing identity stack. */
 public final class NpcLabelRenderer implements net.minecraft.client.renderer.debug.DebugRenderer.SimpleDebugRenderer {
     private static final double MAX_DISTANCE_SQUARED = 64.0D * 64.0D;
-    private static final float NAME_SCALE = 0.20F;
-    private static final float SMALL_SCALE = 0.145F;
+    private static final float NAME_SCALE = 0.40F;
+    private static final float SMALL_SCALE = 0.29F;
     private static final double ROLE_OFFSET = 0.235D;
     private static final double FACTION_OFFSET = -0.225D;
     private static final int ROLE_COLOR = 0xFFB9C3CB;
@@ -39,14 +41,18 @@ public final class NpcLabelRenderer implements net.minecraft.client.renderer.deb
             if (!entry.labelVisible()) continue;
             Entity entity = minecraft.level.getEntity(entry.entityId());
             if (entity == null || entity.isRemoved() || !sameUuid(entity, entry.entityUuid())) continue;
-            Vec3 base = entity.position().add(0.0D, entity.getBbHeight() + 0.52D, 0.0D);
+            float entityScale = entity instanceof LivingEntity living
+                    ? (float) Math.max(0.0625D, Math.min(16.0D, living.getAttributeValue(Attributes.SCALE)))
+                    : 1.0F;
+            Vec3 base = entity.position().add(0.0D, entity.getBbHeight() + 0.52D * entityScale, 0.0D);
             if (playerPosition.distanceToSqr(base) > MAX_DISTANCE_SQUARED) continue;
 
-            text(NpcRole.parse(entry.roleId()).label(), base.add(0.0D, ROLE_OFFSET, 0.0D), ROLE_COLOR, SMALL_SCALE);
-            text(entry.displayName(), base, NAME_COLOR, NAME_SCALE);
+            text(NpcRole.parse(entry.roleId()).label(),
+                    base.add(0.0D, ROLE_OFFSET * entityScale, 0.0D), ROLE_COLOR, SMALL_SCALE * entityScale);
+            text(entry.displayName(), base, NAME_COLOR, NAME_SCALE * entityScale);
             if (!entry.factionName().isBlank()) {
-                text(entry.factionName(), base.add(0.0D, FACTION_OFFSET, 0.0D),
-                        attitudeColor(entry.attitude()), SMALL_SCALE);
+                text(entry.factionName(), base.add(0.0D, FACTION_OFFSET * entityScale, 0.0D),
+                        attitudeColor(entry.attitude()), SMALL_SCALE * entityScale);
             }
         }
     }

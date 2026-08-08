@@ -19,6 +19,7 @@ public final class KnownPlayerPickerScreen extends Screen {
     private static final int ERROR = 0xFFFF8585;
     private final Screen parent;
     private final Consumer<String> selection;
+    private final String description;
     private SsuMenuPageDataPayload data = SsuMenuPageDataPayload.empty("known_players", 0, PAGE_SIZE, 0L, "", false);
     private EditBox search;
     private String query = "";
@@ -29,9 +30,14 @@ public final class KnownPlayerPickerScreen extends Screen {
     private boolean requestedOnce;
 
     public KnownPlayerPickerScreen(Screen parent, Consumer<String> selection) {
+        this(parent, selection, "Select a player.");
+    }
+
+    public KnownPlayerPickerScreen(Screen parent, Consumer<String> selection, String description) {
         super(Component.literal("Choose player"));
         this.parent = parent;
         this.selection = selection;
+        this.description = description == null || description.isBlank() ? "Select a player." : description;
     }
 
     public void accept(SsuMenuPageDataPayload payload) {
@@ -100,7 +106,7 @@ public final class KnownPlayerPickerScreen extends Screen {
         g.outline(x, y, W, H, BORDER);
         g.text(font, "Choose known player", x + 16, y + 16, TEXT, true);
         String status = loading ? "Loading players…" : data.error() ? data.notice()
-                : data.totalItems() == 0 ? "No matching players." : "Select a player to fill the payment field.";
+                : data.totalItems() == 0 ? "No matching players." : description;
         g.text(font, status, x + 16, y + 28, data.error() ? ERROR : MUTED, false);
         g.centeredText(font, "Page " + (page + 1) + "/" + pages(), x + W / 2, y + H - 29, MUTED);
         super.extractRenderState(g, mouseX, mouseY, partialTick);

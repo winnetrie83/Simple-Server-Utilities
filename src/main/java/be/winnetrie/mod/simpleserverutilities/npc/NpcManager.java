@@ -891,8 +891,10 @@ public final class NpcManager {
         if (forceMove || entity.distanceToSqr(instance.x, instance.y, instance.z) > returnDistanceSquared) {
             entity.snapTo(instance.x, instance.y, instance.z, instance.yaw, instance.pitch);
         }
-        entity.setCustomName(Component.literal(definition.displayName));
-        // SSU renders role, name and faction as one three-line label to avoid a duplicate vanilla nameplate.
+        // SSU renders role, name and faction itself. Do not keep a vanilla CustomName on the
+        // runtime shell: Minecraft may reveal hidden custom names while the entity is targeted,
+        // creating a second large nameplate on top of SSU's identity label.
+        entity.setCustomName(null);
         entity.setCustomNameVisible(false);
         entity.setInvulnerable(definition.invulnerable);
         entity.setSilent(definition.silent);

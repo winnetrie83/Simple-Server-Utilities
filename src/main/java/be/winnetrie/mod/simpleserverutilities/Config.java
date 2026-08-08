@@ -120,6 +120,10 @@ public class Config {
             .comment("Enable administrator-defined persistent player statistics and statistic holograms.")
             .define("enableCustomStatistics", true);
 
+    public static final ModConfigSpec.BooleanValue ENABLE_ACHIEVEMENTS = BUILDER
+            .comment("Enable administrator-defined persistent achievements, progress tracking and rewards.")
+            .define("enableAchievements", true);
+
     public static final ModConfigSpec.IntValue HOLOGRAM_RENDER_DISTANCE = BUILDER
             .comment("Global maximum hologram render/load distance in blocks. Individual holograms may use a shorter distance.")
             .defineInRange("hologramRenderDistance", 64, 8, 512);

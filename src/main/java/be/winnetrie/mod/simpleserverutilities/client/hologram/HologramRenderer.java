@@ -8,8 +8,8 @@ import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramImageDecod
 import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramImageDecoder.RenderFrame;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument;
-import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument.CharacterStyle;
-import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument.Segment;
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument.CharacterStyle;
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument.Segment;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramType;
 import be.winnetrie.mod.simpleserverutilities.network.HologramSyncPayload;
 import net.minecraft.client.Minecraft;

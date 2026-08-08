@@ -21,6 +21,7 @@ import be.winnetrie.mod.simpleserverutilities.serverops.SupportTicketCategory;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
@@ -32,6 +33,7 @@ public final class ServerOperationsScreen extends Screen {
     private static final int SUPPORT_W = 555, SUPPORT_H = 323;
     private static final int PANEL = 0xF0161D25, BORDER = 0xFF586978, TEXT = 0xFFF3F5F7, MUTED = 0xFFAAB5BE;
     private static final int GOOD = 0xFF83E39A, WARNING = 0xFFFFB86B, ERROR = 0xFFFF8585;
+    private static final int GREAT = 0xFF55F58A, NEUTRAL = 0xFFFFD166, BAD = 0xFFFF9F43, VERY_BAD = 0xFFFF5E5E;
     private static final DateTimeFormatter TICKET_TIME = DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneId.systemDefault());
     private static final List<String> SCHEDULER_ACTIONS = List.of("BACKUP", "BROADCAST", "MAINTENANCE_ON", "MAINTENANCE_OFF", "SAVE_SSU", "SSU_RELOAD", "STOP_SERVER");
 
@@ -48,6 +50,7 @@ public final class ServerOperationsScreen extends Screen {
     private int ticketListPage = 0;
     private int ticketThreadPage = 0;
     private String ticketStatusFilter = "ALL";
+    private boolean healthDetails;
 
     private EditBox a, b, c, d;
 
@@ -103,7 +106,7 @@ public final class ServerOperationsScreen extends Screen {
             case MAINTENANCE -> initMaintenance(x, contentY);
             case CHAT -> initChat(x, contentY);
             case AUDIT -> { }
-            case HEALTH -> { }
+            case HEALTH -> initHealth(x, contentY);
             case REPORTS -> initReports(x, contentY);
             case WORLDS -> initWorlds(x, contentY);
             case ECONOMY -> initEconomy(x, contentY);
@@ -115,62 +118,68 @@ public final class ServerOperationsScreen extends Screen {
     private void initActivity(int x, int y) {
         JsonObject s = obj("settings");
         toggleA = bool(s, "activityEnabled", true); toggleB = bool(s, "activityBreaks", true); toggleC = bool(s, "activityPlaces", true);
-        addRenderableWidget(Button.builder(Component.literal("Logging: " + on(toggleA)), v -> { toggleA = !toggleA; v.setMessage(Component.literal("Logging: " + on(toggleA))); }).bounds(x + 16, y, 120, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Break: " + on(toggleB)), v -> { toggleB = !toggleB; v.setMessage(Component.literal("Break: " + on(toggleB))); }).bounds(x + 144, y, 90, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Place: " + on(toggleC)), v -> { toggleC = !toggleC; v.setMessage(Component.literal("Place: " + on(toggleC))); }).bounds(x + 242, y, 90, 20).build());
-        a = box(x + 340, y, 70, Integer.toString(integer(s, "activityRetentionDays", 14)), 3, "Days");
-        addRenderableWidget(Button.builder(Component.literal("Save"), v -> action("activity_settings", Boolean.toString(toggleA), a.getValue(), Boolean.toString(toggleB) + "|" + toggleC)).bounds(x + 418, y, 64, 20).build());
-        b = box(x + 490, y, 150, "", 64, "Rollback player / UUID");
-        c = box(x + 648, y, 42, "24", 5, "Hours");
-        d = box(x + 698, y, 34, "32", 4, "R");
+        addRenderableWidget(Button.builder(Component.literal("Logging: " + on(toggleA)), v -> { toggleA = !toggleA; v.setMessage(Component.literal("Logging: " + on(toggleA))); }).bounds(x + 16, y + 16, 120, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Break: " + on(toggleB)), v -> { toggleB = !toggleB; v.setMessage(Component.literal("Break: " + on(toggleB))); }).bounds(x + 144, y + 16, 90, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Place: " + on(toggleC)), v -> { toggleC = !toggleC; v.setMessage(Component.literal("Place: " + on(toggleC))); }).bounds(x + 242, y + 16, 90, 20).build());
+        a = box(x + 340, y + 16, 70, Integer.toString(integer(s, "activityRetentionDays", 14)), 3, "Days");
+        a.setTooltip(Tooltip.create(Component.literal("How many days player break/place activity is retained (1-90 days).")));
+        addRenderableWidget(Button.builder(Component.literal("Save settings"), v -> action("activity_settings", Boolean.toString(toggleA), a.getValue(), Boolean.toString(toggleB) + "|" + toggleC)).bounds(x + 418, y + 16, 86, 20).build());
+        b = box(x + 380, y + 60, 160, "", 64, "Player name / UUID");
+        c = box(x + 548, y + 60, 64, "24", 5, "Hours");
+        d = box(x + 620, y + 60, 64, "32", 4, "Blocks");
+        c.setTooltip(Tooltip.create(Component.literal("Rollback activity from this many hours ago.")));
+        d.setTooltip(Tooltip.create(Component.literal("Rollback radius in blocks around the administrator.")));
         addRenderableWidget(Button.builder(Component.literal(confirm.equals("rollback") ? "Confirm" : "Rollback"), v -> {
-            if (!confirm.equals("rollback")) {
-                confirm = "rollback";
-                v.setMessage(Component.literal("Confirm"));
-            } else action("activity_rollback", b.getValue(), c.getValue(), d.getValue());
-        }).bounds(x + 490, y + 28, 90, 20).build());
+            if (!confirm.equals("rollback")) { confirm = "rollback"; v.setMessage(Component.literal("Confirm")); }
+            else action("activity_rollback", b.getValue(), c.getValue(), d.getValue());
+        }).bounds(x + 548, y + 88, 136, 20).build());
     }
 
     private void initBackups(int x, int y) {
         JsonObject s = obj("settings");
         toggleA = bool(s, "autoBackups", true);
-        a = box(x + 16, y, 130, "manual", 48, "Backup label");
-        addRenderableWidget(Button.builder(Component.literal("Create backup"), v -> action("backup_create", a.getValue(), "", "")).bounds(x + 154, y, 110, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Automatic: " + on(toggleA)), v -> { toggleA = !toggleA; v.setMessage(Component.literal("Automatic: " + on(toggleA))); }).bounds(x + 282, y, 120, 20).build());
-        b = box(x + 410, y, 90, Integer.toString(integer(s, "backupIntervalMinutes", 360)), 6, "Minutes");
-        c = box(x + 508, y, 64, Integer.toString(integer(s, "backupRetention", 7)), 3, "Keep");
-        addRenderableWidget(Button.builder(Component.literal("Save"), v -> action("backup_settings", Boolean.toString(toggleA), b.getValue(), c.getValue())).bounds(x + 580, y, 64, 20).build());
+        a = box(x + 16, y + 16, 130, "manual", 48, "Backup name");
+        Button create = addRenderableWidget(Button.builder(Component.literal("Create backup"), v -> action("backup_create", a.getValue(), "", "")).bounds(x + 154, y + 16, 110, 20).build());
+        create.setTooltip(Tooltip.create(Component.literal("Create a full world backup, including world-specific SSU data.")));
+        Button automatic = addRenderableWidget(Button.builder(Component.literal("Automatic: " + on(toggleA)), v -> { toggleA = !toggleA; v.setMessage(Component.literal("Automatic: " + on(toggleA))); }).bounds(x + 282, y + 16, 120, 20).build());
+        automatic.setTooltip(Tooltip.create(Component.literal("Enable or disable automatic scheduled world backups.")));
+        b = box(x + 410, y + 16, 90, Integer.toString(integer(s, "backupIntervalMinutes", 360)), 6, "Minutes");
+        c = box(x + 508, y + 16, 64, Integer.toString(integer(s, "backupRetention", 7)), 3, "Count");
+        Button save = addRenderableWidget(Button.builder(Component.literal("Save settings"), v -> action("backup_settings", Boolean.toString(toggleA), b.getValue(), c.getValue())).bounds(x + 580, y + 16, 96, 20).build());
+        save.setTooltip(Tooltip.create(Component.literal("Save automatic backup interval and how many backup ZIPs are retained.")));
         JsonArray files = arr(obj("backup"), "files");
-        addListButtons(x + 16, y + 40, files, 8, e -> string(e.getAsJsonObject(), "name", "backup"));
+        addListButtons(x + 16, y + 60, files, 8, e -> string(e.getAsJsonObject(), "name", "backup"));
         if (selected >= 0 && selected < files.size()) {
             String name = string(files.get(selected).getAsJsonObject(), "name", "");
             addRenderableWidget(Button.builder(Component.literal(confirm.equals("restore") ? "CONFIRM RESTORE" : "Restore"), v -> {
                 if (!confirm.equals("restore")) { confirm = "restore"; rebuildWidgets(); } else action("backup_restore", name, "", "");
-            }).bounds(x + 396, y + 246, 132, 20).build());
+            }).bounds(x + 396, y + 270, 132, 20).build());
             addRenderableWidget(Button.builder(Component.literal(confirm.equals("delete") ? "Confirm delete" : "Delete"), v -> {
                 if (!confirm.equals("delete")) { confirm = "delete"; rebuildWidgets(); } else action("backup_delete", name, "", "");
-            }).bounds(x + 536, y + 246, 110, 20).build());
+            }).bounds(x + 536, y + 270, 110, 20).build());
         }
     }
 
     private void initScheduler(int x, int y) {
-        a = box(x + 16, y, 142, "", 80, "Task name");
+        a = box(x + 16, y + 18, 142, "", 80, "Task name");
         addRenderableWidget(Button.builder(Component.literal("Action: " + schedulerAction), v -> {
             int index = SCHEDULER_ACTIONS.indexOf(schedulerAction); schedulerAction = SCHEDULER_ACTIONS.get((index + 1) % SCHEDULER_ACTIONS.size());
             v.setMessage(Component.literal("Action: " + schedulerAction));
-        }).bounds(x + 166, y, 132, 20).build());
-        c = box(x + 306, y, 150, "60", 48, "60 / daily@04:00 / once@yyyy-MM-ddTHH:mm");
-        d = box(x + 464, y, 142, "", 512, "Payload / broadcast text");
-        addRenderableWidget(Button.builder(Component.literal("Add task"), v -> action("task_add", a.getValue(), schedulerAction, c.getValue() + "|" + d.getValue())).bounds(x + 614, y, 94, 20).build());
+        }).bounds(x + 166, y + 18, 132, 20).build());
+        c = box(x + 306, y + 18, 150, "60", 48, "60 / daily@04:00 / once@yyyy-MM-ddTHH:mm");
+        c.setTooltip(Tooltip.create(Component.literal("A number means interval minutes. Also accepts daily@HH:mm or once@yyyy-MM-ddTHH:mm.")));
+        d = box(x + 464, y + 18, 142, "", 512, "Optional payload / message");
+        d.setTooltip(Tooltip.create(Component.literal("Optional action argument; for BROADCAST this is the message text.")));
+        addRenderableWidget(Button.builder(Component.literal("Add task"), v -> action("task_add", a.getValue(), schedulerAction, c.getValue() + "|" + d.getValue())).bounds(x + 614, y + 18, 94, 20).build());
         JsonArray tasks = arr(root, "tasks");
-        addListButtons(x + 16, y + 38, tasks, 8, e -> {
+        addListButtons(x + 16, y + 58, tasks, 8, e -> {
             JsonObject o = e.getAsJsonObject(); return string(o,"name","") + " • " + string(o,"action","") + " • " + string(o,"scheduleMode","INTERVAL") + " " + string(o,"scheduleSpec",Integer.toString(integer(o,"interval",0))) + (bool(o,"enabled",false)?" • ON":" • OFF");
         });
         if (selected >= 0 && selected < tasks.size()) {
             JsonObject t = tasks.get(selected).getAsJsonObject(); String id = string(t,"id",""); boolean enabled = bool(t,"enabled",true); boolean system = bool(t,"system",false);
-            addRenderableWidget(Button.builder(Component.literal(enabled ? "Disable" : "Enable"), v -> action("task_toggle", id, Boolean.toString(!enabled), "")).bounds(x + 396, y + 246, 86, 20).build());
-            addRenderableWidget(Button.builder(Component.literal("Run now"), v -> action("task_run", id, "", "")).bounds(x + 490, y + 246, 86, 20).build());
-            Button del = addRenderableWidget(Button.builder(Component.literal("Delete"), v -> action("task_delete", id, "", "")).bounds(x + 584, y + 246, 80, 20).build()); del.active = !system;
+            addRenderableWidget(Button.builder(Component.literal(enabled ? "Disable" : "Enable"), v -> action("task_toggle", id, Boolean.toString(!enabled), "")).bounds(x + 396, y + 266, 86, 20).build());
+            addRenderableWidget(Button.builder(Component.literal("Run now"), v -> action("task_run", id, "", "")).bounds(x + 490, y + 266, 86, 20).build());
+            Button del = addRenderableWidget(Button.builder(Component.literal("Delete"), v -> action("task_delete", id, "", "")).bounds(x + 584, y + 266, 80, 20).build()); del.active = !system;
         }
     }
 
@@ -184,33 +193,28 @@ public final class ServerOperationsScreen extends Screen {
 
     private void initChat(int x, int y) {
         JsonObject s = obj("settings");
-        toggleA = bool(s,"chatEnabled",false);
-        toggleB = bool(s,"linksAllowed",true);
-        toggleC = bool(s,"staffChatEnabled",true);
-        addRenderableWidget(Button.builder(Component.literal("Moderation: " + on(toggleA)), v -> { toggleA = !toggleA; v.setMessage(Component.literal("Moderation: " + on(toggleA))); }).bounds(x + 16, y, 126, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Links: " + on(toggleB)), v -> { toggleB = !toggleB; v.setMessage(Component.literal("Links: " + on(toggleB))); }).bounds(x + 150, y, 96, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Staff chat: " + on(toggleC)), v -> { toggleC = !toggleC; v.setMessage(Component.literal("Staff chat: " + on(toggleC))); }).bounds(x + 250, y, 118, 20).build());
-        a = box(x + 376, y, 58, Integer.toString(integer(s,"slowModeSeconds",0)), 4, "Slow s");
-        b = box(x + 442, y, 58, Integer.toString(integer(s,"duplicateWindowSeconds",8)), 4, "Dup s");
-        EditBox burstWindow = box(x + 508, y, 58, Integer.toString(integer(s,"burstWindowSeconds",10)), 4, "Burst s");
-        EditBox burstMax = box(x + 574, y, 50, Integer.toString(integer(s,"burstMaxMessages",8)), 3, "Max");
-        EditBox caps = box(x + 632, y, 46, Integer.toString(integer(s,"capsPercent",85)), 3, "Caps %");
-        EditBox capsMin = box(x + 686, y, 38, Integer.toString(integer(s,"capsMinLength",12)), 3, "Min");
-        EditBox blocked = box(x + 16, y + 28, 540, string(s,"blockedWords",""), 1024, "Blocked words/phrases, comma separated");
+        toggleA = bool(s,"chatEnabled",false); toggleB = bool(s,"linksAllowed",true); toggleC = bool(s,"staffChatEnabled",true);
+        addRenderableWidget(Button.builder(Component.literal("Moderation: " + on(toggleA)), v -> { toggleA = !toggleA; v.setMessage(Component.literal("Moderation: " + on(toggleA))); }).bounds(x + 16, y + 16, 126, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Links: " + on(toggleB)), v -> { toggleB = !toggleB; v.setMessage(Component.literal("Links: " + on(toggleB))); }).bounds(x + 150, y + 16, 96, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Staff chat: " + on(toggleC)), v -> { toggleC = !toggleC; v.setMessage(Component.literal("Staff chat: " + on(toggleC))); }).bounds(x + 254, y + 16, 118, 20).build());
+        a = box(x + 380, y + 16, 54, Integer.toString(integer(s,"slowModeSeconds",0)), 4, "sec");
+        b = box(x + 442, y + 16, 54, Integer.toString(integer(s,"duplicateWindowSeconds",8)), 4, "sec");
+        EditBox burstWindow = box(x + 504, y + 16, 54, Integer.toString(integer(s,"burstWindowSeconds",10)), 4, "sec");
+        EditBox burstMax = box(x + 566, y + 16, 48, Integer.toString(integer(s,"burstMaxMessages",8)), 3, "msgs");
+        EditBox caps = box(x + 622, y + 16, 48, Integer.toString(integer(s,"capsPercent",85)), 3, "%");
+        EditBox capsMin = box(x + 678, y + 16, 46, Integer.toString(integer(s,"capsMinLength",12)), 3, "chars");
+        EditBox blocked = box(x + 16, y + 58, 540, string(s,"blockedWords",""), 1024, "Comma-separated blocked words / phrases");
         addRenderableWidget(Button.builder(Component.literal("Save chat"), v -> {
-            JsonObject value = new JsonObject();
-            value.addProperty("enabled", toggleA); value.addProperty("linksAllowed", toggleB); value.addProperty("staffChat", toggleC);
-            value.addProperty("slow", parseInt(a.getValue(),0)); value.addProperty("duplicate", parseInt(b.getValue(),8));
-            value.addProperty("burstWindow", parseInt(burstWindow.getValue(),10)); value.addProperty("burstMax", parseInt(burstMax.getValue(),8));
-            value.addProperty("capsPercent", parseInt(caps.getValue(),85)); value.addProperty("capsMin", parseInt(capsMin.getValue(),12));
-            value.addProperty("blockedWords", blocked.getValue());
+            JsonObject value = new JsonObject(); value.addProperty("enabled", toggleA); value.addProperty("linksAllowed", toggleB); value.addProperty("staffChat", toggleC);
+            value.addProperty("slow", parseInt(a.getValue(),0)); value.addProperty("duplicate", parseInt(b.getValue(),8)); value.addProperty("burstWindow", parseInt(burstWindow.getValue(),10)); value.addProperty("burstMax", parseInt(burstMax.getValue(),8)); value.addProperty("capsPercent", parseInt(caps.getValue(),85)); value.addProperty("capsMin", parseInt(capsMin.getValue(),12)); value.addProperty("blockedWords", blocked.getValue());
             action("chat_settings", "", "", value.toString());
-        }).bounds(x + 564, y + 28, 116, 20).build());
-        c = box(x + 16, y + 56, 150, "", 64, "Player");
-        d = box(x + 174, y + 56, 60, "60", 7, "Min; 0=perm");
-        EditBox reason = box(x + 242, y + 56, 300, "", 256, "Mute reason");
-        addRenderableWidget(Button.builder(Component.literal("Mute"), v -> action("mute", c.getValue(), d.getValue(), "|" + reason.getValue())).bounds(x + 550, y + 56, 64, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Unmute"), v -> action("unmute", c.getValue(), "", "")).bounds(x + 622, y + 56, 72, 20).build());
+        }).bounds(x + 564, y + 58, 116, 20).build());
+        c = box(x + 16, y + 100, 150, "", 64, "Player name / UUID");
+        d = box(x + 174, y + 100, 74, "60", 7, "minutes");
+        EditBox reason = box(x + 256, y + 100, 286, "", 256, "Mute reason");
+        d.setTooltip(Tooltip.create(Component.literal("Mute duration in minutes. Use 0 for a permanent mute.")));
+        addRenderableWidget(Button.builder(Component.literal("Mute"), v -> action("mute", c.getValue(), d.getValue(), "|" + reason.getValue())).bounds(x + 550, y + 100, 64, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Unmute"), v -> action("unmute", c.getValue(), "", "")).bounds(x + 622, y + 100, 72, 20).build());
     }
 
     private void initReports(int x, int y) {
@@ -257,15 +261,26 @@ public final class ServerOperationsScreen extends Screen {
         addListButtons(x+16,y,worlds,8,e->string(e.getAsJsonObject(),"id","dimension"));
         if(selected>=0&&selected<worlds.size()){
             JsonObject w=worlds.get(selected).getAsJsonObject();String id=string(w,"id","");
-            a=box(x+380,y,82,Double.toString(decimal(w,"borderX",0)),16,"Center X");b=box(x+470,y,82,Double.toString(decimal(w,"borderZ",0)),16,"Center Z");c=box(x+560,y,100,Double.toString(decimal(w,"borderSize",1000)),16,"Size");
-            addRenderableWidget(Button.builder(Component.literal("Set border"),v->action("world_border",id,"",a.getValue()+"|"+b.getValue()+"|"+c.getValue())).bounds(x+668,y,58,20).build());
-            d=box(x+380,y+42,82,"16",5,"Radius chunks");
-            addRenderableWidget(Button.builder(Component.literal("Start pregen"),v->action("pregen_start",id,d.getValue(),"")).bounds(x+470,y+42,100,20).build());
-            addRenderableWidget(Button.builder(Component.literal("Stop pregen"),v->action("pregen_stop","","","")).bounds(x+578,y+42,100,20).build());
+            a=box(x+380,y+16,82,Double.toString(decimal(w,"borderX",0)),16,"Center X");
+            b=box(x+470,y+16,82,Double.toString(decimal(w,"borderZ",0)),16,"Center Z");
+            c=box(x+560,y+16,100,Double.toString(decimal(w,"borderSize",1000)),16,"Border size");
+            Button border=addRenderableWidget(Button.builder(Component.literal("Set border"),v->action("world_border",id,"",a.getValue()+"|"+b.getValue()+"|"+c.getValue())).bounds(x+668,y+16,58,20).build());
+            border.setTooltip(Tooltip.create(Component.literal("Apply the world-border center and size to the selected dimension.")));
+            d=box(x+380,y+60,82,"16",5,"Radius chunks");
+            Button startPregen=addRenderableWidget(Button.builder(Component.literal("Start pregen"),v->action("pregen_start",id,d.getValue(),"")).bounds(x+470,y+60,100,20).build());
+            startPregen.setTooltip(Tooltip.create(Component.literal("Pregenerate chunks around the world-border center to reduce exploration lag later.")));
+            addRenderableWidget(Button.builder(Component.literal("Stop pregen"),v->action("pregen_stop","","","")).bounds(x+578,y+60,100,20).build());
         }
         JsonObject s=obj("settings");
-        EditBox chunks=box(x+380,y+82,80,Integer.toString(integer(s,"pregenChunksPerTick",1)),2,"Chunks/tick");EditBox pause=box(x+468,y+82,90,Double.toString(decimal(s,"pregenPauseMspt",48)),8,"Pause MSPT");
-        addRenderableWidget(Button.builder(Component.literal("Save throttle"),v->action("pregen_settings",chunks.getValue(),pause.getValue(),"")).bounds(x+566,y+82,104,20).build());
+        EditBox chunks=box(x+380,y+108,80,Integer.toString(integer(s,"pregenChunksPerTick",1)),2,"Chunks/tick");
+        EditBox pause=box(x+468,y+108,90,Double.toString(decimal(s,"pregenPauseMspt",48)),8,"MSPT");
+        Button save=addRenderableWidget(Button.builder(Component.literal("Save pregen settings"),v->action("pregen_settings",chunks.getValue(),pause.getValue(),"")).bounds(x+566,y+108,130,20).build());
+        save.setTooltip(Tooltip.create(Component.literal("Save pregeneration speed and automatic load-protection threshold.")));
+    }
+
+    private void initHealth(int x,int y){
+        Button details=addRenderableWidget(Button.builder(Component.literal("Technical details: "+(healthDetails?"HIDE":"SHOW")),v->{healthDetails=!healthDetails;rebuildWidgets();}).bounds(x+16,y+62,154,20).build());
+        details.setTooltip(Tooltip.create(Component.literal("Show TPS, MSPT, memory, cache and subsystem timing details.")));
     }
 
     private void initEconomy(int x,int y){JsonObject s=obj("settings");a=box(x+16,y,180,Long.toString(longValue(s,"economyAlertThresholdMinor",1_000_000)),18,"Large transaction threshold");addRenderableWidget(Button.builder(Component.literal("Save threshold"),v->action("economy_threshold",a.getValue(),"","")).bounds(x+204,y,112,20).build());}
@@ -410,7 +425,7 @@ public final class ServerOperationsScreen extends Screen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float pt){int x=left(),y=top(),pw=panelWidth(),ph=panelHeight();g.fill(0,0,width,height,0xA5000000);g.fill(x,y,x+pw,y+ph,PANEL);g.outline(x,y,pw,ph,BORDER);g.text(font,data.admin()?"Server Operations":"Support & Reports",x+14,y+16,TEXT,true);if(data.admin())drawAdmin(g,x,y);else drawSupport(g,x,y);if(!data.notice().isBlank()){var lines=font.split(Component.literal(data.notice()),Math.max(120,pw-28));int base=y+ph-18-Math.max(0,lines.size()-1)*10;for(int i=0;i<Math.min(2,lines.size());i++)g.text(font,lines.get(i),x+14,base+i*10,data.error()?ERROR:GOOD,false);}super.extractRenderState(g,mx,my,pt);}
 
-    private void drawAdmin(GuiGraphicsExtractor g,int x,int y){int cy=y+96;switch(tab){case ACTIVITY->{g.text(font,"Lightweight log: player break/place only; rollback restores block type, not block-entity/NBT state.",x+16,cy+58,MUTED,false);drawRows(g,x+380,cy+86,arr(root,"activity"),8,e->{JsonObject o=e.getAsJsonObject();return string(o,"player","")+" "+string(o,"action","")+" "+("BREAK".equals(string(o,"action",""))?string(o,"before",""):string(o,"after",""))+" @ "+integer(o,"x",0)+","+integer(o,"y",0)+","+integer(o,"z",0);});JsonObject r=obj("rollback");g.text(font,"Rollback: "+(bool(r,"active",false)?integer(r,"processed",0)+"/"+integer(r,"total",0):"idle")+" • restored "+integer(r,"restored",0)+" • skipped "+integer(r,"skipped",0),x+16,cy+292,MUTED,false);}case BACKUPS->{JsonObject b=obj("backup");g.text(font,"Status: "+trim(string(b,"status","Idle"),90),x+16,cy+22,bool(b,"running",false)?WARNING:MUTED,false);drawSelectedDetail(g,x+396,cy+40,arr(b,"files"),"name");}case SCHEDULER->{g.text(font,"Actions: BACKUP • BROADCAST • MAINTENANCE_ON/OFF • SAVE_SSU • SSU_RELOAD • STOP_SERVER",x+16,cy+286,MUTED,false);g.text(font,"STOP_SERVER is restart-ready: your host/watchdog must start the JVM again.",x+16,cy+302,MUTED,false);drawSelectedDetail(g,x+396,cy+38,arr(root,"tasks"),"result");}case MAINTENANCE->g.text(font,"Maintenance bypass: ssu.maintenance.bypass. Disable when normal players may rejoin.",x+16,cy+82,MUTED,false);case CHAT->{g.text(font,"Staff chat: prefix # when ssu.chat.staff is allowed. Chat history is memory-only and capped.",x+16,cy+92,MUTED,false);g.text(font,"Active mutes",x+16,cy+114,MUTED,false);drawRows(g,x+16,cy+132,arr(root,"mutes"),6,e->{JsonObject o=e.getAsJsonObject();return string(o,"name","")+" • "+(longValue(o,"expires",0)<=0?"permanent":"temporary")+" • "+string(o,"reason","");});g.text(font,"Recent chat",x+380,cy+114,MUTED,false);drawRows(g,x+380,cy+132,arr(root,"chatHistory"),6,e->{JsonObject o=e.getAsJsonObject();return (bool(o,"staff",false)?"[Staff] ":"")+string(o,"player","")+": "+string(o,"message","");});}case AUDIT->drawRows(g,x+16,cy,arr(root,"audit"),13,e->{JsonObject o=e.getAsJsonObject();return string(o,"actor","")+" • "+string(o,"action","")+" • "+string(o,"target","")+" • "+string(o,"detail","");});case HEALTH->drawHealth(g,x,cy);case REPORTS->{drawTicketPanel(g,x+380,cy,true);int pages=Math.max(1,(filteredTickets(true).size()+ticketPageSize(true)-1)/ticketPageSize(true));g.text(font,"Page "+(ticketListPage+1)+"/"+pages,x+50,cy+252,MUTED,false);}case WORLDS->{JsonObject p=obj("pregen");g.text(font,"Pregeneration: "+(bool(p,"active",false)?integer(p,"generated",0)+" / "+integer(p,"total",0)+(bool(p,"paused",false)?" • auto-paused for load":""):"idle"),x+380,cy+120,MUTED,false);}case ECONOMY->drawEconomy(g,x,cy);case PROFILES->g.text(font,"Profiles contain configuration only; player balances, mail, inventories and progression are excluded.",x+16,cy+286,MUTED,false);default->{}}}
+    private void drawAdmin(GuiGraphicsExtractor g,int x,int y){int cy=y+96;switch(tab){case ACTIVITY->{g.text(font,"Activity logging",x+16,cy+4,MUTED,false);g.text(font,"Retention (days)",x+340,cy+4,MUTED,false);g.text(font,"Rollback player / UUID",x+380,cy+48,MUTED,false);g.text(font,"Hours",x+548,cy+48,MUTED,false);g.text(font,"Radius (blocks)",x+620,cy+48,MUTED,false);g.text(font,"Logs break/place only; rollback restores block type only (no block-entity/NBT).",x+16,cy+48,MUTED,false);g.text(font,"Recent activity",x+380,cy+112,MUTED,false);drawRows(g,x+380,cy+130,arr(root,"activity"),8,e->{JsonObject o=e.getAsJsonObject();return string(o,"player","")+" "+string(o,"action","")+" "+("BREAK".equals(string(o,"action",""))?string(o,"before",""):string(o,"after",""))+" @ "+integer(o,"x",0)+","+integer(o,"y",0)+","+integer(o,"z",0);});JsonObject r=obj("rollback");g.text(font,"Rollback: "+(bool(r,"active",false)?integer(r,"processed",0)+"/"+integer(r,"total",0):"idle")+" • restored "+integer(r,"restored",0)+" • skipped "+integer(r,"skipped",0),x+16,cy+302,MUTED,false);}case BACKUPS->{JsonObject b=obj("backup");g.text(font,"Backup name",x+16,cy+4,MUTED,false);g.text(font,"Automatic backups",x+282,cy+4,MUTED,false);g.text(font,"Every (min)",x+410,cy+4,MUTED,false);g.text(font,"Keep backups",x+508,cy+4,MUTED,false);g.text(font,"Status: "+trim(string(b,"status","Idle"),90),x+16,cy+42,bool(b,"running",false)?WARNING:MUTED,false);g.text(font,"Backups contain the complete world plus world-specific SSU data.",x+396,cy+42,MUTED,false);drawSelectedDetail(g,x+396,cy+64,arr(b,"files"),"name");}case SCHEDULER->{g.text(font,"Task name",x+16,cy+4,MUTED,false);g.text(font,"Action",x+166,cy+4,MUTED,false);g.text(font,"Schedule",x+306,cy+4,MUTED,false);g.text(font,"Optional payload / broadcast message",x+464,cy+4,MUTED,false);g.text(font,"Schedule: interval minutes, daily@HH:mm, or once@yyyy-MM-ddTHH:mm",x+16,cy+42,MUTED,false);g.text(font,"Actions: BACKUP • BROADCAST • MAINTENANCE_ON/OFF • SAVE_SSU • SSU_RELOAD • STOP_SERVER",x+16,cy+306,MUTED,false);g.text(font,"STOP_SERVER is restart-ready: your host/watchdog must start the JVM again.",x+16,cy+322,MUTED,false);drawSelectedDetail(g,x+396,cy+62,arr(root,"tasks"),"result");}case MAINTENANCE->g.text(font,"Maintenance bypass: ssu.maintenance.bypass. Disable when normal players may rejoin.",x+16,cy+82,MUTED,false);case CHAT->{g.text(font,"Slow sec",x+380,cy+4,MUTED,false);g.text(font,"Dup sec",x+442,cy+4,MUTED,false);g.text(font,"Flood sec",x+504,cy+4,MUTED,false);g.text(font,"Max msgs",x+566,cy+4,MUTED,false);g.text(font,"Caps %",x+622,cy+4,MUTED,false);g.text(font,"Min chars",x+678,cy+4,MUTED,false);g.text(font,"Blocked words / phrases",x+16,cy+46,MUTED,false);g.text(font,"Mute player / UUID",x+16,cy+88,MUTED,false);g.text(font,"Duration (minutes; 0 = permanent)",x+174,cy+88,MUTED,false);g.text(font,"Reason",x+256,cy+88,MUTED,false);g.text(font,"Staff chat: prefix # when ssu.chat.staff is allowed. Chat history is memory-only and capped.",x+16,cy+130,MUTED,false);g.text(font,"Active mutes",x+16,cy+152,MUTED,false);drawRows(g,x+16,cy+170,arr(root,"mutes"),6,e->{JsonObject o=e.getAsJsonObject();return string(o,"name","")+" • "+(longValue(o,"expires",0)<=0?"permanent":"temporary")+" • "+string(o,"reason","");});g.text(font,"Recent chat",x+380,cy+152,MUTED,false);drawRows(g,x+380,cy+170,arr(root,"chatHistory"),6,e->{JsonObject o=e.getAsJsonObject();return (bool(o,"staff",false)?"[Staff] ":"")+string(o,"player","")+": "+string(o,"message","");});}case AUDIT->drawRows(g,x+16,cy,arr(root,"audit"),13,e->{JsonObject o=e.getAsJsonObject();return string(o,"actor","")+" • "+string(o,"action","")+" • "+string(o,"target","")+" • "+string(o,"detail","");});case HEALTH->drawHealth(g,x,cy);case REPORTS->{drawTicketPanel(g,x+380,cy,true);int pages=Math.max(1,(filteredTickets(true).size()+ticketPageSize(true)-1)/ticketPageSize(true));g.text(font,"Page "+(ticketListPage+1)+"/"+pages,x+50,cy+252,MUTED,false);}case WORLDS->{JsonObject p=obj("pregen");if(selected>=0){g.text(font,"Center X",x+380,cy+4,MUTED,false);g.text(font,"Center Z",x+470,cy+4,MUTED,false);g.text(font,"Border size",x+560,cy+4,MUTED,false);g.text(font,"Pregeneration radius (chunks)",x+380,cy+48,MUTED,false);}g.text(font,"Chunks/tick",x+380,cy+96,MUTED,false);g.text(font,"Auto-pause MSPT",x+468,cy+96,MUTED,false);g.text(font,"Pregeneration: "+(bool(p,"active",false)?integer(p,"generated",0)+" / "+integer(p,"total",0)+(bool(p,"paused",false)?" • auto-paused for server load":""):"idle"),x+380,cy+142,bool(p,"paused",false)?WARNING:MUTED,false);g.text(font,"Lower speed is safer; auto-pause protects TPS when the server becomes busy.",x+380,cy+160,MUTED,false);}case ECONOMY->drawEconomy(g,x,cy);case PROFILES->g.text(font,"Profiles contain configuration only; player balances, mail, inventories and progression are excluded.",x+16,cy+286,MUTED,false);default->{}}}
 
     private void drawSupport(GuiGraphicsExtractor g,int x,int y){
         g.text(font,"Your tickets",x+16,y+70,MUTED,false);
@@ -457,7 +472,29 @@ public final class ServerOperationsScreen extends Screen {
         }
     }
 
-    private void drawHealth(GuiGraphicsExtractor g,int x,int y){JsonObject h=obj("health");g.text(font,String.format(Locale.ROOT,"TPS %.2f • MSPT %.2f • p95 %.2f",decimal(h,"tps",20),decimal(h,"mspt",0),decimal(h,"p95Mspt",0)),x+16,y,TEXT,true);g.text(font,"Players "+integer(h,"players",0)+" • SSU jobs "+integer(h,"jobs",0)+" • Uptime "+longValue(h,"uptimeSeconds",0)+"s",x+16,y+22,MUTED,false);long used=longValue(h,"heapUsed",0),max=longValue(h,"heapMax",0);g.text(font,"Heap "+mb(used)+" / "+mb(max)+" MB • Permission cache hit "+String.format(Locale.ROOT,"%.1f%%",decimal(h,"permissionCacheHitRate",0)*100),x+16,y+44,MUTED,false);drawRows(g,x+16,y+78,arr(h,"modules"),10,e->{JsonObject o=e.getAsJsonObject();return String.format(Locale.ROOT,"%s • avg %.3f ms • p95 %.3f • max %.3f",string(o,"name","module"),decimal(o,"avg",0),decimal(o,"p95",0),decimal(o,"max",0));});}
+    private void drawHealth(GuiGraphicsExtractor g,int x,int y){
+        JsonObject h=obj("health");HealthVerdict verdict=healthVerdict(h);
+        g.text(font,"Overall server health",x+16,y,MUTED,false);
+        g.text(font,verdict.label(),x+16,y+18,verdict.color(),true);
+        g.text(font,verdict.summary(),x+116,y+19,verdict.color(),false);
+        if(!healthDetails)return;
+        g.text(font,"Technical details",x+16,y+94,MUTED,true);
+        g.text(font,String.format(Locale.ROOT,"TPS %.2f • MSPT %.2f • p95 %.2f",decimal(h,"tps",20),decimal(h,"mspt",0),decimal(h,"p95Mspt",0)),x+16,y+112,TEXT,true);
+        g.text(font,"Players "+integer(h,"players",0)+" • SSU jobs "+integer(h,"jobs",0)+" • Uptime "+longValue(h,"uptimeSeconds",0)+"s",x+16,y+130,MUTED,false);
+        long used=longValue(h,"heapUsed",0),max=longValue(h,"heapMax",0);
+        g.text(font,"Heap "+mb(used)+" / "+mb(max)+" MB • Permission cache hit "+String.format(Locale.ROOT,"%.1f%%",decimal(h,"permissionCacheHitRate",0)*100),x+16,y+148,MUTED,false);
+        drawRows(g,x+16,y+174,arr(h,"modules"),8,e->{JsonObject o=e.getAsJsonObject();return String.format(Locale.ROOT,"%s • avg %.3f ms • p95 %.3f • max %.3f",string(o,"name","module"),decimal(o,"avg",0),decimal(o,"p95",0),decimal(o,"max",0));});
+    }
+
+    private HealthVerdict healthVerdict(JsonObject h){
+        if(h==null||!h.has("tps")||!h.has("mspt"))return new HealthVerdict("NEUTRAL",NEUTRAL,"Waiting for enough server-health data to rate the server.");
+        double tps=decimal(h,"tps",20),mspt=decimal(h,"mspt",0),p95=decimal(h,"p95Mspt",0);long used=longValue(h,"heapUsed",0),max=longValue(h,"heapMax",0);double heap=max<=0?0:(double)used/(double)max;
+        if(tps<15.0||mspt>60.0||p95>90.0||heap>0.97)return new HealthVerdict("VERY BAD",VERY_BAD,"Severe load detected — investigate immediately.");
+        if(tps<18.0||mspt>48.0||p95>65.0||heap>0.92)return new HealthVerdict("BAD",BAD,"The server is struggling and may lag for players.");
+        if(tps<19.0||mspt>38.0||p95>50.0||heap>0.87)return new HealthVerdict("NEUTRAL",NEUTRAL,"Usable, but server load is getting high.");
+        if(tps<19.8||mspt>28.0||p95>38.0||heap>0.78)return new HealthVerdict("GOOD",GOOD,"Server health is good; there is still healthy headroom.");
+        return new HealthVerdict("GREAT",GREAT,"Everything looks healthy and responsive.");
+    }
 
     private void drawEconomy(GuiGraphicsExtractor g,int x,int y){JsonObject e=obj("economy");g.text(font,"Accounts "+integer(e,"accounts",0)+" • Supply "+longValue(e,"supply",0)+" • Loaded tx "+integer(e,"transactions",0)+" • 24h volume "+longValue(e,"volume24h",0),x+16,y+34,TEXT,false);g.text(font,"Richest players",x+16,y+62,MUTED,false);drawRows(g,x+16,y+80,arr(e,"richest"),7,v->{JsonObject o=v.getAsJsonObject();return string(o,"name","")+" • "+longValue(o,"balance",0);});g.text(font,"Loaded transaction volume by type",x+16,y+220,MUTED,false);drawRows(g,x+16,y+238,arr(e,"types"),5,v->{JsonObject o=v.getAsJsonObject();return string(o,"type","")+" • "+longValue(o,"amount",0);});g.text(font,"Large transaction alerts",x+380,y+62,MUTED,false);drawRows(g,x+380,y+80,arr(e,"alerts"),10,v->{JsonObject o=v.getAsJsonObject();return longValue(o,"amount",0)+" • "+string(o,"type","")+" • "+string(o,"actor","");});}
 
@@ -479,6 +516,8 @@ public final class ServerOperationsScreen extends Screen {
     private static String trim(String s,int max){if(s==null)return"";String v=s.replace('\n',' ');return v.length()<=max?v:v.substring(0,Math.max(0,max-1))+"…";}
     private static String formatTicketTime(long epochMillis){return epochMillis<=0L?"-":TICKET_TIME.format(Instant.ofEpochMilli(epochMillis));}
     private static String on(boolean b){return b?"ON":"OFF";}private static long mb(long bytes){return Math.max(0,bytes)/(1024L*1024L);}
+
+    private record HealthVerdict(String label,int color,String summary){}
 
     private enum Tab { SUPPORT("Support"), ACTIVITY("Activity"), BACKUPS("Backups"), SCHEDULER("Scheduler"), MAINTENANCE("Maintenance"), CHAT("Chat"), AUDIT("Audit"), HEALTH("Health"), REPORTS("Reports"), WORLDS("Worlds"), ECONOMY("Economy"), PROFILES("Profiles");
         static final List<Tab> ADMIN_TABS=List.of(ACTIVITY,BACKUPS,SCHEDULER,MAINTENANCE,CHAT,AUDIT,HEALTH,REPORTS,WORLDS,ECONOMY,PROFILES);final String label;Tab(String l){label=l;}int adminIndex(){return ADMIN_TABS.indexOf(this);} }

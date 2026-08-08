@@ -318,6 +318,31 @@ public final class PlayerIdentityManager {
         } catch (IOException exception) { SimpleServerUtilities.LOGGER.error("Failed to save player identity {}.", id, exception); }
     }
 
+    /** Grants a catalogue title as a durable manual unlock. Returns false when it was already unlocked manually. */
+    public synchronized boolean grantManualTitle(ServerPlayer player, String rawId) {
+        if (player == null) throw new IllegalArgumentException("Player is required.");
+        String id = PlayerTitleDefinition.normalizeId(rawId);
+        if (definition(id).isEmpty()) throw new IllegalArgumentException("Unknown title: " + id);
+        PlayerIdentityData data = ensurePlayer(player);
+        boolean changed = data.manuallyUnlockedTitles.add(id);
+        if (changed) savePlayer(player.getUUID(), data);
+        return changed;
+    }
+
+    public synchronized boolean revokeManualTitle(ServerPlayer player, String rawId) {
+        if (player == null) return false;
+        String id = PlayerTitleDefinition.normalizeId(rawId);
+        PlayerIdentityData data = ensurePlayer(player);
+        boolean changed = data.manuallyUnlockedTitles.remove(id);
+        if (changed) {
+            if (id.equals(data.selectedTitleId) && !isUnlocked(player, definition(id).orElse(null), data)) {
+                data.selectedTitleId = firstUnlocked(player, data).map(value -> value.id).orElse("");
+            }
+            savePlayer(player.getUUID(), data);
+        }
+        return changed;
+    }
+
     private synchronized Optional<PlayerTitleDefinition> definition(String rawId) {
         if (rawId == null || rawId.isBlank()) return Optional.empty();
         String id = PlayerTitleDefinition.normalizeId(rawId);

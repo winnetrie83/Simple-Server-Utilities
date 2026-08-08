@@ -27,6 +27,7 @@ import net.minecraft.server.MinecraftServer;
  */
 public final class NpcTextureAssetService {
     public static final int MAX_TEXTURE_BYTES = 512 * 1024;
+    private static final long FAILED_RETRY_NANOS = Duration.ofSeconds(30).toNanos();
     private static final byte[] PNG_SIGNATURE = {(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
     private final Map<String, CompletableFuture<CacheEntry>> pending = new ConcurrentHashMap<>();
@@ -56,8 +57,13 @@ public final class NpcTextureAssetService {
         if (definition == null || !definition.textureSource().custom()) return null;
         String sourceKey = sourceKey(definition);
         CacheEntry existing = cache.get(definition.id);
-        if (existing != null && existing.sourceKey.equals(sourceKey)) return existing.asset;
-        if (existing != null) cache.remove(definition.id, existing);
+        if (existing != null && existing.sourceKey.equals(sourceKey)) {
+            if (existing.asset != null) return existing.asset;
+            if (System.nanoTime() < existing.retryAfterNanos) return null;
+            cache.remove(definition.id, existing);
+        } else if (existing != null) {
+            cache.remove(definition.id, existing);
+        }
         String definitionId = definition.id;
         if (!pending.containsKey(definitionId)) {
             NpcDefinition snapshot = definition.copy();
@@ -67,7 +73,7 @@ public final class NpcTextureAssetService {
                 future.whenComplete((entry, failure) -> {
                     if (!pending.remove(definitionId, future)) return;
                     if (failure != null) {
-                        cache.put(definitionId, new CacheEntry(sourceKey, null));
+                        cache.put(definitionId, CacheEntry.failed(sourceKey));
                         SimpleServerUtilities.LOGGER.warn("Failed loading custom NPC texture for {}: {}", definitionId, failure.getMessage());
                     } else {
                         cache.put(definitionId, entry);
@@ -90,14 +96,14 @@ public final class NpcTextureAssetService {
                 case URL -> loadUrl(definition.textureValue);
                 default -> null;
             };
-            if (bytes == null) return new CacheEntry(sourceKey, null);
+            if (bytes == null) return CacheEntry.failed(sourceKey);
             validatePng(bytes);
             String hash = sha256(bytes);
-            return new CacheEntry(sourceKey, new Asset(definition.id, hash, definition.textureModel, bytes));
+            return CacheEntry.success(sourceKey, new Asset(definition.id, hash, definition.textureModel, bytes));
         } catch (Exception exception) {
             SimpleServerUtilities.LOGGER.warn("Custom NPC texture '{}' for {} could not be loaded: {}",
                     definition.textureValue, definition.id, exception.getMessage());
-            return new CacheEntry(sourceKey, null);
+            return CacheEntry.failed(sourceKey);
         }
     }
 
@@ -120,8 +126,15 @@ public final class NpcTextureAssetService {
         if (uri.getHost() == null || uri.getHost().isBlank()) throw new IllegalArgumentException("Texture URL has no host");
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5))
                 .followRedirects(HttpClient.Redirect.NORMAL).build();
+        String origin = uri.getScheme() + "://" + uri.getAuthority() + "/";
         HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10))
-                .header("User-Agent", "SimpleServerUtilities-NPC-Texture/1").GET().build();
+                // Some public skin/CDN hosts reject generic Java/bot user agents or direct
+                // image requests without a same-origin referrer. These headers still identify
+                // SSU while behaving like a normal image-capable web client.
+                .header("User-Agent", "Mozilla/5.0 (compatible; SimpleServerUtilities-NPC-Texture/1)")
+                .header("Accept", "image/png,image/*;q=0.9,*/*;q=0.1")
+                .header("Referer", origin)
+                .GET().build();
         HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             try (InputStream ignored = response.body()) { /* close */ }
@@ -154,7 +167,14 @@ public final class NpcTextureAssetService {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
     }
 
-    private record CacheEntry(String sourceKey, Asset asset) {}
+    private record CacheEntry(String sourceKey, Asset asset, long retryAfterNanos) {
+        static CacheEntry success(String sourceKey, Asset asset) {
+            return new CacheEntry(sourceKey, asset, Long.MAX_VALUE);
+        }
+        static CacheEntry failed(String sourceKey) {
+            return new CacheEntry(sourceKey, null, System.nanoTime() + FAILED_RETRY_NANOS);
+        }
+    }
 
     public record Asset(String definitionId, String hash, String model, byte[] bytes) {
         public Asset {

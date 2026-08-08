@@ -60,7 +60,6 @@ import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
-import be.winnetrie.mod.simpleserverutilities.statistics.StatisticEventType;
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderCategory;
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderLayer;
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderVisualizationSettings;
@@ -1449,6 +1448,34 @@ public final class MinigameManager {
             progress.normalize(player.getUUID());
             saveExperienceData();
         }
+    }
+
+    /** Returns whether a player currently owns a minigame cosmetic entitlement. */
+    public synchronized boolean progressionCosmeticUnlocked(UUID playerId, String rawCosmeticId) {
+        if (playerId == null) return false;
+        String cosmeticId = rawCosmeticId == null ? "" : rawCosmeticId.trim().toLowerCase(java.util.Locale.ROOT);
+        if (cosmeticId.isBlank()) return false;
+        MinigameProgressionData.PlayerProgress progress = progression.players.get(playerId.toString());
+        if (progress == null) return false;
+        progress.normalize(playerId);
+        return progress.unlockedCosmetics.contains(cosmeticId);
+    }
+
+    /**
+     * Achievement/content reward bridge for the existing minigame cosmetic catalogue.
+     * Unknown IDs are retained as entitlements so future cosmetic renderers can consume them.
+     */
+    public synchronized void setProgressionCosmeticUnlocked(ServerPlayer player, String rawCosmeticId, boolean unlocked) {
+        if (player == null) throw new IllegalArgumentException("Player is unavailable.");
+        String cosmeticId = rawCosmeticId == null ? "" : rawCosmeticId.trim().toLowerCase(java.util.Locale.ROOT);
+        if (cosmeticId.isBlank() || cosmeticId.length() > 64) throw new IllegalArgumentException("Invalid minigame cosmetic ID.");
+        MinigameProgressionData.PlayerProgress progress = progression.getOrCreate(
+                player.getUUID(), player.getName().getString());
+        if (unlocked) progress.unlockedCosmetics.add(cosmeticId);
+        else progress.unlockedCosmetics.remove(cosmeticId);
+        progress.updatedAtEpochMilli = System.currentTimeMillis();
+        progress.normalize(player.getUUID());
+        saveExperienceData();
     }
 
     /** Shared progression level used by the global title catalogue. */
@@ -3444,10 +3471,6 @@ public final class MinigameManager {
             if (online == null) continue;
             boolean won = match.winningTeams.contains(match.team(playerId));
             try {
-                SimpleServerUtilities.STATISTICS.increment(
-                        online, StatisticEventType.MINIGAME_COMPLETED, definition.id, 1L);
-                if (won) SimpleServerUtilities.STATISTICS.increment(
-                        online, StatisticEventType.MINIGAME_WIN, definition.id, 1L);
                 int before = match.priorLevels.getOrDefault(playerId,
                         match.resultingLevels.getOrDefault(playerId, 1));
                 int after = match.resultingLevels.getOrDefault(playerId, before);
@@ -4564,8 +4587,6 @@ public final class MinigameManager {
                     match.performance(playerId).objectiveTicks, 20L);
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
             if (player != null && match.rewardsEnabled) {
-                SimpleServerUtilities.STATISTICS.increment(player,
-                        StatisticEventType.MINIGAME_OBJECTIVE_TIME, definition.id, 1L);
                 publish(player, ContentEventTypes.MINIGAME_OBJECTIVE_TIME, definition.id, 1L,
                         Map.of("match", match.id.toString()));
             }
@@ -4579,7 +4600,6 @@ public final class MinigameManager {
         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
         if (player != null) {
             if (match.rewardsEnabled) {
-                SimpleServerUtilities.STATISTICS.increment(player, StatisticEventType.MINIGAME_CAPTURE, definition.id, 1L);
                 publish(player, ContentEventTypes.MINIGAME_CAPTURE, definition.id, 1L,
                         Map.of("match", match.id.toString(), "objective", objective == null ? "" : objective));
             }
@@ -4601,7 +4621,6 @@ public final class MinigameManager {
         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
         if (player != null) {
             if (match.rewardsEnabled) {
-                SimpleServerUtilities.STATISTICS.increment(player, StatisticEventType.MINIGAME_DEFENSE, definition.id, 1L);
                 publish(player, ContentEventTypes.MINIGAME_DEFENSE, definition.id, 1L,
                         Map.of("match", match.id.toString(), "objective", objective == null ? "" : objective));
             }
@@ -5536,7 +5555,6 @@ public final class MinigameManager {
         recordActivity(victim);
         if (attacker != null) recordActivity(attacker);
         if (attacker != null && matchFor(attacker.getUUID()) == match && match.rewardsEnabled) {
-            SimpleServerUtilities.STATISTICS.increment(attacker, StatisticEventType.MINIGAME_DAMAGE, definition.id, amount);
             publish(attacker, ContentEventTypes.MINIGAME_DAMAGE, definition.id, amount,
                     Map.of("match", match.id.toString(), "victim", victim.getUUID().toString()));
         }
@@ -5570,18 +5588,15 @@ public final class MinigameManager {
             }
         }
         if (match.rewardsEnabled) {
-            SimpleServerUtilities.STATISTICS.increment(victim, StatisticEventType.MINIGAME_DEATH, definition.id, 1L);
             publish(victim, ContentEventTypes.MINIGAME_DEATH, definition.id, 1L,
                     Map.of("match", match.id.toString()));
             if (killer != null) {
-                SimpleServerUtilities.STATISTICS.increment(killer, StatisticEventType.MINIGAME_KILL, definition.id, 1L);
                 publish(killer, ContentEventTypes.MINIGAME_KILL, definition.id, 1L,
                         Map.of("match", match.id.toString(), "victim", victim.getUUID().toString()));
             }
             for (UUID assistId : assists) {
                 ServerPlayer assist = server.getPlayerList().getPlayer(assistId);
                 if (assist != null) {
-                    SimpleServerUtilities.STATISTICS.increment(assist, StatisticEventType.MINIGAME_ASSIST, definition.id, 1L);
                     publish(assist, ContentEventTypes.MINIGAME_ASSIST, definition.id, 1L,
                             Map.of("match", match.id.toString(), "victim", victim.getUUID().toString()));
                 }
@@ -6457,10 +6472,9 @@ public final class MinigameManager {
                 match.performance(healer.getUUID()).healingDone, hundredths);
         MinigameDefinition definition = definitions.get(match.minigameId);
         if (definition != null && hundredths > 0L && match.rewardsEnabled) {
-            SimpleServerUtilities.STATISTICS.increment(healer, StatisticEventType.MINIGAME_HEALING,
-                    definition.id, hundredths);
             publish(healer, ContentEventTypes.MINIGAME_HEALING, definition.id, hundredths,
-                    Map.of("match", match.id.toString(), "target", target.getUUID().toString()));
+                    Map.of("match", match.id.toString(), "target", target.getUUID().toString(),
+                            "self", Boolean.toString(healer.getUUID().equals(target.getUUID()))));
         }
         return true;
     }
@@ -7007,7 +7021,7 @@ public final class MinigameManager {
             MinigameGameType type = MinigameGameType.parse(definition.gameType);
             if (type == MinigameGameType.SPLEEF && !definition.spleef.allowPvp) return false;
             if (type != MinigameGameType.SPLEEF && type != MinigameGameType.CAPTURE_THE_FLAG
-                    && type != MinigameGameType.DOMINATION) return false;
+                    && type != MinigameGameType.DOMINATION && type != MinigameGameType.KING_OF_THE_HILL) return false;
             MinigameArenaDefinition arena = arena(definition, match.arenaId);
             Region region = arena == null ? null : SimpleServerUtilities.REGIONS.get(arena.regionId);
             return region != null && region.contains(attacker.level().dimension(), targetPos);

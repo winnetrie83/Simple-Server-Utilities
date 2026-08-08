@@ -1,28 +1,38 @@
 package be.winnetrie.mod.simpleserverutilities.client.region;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import be.winnetrie.mod.simpleserverutilities.client.gui.RegionSnapshotPreviewScreen;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSnapshotPreviewPayload;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
-/** Client-only state and free-inspection controller for snapshot previews. */
+/** Client-only state, chunk assembler and free-inspection controller for snapshot previews. */
 public final class RegionSnapshotPreviewClientState {
-    private static RegionSnapshotPreviewPayload snapshot = empty();
+    private static Snapshot snapshot = Snapshot.empty();
+    private static Assembly assembly;
     private static boolean freeMode;
     private static boolean previousAttackDown;
 
     private RegionSnapshotPreviewClientState() { }
 
     public static synchronized void accept(RegionSnapshotPreviewPayload payload) {
-        snapshot = payload == null ? empty() : payload;
-        if (!snapshot.active()) {
-            freeMode = false;
-            previousAttackDown = false;
+        if (payload == null || !payload.active()) {
+            clear();
+            return;
         }
+        if (payload.reset() || payload.chunkIndex() == 0 || assembly == null
+                || !assembly.matches(payload)) {
+            assembly = new Assembly(payload);
+        }
+        if (assembly == null || !assembly.matches(payload)) return;
+        assembly.accept(payload);
+        snapshot = assembly.snapshot();
     }
 
-    public static synchronized RegionSnapshotPreviewPayload snapshot() { return snapshot; }
+    public static synchronized Snapshot snapshot() { return snapshot; }
     public static synchronized boolean active() { return snapshot.active(); }
     public static synchronized boolean freeMode() { return freeMode && snapshot.active(); }
 
@@ -64,8 +74,10 @@ public final class RegionSnapshotPreviewClientState {
     public static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
         if (!freeMode() || minecraft.player == null || minecraft.gui.screen() != null) return;
+        Snapshot data = snapshot();
         String title = "Snapshot preview · Free mode";
-        String help = "Move and inspect freely · Left-click to return to edit controls";
+        String progress = data.complete() ? "" : " · streaming " + data.receivedBlocks() + "/" + data.totalBlocks();
+        String help = "Move and inspect freely · Left-click to return to edit controls" + progress;
         graphics.text(minecraft.font, title, (graphics.guiWidth() - minecraft.font.width(title)) / 2,
                 10, 0xFF6FE7FF, true);
         graphics.text(minecraft.font, help, (graphics.guiWidth() - minecraft.font.width(help)) / 2,
@@ -73,12 +85,75 @@ public final class RegionSnapshotPreviewClientState {
     }
 
     public static synchronized void clear() {
-        snapshot = empty();
+        snapshot = Snapshot.empty();
+        assembly = null;
         freeMode = false;
         previousAttackDown = false;
     }
 
-    private static RegionSnapshotPreviewPayload empty() {
-        return new RegionSnapshotPreviewPayload(false, "", "", 0L, 0, 0, 0, 0, false, java.util.List.of());
+    public record Snapshot(boolean active, String snapshotName, String dimension, long origin,
+                           int sizeX, int sizeY, int sizeZ, int totalBlocks, int receivedBlocks,
+                           List<String> palette, List<RegionSnapshotPreviewPayload.PreviewBlock> blocks,
+                           boolean complete) {
+        public Snapshot {
+            snapshotName = snapshotName == null ? "" : snapshotName;
+            dimension = dimension == null ? "" : dimension;
+            palette = palette == null ? List.of() : List.copyOf(palette);
+            blocks = blocks == null ? List.of() : List.copyOf(blocks);
+        }
+
+        static Snapshot empty() {
+            return new Snapshot(false, "", "", 0L, 0, 0, 0, 0, 0, List.of(), List.of(), true);
+        }
+    }
+
+    private static final class Assembly {
+        private final String name;
+        private final String dimension;
+        private final long origin;
+        private final int sizeX, sizeY, sizeZ, totalBlocks, chunkCount, totalPaletteEntries;
+        private final ArrayList<String> palette = new ArrayList<>();
+        private final ArrayList<RegionSnapshotPreviewPayload.PreviewBlock> blocks = new ArrayList<>();
+        private int nextChunk;
+
+        private Assembly(RegionSnapshotPreviewPayload first) {
+            name = first.snapshotName();
+            dimension = first.dimension();
+            origin = first.origin();
+            sizeX = first.sizeX();
+            sizeY = first.sizeY();
+            sizeZ = first.sizeZ();
+            totalBlocks = first.totalBlocks();
+            chunkCount = first.chunkCount();
+            totalPaletteEntries = first.totalPaletteEntries();
+            for (int i = 0; i < totalPaletteEntries; i++) palette.add("");
+        }
+
+        private boolean matches(RegionSnapshotPreviewPayload payload) {
+            return payload.active()
+                    && name.equals(payload.snapshotName())
+                    && dimension.equals(payload.dimension())
+                    && origin == payload.origin()
+                    && sizeX == payload.sizeX() && sizeY == payload.sizeY() && sizeZ == payload.sizeZ()
+                    && totalBlocks == payload.totalBlocks() && chunkCount == payload.chunkCount()
+                    && totalPaletteEntries == payload.totalPaletteEntries();
+        }
+
+        private void accept(RegionSnapshotPreviewPayload payload) {
+            if (payload.chunkIndex() != nextChunk) return;
+            if (nextChunk == 0) blocks.clear();
+            for (int i = 0; i < payload.palette().size(); i++) {
+                int index = payload.paletteOffset() + i;
+                if (index >= 0 && index < palette.size()) palette.set(index, payload.palette().get(i));
+            }
+            blocks.addAll(payload.blocks());
+            nextChunk++;
+        }
+
+        private Snapshot snapshot() {
+            boolean complete = nextChunk >= chunkCount;
+            return new Snapshot(true, name, dimension, origin, sizeX, sizeY, sizeZ, totalBlocks, blocks.size(),
+                    complete ? palette : List.of(), complete ? blocks : List.of(), complete);
+        }
     }
 }

@@ -30,6 +30,7 @@ public class SSUCommands {
                 .then(HologramCommands.build())
                 .then(NpcCommands.build())
                 .then(QuestCommands.build())
+                .then(AchievementCommands.build())
                 .then(MinigameCommands.build())
                 .then(DungeonCommands.build()));
 
