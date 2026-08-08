@@ -1,23 +1,72 @@
-## Current development build: 1.9.0-dev3.16
+## Current development build: 1.9.0-dev3.24.2
 
-### King of the Hill v2 (on top of NPC redesign + Block Party)
+### NPC custom skin renderer hotfix
 
-- Reorganizes the NPC editor into clear Identity, Appearance, Interaction, Behavior, Relations, Stats, Loadout, Schedule and Respawn pages while preserving the existing reusable-definition/placement model.
-- Merchant NPCs now use an NPC-first shop workflow: create/edit the NPC's linked shop directly from Interaction, while intentionally shared shops remain available as an advanced option. The embedded shop editor hides technical shop-library navigation and returns directly to the NPC editor after save.
-- Shop offer authoring copies exact stacks from the administrator inventory without consuming them: left click copies the full stack and right click copies one item.
-- Adds optional custom player-style NPC skins from either a server-local PNG below `simpleserverutilities/npcs/textures` or an HTTPS URL. Custom skins are bounded to 64x64 PNG and 512 KiB, server-validated/cached and distributed to clients by SSU; clients do not need their own local copy. Wide and slim player models are supported.
-- Custom skins use the vanilla mannequin shell, fall back safely when an asset is invalid/unavailable and are explicitly removed client-side when custom texture use is disabled or replaced. Saving an NPC invalidates the server texture cache so replacing a file at the same path/URL can be reloaded.
-- **King of the Hill v2** now stores STATIC/ROTATING mode per arena. STATIC uses a 40% red / 20% neutral / 40% blue tug-of-war control bar with a live yellow marker and direction indicator; ROTATING uses multiple authored hill points with warning/countdown and direct presence scoring. Both modes have a live score HUD, inside-hill feedback and a translucent in-world hill dome that changes from neutral white to the scoring team colour.
-- Adds fully implemented **Block Party**: 2–32 player free-for-all, configurable block palette, round countdown/speedup/drop time/tile size/fall depth, announced safe block, floor removal/repaint loop, elimination, last-player-standing win handling and region snapshot restoration.
-- Both new modes are supported by Minigame creation/editor/setup workflows and arena validation.
-- Network protocol: `100`.
-- NPC definition schema: `9`.
-- Minigame definition schema: `21`.
-- Server Operations schema remains `3`; Mine schema remains `3`; physical Jail schema remains `2`.
+- Fixed Local server PNG and HTTPS NPC skins rendering as Minecraft's magenta/black missing texture.
+- Dynamic NPC skin textures are now bound through `ClientAsset.ResourceTexture` with an explicit texture path matching the exact identifier registered in the client `TextureManager`.
+- Dynamic skin identifiers are definition-specific, so two NPC definitions using identical PNG bytes no longer share a releasable texture registration.
+- Wide/SLIM model-only changes reuse the already installed dynamic texture safely.
+- Client-side skin installation failures are now logged instead of being silently swallowed.
+- Local texture folder remains `<world>/simpleserverutilities/npcs/textures/`; URL/local source formats and the 64x64 / 512 KiB limits are unchanged.
+- Network protocol remains `105`; NPC schema remains `9`; all persistence schemas are unchanged.
+
+
+### NPC label and remote skin hotfix
+
+- Managed NPC runtime entities no longer carry a vanilla CustomName, preventing Minecraft from showing a second large nameplate while the NPC is targeted.
+- NPC role/name/faction overhead labels are approximately twice the previous base size and now scale their text size and spacing with the NPC SCALE attribute.
+- Remote HTTPS skin loading uses image/browser-compatible request headers and retries transient failures after a bounded 30-second cooldown instead of caching a failed URL forever.
+- Network protocol remains `105`; NPC schema remains `9`; all persistence schemas are unchanged.
+
+### Dashboard icons, Cosmetics placeholder and minimap player arrow
+
+- Added the supplied 16x16 `achievements.png` icon to player and admin Achievement tiles.
+- Added the supplied 16x16 `games.png` icon to player and admin Minigame tiles.
+- Added a new player-dashboard **Cosmetics** tile using the supplied 16x16 `cosmetics.png`; it currently opens a local Coming Soon placeholder and has no cosmetic backend yet.
+- Replaced the procedurally drawn minimap player marker with the supplied 16x16 `arrow.png`, preserving the existing minimap rotation behavior and centering it on the effective map area.
+- Network protocol remains `105`; Player UI Preferences schema remains `13`; all persistence schemas are unchanged.
+
+## Previous development build: 1.9.0-dev3.23.3
+
+### Achievement pickers, Server Operations clarity, Region Tool input and minimap frames
+
+- Achievement icon selection now uses a scrollable, searchable inventory-style catalogue of all registered items with real item icons, explicit selection and confirmation. The previous picker bug that lost the chosen value when returning to the editor is fixed.
+- Achievement item rewards now copy an exact ItemStack template from the editing administrator's own live inventory, without consuming or moving the real item. Selection is explicit and the reward count remains independently editable.
+- Server Operations > Activity, Scheduler and Chat now label the previously bare text/numeric controls with their actual purpose and units, with supporting tooltips where useful.
+- Region Tool mouse input is deterministic: left-click a block sets Point 1, right-click a block sets Point 2, and only right-clicking the air opens the Region GUI.
+- Minimap Settings adds `Frame: CLASSIC / TEXTURED`. Classic preserves the existing SSU border and remains the migration default; Textured uses the supplied square/round frame automatically for the active minimap shape. The textured round map is circularly clipped.
+- Network protocol is `105`; Player UI preference schema is `13`; all other persistence schemas remain unchanged from dev3.22.
+
+## Current development build: 1.9.0-dev3.22
+
+### Achievement UX, server-health clarity and GUI polish
+
+- Player/admin Achievement screens are roughly 25% smaller; admin editing is guided through collapsible sections, human-readable switches and searchable registry/player pickers.
+- Achievement rewards display their effective reward (including real item icons), and earning an achievement plays the vanilla challenge-complete advancement sound.
+- Hologram coordinates/rich-text layout and the Mail Composer were compacted and cleaned up.
+- Server Operations Backup/Worlds fields now have clear labels/tooltips, and Health leads with a color-coded Great/Good/Neutral/Bad/Very Bad verdict with technical details on demand.
+- Network protocol is `104`; persistence schemas remain unchanged from dev3.21.1.
+
+### Achievements + shared progression foundation
+
+- Added a full custom **Achievement system** with rich-text title/info, category/icon, hidden/enabled/announce controls, multi-objective progress, multi-reward support, clickable chat announcements, player comparison and admin create/edit/delete/reset tools.
+- Player Dashboard and Admin Dashboard both contain dedicated Achievement entries. Players can filter All/Earned/Unearned; hidden achievements stay secret until the viewer has earned them.
+- Generic Content gameplay events are now independent of Quests, with reusable objective matching (`ANY`/`EXACT`/`LIST`/`TAG`, `COUNT`/`SUM`/`MAX`/`UNIQUE`) for blocks, mobs, damage/equipment, crafting/use, travel/dimensions/biomes, claims, auctions, quests, minigames, dungeons, NPCs and more.
+- Added a persistent fail-closed **Content Reward Ledger**, exact ItemStack rewards, mail fallback, title/cosmetic rewards and persistent temporary-permission overlays.
+- Statistics now consume the shared Content Event Bus, protect future schemas and lazy-load normal player records.
+- World Edit snapshot preview now segments palettes, avoids repeated stream copies and spatially culls 16³ preview sections.
+- Entity Insight FLEEING now has a 5-second recent-hit TTL; unchanged snapshots are suppressed and normal sync runs every 10 ticks.
+- Shared rich text is no longer Hologram-specific.
 
 Version state:
 
-- Network protocol: `100`
+- Network protocol: `104`
+- Achievement definition schema: `1`
+- Achievement player-progress schema: `1`
+- Content Reward Ledger schema: `1`
+- Temporary Permission overlay schema: `1`
+- Custom Statistics definition/player schema: `2`
+- Auction purchase journal schema: `2`
 - Server Operations schema: `3`
 - Mine definition schema: `3`
 - Physical Jail definition schema: `2`
@@ -38,9 +87,30 @@ Version state:
 - Minigame recovery schema: `4`
 - Minigame progression schema: `3`
 - Minigame match-history schema: `1`
-- Player UI preference schema: `11`
+- Player UI preference schema: `12`
 - Title catalogue schema: `1`
 - Player identity schema: `1`
+
+## Previous development build: 1.9.0-dev3.20.1
+
+- World Edit input/compact tools and realistic ghost snapshot preview from dev3.20 remain included.
+- Entity Insight excludes Armor Stands and includes the cyan FLEEING attitude; dev3.20.1 restored the missing enum member compile hotfix.
+- Network protocol was `102`.
+
+## Previous development build: 1.9.0-dev3.19
+
+- Rich-text palettes use two rows of eight; Floating Hologram swatches are larger and the Black tooltip label is readable.
+- World Edit transforms preserve hanging-entity Facing for item frames/glow item frames/paintings.
+- SSU NPCs suppress the duplicate vanilla target nameplate.
+- Entity Insight added friendly/neutral/hostile overhead labels, optional health, 0-32 block range, 1-50 nearest-entity cap and default-granted `ssu.entity_insight.use`.
+- Network protocol was `101`; Player UI preference schema became `12`.
+
+## Previous development build: 1.9.0-dev3.16
+
+### King of the Hill v2
+- Added per-arena STATIC/ROTATING KOTH modes, live score HUD, static tug-of-war control bar, rotating authored hill points and a translucent in-world hill dome.
+- Added KOTH editor/setup labels, hill-point setup visuals and compacted the detailed in-match overview.
+- Network protocol increased to `100`; Minigame definition schema increased to `21`.
 
 ## Previous development build: 1.9.0-dev3.15.4
 
@@ -258,7 +328,7 @@ Version state:
 - Title catalogue schema: `1`
 - Player identity schema: `1`
 
-## Current development build: 1.9.0-dev3.6.2
+## Previous development build: 1.9.0-dev3.6.2
 
 ### Compact Region Setup Tool and region selection toggle
 
@@ -267,7 +337,7 @@ Version state:
 - Adds `Select region` / `Unselect region` to copy exact region bounds into the active Region Tool selection.
 - Network protocol remains `91`; all schemas remain unchanged.
 
-## Current development build: 1.9.0-dev3.6.1
+## Previous development build: 1.9.0-dev3.6.1
 
 ### Compile hotfix
 
@@ -299,7 +369,7 @@ Version state:
 - Title catalogue schema: `1`
 - Player identity schema: `1`
 
-## Current development build: 1.9.0-dev3.5
+## Previous development build: 1.9.0-dev3.5
 
 ### GUI completion, advanced ranks and Player Claim access roles
 
@@ -327,7 +397,7 @@ Version state:
 - Title catalogue schema: `1`
 - Player identity schema: `1`
 
-## Current development build: 1.9.0-dev3.4
+## Previous development build: 1.9.0-dev3.4
 
 ### Region Setup Tool and scheduled region restoration
 
@@ -352,7 +422,7 @@ Version state:
 - Title catalogue schema: `1`
 - Player identity schema: `1`
 
-## Current development build: 1.9.0-dev3.3.3
+## Previous development build: 1.9.0-dev3.3.3
 
 ### Damage indicators, smooth titles and universal match inventory locking
 
@@ -373,7 +443,7 @@ Version state:
 - Title catalogue schema: `1`
 - Player identity schema: `1`
 
-## Current development build: 1.9.0-dev3.3
+## Previous development build: 1.9.0-dev3.3
 
 ### Global player identity and combat feedback
 
@@ -394,7 +464,7 @@ Version state:
 - Title catalogue schema: `1`
 - Player identity schema: `1`
 
-## Current development build: 1.9.0-dev3.2.1
+## Previous development build: 1.9.0-dev3.2.1
 
 ### Minigame manager API compile hotfix
 
@@ -412,7 +482,7 @@ Version state:
 - Minigame match-history schema: `1`
 - Player UI preference schema: `10`
 
-## Current development build: 1.9.0-dev3.2
+## Previous development build: 1.9.0-dev3.2
 
 ### Minigame progression, preparation and match-overview polish
 
@@ -433,7 +503,7 @@ Version state:
 - Minigame match-history schema: `1`
 - Player UI preference schema: `10`
 
-## Current development build: 1.9.0-dev3.1
+## Previous development build: 1.9.0-dev3.1
 
 ### MVP validator, boosts, borders and dashboard polish
 
@@ -453,7 +523,7 @@ Version state:
 - Minigame match-history schema: `1`
 - Player UI preference schema: `9`
 
-## Current development build: 1.9.0-dev3.0.2
+## Previous development build: 1.9.0-dev3.0.2
 
 ### Reward, border and compact-GUI update
 
@@ -463,7 +533,7 @@ Version state:
 - Adds the supplied claim-land, travel, wallet, mail and minigame dashboard textures and renders dashboard tile icons at approximately twice their former size.
 - Network protocol remains `85`; Minigame definition schema remains `16`; recovery schema remains `4`; progression schema remains `3`; match-history schema remains `1`; Player UI preference schema remains `9`.
 
-## Current development build: 1.9.0-dev3.0
+## Previous development build: 1.9.0-dev3.0
 
 ### Minigame Experience Update
 
@@ -483,7 +553,7 @@ Version state:
 - Minigame match-history schema: `1`
 - Player UI preference schema: `9`
 
-## Current development build: 1.9.0-dev2.9.3.1
+## Previous development build: 1.9.0-dev2.9.3.1
 
 ### Minecraft 26.2 Tank knockback compile hotfix (1.9.0-dev2.9.3.1)
 
@@ -498,7 +568,7 @@ Version state:
 - Minigame recovery schema: `4`
 - Player UI preference schema: `9`
 
-## Current development build: 1.9.0-dev2.9.3
+## Previous development build: 1.9.0-dev2.9.3
 
 ### Delayed respawns and controlled minigame healing (1.9.0-dev2.9.3)
 
@@ -517,7 +587,7 @@ Version state:
 - Minigame recovery schema: `4`
 - Player UI preference schema: `9`
 
-## Current development build: 1.9.0-dev2.9.2
+## Previous development build: 1.9.0-dev2.9.2
 
 ### Single queue action and Tank knockback (1.9.0-dev2.9.2)
 
@@ -534,7 +604,7 @@ Version state:
 - Minigame recovery schema: `4`
 - Player UI preference schema: `9`
 
-## Current development build: 1.9.0-dev2.9.1
+## Previous development build: 1.9.0-dev2.9.1
 
 ### Minigame arena block-placement hotfix (1.9.0-dev2.9.1)
 
@@ -563,7 +633,7 @@ Version state:
 - Minigame recovery schema: `4`
 - Player UI preference schema: `9`
 
-## Current development build: 1.9.0-dev2.8.2
+## Previous development build: 1.9.0-dev2.8.2
 
 ### Runtime objective labels and minigame borders (1.9.0-dev2.8.2)
 

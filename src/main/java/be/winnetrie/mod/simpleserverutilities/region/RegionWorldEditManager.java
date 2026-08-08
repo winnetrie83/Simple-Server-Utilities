@@ -139,6 +139,46 @@ public final class RegionWorldEditManager {
                 operationLocks(level, minX, minY, minZ, maxX, maxY, maxZ), true);
     }
 
+    public static RegionReplaceJob createReplaceJob(
+            ServerLevel level,
+            RegionSelection selection,
+            List<String> sourceBlockIds,
+            String weightedTargetList,
+            long maxVolume
+    ) {
+        if (selection == null || !selection.isComplete()) {
+            throw new IllegalArgumentException("Selection is incomplete.");
+        }
+        if (sourceBlockIds == null || sourceBlockIds.isEmpty()) {
+            throw new IllegalArgumentException("Choose at least one source block to replace.");
+        }
+        Set<Block> sourceBlocks = new HashSet<>();
+        for (String raw : sourceBlockIds) {
+            String value = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+            if (value.isBlank()) continue;
+            String id = value.contains(":") ? value : "minecraft:" + value;
+            Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(id)).orElseThrow(
+                    () -> new IllegalArgumentException("Unknown source block: " + id));
+            sourceBlocks.add(block);
+        }
+        if (sourceBlocks.isEmpty()) throw new IllegalArgumentException("Choose at least one valid source block.");
+        List<WeightedBlock> targets = parseWeightedBlocks(weightedTargetList);
+        if (targets.isEmpty()) throw new IllegalArgumentException("Choose at least one replacement block.");
+
+        int minX = Math.min(selection.getPoint1().getX(), selection.getPoint2().getX());
+        int minY = Math.min(selection.getPoint1().getY(), selection.getPoint2().getY());
+        int minZ = Math.min(selection.getPoint1().getZ(), selection.getPoint2().getZ());
+        int maxX = Math.max(selection.getPoint1().getX(), selection.getPoint2().getX());
+        int maxY = Math.max(selection.getPoint1().getY(), selection.getPoint2().getY());
+        int maxZ = Math.max(selection.getPoint1().getZ(), selection.getPoint2().getZ());
+        long volume = safeVolume(minX, minY, minZ, maxX, maxY, maxZ);
+        if (volume > maxVolume) {
+            throw new IllegalArgumentException("Selection is too large: " + volume + " blocks. Limit: " + maxVolume + ".");
+        }
+        return new RegionReplaceJob(level, minX, minY, minZ, maxX, maxY, maxZ,
+                Set.copyOf(sourceBlocks), targets, operationLocks(level, minX, minY, minZ, maxX, maxY, maxZ));
+    }
+
     private static long safeVolume(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
         long sizeX = (long) maxX - minX + 1L;
         long sizeY = (long) maxY - minY + 1L;
@@ -343,6 +383,64 @@ public final class RegionWorldEditManager {
         public long changedBlocks() {
             return changed;
         }
+    }
+
+    public static final class RegionReplaceJob implements SsuJob {
+        private final ServerLevel level;
+        private final int minX, minY, minZ, maxX, maxY, maxZ;
+        private final Set<Block> sourceBlocks;
+        private final List<WeightedBlock> targets;
+        private final int totalWeight;
+        private final long total;
+        private final Set<String> resourceLocks;
+        private final Random random = new Random();
+        private final BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+        private int x, y, z;
+        private long visited, changed;
+        private boolean complete;
+
+        private RegionReplaceJob(ServerLevel level, int minX, int minY, int minZ, int maxX, int maxY, int maxZ,
+                                 Set<Block> sourceBlocks, List<WeightedBlock> targets, Set<String> resourceLocks) {
+            this.level = level; this.minX = minX; this.minY = minY; this.minZ = minZ;
+            this.maxX = maxX; this.maxY = maxY; this.maxZ = maxZ;
+            this.sourceBlocks = sourceBlocks; this.targets = targets; this.resourceLocks = resourceLocks;
+            this.totalWeight = targets.stream().mapToInt(WeightedBlock::weight).sum();
+            this.total = safeVolume(minX, minY, minZ, maxX, maxY, maxZ);
+            this.x = minX; this.y = minY; this.z = minZ;
+        }
+
+        @Override public String description() { return "Replace blocks in region selection (" + total + " blocks)"; }
+
+        @Override public int runStep(MinecraftServer server, int operationBudget) {
+            int used = 0;
+            while (!complete && used < operationBudget) {
+                mutablePos.set(x, y, z);
+                BlockState current = level.getBlockState(mutablePos);
+                if (sourceBlocks.contains(current.getBlock())) {
+                    clearContainerContents(level, mutablePos);
+                    BlockState replacement = pickBlock(targets, totalWeight, random).defaultBlockState();
+                    level.setBlock(mutablePos, replacement, 3);
+                    changed++;
+                }
+                visited++; used++; advance();
+            }
+            return used;
+        }
+
+        private void advance() {
+            z++;
+            if (z <= maxZ) return;
+            z = minZ; y++;
+            if (y <= maxY) return;
+            y = minY; x++;
+            if (x > maxX) complete = true;
+        }
+
+        @Override public String ownerModule() { return "regions"; }
+        @Override public Set<String> resourceLocks() { return resourceLocks; }
+        @Override public boolean isComplete() { return complete; }
+        @Override public double progress() { return total == 0L ? 1.0D : Math.min(1.0D, visited / (double) total); }
+        public long changedBlocks() { return changed; }
     }
 
     public static final class RegionClearJob implements SsuJob {

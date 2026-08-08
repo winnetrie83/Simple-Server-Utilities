@@ -267,6 +267,7 @@ public final class PermissionCatalog {
         bool(values, PermissionKeys.BLOCK_INFORMATION_INVENTORY_FULL, "Shows every available non-empty preview stack up to SSU's hard cap, overriding the numeric inventory preview limit.");
         integer(values, PermissionKeys.BLOCK_INFORMATION_INVENTORY_MAX_ITEMS, "Maximum number of item stacks shown by Block Information; defaults to one and is hard-capped at 54.", 0, 54);
         bool(values, PermissionKeys.DAMAGE_INDICATORS_USE, "Allows the player to receive floating damage and healing indicators; enabled by default when unset.");
+        bool(values, PermissionKeys.ENTITY_INSIGHT_USE, "Allows the player to use Entity Insight living-entity nametags; enabled by default when unset.");
         bool(values, PermissionKeys.STATISTICS_ADMIN, "Allows creating, editing, pausing, resetting and deleting custom player statistics.");
 
         bool(values, PermissionKeys.CROPS_HARVESTING_USE, "Allows right-click harvesting and automatic replanting while the global Crops Harvesting feature is enabled.");

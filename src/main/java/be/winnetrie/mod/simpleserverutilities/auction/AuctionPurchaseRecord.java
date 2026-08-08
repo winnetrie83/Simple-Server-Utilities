@@ -5,7 +5,7 @@ import java.util.UUID;
 import com.google.gson.JsonElement;
 
 public final class AuctionPurchaseRecord {
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
 
     public enum Status {
         PREPARED,
@@ -37,6 +37,7 @@ public final class AuctionPurchaseRecord {
     private long netMinor;
     private long createdAtEpochMilli = System.currentTimeMillis();
     private Status status = Status.PREPARED;
+    private boolean contentEventsPublished;
 
     public UUID getId() { return id; }
     public UUID getListingId() { return listingId; }
@@ -56,6 +57,8 @@ public final class AuctionPurchaseRecord {
     public long getCreatedAtEpochMilli() { return Math.max(0L, createdAtEpochMilli); }
     public Status getStatus() { return status == null ? Status.PREPARED : status; }
     public void setStatus(Status status) { this.status = status == null ? Status.PREPARED : status; }
+    public boolean isContentEventsPublished() { return contentEventsPublished; }
+    public void setContentEventsPublished(boolean value) { contentEventsPublished = value; }
 
     public static AuctionPurchaseRecord create(AuctionListing listing, JsonElement item, String itemName,
             UUID buyerId, String buyerName, int quantity, long gross, int taxPermille, long tax, long net) {
@@ -81,6 +84,7 @@ public final class AuctionPurchaseRecord {
     }
 
     public void normalize(UUID fallbackId) {
+        if (schemaVersion > SCHEMA_VERSION) throw new IllegalStateException("Auction purchase schema " + schemaVersion + " is newer than supported schema " + SCHEMA_VERSION + ".");
         schemaVersion = SCHEMA_VERSION;
         if (id == null) id = fallbackId == null ? UUID.randomUUID() : fallbackId;
         buyerName = buyerName == null ? "" : buyerName;

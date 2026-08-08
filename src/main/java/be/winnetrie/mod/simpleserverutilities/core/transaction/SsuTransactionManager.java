@@ -62,8 +62,10 @@ public final class SsuTransactionManager {
             }
             return TransactionResult.success(transactionId, normalizedKey);
         } catch (Exception failure) {
-            rollback(applied, failure);
-            return TransactionResult.failed(transactionId, normalizedKey, failure.getMessage());
+            boolean rollbackClean = rollback(applied, failure);
+            return rollbackClean
+                    ? TransactionResult.failed(transactionId, normalizedKey, failure.getMessage())
+                    : TransactionResult.rollbackFailed(transactionId, normalizedKey, failure.getMessage());
         } finally {
             if (!normalizedKey.isEmpty()) {
                 inFlightKeys.remove(normalizedKey);
@@ -88,11 +90,13 @@ public final class SsuTransactionManager {
         return completedKeys.size();
     }
 
-    private void rollback(List<TransactionStep> applied, Exception originalFailure) {
+    private boolean rollback(List<TransactionStep> applied, Exception originalFailure) {
+        boolean clean = true;
         for (int i = applied.size() - 1; i >= 0; i--) {
             try {
                 applied.get(i).rollback();
             } catch (Exception rollbackFailure) {
+                clean = false;
                 SimpleServerUtilities.LOGGER.error(
                         "SSU transaction rollback step failed after transaction error: {}",
                         originalFailure.getMessage(),
@@ -100,6 +104,7 @@ public final class SsuTransactionManager {
                 );
             }
         }
+        return clean;
     }
 
     private void rememberCompleted(String normalizedKey) {
@@ -146,6 +151,11 @@ public final class SsuTransactionManager {
             return new TransactionResult(id, key, Status.FAILED, error == null ? "Transaction failed." : error);
         }
 
+        static TransactionResult rollbackFailed(UUID id, String key, String error) {
+            String message = error == null ? "Transaction failed and rollback was incomplete." : error;
+            return new TransactionResult(id, key, Status.ROLLBACK_FAILED, message);
+        }
+
         public boolean successful() {
             return status == Status.SUCCESS;
         }
@@ -155,6 +165,7 @@ public final class SsuTransactionManager {
         SUCCESS,
         DUPLICATE,
         BUSY,
-        FAILED
+        FAILED,
+        ROLLBACK_FAILED
     }
 }

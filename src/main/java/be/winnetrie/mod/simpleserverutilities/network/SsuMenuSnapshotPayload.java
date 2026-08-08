@@ -139,6 +139,7 @@ public record SsuMenuSnapshotPayload(
         buffer.writeBoolean(settings.holograms());
         buffer.writeBoolean(settings.blockInformation());
         buffer.writeBoolean(settings.statistics());
+        buffer.writeBoolean(settings.achievements());
         buffer.writeBoolean(settings.mail());
         buffer.writeBoolean(settings.auctionHouse());
         buffer.writeBoolean(settings.npcs());
@@ -160,7 +161,7 @@ public record SsuMenuSnapshotPayload(
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
-                buffer.readUtf(16), buffer.readUtf(16), buffer.readBoolean(), buffer.readBoolean(),
+                buffer.readBoolean(), buffer.readUtf(16), buffer.readUtf(16), buffer.readBoolean(), buffer.readBoolean(),
                 buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt()
         );
     }
@@ -181,6 +182,7 @@ public record SsuMenuSnapshotPayload(
         buffer.writeBoolean(settings.minimapEnabled());
         buffer.writeVarInt(settings.minimapSize());
         buffer.writeUtf(settings.minimapShape(), 16);
+        buffer.writeBoolean(settings.minimapTexturedFrame());
         buffer.writeUtf(settings.minimapPosition(), 16);
         buffer.writeBoolean(settings.minimapNorthUp());
         buffer.writeBoolean(settings.minimapShowClaims());
@@ -214,6 +216,10 @@ public record SsuMenuSnapshotPayload(
         buffer.writeBoolean(settings.rankVisible());
         buffer.writeBoolean(settings.damageIndicatorsEnabled());
         buffer.writeUtf(settings.damageIndicatorStyle(), 16);
+        buffer.writeBoolean(settings.entityInsightEnabled());
+        buffer.writeBoolean(settings.entityInsightShowHealth());
+        buffer.writeVarInt(settings.entityInsightRange());
+        buffer.writeVarInt(settings.entityInsightMaxEntities());
     }
 
     private static UiSettingsSummary readUiSettings(RegistryFriendlyByteBuf buffer) {
@@ -222,29 +228,25 @@ public record SsuMenuSnapshotPayload(
                 buffer.readBoolean(),
                 buffer.readVarInt(),
                 buffer.readUtf(16),
-                buffer.readUtf(16),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readVarInt(),
-                buffer.readVarInt(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readUtf(16),
-                buffer.readInt(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
                 buffer.readVarInt(),
+                buffer.readVarInt(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
                 buffer.readUtf(16),
@@ -252,9 +254,18 @@ public record SsuMenuSnapshotPayload(
                 buffer.readVarInt(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
+                buffer.readUtf(16),
+                buffer.readInt(),
+                buffer.readVarInt(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
-                buffer.readUtf(16)
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readUtf(16),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
+                buffer.readVarInt(),
+                buffer.readVarInt()
         );
     }
 
@@ -475,6 +486,7 @@ public record SsuMenuSnapshotPayload(
             boolean holograms,
             boolean blockInformation,
             boolean statistics,
+            boolean achievements,
             boolean mail,
             boolean auctionHouse,
             boolean npcs,
@@ -499,7 +511,7 @@ public record SsuMenuSnapshotPayload(
 
         public static ModuleSettingsSummary defaults() {
             return new ModuleSettingsSummary(true, true, true, true, true, true, true, true, true, true,
-                    true, true, false, false, false, false, "menu", "menu", true, true, 64, 128, 128);
+                    true, true, true, false, false, false, false, "menu", "menu", true, true, 64, 128, 128);
         }
     }
 
@@ -514,6 +526,7 @@ public record SsuMenuSnapshotPayload(
             boolean minimapEnabled,
             int minimapSize,
             String minimapShape,
+            boolean minimapTexturedFrame,
             String minimapPosition,
             boolean minimapNorthUp,
             boolean minimapShowClaims,
@@ -546,7 +559,11 @@ public record SsuMenuSnapshotPayload(
             boolean titleVisible,
             boolean rankVisible,
             boolean damageIndicatorsEnabled,
-            String damageIndicatorStyle
+            String damageIndicatorStyle,
+            boolean entityInsightEnabled,
+            boolean entityInsightShowHealth,
+            int entityInsightRange,
+            int entityInsightMaxEntities
     ) {
         public UiSettingsSummary {
             minimapSize = Math.max(64, Math.min(256, minimapSize));
@@ -559,11 +576,13 @@ public record SsuMenuSnapshotPayload(
             treecapitatorOutlineBrightness = Math.max(10, Math.min(100, treecapitatorOutlineBrightness));
             veinminerOutlineBrightness = Math.max(10, Math.min(100, veinminerOutlineBrightness));
             damageIndicatorStyle = damageIndicatorStyle == null ? "FLOATING" : damageIndicatorStyle;
+            entityInsightRange = Math.max(0, Math.min(32, entityInsightRange));
+            entityInsightMaxEntities = Math.max(1, Math.min(50, entityInsightMaxEntities));
         }
 
         public static UiSettingsSummary defaults() {
             return new UiSettingsSummary(
-                    true, false, 96, "CIRCLE", "TOP_RIGHT",
+                    true, false, 96, "CIRCLE", false, "TOP_RIGHT",
                     true, true, true, true, true,
                     true, true, false, true, true, 128,
                     8,
@@ -571,7 +590,8 @@ public record SsuMenuSnapshotPayload(
                     false, false, false,
                     false, "SNEAK", 0xFF55FF77, 85, true,
                     false, "SNEAK", 0xFF55AAFF, 85, true,
-                    true, true, true, "FLOATING"
+                    true, true, true, "FLOATING",
+                    true, true, 16, 20
             );
         }
     }

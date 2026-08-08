@@ -23,8 +23,8 @@ public final class MailComposeMenu extends AbstractContainerMenu {
     private static final int ATTACHMENT_X = 16;
     private static final int ATTACHMENT_Y = 226;
     private static final int PLAYER_INVENTORY_X = 119;
-    private static final int PLAYER_INVENTORY_Y = 275;
-    private static final int HOTBAR_Y = 360;
+    private static final int PLAYER_INVENTORY_Y = 260;
+    private static final int HOTBAR_Y = 326;
 
     private final Container attachments;
     private final int maxAttachments;

@@ -6,10 +6,10 @@ import java.util.function.IntSupplier;
 import java.util.function.IntUnaryOperator;
 import java.util.function.Supplier;
 
-import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText;
-import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument;
-import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument.CharacterStyle;
-import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument.Segment;
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichText;
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument;
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument.CharacterStyle;
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument.Segment;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultiLineEditBoxAccessor;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultilineTextFieldAccessor;
 import net.minecraft.client.Minecraft;
@@ -40,25 +40,25 @@ public final class RichTextEditBoxRenderer {
 
     public static void register(
             MultiLineEditBox box,
-            Supplier<HologramRichTextDocument> document,
+            Supplier<? extends SsuRichTextDocument> document,
             IntSupplier baseColor,
             Component placeholder
     ) {
         register(box, document, baseColor,
-                index -> 0xFF000000 | HologramRichText.minecraftColorRgb(index), placeholder);
+                index -> 0xFF000000 | SsuRichText.minecraftColorRgb(index), placeholder);
     }
 
     /** Registers a rich-text field with a feature-specific fixed sixteen-colour palette. */
     public static void register(
             MultiLineEditBox box,
-            Supplier<HologramRichTextDocument> document,
+            Supplier<? extends SsuRichTextDocument> document,
             IntSupplier baseColor,
             IntUnaryOperator paletteColor,
             Component placeholder
     ) {
         if (box == null || document == null || baseColor == null) return;
         IntUnaryOperator resolvedPalette = paletteColor == null
-                ? index -> 0xFF000000 | HologramRichText.minecraftColorRgb(index)
+                ? index -> 0xFF000000 | SsuRichText.minecraftColorRgb(index)
                 : paletteColor;
         REGISTRATIONS.put(box, new Registration(document, baseColor, resolvedPalette,
                 placeholder == null ? Component.empty() : placeholder));
@@ -73,7 +73,7 @@ public final class RichTextEditBoxRenderer {
         Registration registration = REGISTRATIONS.get(box);
         if (registration == null) return false;
 
-        HologramRichTextDocument document = registration.document().get();
+        SsuRichTextDocument document = registration.document().get();
         if (document == null) return false;
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.font == null) return false;
@@ -136,7 +136,7 @@ public final class RichTextEditBoxRenderer {
     private static void drawSelection(
             GuiGraphicsExtractor graphics,
             Minecraft minecraft,
-            HologramRichTextDocument document,
+            SsuRichTextDocument document,
             int lineStart,
             int lineEnd,
             int selectionStart,
@@ -168,17 +168,17 @@ public final class RichTextEditBoxRenderer {
     }
 
     public static MutableComponent component(
-            HologramRichTextDocument document,
+            SsuRichTextDocument document,
             int start,
             int end,
             int baseColor
     ) {
         return component(document, start, end, baseColor,
-                index -> 0xFF000000 | HologramRichText.minecraftColorRgb(index));
+                index -> 0xFF000000 | SsuRichText.minecraftColorRgb(index));
     }
 
     public static MutableComponent component(
-            HologramRichTextDocument document,
+            SsuRichTextDocument document,
             int start,
             int end,
             int baseColor,
@@ -209,7 +209,7 @@ public final class RichTextEditBoxRenderer {
     }
 
     private record Registration(
-            Supplier<HologramRichTextDocument> document,
+            Supplier<? extends SsuRichTextDocument> document,
             IntSupplier baseColor,
             IntUnaryOperator paletteColor,
             Component placeholder

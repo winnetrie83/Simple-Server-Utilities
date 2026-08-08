@@ -3,10 +3,15 @@ package be.winnetrie.mod.simpleserverutilities.content;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.gson.JsonParser;
+
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.core.transaction.SsuTransactionManager;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyResult;
+import be.winnetrie.mod.simpleserverutilities.mail.MailOperationResult;
+import be.winnetrie.mod.simpleserverutilities.mail.MailSource;
+import be.winnetrie.mod.simpleserverutilities.mail.MailItemCodec;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
@@ -36,6 +41,15 @@ public final class ContentRewardHandlers {
         }
         if (!engine.isRegistered("add_claim_chunks")) {
             engine.register("add_claim_chunks", (action, context, progression) -> claimChunks(action, context));
+        }
+        if (!engine.isRegistered("grant_temporary_permission")) {
+            engine.register("grant_temporary_permission", (action, context, progression) -> temporaryPermission(action, context));
+        }
+        if (!engine.isRegistered("unlock_cosmetic")) {
+            engine.register("unlock_cosmetic", (action, context, progression) -> cosmetic(action, context, progression));
+        }
+        if (!engine.isRegistered("unlock_title")) {
+            engine.register("unlock_title", (action, context, progression) -> title(action, context));
         }
     }
 
@@ -117,16 +131,29 @@ public final class ContentRewardHandlers {
 
     private static PreparedContentAction item(ContentAction action, ContentActionContext context) {
         ServerPlayer player = requirePlayer(context);
-        String rawItem = required(action.parameter("item"), "item");
-        int count = (int) Math.min(64_000L, positiveLong(action.parameter("count"), "count"));
+        String rawStack = action.parameter("stack_json");
+        String rawItem = action.parameter("item");
         ItemStack template;
-        try {
-            template = BuiltInRegistries.ITEM.getOptional(Identifier.parse(rawItem))
-                    .map(registeredItem -> new ItemStack(registeredItem)).orElse(ItemStack.EMPTY);
-        } catch (RuntimeException exception) {
-            throw new IllegalArgumentException("Invalid reward item: " + rawItem);
+        if (rawStack != null && !rawStack.isBlank()) {
+            try {
+                template = MailItemCodec.decode(player.level().registryAccess(), JsonParser.parseString(rawStack));
+            } catch (RuntimeException exception) {
+                throw new IllegalArgumentException("Invalid exact ItemStack reward data.");
+            }
+            rawItem = template.isEmpty() ? "" : BuiltInRegistries.ITEM.getKey(template.getItem()).toString();
+        } else {
+            rawItem = required(rawItem, "item");
+            try {
+                template = BuiltInRegistries.ITEM.getOptional(Identifier.parse(rawItem))
+                        .map(registeredItem -> new ItemStack(registeredItem)).orElse(ItemStack.EMPTY);
+            } catch (RuntimeException exception) {
+                throw new IllegalArgumentException("Invalid reward item: " + rawItem);
+            }
         }
-        if (template.isEmpty()) throw new IllegalArgumentException("Unknown reward item: " + rawItem);
+        if (template.isEmpty()) throw new IllegalArgumentException("Unknown or empty reward item: " + rawItem);
+        String rawCount = action.parameter("count");
+        long requestedCount = rawCount == null || rawCount.isBlank() ? Math.max(1, template.getCount()) : positiveLong(rawCount, "count");
+        int count = (int) Math.min(64_000L, requestedCount);
         List<ItemStack> incoming = split(template, count);
         InventoryPlan[] appliedPlan = new InventoryPlan[1];
         return new PreparedContentAction("Give content item " + rawItem, new SsuTransactionManager.TransactionStep() {
@@ -137,8 +164,16 @@ public final class ContentRewardHandlers {
                 // stale inventory snapshot.
                 InventoryPlan plan = planInventory(player, incoming);
                 if (plan == null) {
-                    throw new IllegalArgumentException(
-                            "The player does not have enough inventory space for this reward.");
+                    if (SimpleServerUtilities.CORE.modules().isActive("mail")) {
+                        String correlation = rewardStepKey(context, "item-mail");
+                        MailOperationResult delivered = SimpleServerUtilities.MAIL.deliverSystemMail(
+                                player.getUUID(), player.getName().getString(), "Content reward",
+                                "A reward could not fit in your inventory, so SSU delivered it safely by mail.",
+                                incoming, 0L, MailSource.SYSTEM, correlation);
+                        if (!delivered.successful()) throw new IllegalStateException(delivered.message());
+                        return;
+                    }
+                    throw new IllegalArgumentException("The player does not have enough inventory space for this reward.");
                 }
                 appliedPlan[0] = plan;
                 applyInventory(player, plan.after());
@@ -149,6 +184,53 @@ public final class ContentRewardHandlers {
                 InventoryPlan plan = appliedPlan[0];
                 if (plan != null) applyInventory(player, plan.before());
             }
+        });
+    }
+
+    private static PreparedContentAction temporaryPermission(ContentAction action, ContentActionContext context) {
+        ServerPlayer player = requirePlayer(context);
+        String permission = required(action.parameter("permission"), "permission");
+        String value = action.parameter("value");
+        if (value == null || value.isBlank()) value = "true";
+        long duration = positiveLong(action.parameter("duration_seconds"), "duration_seconds");
+        String sourceKey = rewardStepKey(context, "temporary-permission:" + permission);
+        String finalValue = value;
+        return new PreparedContentAction("Grant temporary permission " + permission, new SsuTransactionManager.TransactionStep() {
+            private boolean changed;
+            @Override public void apply() { changed = SimpleServerUtilities.TEMPORARY_PERMISSIONS.grant(player.getUUID(), permission, finalValue, duration, sourceKey); }
+            @Override public void rollback() { if (changed) SimpleServerUtilities.TEMPORARY_PERMISSIONS.revoke(player.getUUID(), permission, sourceKey); }
+        });
+    }
+
+    private static PreparedContentAction cosmetic(ContentAction action, ContentActionContext context, ContentProgressionManager progression) {
+        ServerPlayer player = requirePlayer(context);
+        String id = required(action.parameter("id"), "id").trim().toLowerCase(java.util.Locale.ROOT);
+        if (id.startsWith("minigame:")) {
+            String minigameCosmetic = id.substring("minigame:".length());
+            if (minigameCosmetic.isBlank()) throw new IllegalArgumentException("Minigame cosmetic ID is required.");
+            boolean before = SimpleServerUtilities.MINIGAMES.progressionCosmeticUnlocked(player.getUUID(), minigameCosmetic);
+            return new PreparedContentAction("Unlock minigame cosmetic " + minigameCosmetic, new SsuTransactionManager.TransactionStep() {
+                @Override public void apply() { SimpleServerUtilities.MINIGAMES.setProgressionCosmeticUnlocked(player, minigameCosmetic, true); }
+                @Override public void rollback() { SimpleServerUtilities.MINIGAMES.setProgressionCosmeticUnlocked(player, minigameCosmetic, before); }
+            });
+        }
+
+        // Generic entitlement for current/future cosmetic consumers outside the minigame profile.
+        String key = "cosmetic:" + id;
+        boolean before = progression.isPlayerUnlocked(player.getUUID(), key);
+        return new PreparedContentAction("Unlock cosmetic " + id, new SsuTransactionManager.TransactionStep() {
+            @Override public void apply() { progression.setPlayerUnlocked(player, key, true); }
+            @Override public void rollback() { progression.setPlayerUnlocked(player, key, before); }
+        });
+    }
+
+    private static PreparedContentAction title(ContentAction action, ContentActionContext context) {
+        ServerPlayer player = requirePlayer(context);
+        String id = required(action.parameter("title"), "title");
+        return new PreparedContentAction("Unlock title " + id, new SsuTransactionManager.TransactionStep() {
+            private boolean changed;
+            @Override public void apply() { changed = SimpleServerUtilities.IDENTITY.grantManualTitle(player, id); }
+            @Override public void rollback() { if (changed) SimpleServerUtilities.IDENTITY.revokeManualTitle(player, id); }
         });
     }
 

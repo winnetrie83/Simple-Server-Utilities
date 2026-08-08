@@ -4,8 +4,8 @@ import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText;
-import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument;
-import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument.Format;
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument;
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument.Format;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultiLineEditBoxAccessor;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultilineTextFieldAccessor;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -28,7 +28,7 @@ public final class RichTextValueEditorScreen extends Screen {
     private final int editorCharacterLimit;
     private final int storedCharacterLimit;
     private final int lineLimit;
-    private HologramRichTextDocument document;
+    private SsuRichTextDocument document;
     private MultiLineEditBox box;
     private int rememberedStart = -1, rememberedEnd = -1;
     private String notice = "";
@@ -59,7 +59,7 @@ public final class RichTextValueEditorScreen extends Screen {
         this.editorCharacterLimit = Math.max(16, editorCharacterLimit);
         this.storedCharacterLimit = Math.max(this.editorCharacterLimit, storedCharacterLimit);
         this.lineLimit = Math.max(1, lineLimit);
-        this.document = new HologramRichTextDocument(this.normalizer.apply(initial), this.normalizer, this.storedCharacterLimit);
+        this.document = new SsuRichTextDocument(this.normalizer.apply(initial), this.normalizer, this.storedCharacterLimit);
     }
 
     @Override
@@ -89,7 +89,9 @@ public final class RichTextValueEditorScreen extends Screen {
         int paletteX = x + 240;
         for (int index = 0; index < 16; index++) {
             int colorIndex = index;
-            addRenderableWidget(RichTextPalette.button(paletteX + index * 20, toolbarY + 1, 18, index,
+            int column = index % 8;
+            int row = index / 8;
+            addRenderableWidget(RichTextPalette.button(paletteX + column * 20, toolbarY + 1 + row * 20, 18, index,
                     button -> color(colorIndex)));
         }
 

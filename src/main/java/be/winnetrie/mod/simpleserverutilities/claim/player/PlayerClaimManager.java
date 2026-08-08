@@ -27,6 +27,8 @@ import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapBatchResult;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapOperation;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimShapeValidator;
+import be.winnetrie.mod.simpleserverutilities.content.ContentEvent;
+import be.winnetrie.mod.simpleserverutilities.content.ContentEventTypes;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapData;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.ClaimPolicy;
@@ -185,6 +187,8 @@ public class PlayerClaimManager {
         claims.put(claim.getId(), claim);
         SimpleServerUtilities.CLAIM_TAX.initializeClaimCycle(claim, now);
         save();
+        publishClaimEvent(player, ContentEventTypes.CLAIM_GROUP_CREATED, claim, 1L,
+                Map.of("dimension", claim.getDimension(), "claim_id", claim.getId().toString()));
 
         return ClaimOperationResult.success();
     }
@@ -362,6 +366,9 @@ public class PlayerClaimManager {
 
         chunkIndex.put(key, claim.getId());
         save();
+        publishClaimEvent(player, ContentEventTypes.CLAIM_CHUNK_ADDED, claim, 1L,
+                Map.of("dimension", claim.getDimension(), "claim_id", claim.getId().toString(),
+                        "chunk_x", Integer.toString(chunkPos.x()), "chunk_z", Integer.toString(chunkPos.z())));
 
         return ClaimOperationResult.success();
     }
@@ -627,6 +634,13 @@ public class PlayerClaimManager {
                 SimpleServerUtilities.CLAIM_TAX.initializeClaimCycle(claim, now);
             }
             save();
+            if (operation == ClaimMapOperation.CREATE) {
+                publishClaimEvent(player, ContentEventTypes.CLAIM_GROUP_CREATED, claim, 1L,
+                        Map.of("dimension", claim.getDimension(), "claim_id", claim.getId().toString()));
+            }
+            publishClaimEvent(player, ContentEventTypes.CLAIM_CHUNK_ADDED, claim, chunks.size(),
+                    Map.of("dimension", claim.getDimension(), "claim_id", claim.getId().toString(),
+                            "batch", "true"));
             return ClaimMapBatchResult.success(chunks.size());
         }
 
@@ -672,6 +686,14 @@ public class PlayerClaimManager {
                     removedHomes, removedClaimChunks.size(), claim.getDisplayName(), claim.getId());
         }
         return ClaimMapBatchResult.success(chunks.size());
+    }
+
+    private void publishClaimEvent(ServerPlayer player, String type, PlayerClaim claim, long amount,
+                                   Map<String, String> metadata) {
+        if (player == null || claim == null || amount <= 0L) return;
+        SimpleServerUtilities.CONTENT_EVENTS.publish(player.level().getServer(),
+                ContentEvent.player(type, player.getUUID(), "claims", claim.getId().toString(),
+                        claim.getDimension(), amount, metadata));
     }
 
     private BlockPos mapChunkCenter(ServerPlayer player, ChunkPos chunkPos) {

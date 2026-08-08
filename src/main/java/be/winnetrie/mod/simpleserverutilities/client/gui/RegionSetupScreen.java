@@ -100,7 +100,7 @@ public final class RegionSetupScreen extends Screen {
         if (openEditorAfterResponse && !"SELECT".equals(payload.mode())) {
             page = PAGE_GENERAL;
         } else if ("SELECT".equals(payload.mode())) {
-            page = oldPage == PAGE_REGIONS ? PAGE_REGIONS : PAGE_SELECTION;
+            page = PAGE_REGIONS;
         } else {
             page = oldPage;
             if (page < PAGE_GENERAL || page > PAGE_REGIONS) page = PAGE_GENERAL;
@@ -156,7 +156,7 @@ public final class RegionSetupScreen extends Screen {
         confirmRedefine = false;
         confirmReset = false;
         pendingSelectionOperation = "";
-        if (!preserveFields) page = "SELECT".equals(payload.mode()) ? PAGE_SELECTION : PAGE_GENERAL;
+        if (!preserveFields) page = "SELECT".equals(payload.mode()) ? PAGE_REGIONS : PAGE_GENERAL;
     }
 
     @Override
@@ -179,25 +179,26 @@ public final class RegionSetupScreen extends Screen {
             case PAGE_PROTECTION -> initProtection();
             case PAGE_RENT -> initRent();
             case PAGE_RESET -> initReset();
-            case PAGE_SELECTION -> initSelection();
+            case PAGE_SELECTION -> { page = PAGE_REGIONS; initRegions(); }
             case PAGE_REGIONS -> initRegions();
-            default -> { page = PAGE_SELECTION; initSelection(); }
+            default -> { page = PAGE_REGIONS; initRegions(); }
         }
     }
 
     private void addMainTabs(int x, int y) {
-        String[] labels = {"Region", "Protection", "Access & rent", "Auto reset", "Selection", "Browse"};
-        int[] widths = {72, 92, 104, 90, 82, 72};
+        String[] labels = {"Region", "Protection", "Access & rent", "Auto reset", "Browse"};
+        int[] targets = {PAGE_GENERAL, PAGE_PROTECTION, PAGE_RENT, PAGE_RESET, PAGE_REGIONS};
+        int[] widths = {72, 92, 104, 90, 72};
         int cx = x + 14;
         for (int i = 0; i < labels.length; i++) {
-            int target = i;
+            int target = targets[i];
             Button button = addRenderableWidget(Button.builder(Component.literal(labels[i]), ignored -> {
                 page = target;
                 notice = "";
                 pendingSelectionOperation = "";
                 rebuildWidgets();
             }).bounds(cx, y + 43, widths[i], 18).build());
-            button.active = page != target && (target >= PAGE_SELECTION || !"SELECT".equals(data.mode()));
+            button.active = page != target && (target == PAGE_REGIONS || !"SELECT".equals(data.mode()));
             cx += widths[i] + 5;
         }
     }
@@ -667,7 +668,7 @@ public final class RegionSetupScreen extends Screen {
         String local = data.localRegionName().isBlank() ? "Here: no region" : "Here: " + data.localRegionName();
         if ("EDIT".equals(data.mode())) return "Mode: EDIT · Target: " + data.regionName() + " · " + shortDim(data.dimension()) + " · " + local;
         if ("CREATE".equals(data.mode())) return "Mode: CREATE · selected volume " + data.volume() + " blocks · " + shortDim(data.dimension()) + " · " + local;
-        return "Mode: SELECT · " + local + " · use Selection or Browse";
+        return "Mode: SELECT · " + local + " · mark two corners with the Region Tool or choose Browse";
     }
 
     private void renderGeneral(GuiGraphicsExtractor graphics, int x, int y) {

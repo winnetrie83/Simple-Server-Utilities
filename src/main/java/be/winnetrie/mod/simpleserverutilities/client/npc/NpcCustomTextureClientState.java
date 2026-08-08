@@ -7,6 +7,7 @@ import java.util.Map;
 import com.mojang.blaze3d.platform.NativeImage;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.npc.NpcDefinition;
 import be.winnetrie.mod.simpleserverutilities.network.NpcTextureSyncPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -33,23 +34,56 @@ public final class NpcCustomTextureClientState {
                 }
                 continue;
             }
-            if (current != null && current.hash.equals(entry.hash())) continue;
+            String normalizedModel = "slim".equalsIgnoreCase(entry.model()) ? "slim" : "wide";
+            PlayerModelType model = "slim".equals(normalizedModel) ? PlayerModelType.SLIM : PlayerModelType.WIDE;
+            if (current != null && current.hash.equals(entry.hash()) && current.model.equals(normalizedModel)) continue;
             try {
-                NativeImage image = NativeImage.read(new ByteArrayInputStream(entry.png()));
-                if (image.getWidth() != 64 || image.getHeight() != 64) {
-                    image.close();
+                String definitionPath = NpcDefinition.sanitizeId(entry.definitionId());
+                Identifier textureId = Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID,
+                        "npc_skin/" + definitionPath + "/"
+                                + entry.hash().toLowerCase(java.util.Locale.ROOT));
+
+                // A model-only Wide/Slim change can reuse the already registered pixels.
+                if (current != null && current.hash.equals(entry.hash()) && current.textureId.equals(textureId)) {
+                    PlayerSkin skin = PlayerSkin.insecure(
+                            new ClientAsset.ResourceTexture(textureId, textureId), null, null, model);
+                    BY_DEFINITION.put(entry.definitionId(),
+                            new SkinEntry(entry.hash(), normalizedModel, textureId, skin));
                     continue;
                 }
-                Identifier textureId = Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID,
-                        "npc_skin/" + entry.hash().toLowerCase(java.util.Locale.ROOT));
+
+                NativeImage image = NativeImage.read(new ByteArrayInputStream(entry.png()));
+                int width = image.getWidth();
+                int height = image.getHeight();
+                if (width != 64 || height != 64) {
+                    image.close();
+                    SimpleServerUtilities.LOGGER.warn(
+                            "Rejected custom NPC skin {} on the client: decoded size is {}x{}, expected 64x64",
+                            entry.definitionId(), width, height);
+                    continue;
+                }
                 DynamicTexture texture = new DynamicTexture(() -> "SSU NPC " + entry.definitionId(), image);
                 minecraft.getTextureManager().register(textureId, texture);
-                PlayerModelType model = "slim".equals(entry.model()) ? PlayerModelType.SLIM : PlayerModelType.WIDE;
-                PlayerSkin skin = PlayerSkin.insecure(new ClientAsset.ResourceTexture(textureId), null, null, model);
-                if (current != null && !current.textureId.equals(textureId)) minecraft.getTextureManager().release(current.textureId);
-                BY_DEFINITION.put(entry.definitionId(), new SkinEntry(entry.hash(), textureId, skin));
-            } catch (Exception ignored) {
-                // A malformed texture never takes down the client; the vanilla mannequin skin remains active.
+
+                // ClientAsset's one-argument ResourceTexture constructor derives a resource-pack
+                // path (textures/<id>.png). DynamicTexture is registered directly at textureId,
+                // so explicitly use that same identifier as the render texture path.
+                PlayerSkin skin = PlayerSkin.insecure(
+                        new ClientAsset.ResourceTexture(textureId, textureId), null, null, model);
+                if (current != null && !current.textureId.equals(textureId)) {
+                    minecraft.getTextureManager().release(current.textureId);
+                }
+                BY_DEFINITION.put(entry.definitionId(),
+                        new SkinEntry(entry.hash(), normalizedModel, textureId, skin));
+                SimpleServerUtilities.LOGGER.debug(
+                        "Installed custom NPC skin {} as {} ({})",
+                        entry.definitionId(), textureId, normalizedModel);
+            } catch (Exception exception) {
+                // A malformed/unsupported texture never takes down the client, but do not hide
+                // the failure: the log must make texture-pipeline problems diagnosable.
+                SimpleServerUtilities.LOGGER.warn(
+                        "Could not install custom NPC skin {} (hash {}): {}",
+                        entry.definitionId(), entry.hash(), exception.getMessage(), exception);
             }
         }
     }
@@ -67,5 +101,5 @@ public final class NpcCustomTextureClientState {
         BY_DEFINITION.clear();
     }
 
-    private record SkinEntry(String hash, Identifier textureId, PlayerSkin skin) {}
+    private record SkinEntry(String hash, String model, Identifier textureId, PlayerSkin skin) {}
 }

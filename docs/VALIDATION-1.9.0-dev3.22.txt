@@ -1,0 +1,59 @@
+SSU 1.9.0-dev3.22 validation report
+===================================
+
+Target
+------
+Minecraft: 26.2
+NeoForge: 26.2.0.7-beta
+Required project Java: 25
+Gradle wrapper: 9.2.1
+Mod version: 1.9.0-dev3.22
+Network protocol: 104 (103 -> 104 for changed Achievement menu/editor payloads)
+Persistence schemas: unchanged from 1.9.0-dev3.21.1
+
+TODO implementation checks
+--------------------------
+17/17 targeted source invariants passed:
+- player Achievement browser reduced to 570x370 (~25% smaller);
+- admin Achievement browser/editor reduced to 570x370;
+- item rewards render a real item icon plus friendly count/name;
+- guided collapsible General/Objectives/Rewards editor is present;
+- searchable registry picker is present;
+- admin player lookup uses KnownPlayerPickerScreen and no UUID EditBox remains in AchievementMenuScreen;
+- vanilla minecraft:ui.toast.challenge_complete sound is sent on achievement completion;
+- Hologram Editor has explicit X/Y/Z labels, 58px coordinate fields and no standalone Coordinates label;
+- Mail Composer is reduced to 350px height with raised inventory/hotbar;
+- Health has GREAT/GOOD/NEUTRAL/BAD/VERY BAD color verdicts and optional technical details;
+- Backup fields have visible labels;
+- Worlds/Pregeneration fields have visible labels;
+- Save throttle user-facing text is removed/replaced;
+- raw give_item reward syntax is not rendered by the Achievement browser.
+
+Static/source checks
+--------------------
+Java source files: 789
+Changed/new Java files vs dev3.21.1: 14
+Resource JSON files parsed: 2 / 2
+Unresolved project-local SSU imports: 0
+Custom payload IDs: 178 / 178 unique
+Custom payload classes missing ModNetworking registration: 0
+Java lexical/syntax-style javac pass: no '; expected', illegal-start, unclosed, orphaned-case or EOF syntax diagnostics.
+
+Compatibility/safety checks
+---------------------------
+- Achievement definition and player-progress storage schemas are unchanged.
+- Existing exact ItemStack achievement rewards are preserved by the guided editor rather than rewritten as a simple item/count pair.
+- Exact ItemStack rewards can derive their base item/count for the friendly player reward display without mutating stored reward data.
+- Admin achievement player selection passes names through the existing known-player server lookup; UUID remains server-side/internal.
+- Health returns NEUTRAL / waiting-for-data rather than falsely reporting GREAT if required samples are absent.
+- No generated javac.*.args, build/ or .gradle output is included in the source tree.
+
+Full Gradle compile status
+--------------------------
+A full Gradle compile could not be started in this container because the Gradle 9.2.1 wrapper distribution is not cached and the container cannot download services.gradle.org. The container JDK is also Java 21 while SSU requires Java 25.
+
+The dev3.21.1 base was confirmed compile-clean by the user. Run the following locally against dev3.22:
+
+  gradlew.bat compileJava > compile-report.txt 2>&1
+
+Then follow TESTING-1.9.0-dev3.22.md for runtime/GUI validation.

@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -74,13 +76,15 @@ import net.minecraft.world.phys.AABB;
 public final class RegionSelectionSnapshotManager {
     public static final String FILE_EXTENSION = ".ssuselshot";
     public static final long MAX_VOLUME = RegionSelectionSchematicManager.MAX_VOLUME;
-    public static final int MAX_PREVIEW_BLOCKS = 4096;
     private static final int FORMAT_VERSION = 1;
     private static final int MAX_FILE_BYTES = 32 * 1024 * 1024;
     private static final int MAX_DECOMPRESSED_BYTES = 192 * 1024 * 1024;
     private static final int MAX_STRUCTURAL_ENTITIES = 8192;
     private static final int UPDATE_FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE | Block.UPDATE_SUPPRESS_DROPS;
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
+    // Hanging entities persist their wall/floor/ceiling attachment as the vanilla NBT byte
+    // "Facing" (Direction 3D value). Yaw alone does not rotate an item frame's attachment.
+    private static final Pattern HANGING_FACING = Pattern.compile("(?<![A-Za-z0-9_])Facing:(-?\\d+)([bB]?)");
 
     private RegionSelectionSnapshotManager() {
     }
@@ -129,7 +133,7 @@ public final class RegionSelectionSnapshotManager {
         for (SnapshotEntity entity : template.entities()) {
             ContinuousPosition pos = transform(entity.relX(), entity.relY(), entity.relZ(), sx, sy, sz, transform);
             entities.add(new SnapshotEntity(pos.x(), pos.y(), pos.z(), transformYaw(entity.yaw(), transform),
-                    entity.pitch(), entity.entitySnbt()));
+                    entity.pitch(), transformStructuralEntitySnbt(entity.entitySnbt(), transform)));
         }
         return new SnapshotTemplate(tx, ty, tz, List.copyOf(palette), List.copyOf(blocks), List.copyOf(entities));
     }
@@ -166,6 +170,69 @@ public final class RegionSelectionSnapshotManager {
             case MIRROR_X -> 180.0F - yaw;
             case MIRROR_Z -> -yaw;
             case FLIP_VERTICAL -> yaw;
+        };
+    }
+
+    /**
+     * Rotates the persistent attachment direction used by item frames and paintings.
+     * Direction 3D values are DOWN=0, UP=1, NORTH=2, SOUTH=3, WEST=4, EAST=5.
+     * The entity's visible yaw is stored separately in {@link SnapshotEntity}; both need
+     * transforming because HangingEntity reconstructs its attachment from this NBT value.
+     */
+    private static String transformStructuralEntitySnbt(String snbt,
+                                                         RegionSelectionSchematicManager.SelectionTransform transform) {
+        if (snbt == null || snbt.isBlank() || transform == null) return snbt == null ? "" : snbt;
+        Matcher matcher = HANGING_FACING.matcher(snbt);
+        if (!matcher.find()) return snbt;
+        int facing;
+        try {
+            facing = Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return snbt;
+        }
+        int transformed = transformFacingValue(facing, transform);
+        return snbt.substring(0, matcher.start(1)) + transformed + snbt.substring(matcher.end(1));
+    }
+
+    private static int transformFacingValue(int facing,
+                                            RegionSelectionSchematicManager.SelectionTransform transform) {
+        return switch (transform) {
+            case ROTATE_LEFT -> switch (facing) {
+                case 2 -> 4; // north -> west
+                case 4 -> 3; // west -> south
+                case 3 -> 5; // south -> east
+                case 5 -> 2; // east -> north
+                default -> facing;
+            };
+            case ROTATE_RIGHT -> switch (facing) {
+                case 2 -> 5; // north -> east
+                case 5 -> 3; // east -> south
+                case 3 -> 4; // south -> west
+                case 4 -> 2; // west -> north
+                default -> facing;
+            };
+            case ROTATE_180 -> switch (facing) {
+                case 2 -> 3;
+                case 3 -> 2;
+                case 4 -> 5;
+                case 5 -> 4;
+                default -> facing;
+            };
+            case MIRROR_X -> switch (facing) {
+                case 4 -> 5;
+                case 5 -> 4;
+                default -> facing;
+            };
+            case MIRROR_Z -> switch (facing) {
+                case 2 -> 3;
+                case 3 -> 2;
+                default -> facing;
+            };
+            case FLIP_VERTICAL -> switch (facing) {
+                case 0 -> 1;
+                case 1 -> 0;
+                default -> facing;
+            };
         };
     }
 
@@ -376,7 +443,7 @@ public final class RegionSelectionSnapshotManager {
         return GSON.toJson(json);
     }
 
-    private static BlockState blockStateFromJsonString(String raw) {
+    public static BlockState blockStateFromJsonString(String raw) {
         return blockStateFromJson(JsonParser.parseString(raw).getAsJsonObject());
     }
 

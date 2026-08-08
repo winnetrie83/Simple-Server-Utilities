@@ -1,3 +1,321 @@
+# Simple Server Utilities 1.9.0-dev3.24.2
+
+## NPC custom skin renderer hotfix
+- Fixed both Local server PNG and HTTPS custom NPC skins resolving to Minecraft's magenta/black missing texture on mannequin NPCs.
+- `PlayerSkin` now receives a `ClientAsset.ResourceTexture` whose explicit texture path is the exact identifier registered by SSU's `DynamicTexture`; the former one-argument constructor derived a different resource-pack path.
+- Dynamic texture IDs are now definition-specific (`npc_skin/<definition>/<hash>`) so identical skin bytes used by multiple NPC definitions cannot be released out from under each other.
+- Wide/Slim-only changes reuse the installed pixels while rebuilding the `PlayerSkin` model metadata.
+- Client skin decode/install failures now emit diagnostic log warnings instead of silently falling back to the missing texture.
+- Local/URL validation rules are unchanged: PNG, exactly 64x64, maximum 512 KiB; local files remain sandboxed under `<world>/simpleserverutilities/npcs/textures/`.
+- No network protocol or persistence schema changes versus dev3.24.1.
+
+
+## NPC label and remote-skin hotfix
+- Removed the vanilla CustomName from managed NPC runtime entities so targeting an NPC can no longer reveal a second large vanilla nameplate over SSU's own label.
+- Doubled the base size of NPC role/name/faction overhead text and scale both text size and label spacing with the NPC's live SCALE attribute.
+- Remote HTTPS NPC skins now use image/browser-compatible request headers and a same-origin referrer for CDN/hotlink compatibility.
+- Failed remote texture loads are no longer negatively cached forever; SSU retries a failed source after a bounded 30-second cooldown.
+- No network protocol or persistence schema changes versus dev3.24.
+
+
+## Dashboard icons and minimap marker
+- Added the supplied `achievements.png` as the dedicated Achievement dashboard icon for player and admin views.
+- Added the supplied `games.png` as the dedicated Minigames dashboard icon for player and admin views.
+- Added a visible player-dashboard **Cosmetics** tile using `cosmetics.png`. The tile currently opens a local Coming Soon placeholder only; no cosmetic actions, storage, permissions or networking are introduced yet.
+- Replaced the old procedural minimap player pointer with the supplied `arrow.png` texture. Existing north-up/rotating-map orientation logic is retained.
+- The minimap arrow is centered on the effective map content area, including the inset textured square map.
+
+## Compatibility
+- Network protocol remains `105`.
+- Player UI Preferences schema remains `13`.
+- All persistence schemas remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.23.3
+
+- Hotfix: enlarged the rectangular textured minimap render area by 5 texture pixels on every side.
+- New effective square frame insets: left/top 32 px, right 33 px, bottom 34 px (previously 37/37/38/39).
+- Fixes the square textured minimap appearing slightly too small inside the frame after dev3.23.2.
+- No protocol or schema changes versus dev3.23.2.
+
+
+- Hotfix: textured rectangular minimap now clips terrain and markers to the actual inner opening of the 256×256 square frame.
+- Fixes the issue where the square minimap could render outside the visible frame border.
+- Round textured minimap behavior is unchanged.
+- No protocol or schema changes versus dev3.23.1.
+
+
+- Hotfix: replaced the minimap textured frame assets with the user-provided 256×256 final square and round textures.
+- No code, protocol or schema changes versus dev3.23; this is a texture/asset integration hotfix only.
+
+## Achievement item picker fixes
+- Replaced the Achievement icon text-button registry list with a scrollable inventory-style catalogue using real item icons, translated-name/registry-ID filtering, selection highlighting and an explicit `Select item` confirmation.
+- Fixed the old icon-picker return flow: confirmed choices now update the achievement draft itself before the editor is rebuilt, so the chosen icon is no longer discarded.
+- Reworked Item rewards to choose from the editing administrator's own 36-slot live inventory. The selected stack is copied as an exact ItemStack template without moving or consuming the real item; Count remains independently editable.
+- Exact ItemStack component data is serialized through the existing registry-aware Mail ItemStack codec and remains preserved when the achievement is saved/reopened.
+- Registry target picker callbacks now write directly to the objective draft as well, avoiding the same transient-field loss on return.
+
+## Server Operations labels
+- Activity now visibly labels logging retention, rollback player/UUID, look-back hours and rollback radius, with explicit units and supporting tooltips.
+- Scheduler now labels task name, action, schedule and optional payload/message; schedule syntax explains interval minutes, `daily@HH:mm` and `once@yyyy-MM-ddTHH:mm`.
+- Chat now labels slow mode, duplicate/flood windows, flood message limit, caps threshold/minimum length, blocked phrases and mute player/duration/reason controls.
+
+## Region Tool input fix
+- Region Tool controls are now deterministic: left-click a targeted block sets Point 1; right-click a targeted block sets Point 2; right-click in the air opens the Region GUI.
+- Block-target right-click is consumed by Point 2 and an additional server ray-pick guard prevents a follow-up item-use path from opening the GUI unless the hit result is actually `MISS`.
+- Updated Region Tool help text to match the corrected controls.
+
+## Optional textured minimap frames
+- Added the supplied square and circular minimap frame textures as SSU resources.
+- Added persistent `Frame: CLASSIC / TEXTURED` to Minimap Settings. Existing players migrate to Classic so their visual style does not change unexpectedly.
+- Rectangle and Circle shapes automatically select their matching texture.
+- The textured circular minimap uses bounded strip-based circular clipping so terrain does not leak through the transparent outer corners of the frame.
+
+## Compatibility
+- Network protocol increased `104 -> 105` because minimap payload/menu settings now carry the textured-frame preference.
+- Player UI preference schema increased `12 -> 13` for the persistent minimap-frame choice.
+- All other persistence schemas remain unchanged from dev3.22.
+
+# Simple Server Utilities 1.9.0-dev3.22
+
+## Achievement UX & administration polish
+- Reduced both the player Achievement browser and the admin Achievement browser/editor by roughly 25%.
+- Reworked the admin Achievement editor into collapsible General / Objectives / Rewards sections with guided, human-readable controls instead of exposing internal event/action syntax in the normal workflow.
+- Added searchable registry pickers for achievement icon items, reward items, block/item/entity targets and registry tags; advanced raw metadata/custom-event fields remain available only when needed.
+- Achievement money and damage/healing amounts are now entered in normal human units and converted internally.
+- Replaced manual UUID achievement comparison/admin lookup with the existing searchable known-player picker; online and previously known offline players can be selected by name while UUIDs remain internal.
+- Achievement rewards are rendered as effective rewards. Item rewards show their real item icon and a friendly `count × Item name`; money, permission, temporary permission, cosmetic, title and claim-chunk rewards use human-readable text.
+- Existing exact ItemStack rewards are preserved safely by the guided editor, and their base item/count can be shown in the browser without discarding custom stack data.
+- Added the vanilla challenge-complete advancement sound when an achievement is earned.
+
+## GUI compactness and clarity
+- Hologram Editor: removed the rich-text/color overlap, moved the rich-text/source/scoreboard area down, halved coordinate field widths, and replaced the generic Coordinates label with explicit X / Y / Z labels.
+- Mail Composer: moved inventory upward, pulled the hotbar much closer, moved Back/Send Mail upward, and reduced total window height by about 19%.
+- Server Operations > Backups: added visible labels for backup name, automatic backups, interval and retention plus explanatory tooltips.
+- Server Operations > Worlds: added labels for world-border center/size, pregeneration radius, chunks-per-tick and auto-pause MSPT; `Save throttle` is now `Save pregen settings` with explanatory tooltips.
+- Server Operations > Health now leads with a color-coded `GREAT / GOOD / NEUTRAL / BAD / VERY BAD` summary; TPS/MSPT/heap/cache/module details are hidden behind an optional Technical details control.
+
+## Compatibility
+- Network protocol increased `103 -> 104` because Achievement menu/editor payloads now carry structured reward presentation data and economy formatting metadata.
+- Achievement definition/player schemas, Content Reward Ledger, Statistics, Server Operations and all other persistence schemas are unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.21.1
+
+## Compile hotfix
+- Fixed the remaining rich-text compatibility imports after the dev3.21 `SsuRichTextDocument` generalization: `Format`, `CharacterStyle` and `Segment` now use their canonical declaring type.
+- Replaced the unavailable Minecraft 26.2 `ChatFormatting.isColor()` calls with an explicit vanilla 16-color predicate in `SsuRichTextComponents`.
+- No gameplay, network payload, protocol, persistence, achievement/statistics schema, or reward-ledger behavior changed. Network protocol remains `103`.
+
+# Simple Server Utilities 1.9.0-dev3.21
+
+## Achievement system
+- Added a server-authoritative custom Achievement system with persistent definition schema `1` and per-player progress schema `1`.
+- Admins can create/edit/delete achievements from the Admin Dashboard. Definitions include an immutable ID, rich-text title and info, category, icon item, enabled/hidden/announcement flags, sort weight, multiple objectives and multiple rewards.
+- Player Dashboard now contains Achievements. Players can browse all visible achievements, filter All/Earned/Unearned, inspect objective progress and rewards, and compare a selected achievement against another player.
+- Achievement chat announcements are clickable and open the selected achievement comparison directly. Hidden achievement details are only revealed to viewers who have already earned that hidden achievement themselves; everyone else sees a generic hidden-achievement announcement.
+- Admin testing supports `Reset progress` and `Reset + allow reward again`. The latter advances the reward generation so a deliberate re-test remains idempotent.
+- Achievement completion is persisted before rewards execute. Offline event progress is supported and pending reward/announcement delivery resumes at the player's next login.
+
+## Shared objective/event foundation
+- Moved generic vanilla gameplay publication out of the Quest module into module-independent `ContentGameplayEvents`; disabling Quests no longer disables shared progression events.
+- Added reusable Content objectives with target modes `ANY`, `EXACT`, `LIST`, `TAG` and aggregators `COUNT`, `SUM`, `MAX`, `UNIQUE`, plus exact metadata filters. TAG matching resolves vanilla block/item/entity registry tags directly and still accepts publisher-provided custom tag metadata.
+- Added/standardized Content events for login/logout, play time, block break/place, deaths/kills, damage dealt/taken, crafting, item use/consume, distance travelled, dimension/biome visits, claim-group creation/chunk additions, auction purchases/sales/revenue, achievement completion, and the existing Quest/NPC/Minigame/Dungeon events.
+- Distance tracking samples movement without counting large teleport/correction deltas and records movement metadata such as foot/sprint/swim/vehicle/elytra.
+- Damage events include main-hand item, dimension and damage-source metadata, enabling objectives such as damage with a specific equipped item.
+- Minigame healing events now expose self/non-self metadata for teammate-healing objectives.
+- Claim creation and interactive/batch chunk claiming publish Content events, enabling compound achievements such as create a claim group and claim at least N chunks.
+- Auction COMMITTED purchases publish deterministic durable buyer/seller events, including net seller revenue, so offline sellers can progress auction achievements without duplicate counting after recovery.
+
+## Rewards and permissions
+- Added persistent Content Reward Ledger schema `1`. Content reward lists write a durable PREPARED journal before side effects; interrupted or rollback-incomplete attempts fail closed instead of being replayed automatically and risking duplicate rewards.
+- Cleanly rolled-back normal transaction failures remove their PREPARED ledger entry and may retry normally.
+- Added persistent Temporary Permission overlay schema `1`; timed grants are resolved above base player permissions without overwriting the administrator's underlying permission configuration.
+- Added shared reward actions for money, exact or normal ItemStacks, claim-chunk capacity, temporary permissions, generic cosmetic unlocks and title unlocks; existing permanent permission Content actions remain supported. `unlock_cosmetic` also bridges `minigame:<cosmetic-id>` into the existing minigame cosmetic entitlements.
+- Item rewards can preserve serialized ItemStack components. If inventory delivery cannot fit and Mail is active, SSU delivers the reward as an idempotent system-mail attachment.
+
+## Statistics
+- Custom Statistics definition/player schemas increase to `2` for future-schema protection, durable event IDs and the expanded Content-event model.
+- Statistics now consume the shared Content Event Bus instead of duplicating vanilla event handlers.
+- Minigame direct statistic increments were removed where equivalent Content events already exist, preventing double-counting.
+- Player statistic files are indexed at startup and loaded lazily during ordinary gameplay; global leaderboard/rank/total operations still intentionally load the indexed records they query.
+- Future-schema statistic files are write-protected instead of being silently normalized and overwritten by an older build.
+
+## World Edit snapshot preview safety
+- Snapshot palette data is now segmented into small bounded packet chunks instead of placing the entire palette in the first preview packet.
+- Client preview assembly no longer recopies the growing palette/block collection on every incoming packet; immutable completed data is built once after the stream finishes.
+- Completed previews are spatially indexed into 16x16x16 sections. Rendering culls section AABBs first, avoiding a full million-block scan every frame for large snapshots.
+
+## Entity Insight
+- FLEEING now requires a recent player-caused hit (5-second TTL), preventing old attackers from keeping unrelated mobs cyan later.
+- Entity Insight sync cadence is reduced to every 10 ticks and unchanged per-viewer snapshots are suppressed to reduce repeated entity payload traffic.
+
+## Rich text and cleanup
+- Extracted reusable rich-text code into `SsuRichText`, `SsuRichTextDocument` and `SsuRichTextComponents`. `HologramRichTextDocument` remains as a deprecated compatibility facade, while shared editors/renderers no longer depend on a Hologram-specific document type.
+- Quest gameplay event handling is reduced to Quest-specific lifecycle persistence; generic block/combat/gameplay publication has one shared owner.
+- New achievement/network/storage paths are bounded and future-schema guarded. Existing achievement IDs are immutable after creation to avoid orphaning player progress.
+
+## Compatibility
+- Network protocol increases from `102` to `103` for Achievement menu/editor payloads and the revised snapshot-preview stream payload.
+- Achievement definition schema: `1`.
+- Achievement player-progress schema: `1`.
+- Content Reward Ledger schema: `1`.
+- Temporary Permission overlay schema: `1`.
+- Custom Statistics definition/player schemas increase to `2`.
+- Auction purchase journal schema increases to `2` for durable Content-event publication state.
+- Player UI preferences schema remains `12`.
+- Minigame definition/recovery/progression/history schemas remain `21/4/3/1`.
+- NPC definition/placement/dialogue schemas remain `9/3/1`; NPC Shop remains `4`.
+- Player Claim storage remains `3`; Region storage remains `5`; portable snapshot format remains `1`.
+- Mine schema remains `3`; physical Jail schema remains `2`; Server Operations schema remains `3`.
+
+# Simple Server Utilities 1.9.0-dev3.20.1
+
+Compile hotfix above dev3.20.
+
+- Entity Insight: explicitly restores/validates the `FLEEING` member on `EntityInsightPayload.Attitude` used by `EntityInsightService`.
+- `FLEEING` keeps wire id `3` and cyan color `0x55FFFF`; encode/decode and client color rendering remain aligned.
+- No gameplay, permission, persistence, schema, or network-protocol change. Network protocol remains `102`.
+
+# Simple Server Utilities 1.9.0-dev3.20
+
+## World Edit in-world workflow
+- Reworked the dedicated World Edit Tool input flow: **left-click a block = Point 1**, **right-click a block = Point 2**, and **right-click in the air = open the full World Edit GUI**.
+- Added a normal rebindable Minecraft key mapping named **World Edit: compact tools**, defaulting to `W`. While the SSU World Edit Tool is held, this toggles a transparent bottom-right editing palette instead of covering the world with the full editor.
+- The compact palette exposes the operations that benefit from continuous world visibility: one-block X/Z arrow movement, `+Y`/`-Y`, rotate left/right/180, mirror X/Z and vertical flip. Buttons are deliberately 28x18 pixels and use tooltips rather than long labels.
+- Clipboard, Fill, Replace, Snapshots and the complete editor remain available in the normal World Edit GUI. Existing server-authoritative action payloads and bounded Undo/Redo are reused by the compact controls.
+- Cleaned the World Edit Snapshots page layout so its explanatory text, Preview/Load controls and selected-snapshot label no longer overlap.
+
+## Real snapshot ghost preview
+- Replaced the old sampled coloured-cube preview with a chunked preview stream containing the **full snapshot block-state palette and every snapshot block entry**.
+- Snapshot preview now submits Minecraft's actual baked block-model quads and resource-pack textures through a translucent moving-block render layer, producing a ghost-like copy instead of placeholder boxes.
+- Biome/block tint sources are applied per previewed block where available. Air remains invisible; no blocks are actually placed until confirmation.
+- Removed the filled preview cuboids and removed the preview screen's vanilla blur/dim background extraction. The world remains visually readable behind both preview controls and Free mode.
+- Snapshot preview controls were compacted to bottom-right arrow/axis/transform buttons, with Place/Cancel and Free inspection retained.
+
+## Entity Insight polish
+- Armor Stands are now completely excluded from Entity Insight, preventing their misleading `20/20 HP` label.
+- Added **Fleeing** as a fourth dynamic Entity Insight attitude, rendered cyan. A non-hostile mob that is actively moving away from a player who hurt it is shown as fleeing; active targeting remains higher-priority hostile/red and the label automatically reverts when the flee condition ends.
+
+## Compatibility
+- Network protocol increases from `101` to `102` for the full chunked snapshot-preview wire format and the added Entity Insight attitude semantic.
+- Player UI preferences schema remains `12`.
+- Minigame definition schema remains `21`; NPC definition schema remains `9`; Mine schema remains `3`; physical Jail schema remains `2`; Server Operations schema remains `3`.
+- Portable selection snapshot format remains `1`; saved snapshots are not migrated.
+
+# Simple Server Utilities 1.9.0-dev3.19
+
+## Rich-text palette polish
+- Reflowed every shared 16-colour rich-text palette into exactly two rows of eight colors instead of one long row. This applies to Mail Compose, Floating Hologram, the reusable Rich Text editor and Rank Prefix editor.
+- Enlarged the Floating Hologram inline text-colour swatches from 7x7 to 14x14 pixels so the actual colors are clearly visible.
+- The tooltip label for the **Black** swatch is now rendered in white for readability on Minecraft's dark tooltip background. Selecting Black still applies the real black text color.
+
+## World Edit structural-entity transform fix
+- Full-snapshot transforms now rotate/mirror the persisted vanilla `Facing` direction used by hanging entities in addition to transforming position and yaw.
+- Item frames, glow item frames and paintings therefore keep the correct wall/floor/ceiling attachment when a World Edit snapshot is rotated 90/180 degrees, mirrored, or vertically flipped.
+- Snapshot format remains `1`; existing saved snapshots remain compatible because the fix is applied in memory while transforming them.
+
+## NPC overhead-name fix
+- Suppressed Minecraft's vanilla custom-name nameplate for entities tagged `ssu_npc`. This prevents the NPC name from appearing a second time when the player targets the NPC.
+- SSU's own Role / Name / Faction overhead label remains unchanged and is still the single visible NPC identity layer.
+
+## Compatibility
+- Network protocol remains `101`.
+- Player UI preferences schema remains `12`.
+- Minigame definition schema remains `21`; NPC definition schema remains `9`; Mine schema remains `3`; physical Jail schema remains `2`; Server Operations schema remains `3`.
+- No persistence migration is required.
+
+# Simple Server Utilities 1.9.0-dev3.18.2
+
+## Compile hotfix
+- Fixed the Entity Insight integer dashboard slider for the Minecraft 26.2 `AbstractSliderButton` contract by implementing `applyValue()` instead of the non-existent `apply()` override.
+- Fixed the Minecraft 26.2 `TamableAnimal` import to `net.minecraft.world.entity.TamableAnimal`.
+- Fixed SSU NPC exclusion in Entity Insight by using the current `Entity#entityTags()` accessor instead of removed `Entity#getTags()`.
+- No gameplay behavior, network packet shape, permissions, or persistence formats changed.
+
+## Compatibility
+- Network protocol remains `101`.
+- Player UI preferences schema remains `12`.
+- All other schemas remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.18.1
+
+## Player Dashboard polish
+- Added the supplied dedicated Player Dashboard icons:
+  - `ticket.png` for **Support**.
+  - `kits.png` for **Kits**.
+  - `mines.png` for **Mines**.
+- The admin dashboard keeps its existing administration icons; the new assets are used specifically by the player-facing tiles.
+
+## Entity Insight GUI-first cleanup
+- Removed the newly introduced `/ssu settings entity_insight ...` mutation command branch.
+- Entity Insight remains fully configurable from the player GUI: enabled, health display, range (0-32 blocks), and maximum rendered entities (1-50).
+- Existing legacy settings commands for unrelated older features remain unchanged for compatibility.
+
+## Compatibility
+- Network protocol remains `101`.
+- Player UI preferences schema remains `12`.
+- No persistence or gameplay-format migration is required from dev3.18.
+
+# Simple Server Utilities 1.9.0-dev3.18
+
+## Entity Insight
+- Added **Entity Insight**, a player-configurable overhead nametag overlay for nearby non-player living entities.
+- Entity Insight renders the entity name and, optionally, live current/max health (for example `Sheep  10/10 HP`).
+- Nametags are attitude-coloured: green for friendly entities, yellow for neutral entities and red for hostile entities. Neutral vanilla mobs switch to red while actively targeting a player and return to yellow when that hostility ends; tamed animals remain friendly unless they actually target a player.
+- Invisible entities, players and SSU-managed NPCs are excluded so Entity Insight does not leak invisibility or collide with SSU's existing player/NPC overhead identity renderers.
+- Players can enable/disable the overlay, independently enable/disable health, choose an exact render range from `0` to `32` blocks and cap the nearest rendered entities from `1` to `50`. Defaults are ON, health ON, 16 blocks and 20 entities.
+- Added default-granted permission key `ssu.entity_insight.use`. The server remains the hard gate and selects the bounded nearest entity set for each viewer.
+- Added `/ssu settings entity_insight` fallback controls for enabled/health/range/max_entities in addition to Settings > Combat.
+
+## Compatibility
+- Network protocol increases from `100` to `101` for the bounded Entity Insight viewer payload and expanded dashboard settings snapshot.
+- Player UI preference schema increases from `11` to `12` for Entity Insight enable/health/range/count preferences. Existing player preference files migrate in place with conservative defaults.
+- Minigame definition schema remains `21`; NPC definition schema remains `9`; Mine schema remains `3`; physical Jail schema remains `2`; Server Operations schema remains `3`; all other persistence schemas are unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.17.1
+
+## Compile hotfix
+- RegionSelectionEditScreen compile hotfix: restored the missing `setNotice(String, boolean)` helper used by the new World Edit GUI.
+- No gameplay, protocol, schema, or persistence changes.
+
+## King of the Hill fixes and editor polish
+
+- Fixed active King of the Hill combat being blocked by the containing Region's normal PvP rule. KOTH now participates in the same narrowly scoped active-match Region-PvP bypass as the existing combat minigames; outside an active match the Region rule still applies.
+- KOTH friendly fire remains independent: `Friendly fire: No` blocks only teammate damage while enemy PvP remains enabled during the match.
+- Reworked all three KOTH editor tabs into a smaller, denser layout. Numeric fields are sized for their actual values, text fields retain practical width, time fields show `(sec)`, and the title/helper/label rows no longer occupy the same vertical space.
+
+## Dedicated World Edit Tool
+
+- Added a standalone **SSU World Edit Tool** to Admin Tools. It uses the same two-left-click Point 1/Point 2 selection state as Regions and opens its editor with right-click.
+- The Region Setup Tool is now focused on Region-specific work (Region creation/bounds, protection, access/rent, auto-reset and browsing); the generic Selection/build tab is no longer exposed there.
+- Added a dedicated World Edit GUI with separate Clipboard, Fill, Replace, Snapshots and Transform tabs.
+- Clipboard operations now include Copy, Cut, Paste, Clear to air, Fill water, Fill lava, Undo and Redo.
+- Weighted fill palettes are inventory-backed and no longer limited to six entries. The client editor supports up to 64 authored fill entries and the payload/backend accepts the same bounded maximum; unused percentage can intentionally become air.
+- Added multi-source block replacement with a separately authored weighted target palette. Source and target blocks are chosen from the admin inventory without consuming items.
+- Added rotate left/right/180, mirror east/west, mirror north/south, vertical flip and X/Y/Z offset/move operations.
+- World Edit transforms and moves use the existing full portable snapshot infrastructure so block entities/inventories and supported structural entities are preserved instead of degrading to block-state-only copies.
+- Existing portable selection snapshots are integrated directly into World Edit: save, list/load, ghost preview and confirmed placement reuse the existing snapshot/preview system.
+- Added bounded per-admin session Undo/Redo history using full snapshots. History keeps at most 8 entries and trims aggregate stored volume to a bounded limit; large edits continue to use the existing batched job scheduler.
+- Snapshot preview confirmation now records undo history before placement.
+
+## Mine Setup Tool input fix
+
+- Mine Setup Tool selection now follows the shared SSU convention: first left-click sets Point 1, second left-click sets Point 2, and the next left-click starts a fresh selection.
+- Right-click is now reserved exclusively for opening Mine Administration, removing the previous Point 2/menu input conflict.
+- Actionbar feedback explicitly tells the admin which point was set and what the next input does.
+
+## Block Party editor polish
+
+- Removed the long comma-separated registered block-ID field from Block Party round configuration.
+- Block Party palettes are now authored through a 16-slot inventory-backed ghost palette. Real block icons and vanilla hover tooltips are shown; left-click selects/replaces a palette slot and right-click removes an individual entry. Admin inventory items are never consumed.
+- Duplicate palette blocks are rejected, the existing minimum of 2 valid blocks remains enforced, and the maximum is explicitly 16.
+- Added clear labels and units to every round-rule field, including initial/minimum round time, per-round speedup, drop duration, tile size and elimination depth; numeric fields were compacted accordingly.
+
+## Compatibility
+
+- Network protocol remains `100` because no packet wire shape changed; the existing Region selection action payload only accepts a larger bounded list.
+- Minigame definition schema remains `21`; Block Party and KOTH reuse existing schema-21 fields.
+- NPC definition schema remains `9`; Mine schema remains `3`; physical Jail schema remains `2`; Server Operations schema remains `3`; all other persistence schemas are unchanged.
+
 # Simple Server Utilities 1.9.0-dev3.16
 
 ## King of the Hill v2

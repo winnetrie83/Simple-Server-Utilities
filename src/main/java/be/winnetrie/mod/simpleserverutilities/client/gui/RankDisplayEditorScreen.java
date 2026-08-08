@@ -1,7 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.client.gui;
 
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument;
-import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument.Format;
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument.Format;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultiLineEditBoxAccessor;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultilineTextFieldAccessor;
 import be.winnetrie.mod.simpleserverutilities.network.RankDisplayDataPayload;
@@ -71,8 +71,10 @@ public final class RankDisplayEditorScreen extends Screen {
         int paletteY = y + 162;
         for (int index = 0; index < 16; index++) {
             int paletteIndex = index;
+            int column = index % 8;
+            int row = index / 8;
             addRenderableWidget(RichTextPalette.button(
-                    x + 18 + index * 26, paletteY, 22, paletteIndex, ignored -> applyColor(paletteIndex)
+                    x + 18 + column * 26, paletteY + row * 26, 22, paletteIndex, ignored -> applyColor(paletteIndex)
             ));
         }
 

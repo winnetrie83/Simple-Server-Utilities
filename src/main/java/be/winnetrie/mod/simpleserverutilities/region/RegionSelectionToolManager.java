@@ -12,6 +12,7 @@ import net.minecraft.world.item.Items;
 public class RegionSelectionToolManager {
 
     public static final String SSU_ADMIN_TOOL_NAME = "SSU Region Tool";
+    public static final String SSU_WORLD_EDIT_TOOL_NAME = "SSU World Edit Tool";
 
     private final Map<UUID, String> boundTools = new HashMap<>();
 
@@ -31,21 +32,28 @@ public class RegionSelectionToolManager {
         return boundTools.containsKey(player.getUUID());
     }
 
-    public boolean isBoundTool(ServerPlayer player, ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return false;
-        }
-
-        // The dashboard-issued SSU tool remains usable after relog/restart.
-        // Permission checks still run for every interaction, so recognizing this
-        // named tool does not grant region access by itself.
-        if (stack.is(Items.WOODEN_AXE)
-                && SSU_ADMIN_TOOL_NAME.equals(stack.getHoverName().getString())) {
-            return true;
-        }
-
+    public boolean isRegionTool(ServerPlayer player, ItemStack stack) {
+        if (player == null || stack == null || stack.isEmpty()) return false;
+        if (stack.is(Items.WOODEN_AXE) && SSU_ADMIN_TOOL_NAME.equals(stack.getHoverName().getString())) return true;
         String boundTool = boundTools.get(player.getUUID());
-        return boundTool != null && boundTool.equals(getStackKey(stack));
+        return boundTool != null && boundTool.equals(getStackKey(stack))
+                && !SSU_WORLD_EDIT_TOOL_NAME.equals(stack.getHoverName().getString());
+    }
+
+    public boolean isWorldEditTool(ServerPlayer player, ItemStack stack) {
+        return player != null && stack != null && !stack.isEmpty()
+                && stack.is(Items.GOLDEN_AXE)
+                && SSU_WORLD_EDIT_TOOL_NAME.equals(stack.getHoverName().getString());
+    }
+
+    /** Any SSU cuboid-selection tool. Region and World Edit deliberately use their own interaction flow. */
+    public boolean isSelectionTool(ServerPlayer player, ItemStack stack) {
+        return isRegionTool(player, stack) || isWorldEditTool(player, stack);
+    }
+
+    /** Backward-compatible alias for older call sites; prefer isRegionTool/isSelectionTool. */
+    public boolean isBoundTool(ServerPlayer player, ItemStack stack) {
+        return isRegionTool(player, stack);
     }
 
     public String getBoundTool(ServerPlayer player) {

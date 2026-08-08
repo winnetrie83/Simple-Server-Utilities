@@ -1,0 +1,37 @@
+SSU 1.9.0-dev3.17 validation notes
+=====================================
+
+Base
+----
+Built on: 1.9.0-dev3.16
+mod_version: 1.9.0-dev3.17
+Network protocol: 100 (unchanged)
+Minigame definition schema: 21 (unchanged)
+NPC definition schema: 9 (unchanged)
+Mine definition schema: 3 (unchanged)
+Physical Jail definition schema: 2 (unchanged)
+Server Operations schema: 3 (unchanged)
+
+Implemented scope
+-----------------
+1. KOTH active-match Region PvP bypass + compact/clean editor layout.
+2. Dedicated World Edit Tool and Region Tool responsibility split.
+3. World Edit fill/fluids/air/copy/cut/paste/undo/redo/save/load/preview/transforms/offset/weighted replace.
+4. Mine Setup Tool sequential two-left-click selection; RMB menu only.
+5. Block Party 16-slot inventory-backed ghost palette + labels/units.
+
+Validation performed
+--------------------
+- Whole Java-tree lexical delimiter-balance scan: `JAVA_LEXICAL_BALANCE_OK files=756`.
+- Dependency-less javac parser sanity over 18 changed/new Java files: `DEPENDENCY_LESS_JAVAC_PARSER_HITS=0`; missing Minecraft/NeoForge/project symbols are expected without the real classpath.
+- Targeted static assertions: `SSU_DEV3_17_STATIC_CHECKS_OK count=26` for version/protocol/schema, KOTH PvP allowlist, World Edit registration/dispatch, history bounds, fill-list bound, Region GUI separation, Mine input flow and Block Party/KOTH editor requirements.
+- JSON parse validation: `JSON_PARSE_OK files=15`.
+- ZIP integrity validation after packaging.
+
+Full Gradle compile
+-------------------
+A real `./gradlew compileJava --no-daemon` was attempted. The wrapper could not reach Java compilation because Gradle 9.2.1 is not available locally and `services.gradle.org` cannot be resolved/reached from this environment (`java.net.UnknownHostException`). A local Gradle compile with the actual Minecraft/NeoForge classpath is therefore still required.
+
+Runtime status
+--------------
+Not yet confirmed in a Minecraft client/dedicated server. Follow `docs/TESTING-1.9.0-dev3.17.md` before treating this build as stable.

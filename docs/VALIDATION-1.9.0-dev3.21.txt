@@ -1,0 +1,21 @@
+SSU 1.9.0-dev3.21 source validation
+====================================
+
+Target version: 1.9.0-dev3.21
+Network protocol: 103
+
+Static source checks performed in the build workspace:
+- 788 Java source files present.
+- 66 Java files changed/new relative to the supplied dev3.20.1 source at the time of final validation.
+- Internal SSU import scan: 0 unresolved internal imports.
+- Custom payload type scan: 178 distinct payload IDs; 0 duplicate IDs.
+- Direct legacy STATISTICS.increment call scan: none remain in source.
+- Changed-source javac parser pass (without Minecraft/NeoForge classpath): no Java syntax-error patterns detected.
+- NeoForge event accessors introduced by the shared gameplay adapter were checked against official NeoForge source.
+
+Environment limitation:
+A full Gradle compile could not be completed in this offline workspace because the required Gradle 9.2.1
+distribution / Minecraft-NeoForge dependency classpath was not locally available and the wrapper could not reach
+services.gradle.org. The source therefore still requires the normal local `./gradlew clean build` before runtime testing.
+
+See TESTING-1.9.0-dev3.21.md for the focused runtime checklist.

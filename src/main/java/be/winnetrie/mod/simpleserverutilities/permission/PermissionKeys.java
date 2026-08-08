@@ -161,6 +161,9 @@ public final class PermissionKeys {
     public static final String QUESTS_ABANDON = "ssu.quests.abandon";
     public static final String QUESTS_ADMIN = "ssu.quests.admin";
 
+    public static final String ACHIEVEMENTS_USE = "ssu.achievements.use";
+    public static final String ACHIEVEMENTS_ADMIN = "ssu.achievements.admin";
+
     public static final String MINIGAMES_USE = "ssu.minigames.use";
     public static final String MINIGAMES_QUEUE = "ssu.minigames.queue";
     public static final String MINIGAMES_ADMIN = "ssu.minigames.admin";
@@ -176,6 +179,7 @@ public final class PermissionKeys {
     public static final String BLOCK_INFORMATION_INVENTORY_FULL = "ssu.block_information.inventory.full";
     public static final String BLOCK_INFORMATION_INVENTORY_MAX_ITEMS = "ssu.block_information.inventory.max_items";
     public static final String DAMAGE_INDICATORS_USE = "ssu.damage_indicators.use";
+    public static final String ENTITY_INSIGHT_USE = "ssu.entity_insight.use";
     public static final String STATISTICS_ADMIN = "ssu.statistics.admin";
 
     public static final String CROPS_HARVESTING_USE = "ssu.crops_harvesting.use";
@@ -356,6 +360,8 @@ public final class PermissionKeys {
             QUESTS_TRACK,
             QUESTS_ABANDON,
             QUESTS_ADMIN,
+            ACHIEVEMENTS_USE,
+            ACHIEVEMENTS_ADMIN,
             MINIGAMES_USE,
             MINIGAMES_QUEUE,
             MINIGAMES_ADMIN,
@@ -370,6 +376,7 @@ public final class PermissionKeys {
             BLOCK_INFORMATION_INVENTORY_FULL,
             BLOCK_INFORMATION_INVENTORY_MAX_ITEMS,
             DAMAGE_INDICATORS_USE,
+            ENTITY_INSIGHT_USE,
             STATISTICS_ADMIN,
             CROPS_HARVESTING_USE,
 

@@ -24,6 +24,7 @@ public final class SsuReloadService {
                     + " long-running job(s) are active. Finish or cancel them first.");
         }
 
+        boolean achievementsWasActive = active("achievements");
         boolean statisticsWasActive = active("statistics");
         boolean mapMarkersWasActive = active("map_markers");
         boolean auctionWasActive = active("auction_house");
@@ -33,6 +34,7 @@ public final class SsuReloadService {
         boolean minigamesWasActive = active("minigames");
         boolean dungeonsWasActive = active("dungeons");
 
+        if (achievementsWasActive) SimpleServerUtilities.ACHIEVEMENTS.saveAll();
         if (statisticsWasActive) SimpleServerUtilities.STATISTICS.saveAll();
         if (mapMarkersWasActive) SimpleServerUtilities.MAP_MARKERS.save();
         if (auctionWasActive) SimpleServerUtilities.AUCTION_HOUSE.saveAllSync();
@@ -51,12 +53,16 @@ public final class SsuReloadService {
             SimpleServerUtilities.DUNGEONS.saveAll();
         }
         SimpleServerUtilities.CONTENT_PROGRESS.saveAll();
+        SimpleServerUtilities.CONTENT_REWARD_LEDGER.saveAll();
+        SimpleServerUtilities.TEMPORARY_PERMISSIONS.saveAll();
         SimpleServerUtilities.STORAGE.flush(Duration.ofSeconds(5));
 
         SimpleServerUtilities.CORE.modules().refreshEnabledState(server);
 
         SimpleServerUtilities.TRANSACTIONS.clear();
         SimpleServerUtilities.CONTENT_PROGRESS.load(server);
+        SimpleServerUtilities.CONTENT_REWARD_LEDGER.load(server);
+        SimpleServerUtilities.TEMPORARY_PERMISSIONS.load(server);
         SimpleServerUtilities.ECONOMY.load(server);
         if (Config.ENABLE_PLAYER_CLAIMS.get()) {
             SimpleServerUtilities.PLAYER_CLAIMS.load(server);
@@ -81,6 +87,7 @@ public final class SsuReloadService {
         SimpleServerUtilities.BORDER_SETTINGS.load(server);
 
         if (active("statistics")) SimpleServerUtilities.STATISTICS.load(server);
+        if (active("achievements")) SimpleServerUtilities.ACHIEVEMENTS.load(server);
         if (active("map_markers")) SimpleServerUtilities.MAP_MARKERS.load(server);
         if (active("npcs")) {
             SimpleServerUtilities.NPC_DIALOGUES.clear();

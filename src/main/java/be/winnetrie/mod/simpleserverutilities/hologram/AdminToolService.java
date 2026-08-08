@@ -23,6 +23,15 @@ public final class AdminToolService {
         return true;
     }
 
+
+    public static boolean giveWorldEditTool(ServerPlayer player) {
+        if (!Config.ENABLE_ADMIN_REGIONS.get()) return false;
+        ItemStack stack = new ItemStack(Items.GOLDEN_AXE);
+        stack.set(DataComponents.ITEM_NAME, Component.literal(RegionSelectionToolManager.SSU_WORLD_EDIT_TOOL_NAME));
+        if (!player.getInventory().add(stack)) player.drop(stack, false);
+        return true;
+    }
+
     public static boolean giveHologramTool(ServerPlayer player) {
         if (!Config.ENABLE_HOLOGRAMS.get()) return false;
         SimpleServerUtilities.HOLOGRAM_TOOLS.giveTool(player);

@@ -7,6 +7,8 @@ import java.util.Map;
 import be.winnetrie.mod.simpleserverutilities.content.ContentDataMap;
 import be.winnetrie.mod.simpleserverutilities.content.ContentEvent;
 import be.winnetrie.mod.simpleserverutilities.content.ContentId;
+import be.winnetrie.mod.simpleserverutilities.content.objective.ContentObjectiveDefinition;
+import be.winnetrie.mod.simpleserverutilities.content.objective.ContentObjectiveMatcher;
 
 /** One event-driven, independently tracked quest objective. */
 public final class QuestObjectiveDefinition {
@@ -28,18 +30,30 @@ public final class QuestObjectiveDefinition {
         return this;
     }
 
+    /** Quest compatibility facade over the shared Content objective matcher. */
     public boolean matches(ContentEvent event) {
-        if (event == null || !eventType.equals(event.type())) return false;
-        if (!"*".equals(subject) && !subject.equalsIgnoreCase(event.subject())) return false;
-        for (Map.Entry<String, String> requirement : metadata.entrySet()) {
-            String actual = event.metadata().get(requirement.getKey());
-            if (actual == null || !actual.equalsIgnoreCase(requirement.getValue())) return false;
-        }
-        return true;
+        return ContentObjectiveMatcher.matches(toContentObjective(), event);
     }
 
     public long increment(ContentEvent event) {
-        return event == null || event.amount() <= 0L ? 1L : event.amount();
+        if (!matches(event)) return 0L;
+        long contribution = ContentObjectiveMatcher.contribution(toContentObjective(), event);
+        // Preserve the legacy Quest behavior: zero/negative event amounts count as one occurrence.
+        return contribution <= 0L ? 1L : contribution;
+    }
+
+    public ContentObjectiveDefinition toContentObjective() {
+        ContentObjectiveDefinition objective = new ContentObjectiveDefinition();
+        objective.id = id;
+        objective.description = description;
+        objective.eventType = eventType;
+        objective.targetMode = "*".equals(subject) ? ContentObjectiveDefinition.TargetMode.ANY : ContentObjectiveDefinition.TargetMode.EXACT;
+        objective.targets = "*".equals(subject) ? java.util.List.of() : java.util.List.of(subject);
+        objective.aggregator = ContentObjectiveDefinition.Aggregator.SUM;
+        objective.targetAmount = targetAmount;
+        objective.metadata = new LinkedHashMap<>(metadata);
+        objective.optional = optional;
+        return objective.normalize();
     }
 
     public QuestObjectiveDefinition copy() {

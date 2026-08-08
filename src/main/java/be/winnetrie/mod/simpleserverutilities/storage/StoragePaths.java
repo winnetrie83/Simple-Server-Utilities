@@ -131,6 +131,10 @@ public final class StoragePaths {
         return contentProgression(root).resolve("players");
     }
 
+    public static Path achievements(Path root) { return root.resolve("achievements"); }
+    public static Path achievementDefinitions(Path root) { return achievements(root).resolve("definitions"); }
+    public static Path achievementPlayers(Path root) { return achievements(root).resolve("players"); }
+
     public static Path npcs(Path root) {
         return root.resolve("npcs");
     }

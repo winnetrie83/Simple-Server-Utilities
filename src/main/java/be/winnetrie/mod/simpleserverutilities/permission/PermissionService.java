@@ -27,6 +27,11 @@ public class PermissionService {
     private PermissionService() {
     }
 
+    private static String temporaryValue(ServerPlayer player, String permission) {
+        if (player == null || permission == null || SimpleServerUtilities.TEMPORARY_PERMISSIONS == null) return null;
+        return SimpleServerUtilities.TEMPORARY_PERMISSIONS.resolve(player.getUUID(), permission);
+    }
+
     public static boolean has(ServerPlayer player, String permission) {
         return has(player, permission, PermissionContext.global(player));
     }
@@ -65,7 +70,8 @@ public class PermissionService {
             return fallback;
         }
 
-        String resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, context);
+        String resolvedValue = temporaryValue(player, permission);
+        if (resolvedValue == null) resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, context);
         if (resolvedValue != null) {
             Boolean value = parseBoolean(resolvedValue);
             if (value != null) {
@@ -82,7 +88,8 @@ public class PermissionService {
      */
     public static boolean getBooleanForJailGameplay(ServerPlayer player, String permission, boolean fallback) {
         if (!Config.ENABLE_PERMISSION_SYSTEM.get()) return fallback;
-        String resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, PermissionContext.global(player));
+        String resolvedValue = temporaryValue(player, permission);
+        if (resolvedValue == null) resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, PermissionContext.global(player));
         if (resolvedValue != null) {
             Boolean value = parseBoolean(resolvedValue);
             if (value != null) return value;
@@ -102,7 +109,8 @@ public class PermissionService {
             return true;
         }
 
-        String resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, context);
+        String resolvedValue = temporaryValue(player, permission);
+        if (resolvedValue == null) resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, context);
 
         if (resolvedValue != null) {
             Boolean value = parseBoolean(resolvedValue);
@@ -124,7 +132,8 @@ public class PermissionService {
             return fallback;
         }
 
-        String resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, context);
+        String resolvedValue = temporaryValue(player, permission);
+        if (resolvedValue == null) resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, context);
 
         if (resolvedValue != null) {
             try {
@@ -146,7 +155,8 @@ public class PermissionService {
             return fallback;
         }
 
-        String resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, context);
+        String resolvedValue = temporaryValue(player, permission);
+        if (resolvedValue == null) resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, context);
 
         if (resolvedValue != null) {
             return resolvedValue;
@@ -211,6 +221,7 @@ public class PermissionService {
                     PermissionKeys.QUESTS_USE,
                     PermissionKeys.QUESTS_TRACK,
                     PermissionKeys.QUESTS_ABANDON,
+                    PermissionKeys.ACHIEVEMENTS_USE,
                     PermissionKeys.MINIGAMES_USE,
                     PermissionKeys.MINIGAMES_QUEUE,
                     PermissionKeys.DUNGEONS_USE,

@@ -1,0 +1,16 @@
+SSU 1.9.0-dev3.17.1 validation notes
+
+Base: 1.9.0-dev3.17
+Type: compile hotfix
+
+Fixed:
+- RegionSelectionEditScreen now defines the missing setNotice(String, boolean) helper used by all World Edit validation/status callsites.
+- The helper updates the existing notice text and error-color state; no network, gameplay, schema or persistence behavior changed.
+
+Checks:
+- All 20 compile-error callsites from the supplied compile log resolve to the restored helper.
+- Exactly one compatible setNotice(String, boolean) method exists in RegionSelectionEditScreen.
+- No protocol/schema bumps.
+- Full Gradle compile could not start in the container because Gradle 9.2.1 download from services.gradle.org failed with UnknownHostException.
+
+Local compile remains required.

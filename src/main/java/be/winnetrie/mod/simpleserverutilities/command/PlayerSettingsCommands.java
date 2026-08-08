@@ -184,6 +184,10 @@ public final class PlayerSettingsCommands {
                 + " | activation " + value.getVeinminerActivation().name().toLowerCase()
                 + " | color " + colorHex(value.getVeinminerOutlineColor())
                 + " | glow " + value.getVeinminerOutlineBrightness() + "%"));
+        player.sendSystemMessage(Component.literal(" Entity Insight: " + value.isEntityInsightEnabled()
+                + " | health " + value.isEntityInsightShowHealth()
+                + " | range " + value.getEntityInsightRange() + " blocks"
+                + " | max entities " + value.getEntityInsightMaxEntities()));
         player.sendSystemMessage(Component.literal(" Auto-delete claimed private attachment mail: "
                 + value.isMailAutoDeletePlayerAttachments()));
         player.sendSystemMessage(Component.literal(" Auto-delete claimed server attachment mail: "
@@ -367,6 +371,7 @@ public final class PlayerSettingsCommands {
         SimpleServerUtilities.UI_PREFERENCES.save();
         player.sendSystemMessage(Component.literal(confirmation));
         MinimapService.send(player);
+        be.winnetrie.mod.simpleserverutilities.identity.EntityInsightService.sync(player);
         return 1;
     }
 

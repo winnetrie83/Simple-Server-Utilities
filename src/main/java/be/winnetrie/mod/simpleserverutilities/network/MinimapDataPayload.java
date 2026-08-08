@@ -17,6 +17,7 @@ public record MinimapDataPayload(
         boolean enabled,
         int size,
         String shape,
+        boolean texturedFrame,
         String position,
         boolean northUp,
         boolean showClaims,
@@ -60,6 +61,7 @@ public record MinimapDataPayload(
         buffer.writeBoolean(payload.enabled());
         buffer.writeVarInt(payload.size());
         buffer.writeUtf(payload.shape(), 16);
+        buffer.writeBoolean(payload.texturedFrame());
         buffer.writeUtf(payload.position(), 16);
         buffer.writeBoolean(payload.northUp());
         buffer.writeBoolean(payload.showClaims());
@@ -96,6 +98,7 @@ public record MinimapDataPayload(
         boolean enabled = buffer.readBoolean();
         int size = buffer.readVarInt();
         String shape = buffer.readUtf(16);
+        boolean texturedFrame = buffer.readBoolean();
         String position = buffer.readUtf(16);
         boolean northUp = buffer.readBoolean();
         boolean showClaims = buffer.readBoolean();
@@ -133,7 +136,7 @@ public record MinimapDataPayload(
         }
 
         return new MinimapDataPayload(
-                allowed, enabled, size, shape, position, northUp, showClaims, showRegions, showCalendar,
+                allowed, enabled, size, shape, texturedFrame, position, northUp, showClaims, showRegions, showCalendar,
                 liveUpdateRadiusChunks,
                 dimension, centerChunkX, centerChunkZ, ownClaimColor, otherClaimColor, regionColor,
                 claims, regions

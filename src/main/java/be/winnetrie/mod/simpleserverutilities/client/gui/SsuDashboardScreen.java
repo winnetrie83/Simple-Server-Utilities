@@ -30,6 +30,7 @@ import be.winnetrie.mod.simpleserverutilities.network.SsuPlayerProfileDataPayloa
 import be.winnetrie.mod.simpleserverutilities.network.SsuPlayerProfileRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.PlayerManagementRequestPayload;
+import be.winnetrie.mod.simpleserverutilities.network.PlayerUiSettingUpdatePayload;
 import be.winnetrie.mod.simpleserverutilities.network.KitRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MineRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.OnboardingAdminRequestPayload;
@@ -37,6 +38,7 @@ import be.winnetrie.mod.simpleserverutilities.time.GameCalendar;
 import be.winnetrie.mod.simpleserverutilities.mixin.PlayerSkinWidgetAccessor;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.PlayerSkinWidget;
@@ -80,13 +82,18 @@ public final class SsuDashboardScreen extends Screen {
     private static final Identifier ICON_TRAVEL = texture("travel.png");
     private static final Identifier ICON_WALLET = texture("wallet.png");
     private static final Identifier ICON_MAIL = texture("mail.png");
-    private static final Identifier ICON_MINIGAMES = texture("minigames.png");
+    private static final Identifier ICON_MINIGAMES = texture("games.png");
+    private static final Identifier ICON_ACHIEVEMENTS = texture("achievements.png");
+    private static final Identifier ICON_COSMETICS = texture("cosmetics.png");
     private static final Identifier ICON_QUESTBOOK = texture("questbook.png");
     private static final Identifier ICON_SETTINGS = texture("cogwheel.png");
     private static final Identifier ICON_MARKET = texture("market.png");
     private static final Identifier ICON_PLAYERS = texture("multiplayer.png");
     private static final Identifier ICON_PORTAL = texture("portal.png");
     private static final Identifier ICON_SHIELD = texture("shield.png");
+    private static final Identifier ICON_TICKET = texture("ticket.png");
+    private static final Identifier ICON_KITS = texture("kits.png");
+    private static final Identifier ICON_MINES = texture("mines.png");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("dd/MM HH:mm")
             .withZone(ZoneId.systemDefault());
 
@@ -378,7 +385,7 @@ public final class SsuDashboardScreen extends Screen {
             case RENT_OPERATIONS -> addRentOperationButtons(l);
             case CORE -> addCoreButtons(l);
             case PROFILE -> addProfileButtons(l);
-            case MAIL, AUCTION_HOUSE, QUESTS, MINIGAMES, MINIGAME_ADMIN, DUNGEONS, KITS, KIT_ADMIN, MINES, MINE_ADMIN, JAIL_ADMIN, ONBOARDING_ADMIN -> { }
+            case MAIL, AUCTION_HOUSE, QUESTS, ACHIEVEMENTS, ACHIEVEMENTS_ADMIN, COSMETICS, MINIGAMES, MINIGAME_ADMIN, DUNGEONS, KITS, KIT_ADMIN, MINES, MINE_ADMIN, JAIL_ADMIN, ONBOARDING_ADMIN -> { }
         }
         if (requestInitialRemotePage) {
             requestInitialRemotePage = false;
@@ -412,9 +419,9 @@ public final class SsuDashboardScreen extends Screen {
                 new Module("My Warps", "Rent, place and control the visibility of your personal warps.", ICON_PORTAL, Page.MY_WARPS, snapshot.moduleSettings().warps()),
                 new Module("Wallet", "Balance, payments and your transaction history.", ICON_WALLET, Page.WALLET, snapshot.economy().enabled()),
                 new Module("Mail", "Inbox, sent mail, items and money attachments.", ICON_MAIL, Page.MAIL, snapshot.moduleSettings().mail()),
-                new Module("Kits", "View and claim kits available to your permissions.", ICON_MARKET, Page.KITS, true),
-                new Module("Mines", "View resettable server mines available to your permissions.", ICON_SETTINGS, Page.MINES, true),
-                new Module("Support", "Create and follow help, bug and player-report tickets.", ICON_MAIL, Page.SUPPORT, true)
+                new Module("Kits", "View and claim kits available to your permissions.", ICON_KITS, Page.KITS, true),
+                new Module("Mines", "View resettable server mines available to your permissions.", ICON_MINES, Page.MINES, true),
+                new Module("Support", "Create and follow help, bug and player-report tickets.", ICON_TICKET, Page.SUPPORT, true)
         ));
         if (snapshot.auctionHouseDashboardVisible()) {
             modules.add(new Module("Auction House", "Browse, buy and sell player-listed items.", ICON_MARKET, Page.AUCTION_HOUSE, true));
@@ -423,6 +430,10 @@ public final class SsuDashboardScreen extends Screen {
                 && "menu".equalsIgnoreCase(snapshot.moduleSettings().effectiveQuestAccessMode())) {
             modules.add(new Module("Questbook", "Available, active and completed quests.", ICON_QUESTBOOK, Page.QUESTS, true));
         }
+        if (snapshot.moduleSettings().achievements()) {
+            modules.add(new Module("Achievements", "Browse earned and unearned achievements and compare progress.", ICON_ACHIEVEMENTS, Page.ACHIEVEMENTS, true));
+        }
+        modules.add(new Module("Cosmetics", "Cosmetic unlocks and customization. Coming soon.", ICON_COSMETICS, Page.COSMETICS, true));
         if (snapshot.moduleSettings().minigames()) {
             modules.add(new Module("Minigames", "Queues, arenas and active matches.", ICON_MINIGAMES, Page.MINIGAMES, true));
         }
@@ -457,13 +468,15 @@ public final class SsuDashboardScreen extends Screen {
                 new Module("Core status", "Storage, indexes and migrated modules.", ICON_SETTINGS, Page.CORE, snapshot.adminAccess().core()),
                 new Module("Module settings", "Enable modules and configure world render distances.", ICON_SETTINGS, Page.MODULE_SETTINGS, snapshot.administrator()),
                 new Module("Utility Mining", "Configure Treecapitator and Veinminer block rules.", ICON_SETTINGS, Page.UTILITY_MINING_ADMIN, snapshot.administrator()),
-                new Module("Minigames", "Configure game modes, arenas, rewards and live matches.", ICON_PORTAL, Page.MINIGAME_ADMIN,
+                new Module("Minigames", "Configure game modes, arenas, rewards and live matches.", ICON_MINIGAMES, Page.MINIGAME_ADMIN,
                         snapshot.administrator() && snapshot.moduleSettings().minigames()),
                 new Module("Admin tools", "Get purpose-built world editing and setup tools.", ICON_SETTINGS, Page.ADMIN_TOOLS, snapshot.administrator()),
                 new Module("Holograms", "Edit, teleport to and delete floating text from anywhere.", ICON_SETTINGS, Page.HOLOGRAMS,
                         snapshot.administrator() && snapshot.moduleSettings().holograms()),
                 new Module("Statistics", "Create event counters and publish personal values or leaderboards.", ICON_PLAYERS, Page.STATISTICS,
                         snapshot.administrator() && snapshot.moduleSettings().statistics()),
+                new Module("Achievements", "Create, edit, inspect and reset custom achievements.", ICON_ACHIEVEMENTS, Page.ACHIEVEMENTS_ADMIN,
+                        snapshot.administrator() && snapshot.moduleSettings().achievements()),
                 new Module("Regions", "Open server-region details, visibility and settings.", ICON_SHIELD, Page.REGIONS, snapshot.moduleSettings().regions()),
                 new Module("Maintenance", "Reload SSU, refresh runtime content and manage visualization defaults.", ICON_SETTINGS, Page.MAINTENANCE,
                         snapshot.administrator())
@@ -489,14 +502,15 @@ public final class SsuDashboardScreen extends Screen {
 
     private List<AdminTool> adminTools() {
         return List.of(
-                new AdminTool("Region Tool", "Left-click point 1 and point 2. Right-click opens Create Region or the selection block editor.", "region"),
+                new AdminTool("Region Tool", "Left-click a block for Point 1, right-click a block for Point 2, and right-click the air to open Region settings.", "region"),
+                new AdminTool("World Edit Tool", "Left-click sets point 1; right-click a block sets point 2; right-click air opens the full editor. The World Edit key (default W) opens compact in-world move/transform controls.", "world_edit"),
                 new AdminTool("Hologram Tool", "Right-click to create one block ahead. Right-click an existing hologram with the tool to edit or delete it.", "hologram"),
                 new AdminTool("NPC Tool", "Right-click to create/edit. Sneak-right-click an NPC to copy and elsewhere to paste a linked placement.", "npc"),
                 new AdminTool("Shop Manager", "Create and edit shared NPC shops and inspect every linked NPC.", "shops"),
                 new AdminTool("Item Price Catalog", "Edit what players pay and receive for every vanilla and modded item.", "item_prices"),
                 new AdminTool("Quest Editor", "Create and edit quest prerequisites, objectives, rewards and lifecycle settings.", "quest"),
                 new AdminTool("Minigame Setup Tool", "Left-click performs the selected in-world setup action; right-click opens its action and arena menu.", "minigame"),
-                new AdminTool("Mine Setup Tool", "Select Mine bounds in-world; right-click air opens Mine Administration.", "mine"),
+                new AdminTool("Mine Setup Tool", "Left-click point 1 and point 2; right-click opens Mine Administration.", "mine"),
                 new AdminTool("Jail Setup Tool", "Select Jail or Task Area bounds in-world; right-click air opens Jail Administration.", "jail"),
                 new AdminTool("Dungeon Editor", "Create region arenas, checkpoints, ordered stages, lives and rewards.", "dungeon")
         );
@@ -518,7 +532,7 @@ public final class SsuDashboardScreen extends Screen {
                             || "dungeon".equals(tool.id()) || "shops".equals(tool.id()) || "item_prices".equals(tool.id()))
                             ? "Open Editor" : "Get Tool"), ignored -> action("admin_tool_get", tool.id(), "", ""))
                     .bounds(l.contentRight() - 84, y + 10, 84, 20).build();
-            getTool.active = !(("region".equals(tool.id()) && !snapshot.moduleSettings().regions())
+            getTool.active = !((("region".equals(tool.id()) || "world_edit".equals(tool.id())) && !snapshot.moduleSettings().regions())
                     || ("hologram".equals(tool.id()) && !snapshot.moduleSettings().holograms())
                     || ("npc".equals(tool.id()) && !snapshot.moduleSettings().npcs())
                     || ("shops".equals(tool.id()) && !snapshot.moduleSettings().npcs())
@@ -564,6 +578,7 @@ public final class SsuDashboardScreen extends Screen {
                 new ModuleSwitch("Floating Text / Media", "holograms", settings.holograms()),
                 new ModuleSwitch("Block Information", "block_information", settings.blockInformation()),
                 new ModuleSwitch("Player Statistics", "statistics", settings.statistics()),
+                new ModuleSwitch("Achievements", "achievements", settings.achievements()),
                 new ModuleSwitch("Mail", "mail", settings.mail()),
                 new ModuleSwitch("Auction House", "auction_house", settings.auctionHouse()),
                 new ModuleSwitch("NPC Core", "npcs", settings.npcs()),
@@ -1669,6 +1684,29 @@ public final class SsuDashboardScreen extends Screen {
                 addSetting(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w,
                         "Indicator style: " + indicatorStyleLabel(s.damageIndicatorStyle()),
                         "damage_indicator_style", nextIndicatorStyle(s.damageIndicatorStyle()));
+
+                int entityRow = twoColumns ? 27 : 54;
+                addSettingWithTooltip(x, y + entityRow, w,
+                        "Entity Insight: " + onOff(s.entityInsightEnabled()),
+                        "entity_insight_enabled", !s.entityInsightEnabled(),
+                        "Shows colored living-entity nametags for the nearest entities in range.",
+                        "Green = friendly, yellow = neutral, red = hostile.",
+                        "This setting also requires ssu.entity_insight.use.");
+                addSettingWithTooltip(twoColumns ? secondX : x, y + entityRow + (twoColumns ? 0 : 27), w,
+                        "Show health: " + onOff(s.entityInsightShowHealth()),
+                        "entity_insight_health", !s.entityInsightShowHealth(),
+                        "Adds current/max HP after the entity name.");
+
+                int sliderRow = entityRow + (twoColumns ? 27 : 54);
+                IntSettingSlider rangeSlider = new IntSettingSlider(x, y + sliderRow, w,
+                        "Insight range", "entity_insight_range", 0, 32, s.entityInsightRange(), " blocks");
+                rangeSlider.active = s.entityInsightEnabled();
+                addRenderableWidget(rangeSlider);
+                IntSettingSlider countSlider = new IntSettingSlider(twoColumns ? secondX : x,
+                        y + sliderRow + (twoColumns ? 0 : 27), w,
+                        "Max entities", "entity_insight_max_entities", 1, 50, s.entityInsightMaxEntities(), "");
+                countSlider.active = s.entityInsightEnabled();
+                addRenderableWidget(countSlider);
             }
             case MINIMAP -> {
                 addSetting(x, y, w, "Minimap: " + onOff(s.minimapEnabled()), "minimap_enabled", !s.minimapEnabled());
@@ -1677,26 +1715,27 @@ public final class SsuDashboardScreen extends Screen {
                 int row = twoColumns ? 27 : 54;
                 addSetting(x, y + row, w, "Shape: " + s.minimapShape(), "minimap_shape",
                         s.minimapShape().equals("CIRCLE") ? "RECTANGLE" : "CIRCLE");
+                addSettingWithTooltip(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
+                        "Frame: " + (s.minimapTexturedFrame() ? "TEXTURED" : "CLASSIC"),
+                        "minimap_frame", !s.minimapTexturedFrame(),
+                        "Choose between SSU's original minimap border and the supplied custom textured frame.",
+                        "Square and round minimaps automatically use their matching texture.");
+                row += twoColumns ? 27 : 54;
                 String nextPos = switch (s.minimapPosition()) {
                     case "TOP_LEFT" -> "TOP_RIGHT"; case "TOP_RIGHT" -> "BOTTOM_RIGHT";
                     case "BOTTOM_RIGHT" -> "BOTTOM_LEFT"; default -> "TOP_LEFT";
                 };
+                addSetting(x, y + row, w, "Position: " + s.minimapPosition(), "minimap_position", nextPos);
                 addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
-                        "Position: " + s.minimapPosition(), "minimap_position", nextPos);
+                        "North-up: " + onOff(s.minimapNorthUp()), "minimap_northup", !s.minimapNorthUp());
                 row += twoColumns ? 27 : 54;
-                addSetting(x, y + row, w, "North-up: " + onOff(s.minimapNorthUp()),
-                        "minimap_northup", !s.minimapNorthUp());
+                addSetting(x, y + row, w, "Claim overlay: " + onOff(s.minimapShowClaims()), "minimap_claims", !s.minimapShowClaims());
                 addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
-                        "Claim overlay: " + onOff(s.minimapShowClaims()), "minimap_claims", !s.minimapShowClaims());
+                        "Region overlay: " + onOff(s.minimapShowRegions()), "minimap_regions", !s.minimapShowRegions());
                 row += twoColumns ? 27 : 54;
-                addSetting(x, y + row, w, "Region overlay: " + onOff(s.minimapShowRegions()),
-                        "minimap_regions", !s.minimapShowRegions());
+                addSetting(x, y + row, w, "Marker overlay: " + onOff(s.minimapShowMarkers()), "minimap_markers", !s.minimapShowMarkers());
                 addSetting(twoColumns ? secondX : x, y + row + (twoColumns ? 0 : 27), w,
-                        "Marker overlay: " + onOff(s.minimapShowMarkers()),
-                        "minimap_markers", !s.minimapShowMarkers());
-                row += twoColumns ? 27 : 54;
-                addSetting(x, y + row, w, "Day & time below map: " + onOff(s.minimapShowCalendar()),
-                        "minimap_calendar", !s.minimapShowCalendar());
+                        "Day & time below map: " + onOff(s.minimapShowCalendar()), "minimap_calendar", !s.minimapShowCalendar());
             }
             case WORLD_MAP -> {
                 addSetting(x, y, w, "Claim overlay: " + onOff(s.worldMapShowClaims()),
@@ -1801,6 +1840,55 @@ public final class SsuDashboardScreen extends Screen {
                         "DELETE removes it after all items and money are claimed.",
                         "KEEP leaves it in your inbox until normal deletion or expiry.");
             }
+        }
+    }
+
+    private final class IntSettingSlider extends AbstractSliderButton {
+        private final String label;
+        private final String key;
+        private final int min;
+        private final int max;
+        private final String suffix;
+        private int lastSent;
+
+        private IntSettingSlider(int x, int y, int width, String label, String key,
+                                 int min, int max, int current, String suffix) {
+            super(x, y, width, 20, Component.empty(), normalized(min, max, current));
+            this.label = label;
+            this.key = key;
+            this.min = min;
+            this.max = max;
+            this.suffix = suffix == null ? "" : suffix;
+            this.lastSent = clamp(current);
+            updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            if (label != null) setMessage(Component.literal(label + ": " + currentValue() + suffix));
+        }
+
+        @Override
+        protected void applyValue() {
+            if (key == null) return;
+            int current = currentValue();
+            if (current == lastSent) return;
+            lastSent = current;
+            ClientPacketDistributor.sendToServer(new PlayerUiSettingUpdatePayload(key, Integer.toString(current)));
+        }
+
+        private int currentValue() {
+            return clamp((int) Math.round(min + value * (max - min)));
+        }
+
+        private int clamp(int candidate) {
+            return Math.max(min, Math.min(max, candidate));
+        }
+
+        private static double normalized(int min, int max, int current) {
+            if (max <= min) return 0.0D;
+            int safe = Math.max(min, Math.min(max, current));
+            return (double) (safe - min) / (double) (max - min);
         }
     }
 
@@ -2408,6 +2496,11 @@ public final class SsuDashboardScreen extends Screen {
         }
         if (target == Page.QUESTS) {
             ClientPacketDistributor.sendToServer(new QuestBookRequestPayload("open", "", "menu", 0, nextRequestId++));
+            return;
+        }
+        if (target == Page.ACHIEVEMENTS || target == Page.ACHIEVEMENTS_ADMIN) {
+            ClientPacketDistributor.sendToServer(new be.winnetrie.mod.simpleserverutilities.network.AchievementMenuRequestPayload(
+                    target == Page.ACHIEVEMENTS_ADMIN ? "open_admin" : "open", "", "", "all", 0, nextRequestId++));
             return;
         }
         if (target == Page.MINIGAMES) {
@@ -3133,6 +3226,11 @@ public final class SsuDashboardScreen extends Screen {
             case MAIL -> g.text(font,"Opening mailbox…",l.contentX(),l.contentTop(),MUTED,false);
             case AUCTION_HOUSE -> g.text(font,"Opening Auction House…",l.contentX(),l.contentTop(),MUTED,false);
             case QUESTS -> g.text(font,"Opening Questbook…",l.contentX(),l.contentTop(),MUTED,false);
+            case ACHIEVEMENTS, ACHIEVEMENTS_ADMIN -> g.text(font,"Opening Achievements…",l.contentX(),l.contentTop(),MUTED,false);
+            case COSMETICS -> {
+                g.text(font, "Cosmetics", l.contentX(), l.contentTop(), TEXT, true);
+                g.text(font, "Cosmetic customization is coming in a future SSU build.", l.contentX(), l.contentTop() + 20, MUTED, false);
+            }
             case MINIGAMES -> g.text(font,"Opening Minigame Lobby…",l.contentX(),l.contentTop(),MUTED,false);
             case MINIGAME_ADMIN -> g.text(font,"Opening Minigame Administration…",l.contentX(),l.contentTop(),MUTED,false);
             case DUNGEONS -> g.text(font,"Opening Dungeon Lobby…",l.contentX(),l.contentTop(),MUTED,false);
@@ -3709,6 +3807,9 @@ public final class SsuDashboardScreen extends Screen {
         MAIL("Mail","Inbox, attachments and sent mail",""),
         AUCTION_HOUSE("Auction House","Browse, buy and sell player auctions",""),
         QUESTS("Questbook","Available, active and completed quests",""),
+        ACHIEVEMENTS("Achievements","Earned and unearned achievements",""),
+        ACHIEVEMENTS_ADMIN("Achievement Administration","Create, edit and reset achievements",""),
+        COSMETICS("Cosmetics","Cosmetic unlocks and customization - coming soon",""),
         MINIGAMES("Minigames","Queues, arenas and active matches",""),
         MINIGAME_ADMIN("Minigame Administration","Modes, arenas, setup and live-match control",""),
         DUNGEONS("Customized Dungeons","Parties, stages, checkpoints and dungeon runs",""),

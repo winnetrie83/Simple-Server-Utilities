@@ -1,0 +1,15 @@
+Simple Server Utilities 1.9.0-dev3.24.2 — static validation
+
+Scope: NPC custom skin client binding hotfix.
+
+Expected invariants:
+- DynamicTexture registration identifier is also supplied explicitly as ClientAsset.ResourceTexture.texturePath.
+- Dynamic texture identifier contains sanitized NPC definition id plus content hash.
+- Skin cache identity includes both PNG hash and Wide/Slim model.
+- Client install exceptions are logged, not silently ignored.
+- Local texture root remains <world>/simpleserverutilities/npcs/textures.
+- Network protocol remains 105.
+- NPC schema remains 9.
+- No persistence schema changes.
+
+Full Gradle/NeoForge compilation must be performed in the normal Java 25 development environment.

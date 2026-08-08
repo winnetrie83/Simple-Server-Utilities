@@ -1,0 +1,63 @@
+Simple Server Utilities 1.9.0-dev3.23.2.2 — static validation
+==========================================================
+
+Scope
+-----
+Baseline: 1.9.0-dev3.22
+Target:   1.9.0-dev3.23.2.2
+Network protocol: 105 (was 104)
+Player UI preference schema: 13 (was 12)
+Other persistence schemas: unchanged
+
+Implemented post-dev3.22 TODO
+-----------------------------
+[PASS] Achievement icon picker is inventory-style, scrollable, filtered, explicit-select.
+[PASS] Achievement icon selection writes to the draft instead of a temporary EditBox only.
+[PASS] Achievement item rewards select from the editing player's 36-slot live inventory.
+[PASS] Reward inventory selection copies the ItemStack and preserves exact components via MailItemCodec.
+[PASS] Reward Count remains independently editable and exact stack_json is preserved on save.
+[PASS] Objective registry picker callback also writes directly to the objective draft.
+[PASS] Server Operations Activity exposes visible labels/units for retention and rollback controls.
+[PASS] Server Operations Scheduler exposes visible labels and schedule syntax.
+[PASS] Server Operations Chat exposes visible labels/units for filter and mute controls.
+[PASS] Region Tool left-click block sets Point 1.
+[PASS] Region Tool right-click block sets Point 2 and consumes the block interaction.
+[PASS] Region Tool right-click item path checks for HitResult.MISS before opening the GUI.
+[PASS] Region Tool user-facing instructions match the new input model.
+[PASS] Minimap has persistent CLASSIC/TEXTURED frame choice.
+[PASS] Existing schema-12 players migrate to CLASSIC (no forced visual change).
+[PASS] Rectangle and Circle textured minimaps use separate supplied textures.
+[PASS] Textured Circle terrain is circularly clipped with a bounded 32-strip mask.
+[PASS] Both minimap frame resources are RGBA PNGs, 256x256 after lossless-alpha-preserving preparation.
+[PASS] Minimap network/menu payloads carry the frame preference symmetrically.
+
+Static source checks
+--------------------
+- Java source files: 791
+- Internal SSU import resolution issues: 0
+- Network payload IDs: 178 unique, 0 duplicates
+- UiSettingsSummary fields/write order: 42/42 aligned
+- Focused TODO invariant checks: 19/19 passed
+- javac parse-oriented pass over changed sources: no syntax diagnostics detected.
+  (Type resolution cannot complete in this container because Minecraft/NeoForge dependencies are unavailable.)
+- Source/resource archive structure checked before packaging.
+
+Build limitation
+----------------
+A real Gradle/NeoForge compile could not be run in this environment. The wrapper attempts to download
+Gradle 9.2.1 from services.gradle.org, but the container has no external network access. The container
+also has Java 21 while this project targets Java 25. Run locally with Java 25:
+
+    gradlew.bat clean build
+
+or at minimum:
+
+    gradlew.bat compileJava
+
+Then execute docs/TESTING-1.9.0-dev3.23.2.2.md in a Minecraft 26.2 client/server test.
+
+
+Texture hotfix note: this build replaces the minimap textured frame assets with the final 256×256 user-provided square and circle textures.
+
+
+Hotfix note: square textured minimap now clips rendering to the actual inner frame opening so the map no longer protrudes outside the border.
