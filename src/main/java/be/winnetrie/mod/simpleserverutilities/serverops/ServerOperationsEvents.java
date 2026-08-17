@@ -17,18 +17,21 @@ public final class ServerOperationsEvents {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onBreak(BreakBlockEvent event) {
+        if (!SimpleServerUtilities.CORE.modules().isActive("server_operations")) return;
         if (event.isCanceled() || !(event.getPlayer() instanceof ServerPlayer player)) return;
         SimpleServerUtilities.SERVER_OPERATIONS.logBlockBreak(player, event.getPos(), event.getState());
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onPlace(BlockEvent.EntityPlaceEvent event) {
+        if (!SimpleServerUtilities.CORE.modules().isActive("server_operations")) return;
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)) return;
         SimpleServerUtilities.SERVER_OPERATIONS.logBlockPlace(player, event.getPos(), event.getBlockSnapshot().getState(), event.getPlacedBlock());
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onChat(ServerChatEvent event) {
+        if (!SimpleServerUtilities.CORE.modules().isActive("server_operations")) return;
         if (event.isCanceled()) return;
         ServerOperationsManager.ChatDecision decision = SimpleServerUtilities.SERVER_OPERATIONS.chat(event.getPlayer(), event.getRawText());
         if (decision.allowed()) return;
@@ -38,14 +41,15 @@ public final class ServerOperationsEvents {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!SimpleServerUtilities.CORE.modules().isActive("server_operations")) return;
         if (event.getEntity() instanceof ServerPlayer player) SimpleServerUtilities.SERVER_OPERATIONS.onLogin(player);
     }
 
     @SubscribeEvent
-    public static void onTickPre(ServerTickEvent.Pre event) { SimpleServerUtilities.SERVER_OPERATIONS.beginTick(); }
+    public static void onTickPre(ServerTickEvent.Pre event) { if (SimpleServerUtilities.CORE.modules().isActive("server_operations")) SimpleServerUtilities.SERVER_OPERATIONS.beginTick(); }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onTickPost(ServerTickEvent.Post event) { SimpleServerUtilities.SERVER_OPERATIONS.endTick(event.getServer()); }
+    public static void onTickPost(ServerTickEvent.Post event) { if (SimpleServerUtilities.CORE.modules().isActive("server_operations")) SimpleServerUtilities.SERVER_OPERATIONS.endTick(event.getServer()); }
 
     @SubscribeEvent
     public static void onStopped(ServerStoppedEvent event) { ServerOperationsManager.applyPendingRestoreAfterStop(); }

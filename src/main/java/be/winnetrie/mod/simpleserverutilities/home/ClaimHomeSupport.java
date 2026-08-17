@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -19,7 +20,7 @@ public final class ClaimHomeSupport {
     }
 
     public static PlayerClaim ownedClaimAt(ServerPlayer player, BlockPos position) {
-        if (player == null || position == null) return null;
+        if (player == null || position == null || !SsuModuleAccess.active("claims")) return null;
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaim(
                 player.level(), new ChunkPos(position.getX() >> 4, position.getZ() >> 4));
         return claim != null && claim.isOwner(player.getUUID()) ? claim : null;
@@ -40,7 +41,7 @@ public final class ClaimHomeSupport {
     }
 
     public static List<PlayerHome> homesInClaim(UUID owner, PlayerClaim claim) {
-        if (owner == null || claim == null) return List.of();
+        if (owner == null || claim == null || !SsuModuleAccess.active("homes")) return List.of();
         return SimpleServerUtilities.HOMES.getHomes(owner).stream()
                 .filter(home -> contains(claim, home))
                 .toList();

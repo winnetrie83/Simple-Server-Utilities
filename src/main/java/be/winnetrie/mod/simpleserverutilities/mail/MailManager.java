@@ -20,6 +20,7 @@ import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyAccount;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyResult;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyTransactionType;
@@ -173,13 +174,15 @@ public final class MailManager {
     }
 
     public void handleRequest(MailRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("mail")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         sendPage(player, payload.mode(), payload.pageIndex(), payload.pageSize(), payload.requestId(), "", false);
     }
 
     public void handleRecipientSuggestions(MailRecipientSuggestionsRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("mail")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
-        if (!Config.ENABLE_MAIL.get()
+        if (!mailActive()
                 || !PermissionService.getBoolean(player, PermissionKeys.MAIL_ACCESS, true)
                 || !PermissionService.getBoolean(player, PermissionKeys.MAIL_SEND, true)) {
             PacketDistributor.sendToPlayer(player, new MailRecipientSuggestionsPayload(
@@ -191,6 +194,7 @@ public final class MailManager {
     }
 
     public void handleAction(MailActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("mail")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         String action = payload.action().toLowerCase(Locale.ROOT);
         if (action.equals("open_compose")) {
@@ -218,6 +222,7 @@ public final class MailManager {
     }
 
     public void handleCompose(MailComposeSubmitPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("mail")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (!(player.containerMenu instanceof MailComposeMenu menu) || menu.containerId != payload.containerId()) {
             PacketDistributor.sendToPlayer(player, new MailComposeResultPayload(false,
@@ -298,7 +303,7 @@ public final class MailManager {
 
     private synchronized MailOperationResult sendPlayerMail(ServerPlayer sender, MailComposeMenu menu,
             String rawRecipient, String rawSubject, String rawBody, String rawMoney) {
-        if (!Config.ENABLE_MAIL.get()) return MailOperationResult.failure("disabled", "The mail system is disabled.");
+        if (!mailActive()) return MailOperationResult.failure("disabled", "The mail system is disabled.");
         if (!PermissionService.getBoolean(sender, PermissionKeys.MAIL_ACCESS, true)) {
             return MailOperationResult.failure("access_denied", "You have not unlocked mailbox access.");
         }
@@ -599,7 +604,7 @@ public final class MailManager {
     }
 
     private void openCompose(ServerPlayer player, long requestId) {
-        if (!Config.ENABLE_MAIL.get()
+        if (!mailActive()
                 || !PermissionService.getBoolean(player, PermissionKeys.MAIL_ACCESS, true)
                 || !PermissionService.getBoolean(player, PermissionKeys.MAIL_SEND, true)) {
             sendPage(player, "inbox", 0, DEFAULT_PAGE_SIZE, requestId,
@@ -621,7 +626,7 @@ public final class MailManager {
 
     private synchronized void sendPage(ServerPlayer player, String mode, int requestedPage, int pageSize,
             long requestId, String notice, boolean error) {
-        if (!Config.ENABLE_MAIL.get() || !PermissionService.getBoolean(player, PermissionKeys.MAIL_ACCESS, true)) {
+        if (!mailActive() || !PermissionService.getBoolean(player, PermissionKeys.MAIL_ACCESS, true)) {
             PacketDistributor.sendToPlayer(player, MailDataPayload.denied(mode, requestedPage, pageSize, requestId,
                     "You have not unlocked mailbox access."));
             return;
@@ -1017,4 +1022,9 @@ public final class MailManager {
 
     private record InventoryPlan(List<ItemStack> before, List<ItemStack> after) {}
     private record Recipient(UUID id, String name) {}
+
+    private static boolean mailActive() {
+        return Config.ENABLE_MAIL.get() && SsuModuleAccess.active("mail");
+    }
+
 }

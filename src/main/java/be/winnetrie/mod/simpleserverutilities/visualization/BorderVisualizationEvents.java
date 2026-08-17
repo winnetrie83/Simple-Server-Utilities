@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.visualization;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -17,6 +18,7 @@ public final class BorderVisualizationEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        if (!SsuModuleAccess.active("visualization")) return;
         long timer = SimpleServerUtilities.PERFORMANCE.startTimer();
         try {
             SimpleServerUtilities.BORDER_VISUALIZATIONS.tick(event.getServer());
@@ -27,6 +29,7 @@ public final class BorderVisualizationEvents {
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!SsuModuleAccess.active("visualization")) return;
         if (event.getEntity() instanceof ServerPlayer player) {
             SimpleServerUtilities.BORDER_VISUALIZATIONS.syncOverview(player, true);
         }
@@ -34,6 +37,7 @@ public final class BorderVisualizationEvents {
 
     @SubscribeEvent
     public static void onDimensionChange(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (!SsuModuleAccess.active("visualization")) return;
         if (event.getEntity() instanceof ServerPlayer player) {
             SimpleServerUtilities.BORDER_VISUALIZATIONS.syncOverview(player, true);
         }
@@ -41,6 +45,7 @@ public final class BorderVisualizationEvents {
 
     @SubscribeEvent
     public static void onRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (!SsuModuleAccess.active("visualization")) return;
         if (event.getEntity() instanceof ServerPlayer player) {
             SimpleServerUtilities.BORDER_VISUALIZATIONS.syncOverview(player, true);
         }

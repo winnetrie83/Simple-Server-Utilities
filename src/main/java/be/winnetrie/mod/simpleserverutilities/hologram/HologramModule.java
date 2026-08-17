@@ -18,12 +18,10 @@ public final class HologramModule implements SsuModule {
     }
 
     @Override public String id() { return "holograms"; }
-    @Override
-    public boolean isEnabled() {
-        return Config.ENABLE_HOLOGRAMS.get();
-    }
+    @Override public boolean isEnabled() { return Config.ENABLE_HOLOGRAMS.get(); }
 
-    @Override public Set<String> dependencies() { return Set.of("storage", "permissions"); }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("permissions", "statistics", "mines", "regions"); }
 
     @Override public void initialize(SsuServiceRegistry services) {
         services.register(HologramManager.class, manager);

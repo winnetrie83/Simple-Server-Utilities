@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.hologram;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -12,6 +13,7 @@ public final class HologramEvents {
 
     @SubscribeEvent
     public static void onTick(ServerTickEvent.Post event) {
+        if (!SsuModuleAccess.active("holograms")) return;
         long timer = SimpleServerUtilities.PERFORMANCE.startTimer();
         try {
             SimpleServerUtilities.HOLOGRAMS.tick(event.getServer());
@@ -22,6 +24,7 @@ public final class HologramEvents {
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!SsuModuleAccess.active("holograms")) return;
         if (event.getEntity() instanceof ServerPlayer player) {
             SimpleServerUtilities.HOLOGRAMS.syncPlayer(player);
         }
@@ -36,6 +39,7 @@ public final class HologramEvents {
 
     @SubscribeEvent
     public static void onDimensionChange(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (!SsuModuleAccess.active("holograms")) return;
         if (event.getEntity() instanceof ServerPlayer player) {
             SimpleServerUtilities.HOLOGRAMS.syncPlayer(player);
         }

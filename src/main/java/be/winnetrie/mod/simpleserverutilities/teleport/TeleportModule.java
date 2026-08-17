@@ -1,5 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.teleport;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import java.util.Set;
 
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModule;
@@ -20,10 +21,10 @@ public final class TeleportModule implements SsuModule {
         return "teleport";
     }
 
-    @Override
-    public Set<String> dependencies() {
-        return Set.of("claims", "regions", "permissions");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of(); }
+    @Override public boolean isEnabled() { return Config.ENABLE_TELEPORT.get(); }
+    @Override public Set<String> optionalDependencies() { return Set.of("claims", "regions", "permissions", "moderation"); }
+    @Override public Set<String> integrationDependencies() { return Set.of("minigames"); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

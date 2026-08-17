@@ -1,5 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.visualization;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import java.util.Set;
 
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModule;
@@ -22,10 +23,9 @@ public final class VisualizationModule implements SsuModule {
         return "visualization";
     }
 
-    @Override
-    public Set<String> dependencies() {
-        return Set.of("claims", "regions", "permissions", "storage");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage"); }
+    @Override public boolean isEnabled() { return Config.ENABLE_VISUALIZATION.get(); }
+    @Override public Set<String> optionalDependencies() { return Set.of("claims", "regions", "permissions"); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {
@@ -41,6 +41,7 @@ public final class VisualizationModule implements SsuModule {
 
     @Override
     public void onServerStopping(MinecraftServer server) {
+        service.clearAllClients(server);
         service.clear();
     }
 }

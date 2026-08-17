@@ -19,14 +19,10 @@ public final class UtilityMiningModule implements SsuModule {
 
     @Override public String id() { return "utility_mining"; }
 
-    @Override
-    public boolean isEnabled() {
-        return (Config.ENABLE_TREECAPITATOR.get() || Config.ENABLE_VEINMINER.get());
-    }
+    @Override public boolean isEnabled() { return (Config.ENABLE_TREECAPITATOR.get() || Config.ENABLE_VEINMINER.get()); }
 
-    @Override public Set<String> dependencies() {
-        return Set.of("storage", "permissions", "ui_preferences", "claims", "regions");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage", "ui_preferences"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("claims", "regions", "permissions"); }
 
     @Override public void initialize(SsuServiceRegistry services) {
         services.register(UtilityMiningManager.class, manager);

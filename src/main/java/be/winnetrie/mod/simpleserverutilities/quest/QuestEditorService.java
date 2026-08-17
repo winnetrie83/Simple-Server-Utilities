@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.quest;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.content.QuestAccessMode;
 import be.winnetrie.mod.simpleserverutilities.network.QuestEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.QuestEditorRequestPayload;
@@ -18,6 +19,7 @@ public final class QuestEditorService {
     private QuestEditorService() {}
 
     public static void handleRequest(QuestEditorRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("quests")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (!canAdmin(player)) {
             player.sendSystemMessage(net.minecraft.network.chat.Component.literal("Quest administrator permission is required."));
@@ -32,6 +34,7 @@ public final class QuestEditorService {
     }
 
     public static void handleSubmit(QuestEditorSubmitPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("quests")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (!canAdmin(player)) {
             send(player, false, "Quest administrator permission is required.", "", payload.requestId());
@@ -47,20 +50,27 @@ public final class QuestEditorService {
                     send(player, false, "NPC quest links require NPC or Both quest access.", "", payload.requestId());
                     return;
                 }
-                if ("npc".equals(requested) && !Config.ENABLE_NPCS.get()) {
+                if (("npc".equals(requested) || "both".equals(requested)) && !SsuModuleAccess.active("npcs")) {
                     send(player, false, "NPC quest access requires the NPC module.", "", payload.requestId());
                     return;
                 }
                 Config.QUEST_ACCESS_MODE.set(requested);
                 Config.QUEST_ACCESS_MODE.save();
             }
-            QuestNpcBridge.validateSimpleLinkCapacity(SimpleServerUtilities.QUESTS, definition);
+            boolean npcActive = SsuModuleAccess.active("npcs");
+            if ((!definition.giverNpcInstanceId.isBlank() || !definition.turnInNpcInstanceId.isBlank()) && !npcActive) {
+                send(player, false, "NPC-linked quests require the NPC module to be active.", "", payload.requestId());
+                return;
+            }
+            if (npcActive) QuestNpcBridge.validateSimpleLinkCapacity(SimpleServerUtilities.QUESTS, definition);
             if (!SimpleServerUtilities.QUESTS.saveDefinition(payload.originalQuestId(), definition)) {
                 send(player, false, "The quest ID already exists or the quest library limit was reached.", "", payload.requestId());
                 return;
             }
-            QuestNpcBridge.rebuildManagedDialogues(SimpleServerUtilities.QUESTS, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS);
-            SimpleServerUtilities.NPCS.syncAll();
+            if (npcActive) {
+                QuestNpcBridge.rebuildManagedDialogues(SimpleServerUtilities.QUESTS, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS);
+                SimpleServerUtilities.NPCS.syncAll();
+            }
             send(player, true, "Quest '" + definition.title + "' saved.", definition.id, payload.requestId());
         } catch (RuntimeException exception) {
             send(player, false, exception.getMessage() == null ? "Quest validation failed." : exception.getMessage(), "", payload.requestId());

@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimAccessRole;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.network.SsuTrustedPlayersActionPayload;
@@ -41,12 +42,14 @@ public final class TrustedPlayersService {
     private TrustedPlayersService() {}
 
     public static void handleRequest(SsuTrustedPlayersRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("claims")) return;
         if (context.player() instanceof ServerPlayer player) {
             send(player, payload.claim(), payload.search(), payload.requestId(), "", false);
         }
     }
 
     public static void handleAction(SsuTrustedPlayersActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("claims")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         String notice;
         boolean error = false;
@@ -101,6 +104,7 @@ public final class TrustedPlayersService {
     }
 
     public static void handleRolePermissionAction(SsuClaimRolePermissionActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("claims")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         String notice;
         boolean error = false;
@@ -245,18 +249,22 @@ public final class TrustedPlayersService {
 
     private static Map<UUID, String> knownPlayerNames(ServerPlayer viewer) {
         Map<UUID, String> known = new LinkedHashMap<>();
-        for (var entry : SimpleServerUtilities.PERMISSIONS.getKnownPlayers()) {
-            if (SimpleServerUtilities.ECONOMY.isSystemAccount(entry.playerId())) continue;
-            String name = entry.name() == null || entry.name().isBlank()
-                    ? entry.playerId().toString().substring(0, 8)
-                    : entry.name();
-            known.put(entry.playerId(), name);
+        if (SsuModuleAccess.active("permissions")) {
+            for (var entry : SimpleServerUtilities.PERMISSIONS.getKnownPlayers()) {
+                if (SsuModuleAccess.active("economy") && SimpleServerUtilities.ECONOMY.isSystemAccount(entry.playerId())) continue;
+                String name = entry.name() == null || entry.name().isBlank()
+                        ? entry.playerId().toString().substring(0, 8)
+                        : entry.name();
+                known.put(entry.playerId(), name);
+            }
         }
-        for (var account : SimpleServerUtilities.ECONOMY.playerAccounts()) {
-            String name = account.getLastKnownName().isBlank()
-                    ? account.getPlayerId().toString().substring(0, 8)
-                    : account.getLastKnownName();
-            known.putIfAbsent(account.getPlayerId(), name);
+        if (SsuModuleAccess.active("economy")) {
+            for (var account : SimpleServerUtilities.ECONOMY.playerAccounts()) {
+                String name = account.getLastKnownName().isBlank()
+                        ? account.getPlayerId().toString().substring(0, 8)
+                        : account.getLastKnownName();
+                known.putIfAbsent(account.getPlayerId(), name);
+            }
         }
         for (ServerPlayer online : viewer.level().getServer().getPlayerList().getPlayers()) {
             known.put(online.getUUID(), online.getName().getString());
@@ -265,6 +273,7 @@ public final class TrustedPlayersService {
     }
 
     private static void removeSystemAccountsFromClaim(PlayerClaim claim) {
+        if (!SsuModuleAccess.active("economy")) return;
         boolean changed = false;
         for (UUID trustedId : List.copyOf(claim.getTrustedPlayers())) {
             if (!SimpleServerUtilities.ECONOMY.isSystemAccount(trustedId)) continue;
@@ -277,12 +286,17 @@ public final class TrustedPlayersService {
     private static String displayName(ServerPlayer viewer, UUID playerId) {
         ServerPlayer online = viewer.level().getServer().getPlayerList().getPlayer(playerId);
         if (online != null) return online.getName().getString();
-        var data = SimpleServerUtilities.PERMISSIONS.getPlayerData(playerId);
-        if (data != null && !data.getLastKnownName().isBlank()) return data.getLastKnownName();
-        return SimpleServerUtilities.ECONOMY.findPlayerAccount(playerId)
-                .map(account -> account.getLastKnownName().isBlank()
-                        ? playerId.toString().substring(0, 8)
-                        : account.getLastKnownName())
-                .orElse(playerId.toString().substring(0, 8));
+        if (SsuModuleAccess.active("permissions")) {
+            var data = SimpleServerUtilities.PERMISSIONS.getPlayerData(playerId);
+            if (data != null && !data.getLastKnownName().isBlank()) return data.getLastKnownName();
+        }
+        if (SsuModuleAccess.active("economy")) {
+            return SimpleServerUtilities.ECONOMY.findPlayerAccount(playerId)
+                    .map(account -> account.getLastKnownName().isBlank()
+                            ? playerId.toString().substring(0, 8)
+                            : account.getLastKnownName())
+                    .orElse(playerId.toString().substring(0, 8));
+        }
+        return playerId.toString().substring(0, 8);
     }
 }

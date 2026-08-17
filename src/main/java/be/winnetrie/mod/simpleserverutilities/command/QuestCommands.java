@@ -27,6 +27,7 @@ public final class QuestCommands {
     }
 
     private static int open(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         if (!(source.getEntity() instanceof ServerPlayer player)) {
             source.sendFailure(Component.literal("This command can only be used by a player.")); return 0;
         }
@@ -34,6 +35,7 @@ public final class QuestCommands {
     }
 
     private static int status(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) { source.sendFailure(Component.literal("Quest administrator permission is required.")); return 0; }
         var snapshot=SimpleServerUtilities.QUESTS.snapshot();
         source.sendSystemMessage(Component.literal("SSU Quest Core: definitions="+snapshot.definitions()+", journals="+snapshot.journals()+", active="+snapshot.active()+", ready="+snapshot.readyToTurnIn()+", completions="+snapshot.completions()));
@@ -41,6 +43,7 @@ public final class QuestCommands {
     }
 
     private static int edit(CommandSourceStack source,String questId) {
+        if (!requireModule(source)) return 0;
         if (!(source.getEntity() instanceof ServerPlayer player)) { source.sendFailure(Component.literal("This command can only be used by a player.")); return 0; }
         if (!PermissionService.getBoolean(player, PermissionKeys.QUESTS_ADMIN, false)) { source.sendFailure(Component.literal("Quest administrator permission is required.")); return 0; }
         QuestEditorService.open(player,questId);return 1;
@@ -49,5 +52,11 @@ public final class QuestCommands {
     private static boolean canAdmin(CommandSourceStack source) {
         return !(source.getEntity() instanceof ServerPlayer player)
                 || PermissionService.getBoolean(player, PermissionKeys.QUESTS_ADMIN, false);
+    }
+
+    private static boolean requireModule(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("quests")) return true;
+        source.sendFailure(Component.literal("Quests is disabled or blocked by a required dependency."));
+        return false;
     }
 }

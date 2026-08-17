@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.statistics;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.StatisticEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.StatisticEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.StatisticEditorSubmitPayload;
@@ -29,6 +30,7 @@ public final class StatisticEditorService {
     }
 
     public static void handleSubmit(StatisticEditorSubmitPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("statistics")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         Result result = save(player, payload);
         PacketDistributor.sendToPlayer(player,
@@ -59,7 +61,7 @@ public final class StatisticEditorService {
         if (!SimpleServerUtilities.STATISTICS.put(payload.originalId(), definition)) {
             return Result.fail("The statistic could not be saved. The ID may already exist or the definition limit was reached.");
         }
-        SimpleServerUtilities.HOLOGRAMS.syncAll();
+        if (SsuModuleAccess.active("holograms")) SimpleServerUtilities.HOLOGRAMS.syncAll();
         return Result.ok("Statistic '" + definition.displayName + "' saved.");
     }
 

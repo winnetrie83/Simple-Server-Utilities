@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.economy.MoneyFormat;
 import be.winnetrie.mod.simpleserverutilities.command.RegionCommands;
@@ -75,7 +75,7 @@ public class RegionInteractionEvents {
 
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-        if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
+        if (!SsuModuleAccess.active("regions")) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
@@ -100,7 +100,7 @@ public class RegionInteractionEvents {
                 player.sendSystemMessage(Component.literal("Set World Edit Point 1 with left-click first."), true);
             } else {
                 manager.setPoint2(player, event.getPos());
-                SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, manager.getSelection(player));
+                showSelectionIfAvailable(player, manager.getSelection(player));
                 player.sendSystemMessage(Component.literal(
                         "World Edit point 2 set to " + formatPos(event.getPos()) + ". Right-click the air for the full editor or use the compact-tools key."
                 ), true);
@@ -118,7 +118,7 @@ public class RegionInteractionEvents {
                 player.sendSystemMessage(Component.literal("Set Region Point 1 with left-click first."), true);
             } else {
                 manager.setPoint2(player, event.getPos());
-                SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, manager.getSelection(player));
+                showSelectionIfAvailable(player, manager.getSelection(player));
                 player.sendSystemMessage(Component.literal(
                         "Region point 2 set to " + formatPos(event.getPos()) + ". Right-click the air to open the Region menu."
                 ), true);
@@ -144,6 +144,13 @@ public class RegionInteractionEvents {
             return;
         }
 
+        if (!SsuModuleAccess.active("economy")) {
+            player.sendSystemMessage(Component.literal("Region renting is unavailable while Economy is disabled."));
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.FAIL);
+            return;
+        }
+
         if (!RegionPolicy.canRentRegion(player)) {
             player.sendSystemMessage(Component.literal("You do not have permission to rent regions."));
             event.setCanceled(true);
@@ -158,7 +165,7 @@ public class RegionInteractionEvents {
 
     @SubscribeEvent
     public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
-        if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
+        if (!SsuModuleAccess.active("regions")) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (RegionSetupToolService.hasActivePreview(player)) {
             event.setCanceled(true);
@@ -184,7 +191,7 @@ public class RegionInteractionEvents {
 
     @SubscribeEvent
     public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
-        if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
+        if (!SsuModuleAccess.active("regions")) return;
         if (event.getAction() != PlayerInteractEvent.LeftClickBlock.Action.START) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
@@ -221,7 +228,7 @@ public class RegionInteractionEvents {
                     "Region point 1 set to " + formatPos(event.getPos()) + ". Right-click a block for point 2."
             ), true);
         }
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, manager.getSelection(player));
+        showSelectionIfAvailable(player, manager.getSelection(player));
         event.setCanceled(true);
     }
 
@@ -305,7 +312,7 @@ public class RegionInteractionEvents {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (RegionSetupToolService.hasActivePreview(player) && player.containerMenu != player.inventoryMenu) player.closeContainer();
         }
-        if (!Config.ENABLE_ADMIN_REGIONS.get()) return;
+        if (!SsuModuleAccess.active("regions")) return;
         long tick = server.getTickCount();
 
         if (tick >= nextEnterLeaveTick) {
@@ -319,6 +326,7 @@ public class RegionInteractionEvents {
     }
 
     public static void showBoundary(ServerPlayer player, String regionName) {
+        if (!SsuModuleAccess.active("regions") || !SsuModuleAccess.active("visualization")) return;
         Region region = SimpleServerUtilities.REGIONS.get(regionName);
         if (region != null) {
             SimpleServerUtilities.BORDER_VISUALIZATIONS.showRegion(player, region);
@@ -326,11 +334,19 @@ public class RegionInteractionEvents {
     }
 
     public static void hideBoundary(ServerPlayer player, String regionName) {
+        if (!SsuModuleAccess.active("visualization")) return;
         SimpleServerUtilities.BORDER_VISUALIZATIONS.hideRegion(player, regionName);
     }
 
     public static void hideAllBoundaries(ServerPlayer player) {
+        if (!SsuModuleAccess.active("visualization")) return;
         SimpleServerUtilities.BORDER_VISUALIZATIONS.hideRegion(player);
+    }
+
+    private static void showSelectionIfAvailable(ServerPlayer player, RegionSelection selection) {
+        if (SsuModuleAccess.active("visualization")) {
+            SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, selection);
+        }
     }
 
     private static void updateRegionMessages(MinecraftServer server) {
@@ -360,6 +376,10 @@ public class RegionInteractionEvents {
     }
 
     private static void sendRentOffer(ServerPlayer player, Region region) {
+        if (!SsuModuleAccess.active("economy")) {
+            player.sendSystemMessage(Component.literal("Region renting is unavailable while Economy is disabled."));
+            return;
+        }
         RegionRentData rentData = region.getRentData();
 
         player.sendSystemMessage(Component.literal("Rent region: " + region.getName()).withStyle(ChatFormatting.GOLD));

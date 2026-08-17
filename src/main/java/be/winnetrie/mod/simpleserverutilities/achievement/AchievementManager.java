@@ -28,6 +28,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentEventBus;
 import be.winnetrie.mod.simpleserverutilities.content.ContentId;
 import be.winnetrie.mod.simpleserverutilities.content.ContentEventTypes;
 import be.winnetrie.mod.simpleserverutilities.content.objective.ContentObjectiveDefinition;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.content.objective.ContentObjectiveMatcher;
 import be.winnetrie.mod.simpleserverutilities.network.AchievementMenuDataPayload;
 import be.winnetrie.mod.simpleserverutilities.mail.MailItemCodec;
@@ -115,6 +116,7 @@ public final class AchievementManager {
     }
 
     public void handleRequest(AchievementMenuRequestPayload payload,IPayloadContext context){
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("achievements")) return;
         if(!(context.player() instanceof ServerPlayer viewer))return;
         String notice="";boolean error=false;boolean adminView="open_admin".equalsIgnoreCase(payload.action())||"admin_refresh".equalsIgnoreCase(payload.action());
         try{
@@ -441,7 +443,8 @@ public final class AchievementManager {
                 case "give_money" -> {
                     long amount=Math.max(0L,parsePositive(action.parameter("amount_minor"),0L));
                     String label;
-                    try{label="Money: "+SimpleServerUtilities.ECONOMY.format(amount);}catch(RuntimeException ignored){label="Money: "+amount;}
+                    if (!SsuModuleAccess.active("economy")) label="Money: "+amount+" minor unit(s) (Economy unavailable)";
+                    else try{label="Money: "+SimpleServerUtilities.ECONOMY.format(amount);}catch(RuntimeException ignored){label="Money: "+amount;}
                     out.add(new AchievementMenuDataPayload.Reward("money",label,"",0));
                 }
                 case "grant_temporary_permission" -> {

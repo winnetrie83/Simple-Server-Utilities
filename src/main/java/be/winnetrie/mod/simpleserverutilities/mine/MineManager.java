@@ -19,6 +19,7 @@ import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJob;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramDefinition;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramType;
@@ -112,7 +113,7 @@ public final class MineManager {
 
     public synchronized boolean delete(String rawId){
         String id=MineDefinition.normalizeId(rawId);MineDefinition removed=definitions.remove(id);resetting.remove(id);lastWarningSecond.remove(id);thresholdResetDueAt.remove(id);if(removed==null)return false;
-        Path file=StoragePaths.jsonFile(folder,id);store.forget(file);SimpleServerUtilities.STORAGE.queueDelete(file);SimpleServerUtilities.HOLOGRAMS.delete(statusHologramId(id));return true;
+        Path file=StoragePaths.jsonFile(folder,id);store.forget(file);SimpleServerUtilities.STORAGE.queueDelete(file);if(SsuModuleAccess.active("holograms"))SimpleServerUtilities.HOLOGRAMS.delete(statusHologramId(id));return true;
     }
 
     public synchronized void applySelection(String id, MineSetupToolManager.Selection selection) {
@@ -128,7 +129,7 @@ public final class MineManager {
         MineDefinition d=definitions.get(MineDefinition.normalizeId(id));if(d==null)throw new IllegalArgumentException("Mine not found.");d.hologramDimension=player.level().dimension().identifier().toString();d.hologramX=player.getX();d.hologramY=player.getY()+2.25D;d.hologramZ=player.getZ();d.hologramSet=true;d.statusHologramEnabled=true;saveDefinition(d);syncStatusHologram(d);
     }
 
-    public synchronized void removeHologram(String id){MineDefinition d=definitions.get(MineDefinition.normalizeId(id));if(d==null)throw new IllegalArgumentException("Mine not found.");d.statusHologramEnabled=false;d.hologramSet=false;d.hologramDimension="";d.hologramX=0D;d.hologramY=0D;d.hologramZ=0D;SimpleServerUtilities.HOLOGRAMS.delete(statusHologramId(d.id));saveDefinition(d);}
+    public synchronized void removeHologram(String id){MineDefinition d=definitions.get(MineDefinition.normalizeId(id));if(d==null)throw new IllegalArgumentException("Mine not found.");d.statusHologramEnabled=false;d.hologramSet=false;d.hologramDimension="";d.hologramX=0D;d.hologramY=0D;d.hologramZ=0D;if(SsuModuleAccess.active("holograms"))SimpleServerUtilities.HOLOGRAMS.delete(statusHologramId(d.id));saveDefinition(d);}
 
     public synchronized MineDefinition at(ServerLevel level,BlockPos pos){String dim=level.dimension().identifier().toString();for(MineDefinition d:definitions.values())if(hasValidParent(d)&&d.contains(dim,pos.getX(),pos.getY(),pos.getZ()))return d;return null;}
     public synchronized boolean canMine(ServerPlayer player,MineDefinition d){return d!=null&&hasValidParent(d)&&(PermissionService.isAdmin(player)||(PermissionService.getBoolean(player,PermissionKeys.MINES_USE,true)&&(d.permissionKey.isBlank()||PermissionService.getBoolean(player,d.permissionKey,false))));}
@@ -158,7 +159,7 @@ public final class MineManager {
 
     public UUID scheduleReset(MinecraftServer server,String rawId,boolean manual){
         MineDefinition snapshot; synchronized(this){String id=MineDefinition.normalizeId(rawId);MineDefinition d=definitions.get(id);if(d==null)throw new IllegalArgumentException("Mine not found.");if(!d.boundsSet)throw new IllegalArgumentException("Mine bounds are not set.");if(!hasValidParent(d))throw new IllegalArgumentException("Mine bounds are not fully inside a valid Region.");if(d.volume()<=0L||d.volume()>MAX_VOLUME)throw new IllegalArgumentException("Mine volume is invalid or too large.");if(resetting.contains(id))throw new IllegalArgumentException("That mine is already resetting.");List<ServerPlayer> inside=playersInside(server,d);if(!inside.isEmpty()&&d.resetOnlyWhenEmpty){long retryAt=System.currentTimeMillis()+30_000L;if(d.resetIntervalSeconds>0L)d.nextResetAt=retryAt;if(d.resetMinedPercent>0&&d.minedPercent()>=d.resetMinedPercent)thresholdResetDueAt.put(id,retryAt);lastWarningSecond.remove(id);saveDefinition(d);throw new IllegalArgumentException("Mine reset delayed because players are still inside.");}if(!inside.isEmpty()&&d.teleportPlayersOnReset){for(ServerPlayer p:inside)teleportOut(server,d,p);}resetting.add(id);lastWarningSecond.remove(id);thresholdResetDueAt.remove(id);snapshot=d.copy();}
-        MineResetJob job=new MineResetJob(snapshot);UUID jobId=SimpleServerUtilities.JOBS.submit(job,result->{synchronized(MineManager.this){MineDefinition live=definitions.get(snapshot.id);resetting.remove(snapshot.id);if(live==null)return;if(result.status()==be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler.Status.COMPLETED){long completedAt=System.currentTimeMillis();live.blocksMined=0L;live.resetCount=saturatingAdd(live.resetCount,1L);if(manual)live.manualResetCount=saturatingAdd(live.manualResetCount,1L);else live.automaticResetCount=saturatingAdd(live.automaticResetCount,1L);live.lastResetAt=completedAt;live.nextResetAt=live.resetIntervalSeconds>0L?completedAt+live.resetIntervalSeconds*1000L:0L;thresholdResetDueAt.remove(live.id);lastWarningSecond.remove(live.id);saveDefinition(live);syncStatusHologram(live);if(!manual)SimpleServerUtilities.SERVER_OPERATIONS.audit("Server","server","mines.auto_reset",live.id,"completed");}else{long retryAt=System.currentTimeMillis()+30_000L;if(live.resetIntervalSeconds>0L&&live.nextResetAt>0L&&live.nextResetAt<=System.currentTimeMillis())live.nextResetAt=retryAt;if(live.resetMinedPercent>0&&live.minedPercent()>=live.resetMinedPercent)thresholdResetDueAt.put(live.id,retryAt);lastWarningSecond.remove(live.id);saveDefinition(live);SimpleServerUtilities.LOGGER.warn("Mine {} reset job ended with status {}; retry delayed safely.",live.id,result.status());}}});return jobId;
+        MineResetJob job=new MineResetJob(snapshot);UUID jobId=SimpleServerUtilities.JOBS.submit(job,result->{synchronized(MineManager.this){MineDefinition live=definitions.get(snapshot.id);resetting.remove(snapshot.id);if(live==null)return;if(result.status()==be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler.Status.COMPLETED){long completedAt=System.currentTimeMillis();live.blocksMined=0L;live.resetCount=saturatingAdd(live.resetCount,1L);if(manual)live.manualResetCount=saturatingAdd(live.manualResetCount,1L);else live.automaticResetCount=saturatingAdd(live.automaticResetCount,1L);live.lastResetAt=completedAt;live.nextResetAt=live.resetIntervalSeconds>0L?completedAt+live.resetIntervalSeconds*1000L:0L;thresholdResetDueAt.remove(live.id);lastWarningSecond.remove(live.id);saveDefinition(live);syncStatusHologram(live);if(!manual&&SsuModuleAccess.active("server_operations"))SimpleServerUtilities.SERVER_OPERATIONS.audit("Server","server","mines.auto_reset",live.id,"completed");}else{long retryAt=System.currentTimeMillis()+30_000L;if(live.resetIntervalSeconds>0L&&live.nextResetAt>0L&&live.nextResetAt<=System.currentTimeMillis())live.nextResetAt=retryAt;if(live.resetMinedPercent>0&&live.minedPercent()>=live.resetMinedPercent)thresholdResetDueAt.put(live.id,retryAt);lastWarningSecond.remove(live.id);saveDefinition(live);SimpleServerUtilities.LOGGER.warn("Mine {} reset job ended with status {}; retry delayed safely.",live.id,result.status());}}});return jobId;
     }
 
     public void teleportToMine(MinecraftServer server,ServerPlayer player,String rawId){
@@ -213,8 +214,24 @@ public final class MineManager {
         to.miners=new ArrayList<>();for(MineDefinition.MinerStat s:from.miners)to.miners.add(new MineDefinition.MinerStat(s.uuid,s.name,s.blocks,s.lastMinedAt));to.blockStats=new ArrayList<>();for(MineDefinition.BlockStat s:from.blockStats)to.blockStats.add(new MineDefinition.BlockStat(s.blockId,s.blocks));
     }
 
+    /** Rebuild optional runtime integrations after another module changes effective state. */
+    public synchronized void refreshOptionalIntegrations(){
+        if(!SsuModuleAccess.active("holograms"))return;
+        java.util.Set<String> expected=new java.util.HashSet<>();
+        for(MineDefinition d:definitions.values()){expected.add(statusHologramId(d.id));syncStatusHologram(d);}
+        for(HologramDefinition h:SimpleServerUtilities.HOLOGRAMS.all()){
+            if(h.id!=null&&h.id.startsWith("ssu_mine_status_")&&!expected.contains(h.id))SimpleServerUtilities.HOLOGRAMS.delete(h.id);
+        }
+    }
+
+    /** Hide generated mine holograms while the Mines module itself is disabled. */
+    public synchronized void hideStatusHolograms(){
+        if(!SsuModuleAccess.active("holograms"))return;
+        for(MineDefinition d:definitions.values())SimpleServerUtilities.HOLOGRAMS.delete(statusHologramId(d.id));
+    }
+
     private void syncStatusHologram(MineDefinition d){
-        if(d==null||d.id.isBlank())return;String hologramId=statusHologramId(d.id);if(!d.statusHologramEnabled||!d.enabled||!hasValidParent(d)){SimpleServerUtilities.HOLOGRAMS.delete(hologramId);return;}
+        if(!SsuModuleAccess.active("holograms")||d==null||d.id.isBlank())return;String hologramId=statusHologramId(d.id);if(!d.statusHologramEnabled||!d.enabled||!hasValidParent(d)){SimpleServerUtilities.HOLOGRAMS.delete(hologramId);return;}
         HologramDefinition h=SimpleServerUtilities.HOLOGRAMS.get(hologramId);if(h==null)h=new HologramDefinition();h.id=hologramId;h.type=HologramType.TEXT;h.enabled=true;h.text="§e"+d.displayName+"\n§aRemaining: {mine:"+d.id+":remaining}%\n§7{mine:"+d.id+":reset}";h.backgroundColor=0x90000000;h.scale=1.0F;h.viewDistance=d.hologramViewDistance;h.seeThrough=true;
         if(d.hologramSet){h.dimension=d.hologramDimension;h.x=d.hologramX;h.y=d.hologramY;h.z=d.hologramZ;}
         else if(d.spawnSet){h.dimension=d.spawnDimension;h.x=d.spawnX;h.y=d.spawnY+2.25D;h.z=d.spawnZ;}

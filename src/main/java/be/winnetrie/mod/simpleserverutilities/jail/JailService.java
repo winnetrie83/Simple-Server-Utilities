@@ -9,7 +9,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
-import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.moderation.JailSentence;
 import be.winnetrie.mod.simpleserverutilities.moderation.PlayerModerationRecord;
 import be.winnetrie.mod.simpleserverutilities.network.BorderVisualizationPayload;
@@ -29,9 +29,11 @@ public final class JailService {
     private static final Gson GSON=new GsonBuilder().setPrettyPrinting().create();
     private JailService(){}
 
-    public static void request(JailAdminRequestPayload payload,IPayloadContext context){if(context.player() instanceof ServerPlayer actor)send(actor,payload.selectedId(),payload.requestId(),"",false);}
+    public static void request(JailAdminRequestPayload payload,IPayloadContext context){
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("jails")) return;if(context.player() instanceof ServerPlayer actor)send(actor,payload.selectedId(),payload.requestId(),"",false);}
 
     public static void action(JailAdminActionPayload payload,IPayloadContext context){
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("jails")) return;
         if(!(context.player() instanceof ServerPlayer actor))return;
         if(!canAdmin(actor)){send(actor,payload.jailId(),payload.requestId(),"Jail administration denied.",true);return;}
         String selected=payload.jailId(),notice="";boolean error=false;boolean audit=true,respond=true;
@@ -53,7 +55,7 @@ public final class JailService {
             case"hide_borders"->{PacketDistributor.sendToPlayer(actor,BorderVisualizationPayload.clear(BorderLayer.JAIL_FOCUS));selected="";notice="";audit=false;respond=false;}
             default->throw new IllegalArgumentException("Unknown Jail administration action.");
         }}catch(Exception ex){notice=ex.getMessage()==null?"Jail action failed safely.":ex.getMessage();error=true;}
-        if(audit&&!error)SimpleServerUtilities.SERVER_OPERATIONS.audit(actor,"jails."+payload.action(),selected,"");
+        if(audit&&!error&&SsuModuleAccess.active("server_operations"))SimpleServerUtilities.SERVER_OPERATIONS.audit(actor,"jails."+payload.action(),selected,"");
         if(respond)send(actor,selected,payload.requestId(),notice,error);
     }
 
@@ -67,11 +69,13 @@ public final class JailService {
         PacketDistributor.sendToPlayer(actor,new JailAdminDataPayload(selected,GSON.toJson(root),notice,error,request));
     }
 
-    private static JsonArray prisoners(ServerPlayer actor){JsonArray array=new JsonArray();long now=System.currentTimeMillis();for(PlayerModerationRecord record:SimpleServerUtilities.MODERATION.records()){if(record==null||record.jail==null||!record.jail.active)continue;JailSentence jail=record.jail;JsonObject item=new JsonObject();item.addProperty("uuid",record.playerId);item.addProperty("name",record.lastKnownName.isBlank()?record.playerId:record.lastKnownName);item.addProperty("online",resolveOnline(actor,record.playerId));item.addProperty("jailId",jail.jailId);JailDefinition facility=SimpleServerUtilities.JAILS.definition(jail.jailId);item.addProperty("jailName",facility==null?jail.jailId:facility.displayName);item.addProperty("reason",jail.reason);item.addProperty("sentenceMode",jail.sentenceMode);item.addProperty("selectedPath",jail.selectedPath);item.addProperty("startedAt",jail.startedAt);item.addProperty("choiceExpiresAt",jail.choiceExpiresAt);item.addProperty("taskDeadlineAt",jail.taskDeadlineAt);item.addProperty("releaseAt",jail.releaseAt);item.addProperty("buyoutMinor",jail.buyoutMinor);item.addProperty("buyoutFormatted",SimpleServerUtilities.ECONOMY.format(jail.buyoutMinor));item.addProperty("assignedCell",jail.assignedCell);long required=0,done=0;for(var entry:jail.requirements.entrySet()){required+=entry.getValue();done+=Math.min(entry.getValue(),jail.progress.getOrDefault(entry.getKey(),0));}item.addProperty("taskRequired",required);item.addProperty("taskDone",done);item.addProperty("taskPercent",required<=0?0D:Math.min(100D,done*100D/required));long due=jail.pendingChoice()?jail.choiceExpiresAt:(jail.taskSelected()?jail.taskDeadlineAt:jail.releaseAt);item.addProperty("secondsRemaining",due<=0?0L:Math.max(0L,(due-now+999L)/1000L));array.add(item);}return array;}
+    private static JsonArray prisoners(ServerPlayer actor){JsonArray array=new JsonArray();long now=System.currentTimeMillis();for(PlayerModerationRecord record:SimpleServerUtilities.MODERATION.records()){if(record==null||record.jail==null||!record.jail.active)continue;JailSentence jail=record.jail;JsonObject item=new JsonObject();item.addProperty("uuid",record.playerId);item.addProperty("name",record.lastKnownName.isBlank()?record.playerId:record.lastKnownName);item.addProperty("online",resolveOnline(actor,record.playerId));item.addProperty("jailId",jail.jailId);JailDefinition facility=SimpleServerUtilities.JAILS.definition(jail.jailId);item.addProperty("jailName",facility==null?jail.jailId:facility.displayName);item.addProperty("reason",jail.reason);item.addProperty("sentenceMode",jail.sentenceMode);item.addProperty("selectedPath",jail.selectedPath);item.addProperty("startedAt",jail.startedAt);item.addProperty("choiceExpiresAt",jail.choiceExpiresAt);item.addProperty("taskDeadlineAt",jail.taskDeadlineAt);item.addProperty("releaseAt",jail.releaseAt);item.addProperty("buyoutMinor",jail.buyoutMinor);item.addProperty("buyoutFormatted",SsuModuleAccess.active("economy")
+                ?SimpleServerUtilities.ECONOMY.format(jail.buyoutMinor)
+                :jail.buyoutMinor+" minor units (Economy unavailable)");item.addProperty("assignedCell",jail.assignedCell);long required=0,done=0;for(var entry:jail.requirements.entrySet()){required+=entry.getValue();done+=Math.min(entry.getValue(),jail.progress.getOrDefault(entry.getKey(),0));}item.addProperty("taskRequired",required);item.addProperty("taskDone",done);item.addProperty("taskPercent",required<=0?0D:Math.min(100D,done*100D/required));long due=jail.pendingChoice()?jail.choiceExpiresAt:(jail.taskSelected()?jail.taskDeadlineAt:jail.releaseAt);item.addProperty("secondsRemaining",due<=0?0L:Math.max(0L,(due-now+999L)/1000L));array.add(item);}return array;}
     private static boolean resolveOnline(ServerPlayer actor,String uuid){try{return actor.level().getServer().getPlayerList().getPlayer(UUID.fromString(uuid))!=null;}catch(Exception ignored){return false;}}
     private static int index(String json){try{JsonObject object=GSON.fromJson(json,JsonObject.class);return object!=null&&object.has("index")?object.get("index").getAsInt():-1;}catch(Exception ignored){return -1;}}
 
     private static void syncBorder(ServerPlayer actor,String selected){JailDefinition jail=SimpleServerUtilities.JAILS.definition(selected);if(jail==null||!jail.boundsSet){PacketDistributor.sendToPlayer(actor,BorderVisualizationPayload.clear(BorderLayer.JAIL_FOCUS));return;}List<BorderVisualizationPayload.Entry> entries=new ArrayList<>();entries.add(entry(BorderCategory.JAIL_AREA,"Jail: "+jail.displayName,jail.minX,jail.minY,jail.minZ,jail.maxX,jail.maxY,jail.maxZ,0xFFFF5A5F,0x24FF5A5F,3.5F));if(jail.workBoundsSet)entries.add(entry(BorderCategory.JAIL_TASK_AREA,"Task Area",jail.workMinX,jail.workMinY,jail.workMinZ,jail.workMaxX,jail.workMaxY,jail.workMaxZ,0xFFFFB347,0x20FFB347,3.0F));PacketDistributor.sendToPlayer(actor,new BorderVisualizationPayload(BorderLayer.JAIL_FOCUS,true,jail.dimension,64,192,entries));}
     private static BorderVisualizationPayload.Entry entry(BorderCategory category,String label,int minX,int minY,int minZ,int maxX,int maxY,int maxZ,int stroke,int fill,float width){return new BorderVisualizationPayload.Entry(category,label,stroke,fill,width,true,List.of(new BorderVisualizationPayload.Box(minX,minY,minZ,maxX,maxY,maxZ)),List.of());}
-    private static boolean canAdmin(ServerPlayer player){return PermissionService.isAdmin(player)&&PermissionService.getBoolean(player,PermissionKeys.JAILS_ADMIN,false);}
+    private static boolean canAdmin(ServerPlayer player){return SsuModuleAccess.active("jails")&&PermissionService.isAdmin(player)&&PermissionService.getBoolean(player,PermissionKeys.JAILS_ADMIN,false);}
 }

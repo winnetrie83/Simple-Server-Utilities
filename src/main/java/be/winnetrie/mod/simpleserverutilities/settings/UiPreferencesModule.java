@@ -20,10 +20,8 @@ public final class UiPreferencesModule implements SsuModule {
         return "ui_preferences";
     }
 
-    @Override
-    public Set<String> dependencies() {
-        return Set.of("storage");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage"); }
+    @Override public boolean isCoreInfrastructure() { return true; }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

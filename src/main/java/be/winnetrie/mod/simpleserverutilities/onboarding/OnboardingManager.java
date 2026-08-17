@@ -13,6 +13,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.identity.RichTextComponents;
 import be.winnetrie.mod.simpleserverutilities.network.OnboardingStatePayload;
@@ -151,7 +152,8 @@ public final class OnboardingManager {
     public void tick(MinecraftServer server) {
         long nowTick = server.getTickCount();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            if (!restricted(player.getUUID()) || SimpleServerUtilities.MODERATION.restricted(player.getUUID())) continue;
+            if (!restricted(player.getUUID())
+                    || (SsuModuleAccess.active("moderation") && SimpleServerUtilities.MODERATION.restricted(player.getUUID()))) continue;
             Long openAt;
             synchronized (this) { openAt = pendingMenuOpen.get(player.getUUID()); }
             if (openAt != null && nowTick >= openAt) {
@@ -171,6 +173,7 @@ public final class OnboardingManager {
     }
 
     public void handleAction(ServerPlayer player, String action, int page, long requestId) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("onboarding")) return;
         if (player == null) return;
         String normalized = action == null ? "" : action.trim().toLowerCase(java.util.Locale.ROOT);
         synchronized (this) {

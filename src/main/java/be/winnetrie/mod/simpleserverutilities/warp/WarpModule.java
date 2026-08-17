@@ -22,15 +22,10 @@ public final class WarpModule implements SsuModule {
         return "warps";
     }
 
-    @Override
-    public boolean isEnabled() {
-        return Config.ENABLE_WARPS.get();
-    }
+    @Override public boolean isEnabled() { return Config.ENABLE_WARPS.get(); }
 
-    @Override
-    public Set<String> dependencies() {
-        return Set.of("storage");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("economy", "permissions", "teleport", "mail"); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

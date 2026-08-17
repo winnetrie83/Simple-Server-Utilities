@@ -1,5 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.core.transaction;
 
+import java.util.Set;
+
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModule;
 import be.winnetrie.mod.simpleserverutilities.core.service.SsuServiceRegistry;
 import net.minecraft.server.MinecraftServer;
@@ -17,6 +19,8 @@ public final class TransactionModule implements SsuModule {
     public String id() {
         return "transactions";
     }
+    @Override public Set<String> requiredDependencies() { return Set.of(); }
+    @Override public boolean isCoreInfrastructure() { return true; }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

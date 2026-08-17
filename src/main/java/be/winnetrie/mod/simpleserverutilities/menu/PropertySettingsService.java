@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimSettings;
 import be.winnetrie.mod.simpleserverutilities.home.ClaimHomeSupport;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
@@ -28,11 +29,20 @@ public final class PropertySettingsService {
     private PropertySettingsService() {}
 
     public static void handleRequest(SsuPropertySettingsRequestPayload payload, IPayloadContext context) {
-        if (context.player() instanceof ServerPlayer player) send(player, payload.kind(), payload.target(), payload.requestId(), "", false);
+        if (!(context.player() instanceof ServerPlayer player)) return;
+        if (!propertyModuleActive(payload.kind())) {
+            send(player, payload.kind(), payload.target(), payload.requestId(), "That feature module is disabled.", true);
+            return;
+        }
+        send(player, payload.kind(), payload.target(), payload.requestId(), "", false);
     }
 
     public static void handleAction(SsuPropertySettingsActionPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)) return;
+        if (!propertyModuleActive(payload.kind())) {
+            send(player, payload.kind(), payload.target(), payload.requestId(), "That feature module is disabled.", true);
+            return;
+        }
         String notice;
         boolean error = false;
         try {
@@ -95,7 +105,7 @@ public final class PropertySettingsService {
         if (region == null) return SsuPropertySettingsDataPayload.error("region", name, id, "Region not found.");
         boolean regionAdmin = RegionPolicy.canEditRegion(player) || RegionPolicy.isRegionAdmin(player);
         boolean canEdit = regionAdmin || region.isManager(player.getUUID());
-        boolean rentAdmin = RegionPolicy.canAdminRentRegion(player) || RegionPolicy.isRegionAdmin(player);
+        boolean rentAdmin = SsuModuleAccess.active("economy") && (RegionPolicy.canAdminRentRegion(player) || RegionPolicy.isRegionAdmin(player));
         RegionSettings s = region.getSettings(); RegionRentData r = region.getRentData();
         List<SsuPropertySettingsDataPayload.Entry> entries = new ArrayList<>();
         entries.add(editable(bool("allow_block_break", "Allow block breaking", s.isAllowBlockBreak(), false, "Allows non-members to break blocks inside this region."), canEdit));
@@ -120,7 +130,10 @@ public final class PropertySettingsService {
         entries.add(editable(text("add_member", "Add member", "", "", "Enter an online or previously known player name to add as region member."), regionAdmin));
         entries.add(editable(text("remove_member", "Remove member", "", "", "Enter a member name to remove from the region."), regionAdmin));
         entries.add(editable(bool("rentable", "Rentable", r.isRentable(), false, "Controls whether players may rent this server-owned region."), rentAdmin));
-        entries.add(editable(text("price", "Rent price", MoneyFormat.format(r.getPriceMinor(SimpleServerUtilities.ECONOMY.settings()), SimpleServerUtilities.ECONOMY.settings()), "€0,00", "Price charged for each rent period. The payment is removed from circulation as a money sink."), rentAdmin));
+        String rentPrice = SsuModuleAccess.active("economy")
+                ? MoneyFormat.format(r.getPriceMinor(SimpleServerUtilities.ECONOMY.settings()), SimpleServerUtilities.ECONOMY.settings())
+                : (r.getStoredPriceMinor() >= 0L ? r.getStoredPriceMinor() + " minor units" : r.getAmount() + " legacy units");
+        entries.add(editable(text("price", "Rent price", rentPrice, "0", "Price charged for each rent period. Economy must be active to edit rental policy."), rentAdmin));
         entries.add(editable(integer("period_days", "Rent period days", r.getPeriodDays(), -1, -1, 36_500, "Number of days per payment. Use -1 for a permanent rental."), rentAdmin));
         entries.add(editable(bool("reset_on_expire", "Reset on expiry", r.isResetOnExpire(), true, "Restores the saved region snapshot when a timed rental expires."), rentAdmin));
         entries.add(editable(bool("reset_on_unrent", "Reset on cancellation", r.isResetOnUnrent(), true, "Restores the saved region snapshot when a rental is cancelled."), rentAdmin));
@@ -157,8 +170,9 @@ public final class PropertySettingsService {
         if (region == null) throw new IllegalArgumentException("Region not found.");
         boolean regionAdmin = RegionPolicy.canEditRegion(player) || RegionPolicy.isRegionAdmin(player);
         boolean canEdit = regionAdmin || region.isManager(player.getUUID());
-        if (!canEdit && !RegionPolicy.canAdminRentRegion(player)) throw new IllegalArgumentException("You cannot edit this region.");
-        boolean rentAdmin = RegionPolicy.canAdminRentRegion(player) || RegionPolicy.isRegionAdmin(player);
+        boolean rentPolicyAdmin = RegionPolicy.canAdminRentRegion(player) || RegionPolicy.isRegionAdmin(player);
+        if (!canEdit && !rentPolicyAdmin) throw new IllegalArgumentException("You cannot edit this region.");
+        boolean rentAdmin = SsuModuleAccess.active("economy") && rentPolicyAdmin;
         RegionSettings s = region.getSettings(); RegionRentData r = region.getRentData();
         switch (key) {
             case "allow_block_break" -> { requireRegionEdit(canEdit); s.setAllowBlockBreak(parseBoolean(value)); }
@@ -216,24 +230,34 @@ public final class PropertySettingsService {
         }
         ServerPlayer online = actor.level().getServer().getPlayerList().getPlayerByName(name);
         if (online != null) return online.getUUID();
-        UUID known = SimpleServerUtilities.PERMISSIONS.findKnownPlayerId(name);
-        if (known != null && !SimpleServerUtilities.ECONOMY.isSystemAccount(known)) return known;
-        return SimpleServerUtilities.ECONOMY.findPlayerAccountByName(actor.level().getServer(), name)
-                .map(account -> account.getPlayerId())
-                .orElseThrow(() -> new IllegalArgumentException("Player not found: " + name));
+        if (SsuModuleAccess.active("permissions")) {
+            UUID known = SimpleServerUtilities.PERMISSIONS.findKnownPlayerId(name);
+            if (known != null && !SimpleServerUtilities.ECONOMY.isSystemAccount(known)) return known;
+        }
+        if (SsuModuleAccess.active("economy")) {
+            return SimpleServerUtilities.ECONOMY.findPlayerAccountByName(actor.level().getServer(), name)
+                    .map(account -> account.getPlayerId())
+                    .orElseThrow(() -> new IllegalArgumentException("Player not found: " + name));
+        }
+        throw new IllegalArgumentException("Player not found: " + name);
     }
 
 
     private static String displayName(ServerPlayer viewer, UUID playerId) {
         ServerPlayer online = viewer.level().getServer().getPlayerList().getPlayer(playerId);
         if (online != null) return online.getName().getString();
-        var data = SimpleServerUtilities.PERMISSIONS.getPlayerData(playerId);
-        if (data != null && !data.getLastKnownName().isBlank()) return data.getLastKnownName();
-        return SimpleServerUtilities.ECONOMY.findPlayerAccount(playerId)
-                .map(account -> account.getLastKnownName().isBlank()
-                        ? playerId.toString().substring(0, 8)
-                        : account.getLastKnownName())
-                .orElse(playerId.toString().substring(0, 8));
+        if (SsuModuleAccess.active("permissions")) {
+            var data = SimpleServerUtilities.PERMISSIONS.getPlayerData(playerId);
+            if (data != null && !data.getLastKnownName().isBlank()) return data.getLastKnownName();
+        }
+        if (SsuModuleAccess.active("economy")) {
+            return SimpleServerUtilities.ECONOMY.findPlayerAccount(playerId)
+                    .map(account -> account.getLastKnownName().isBlank()
+                            ? playerId.toString().substring(0, 8)
+                            : account.getLastKnownName())
+                    .orElse(playerId.toString().substring(0, 8));
+        }
+        return playerId.toString().substring(0, 8);
     }
 
     private static String displayNames(ServerPlayer viewer, Collection<UUID> ids) {
@@ -274,5 +298,11 @@ public final class PropertySettingsService {
     }
     private static SsuPropertySettingsDataPayload.Entry editable(SsuPropertySettingsDataPayload.Entry e,boolean editable) {
         return new SsuPropertySettingsDataPayload.Entry(e.key(),e.label(),e.value(),e.type(),e.description(),e.defaultValue(),e.minimum(),e.maximum(),editable,e.options());
+    }
+
+    private static boolean propertyModuleActive(String kind) {
+        if ("claim".equalsIgnoreCase(kind)) return SsuModuleAccess.active("claims");
+        if ("region".equalsIgnoreCase(kind)) return SsuModuleAccess.active("regions");
+        return false;
     }
 }

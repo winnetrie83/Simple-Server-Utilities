@@ -11,6 +11,7 @@ public class TeleportEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("teleport")) return;
         SimpleServerUtilities.TELEPORTS.tick(event.getServer());
     }
 }

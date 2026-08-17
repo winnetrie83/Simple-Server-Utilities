@@ -162,6 +162,7 @@ public final class HologramCommands {
     }
 
     private static int list(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         source.sendSystemMessage(Component.literal("SSU holograms (" + SimpleServerUtilities.HOLOGRAMS.all().size() + "):"));
         for (HologramDefinition definition : SimpleServerUtilities.HOLOGRAMS.all()) {
             source.sendSystemMessage(Component.literal(" - " + definition.id + " [" + definition.type.name().toLowerCase()
@@ -171,12 +172,14 @@ public final class HologramCommands {
     }
 
     private static int refresh(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         SimpleServerUtilities.HOLOGRAMS.syncAll();
         source.sendSystemMessage(Component.literal("Holograms refreshed for all players."));
         return 1;
     }
 
     private static int createText(CommandSourceStack source, String id, String text) {
+        if (!requireModule(source)) return 0;
         HologramDefinition value = atSource(source, id, HologramType.TEXT);
         if (value == null) return 0;
         value.text = text;
@@ -184,6 +187,7 @@ public final class HologramCommands {
     }
 
     private static int createLink(CommandSourceStack source, String id, String url, String text) {
+        if (!requireModule(source)) return 0;
         if (!validWebsite(url)) {
             source.sendFailure(Component.literal("Only valid http/https website links are accepted."));
             return 0;
@@ -198,6 +202,7 @@ public final class HologramCommands {
 
     private static int createScoreboard(CommandSourceStack source, String id, String objective,
                                         HologramScoreboardMode mode, String title) {
+        if (!requireModule(source)) return 0;
         HologramDefinition value = atSource(source, id, HologramType.SCOREBOARD);
         if (value == null) return 0;
         value.objective = objective;
@@ -207,6 +212,7 @@ public final class HologramCommands {
     }
 
     private static int createImage(CommandSourceStack source, String id, String imageSource) {
+        if (!requireModule(source)) return 0;
         if (!validateImageSource(source, imageSource)) {
             return 0;
         }
@@ -217,6 +223,7 @@ public final class HologramCommands {
     }
 
     private static int editText(CommandSourceStack source, String id, String text) {
+        if (!requireModule(source)) return 0;
         HologramDefinition value = require(source, id);
         if (value == null) return 0;
         value.text = text;
@@ -224,6 +231,7 @@ public final class HologramCommands {
     }
 
     private static int editLink(CommandSourceStack source, String id, String url) {
+        if (!requireModule(source)) return 0;
         HologramDefinition value = requireType(source, id, HologramType.LINK);
         if (value == null) return 0;
         if (!validWebsite(url)) {
@@ -235,6 +243,7 @@ public final class HologramCommands {
     }
 
     private static int editImageSource(CommandSourceStack source, String id, String imageSource) {
+        if (!requireModule(source)) return 0;
         HologramDefinition value = requireType(source, id, HologramType.IMAGE);
         if (value == null || !validateImageSource(source, imageSource)) return 0;
         value.imageSource = imageSource;
@@ -242,6 +251,7 @@ public final class HologramCommands {
     }
 
     private static int editImageSize(CommandSourceStack source, String id, double width, double height) {
+        if (!requireModule(source)) return 0;
         HologramDefinition value = requireType(source, id, HologramType.IMAGE);
         if (value == null) return 0;
         value.imageWidth = (float) width;
@@ -250,6 +260,7 @@ public final class HologramCommands {
     }
 
     private static int delete(CommandSourceStack source, String id) {
+        if (!requireModule(source)) return 0;
         if (!SimpleServerUtilities.HOLOGRAMS.delete(id)) {
             source.sendFailure(Component.literal("Unknown hologram: " + id));
             return 0;
@@ -259,6 +270,7 @@ public final class HologramCommands {
     }
 
     private static int moveHere(CommandSourceStack source, String id) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = requirePlayer(source);
         if (player == null) return 0;
         HologramDefinition value = require(source, id);
@@ -271,6 +283,7 @@ public final class HologramCommands {
     }
 
     private static int setColor(CommandSourceStack source, String id, String raw) {
+        if (!requireModule(source)) return 0;
         HologramDefinition value = require(source, id);
         if (value == null) return 0;
         try {
@@ -286,6 +299,7 @@ public final class HologramCommands {
     }
 
     private static int setBooleanStyle(CommandSourceStack source, String id, String property, boolean enabled) {
+        if (!requireModule(source)) return 0;
         HologramDefinition value = require(source, id);
         if (value == null) return 0;
         switch (property) {
@@ -308,6 +322,7 @@ public final class HologramCommands {
     }
 
     private static int setScale(CommandSourceStack source, String id, double scale) {
+        if (!requireModule(source)) return 0;
         HologramDefinition value = require(source, id);
         if (value == null) return 0;
         value.scale = (float) scale;
@@ -315,6 +330,7 @@ public final class HologramCommands {
     }
 
     private static int setViewDistance(CommandSourceStack source, String id, double distance) {
+        if (!requireModule(source)) return 0;
         HologramDefinition value = require(source, id);
         if (value == null) return 0;
         value.viewDistance = distance;
@@ -322,6 +338,7 @@ public final class HologramCommands {
     }
 
     private static int setMaxLines(CommandSourceStack source, String id, int lines) {
+        if (!requireModule(source)) return 0;
         HologramDefinition value = requireScoreboard(source, id);
         if (value == null) return 0;
         value.maxLines = lines;
@@ -329,6 +346,7 @@ public final class HologramCommands {
     }
 
     private static int setInterval(CommandSourceStack source, String id, int ticks) {
+        if (!requireModule(source)) return 0;
         HologramDefinition value = requireScoreboard(source, id);
         if (value == null) return 0;
         value.updateIntervalTicks = ticks;
@@ -373,6 +391,7 @@ public final class HologramCommands {
     }
 
     private static int save(CommandSourceStack source, HologramDefinition value, String message) {
+        if (!requireModule(source)) return 0;
         if (!SimpleServerUtilities.HOLOGRAMS.put(value)) {
             source.sendFailure(Component.literal("Hologram could not be saved; the server limit of "
                     + be.winnetrie.mod.simpleserverutilities.hologram.HologramManager.MAX_HOLOGRAMS + " was reached."));
@@ -432,5 +451,11 @@ public final class HologramCommands {
 
     private static String one(double value) {
         return String.format(java.util.Locale.ROOT, "%.1f", value);
+    }
+
+    private static boolean requireModule(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("holograms")) return true;
+        source.sendFailure(Component.literal("Holograms is disabled or blocked by a required dependency."));
+        return false;
     }
 }

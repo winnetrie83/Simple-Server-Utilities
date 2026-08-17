@@ -16,7 +16,9 @@ public final class DungeonModule implements SsuModule {
 
     @Override public String id() { return "dungeons"; }
     @Override public boolean isEnabled() { return Config.ENABLE_DUNGEONS.get(); }
-    @Override public Set<String> dependencies() { return Set.of("content_core", "storage", "permissions", "regions"); }
+    @Override public Set<String> requiredDependencies() { return Set.of("content_core", "storage", "regions"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("permissions"); }
+    @Override public Set<String> integrationDependencies() { return Set.of("npcs", "economy", "mail"); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

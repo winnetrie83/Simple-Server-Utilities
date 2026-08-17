@@ -18,6 +18,7 @@ public final class PistonProtectionEvents {
 
     @SubscribeEvent
     public static void onPistonPre(PistonEvent.Pre event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         if (!(event.getLevel() instanceof Level level)) {
             return;
         }

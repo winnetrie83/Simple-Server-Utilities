@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.protection;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -20,12 +21,13 @@ public class EntityProtectionEvents {
 
     @SubscribeEvent
     public static void onAttackEntity(AttackEntityEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
 
         Entity target = event.getTarget();
-        if (SimpleServerUtilities.NPCS.isManagedEntity(target.getUUID())) return;
+        if (SsuModuleAccess.active("npcs") && SimpleServerUtilities.NPCS.isManagedEntity(target.getUUID())) return;
 
         if (target instanceof ServerPlayer) {
             if (ProtectionHelper.canPlayerPvp(player, player.level(), target.blockPosition())) {
@@ -48,6 +50,7 @@ public class EntityProtectionEvents {
 
     @SubscribeEvent
     public static void onLivingIncomingDamage(LivingIncomingDamageEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         ServerPlayer player = getAttackingPlayer(event.getSource().getEntity());
 
         if (player == null) {
@@ -55,7 +58,7 @@ public class EntityProtectionEvents {
         }
 
         Entity target = event.getEntity();
-        if (SimpleServerUtilities.NPCS.isManagedEntity(target.getUUID())) return;
+        if (SsuModuleAccess.active("npcs") && SimpleServerUtilities.NPCS.isManagedEntity(target.getUUID())) return;
 
         if (target instanceof ServerPlayer) {
             if (ProtectionHelper.canPlayerPvp(player, player.level(), target.blockPosition())) {
@@ -78,10 +81,11 @@ public class EntityProtectionEvents {
 
     @SubscribeEvent
     public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
-        if (SimpleServerUtilities.NPCS.isManagedEntity(event.getTarget().getUUID())) return;
+        if (SsuModuleAccess.active("npcs") && SimpleServerUtilities.NPCS.isManagedEntity(event.getTarget().getUUID())) return;
 
         boolean allowed = event.getTarget() instanceof LivingEntity && !(event.getTarget() instanceof ArmorStand)
                 ? ProtectionHelper.canInteractClaimEntity(player, player.level(), event.getTarget().blockPosition())
@@ -95,6 +99,7 @@ public class EntityProtectionEvents {
 
     @SubscribeEvent
     public static void onProjectileImpact(ProjectileImpactEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         if (!(event.getProjectile() instanceof Projectile projectile)) {
             return;
         }
@@ -106,7 +111,7 @@ public class EntityProtectionEvents {
         }
 
         Entity hitEntity = entityHitResult.getEntity();
-        if (SimpleServerUtilities.NPCS.isManagedEntity(hitEntity.getUUID())) return;
+        if (SsuModuleAccess.active("npcs") && SimpleServerUtilities.NPCS.isManagedEntity(hitEntity.getUUID())) return;
 
         if (projectile.getOwner() instanceof ServerPlayer player) {
             if (hitEntity instanceof ServerPlayer) {

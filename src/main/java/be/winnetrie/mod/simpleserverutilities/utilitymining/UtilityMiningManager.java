@@ -32,6 +32,7 @@ public final class UtilityMiningManager {
     }
 
     public void handleActivation(UtilityMiningActivationPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("utility_mining")) return;
         if (!(context.player() instanceof ServerPlayer player)) {
             return;
         }
@@ -46,6 +47,7 @@ public final class UtilityMiningManager {
     }
 
     public void handlePreview(UtilityMiningPreviewRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("utility_mining")) return;
         if (!(context.player() instanceof ServerPlayer player)) {
             return;
         }

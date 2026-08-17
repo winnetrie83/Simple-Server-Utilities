@@ -16,7 +16,8 @@ public final class StatisticsModule implements SsuModule {
     }
 
     @Override public String id() { return "statistics"; }
-    @Override public Set<String> dependencies() { return Set.of("storage"); }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("holograms"); }
     @Override public boolean isEnabled() { return Config.ENABLE_CUSTOM_STATISTICS.get(); }
     @Override public void initialize(SsuServiceRegistry services) { services.register(PlayerStatisticsManager.class, manager); }
     @Override public void onServerStarting(MinecraftServer server) { manager.load(server); }

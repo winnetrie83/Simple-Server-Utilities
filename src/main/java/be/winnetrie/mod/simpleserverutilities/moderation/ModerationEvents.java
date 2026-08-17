@@ -21,12 +21,13 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 /** Enforces freeze/jail restrictions while retaining the explicit community-mining route. */
 public final class ModerationEvents {
     private ModerationEvents(){}
-    private static boolean restricted(ServerPlayer p){return p!=null&&SimpleServerUtilities.MODERATION.restricted(p.getUUID());}
-    private static boolean jailed(ServerPlayer p){return p!=null&&SimpleServerUtilities.MODERATION.jailed(p.getUUID());}
+    private static boolean active(){return SimpleServerUtilities.CORE.modules().isActive("moderation");}
+    private static boolean restricted(ServerPlayer p){return active()&&p!=null&&SimpleServerUtilities.MODERATION.restricted(p.getUUID());}
+    private static boolean jailed(ServerPlayer p){return active()&&p!=null&&SimpleServerUtilities.MODERATION.jailed(p.getUUID());}
 
-    @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onLogin(PlayerEvent.PlayerLoggedInEvent e){if(e.getEntity() instanceof ServerPlayer p)SimpleServerUtilities.MODERATION.onLogin(p);}
-    @SubscribeEvent public static void onLogout(PlayerEvent.PlayerLoggedOutEvent e){if(e.getEntity() instanceof ServerPlayer p)SimpleServerUtilities.MODERATION.onLogout(p);}
-    @SubscribeEvent public static void onTick(ServerTickEvent.Post e){SimpleServerUtilities.MODERATION.tick(e.getServer());}
+    @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onLogin(PlayerEvent.PlayerLoggedInEvent e){if(active()&&e.getEntity() instanceof ServerPlayer p)SimpleServerUtilities.MODERATION.onLogin(p);}
+    @SubscribeEvent public static void onLogout(PlayerEvent.PlayerLoggedOutEvent e){if(active()&&e.getEntity() instanceof ServerPlayer p)SimpleServerUtilities.MODERATION.onLogout(p);}
+    @SubscribeEvent public static void onTick(ServerTickEvent.Post e){if(active())SimpleServerUtilities.MODERATION.tick(e.getServer());}
 
     @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onRightBlock(PlayerInteractEvent.RightClickBlock e){if(e.getEntity() instanceof ServerPlayer p&&restricted(p)){e.setCanceled(true);e.setCancellationResult(InteractionResult.FAIL);}}
     @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onRightItem(PlayerInteractEvent.RightClickItem e){if(e.getEntity() instanceof ServerPlayer p&&restricted(p)){e.setCanceled(true);e.setCancellationResult(InteractionResult.FAIL);}}

@@ -5,6 +5,7 @@ import java.util.Map;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.content.ContentAccessPolicy;
 import be.winnetrie.mod.simpleserverutilities.content.ContentEvent;
 import be.winnetrie.mod.simpleserverutilities.content.ContentEventTypes;
@@ -44,6 +45,7 @@ public final class NpcFunctionService {
     }
 
     public static void handleUse(NpcFunctionUsePayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         SimpleServerUtilities.NPC_FUNCTIONS.use(player, payload);
     }
@@ -90,7 +92,7 @@ public final class NpcFunctionService {
 
     private static boolean canUse(ServerPlayer player, NpcInstance instance, NpcDefinition definition) {
         if (player == null || instance == null || definition == null
-                || !Config.ENABLE_NPCS.get() || !ContentAccessPolicy.canInteractWithNpc(player)
+                || !SsuModuleAccess.active("npcs") || !ContentAccessPolicy.canInteractWithNpc(player)
                 || !definition.enabled || !instance.enabled || instance.dead) return false;
         if (!instance.dimension.equals(player.level().dimension().identifier().toString())) return false;
         double dx = player.getX() - instance.x, dy = player.getY() - instance.y, dz = player.getZ() - instance.z;

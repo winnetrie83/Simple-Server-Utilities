@@ -18,7 +18,9 @@ public final class QuestModule implements SsuModule {
 
     @Override public String id() { return "quests"; }
     @Override public boolean isEnabled() { return Config.ENABLE_QUESTS.get(); }
-    @Override public Set<String> dependencies() { return Set.of("content_core", "storage", "permissions"); }
+    @Override public Set<String> requiredDependencies() { return Set.of("content_core", "storage"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("permissions"); }
+    @Override public Set<String> integrationDependencies() { return Set.of("npcs", "economy", "mail"); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

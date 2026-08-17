@@ -8,6 +8,7 @@ public class ExplosionProtectionEvents {
 
     @SubscribeEvent
     public static void onExplosionDetonate(ExplosionEvent.Detonate event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         Level level = event.getLevel();
 
         event.getAffectedBlocks().removeIf(pos ->

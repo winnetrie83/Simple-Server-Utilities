@@ -30,9 +30,11 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 /** Mine access, drop-rule/progress hooks plus the dedicated Mine Setup Tool workflow. */
 public final class MineEvents {
     private MineEvents() { }
+    private static boolean active() { return SimpleServerUtilities.CORE.modules().isActive("mines"); }
+    private static boolean moderated(ServerPlayer player) { return SimpleServerUtilities.CORE.modules().isActive("moderation") && SimpleServerUtilities.MODERATION.jailed(player.getUUID()); }
 
     @SubscribeEvent(priority=EventPriority.HIGHEST)
-    public static void onLeftClick(PlayerInteractEvent.LeftClickBlock event){
+    public static void onLeftClick(PlayerInteractEvent.LeftClickBlock event){if(!active())return;
         if(event.getAction()!=PlayerInteractEvent.LeftClickBlock.Action.START||!(event.getEntity() instanceof ServerPlayer player))return;
         if(!SimpleServerUtilities.MINE_SETUP_TOOLS.isTool(player,player.getMainHandItem()))return;
         if(!canAdmin(player))return;
@@ -49,7 +51,7 @@ public final class MineEvents {
     }
 
     @SubscribeEvent(priority=EventPriority.HIGHEST)
-    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event){
+    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event){if(!active())return;
         if(!(event.getEntity() instanceof ServerPlayer player)||event.getHand()!=InteractionHand.MAIN_HAND)return;
         if(!SimpleServerUtilities.MINE_SETUP_TOOLS.isTool(player,player.getMainHandItem())||!canAdmin(player))return;
         MineService.send(player,true,"",0L,"",false);
@@ -57,29 +59,29 @@ public final class MineEvents {
     }
 
     @SubscribeEvent(priority=EventPriority.HIGHEST)
-    public static void onRightClickItem(PlayerInteractEvent.RightClickItem event){
+    public static void onRightClickItem(PlayerInteractEvent.RightClickItem event){if(!active())return;
         if(!(event.getEntity() instanceof ServerPlayer player)||event.getHand()!=InteractionHand.MAIN_HAND)return;
         if(!SimpleServerUtilities.MINE_SETUP_TOOLS.isTool(player,player.getMainHandItem())||!canAdmin(player))return;
         MineService.send(player,true,"",0L,"",false);event.setCanceled(true);event.setCancellationResult(InteractionResult.SUCCESS);
     }
 
     @SubscribeEvent(priority=EventPriority.HIGHEST)
-    public static void protectBreak(BreakBlockEvent event){
+    public static void protectBreak(BreakBlockEvent event){if(!active())return;
         if(!(event.getPlayer() instanceof ServerPlayer player))return;MineDefinition mine=SimpleServerUtilities.MINES.at(player.level(),event.getPos());if(mine==null)return;
         // Jail task mining is adjudicated by ModerationEvents/ModerationManager so the narrow jail-safe
         // permission path can enforce both the global and per-mine keys without unlocking other SSU features.
-        if(SimpleServerUtilities.MODERATION.jailed(player.getUUID()))return;
+        if(moderated(player))return;
         if(!canUse(player,mine)){event.setCanceled(true);player.sendOverlayMessage(Component.literal("You do not have permission to mine here."));}
     }
 
     @SubscribeEvent(priority=EventPriority.LOWEST)
-    public static void afterBreak(BreakBlockEvent event){
+    public static void afterBreak(BreakBlockEvent event){if(!active())return;
         if(event.isCanceled()||!(event.getPlayer() instanceof ServerPlayer player))return;MineDefinition mine=SimpleServerUtilities.MINES.at(player.level(),event.getPos());if(mine!=null&&canUse(player,mine))SimpleServerUtilities.MINES.blockMined(mine,player,event.getState());
     }
 
     /** Applies mine-local drop, XP and Fortune/Silk rules after vanilla has calculated the drop result. */
     @SubscribeEvent(priority=EventPriority.LOWEST)
-    public static void onDrops(BlockDropsEvent event){
+    public static void onDrops(BlockDropsEvent event){if(!active())return;
         if(!(event.getBreaker() instanceof ServerPlayer player))return;MineDefinition mine=SimpleServerUtilities.MINES.at(event.getLevel(),event.getPos());if(mine==null||!canUse(player,mine))return;
         if("NONE".equals(mine.dropMode))event.getDrops().clear();
         else if("CUSTOM".equals(mine.dropMode))replaceWithCustomDrops(event,mine);
@@ -100,12 +102,12 @@ public final class MineEvents {
     }
 
     @SubscribeEvent(priority=EventPriority.HIGHEST)
-    public static void onPlace(BlockEvent.EntityPlaceEvent event){if(!(event.getEntity() instanceof ServerPlayer player)||PermissionService.isAdmin(player))return;MineDefinition mine=SimpleServerUtilities.MINES.at(player.level(),event.getPos());if(mine!=null)event.setCanceled(true);}
+    public static void onPlace(BlockEvent.EntityPlaceEvent event){if(!active())return;if(!(event.getEntity() instanceof ServerPlayer player)||PermissionService.isAdmin(player))return;MineDefinition mine=SimpleServerUtilities.MINES.at(player.level(),event.getPos());if(mine!=null)event.setCanceled(true);}
 
-    @SubscribeEvent public static void onTick(ServerTickEvent.Post event){SimpleServerUtilities.MINES.tick(event.getServer());}
-    @SubscribeEvent public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event){if(event.getEntity() instanceof ServerPlayer player)SimpleServerUtilities.MINE_SETUP_TOOLS.forget(player.getUUID());}
+    @SubscribeEvent public static void onTick(ServerTickEvent.Post event){if(active())SimpleServerUtilities.MINES.tick(event.getServer());}
+    @SubscribeEvent public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event){if(active()&&event.getEntity() instanceof ServerPlayer player)SimpleServerUtilities.MINE_SETUP_TOOLS.forget(player.getUUID());}
 
-    private static boolean canUse(ServerPlayer p,MineDefinition d){if(SimpleServerUtilities.MODERATION.jailed(p.getUUID()))return PermissionService.getBooleanForJailGameplay(p,PermissionKeys.MINES_USE,true)&&(d.permissionKey.isBlank()||PermissionService.getBooleanForJailGameplay(p,d.permissionKey,false));return PermissionService.isAdmin(p)||(PermissionService.getBoolean(p,PermissionKeys.MINES_USE,true)&&(d.permissionKey.isBlank()||PermissionService.getBoolean(p,d.permissionKey,false)));}
-    private static boolean canAdmin(ServerPlayer p){return PermissionService.isAdmin(p)&&PermissionService.getBoolean(p,PermissionKeys.MINES_ADMIN,false);}
+    private static boolean canUse(ServerPlayer p,MineDefinition d){if(moderated(p))return PermissionService.getBooleanForJailGameplay(p,PermissionKeys.MINES_USE,true)&&(d.permissionKey.isBlank()||PermissionService.getBooleanForJailGameplay(p,d.permissionKey,false));return PermissionService.isAdmin(p)||(PermissionService.getBoolean(p,PermissionKeys.MINES_USE,true)&&(d.permissionKey.isBlank()||PermissionService.getBoolean(p,d.permissionKey,false)));}
+    private static boolean canAdmin(ServerPlayer p){return active()&&PermissionService.isAdmin(p)&&PermissionService.getBoolean(p,PermissionKeys.MINES_ADMIN,false);}
     private static String format(net.minecraft.core.BlockPos p){return p.getX()+", "+p.getY()+", "+p.getZ();}
 }

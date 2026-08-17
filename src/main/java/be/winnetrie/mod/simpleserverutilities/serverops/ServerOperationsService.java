@@ -13,11 +13,13 @@ public final class ServerOperationsService {
     private ServerOperationsService() { }
 
     public static void request(ServerOperationsRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("server_operations")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         send(player, payload.admin(), payload.requestId(), "", false);
     }
 
     public static void action(ServerOperationsActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("server_operations")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         boolean admin = payload.admin();
         String action = payload.action();

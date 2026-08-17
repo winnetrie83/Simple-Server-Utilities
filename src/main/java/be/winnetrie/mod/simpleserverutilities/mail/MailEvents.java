@@ -15,7 +15,7 @@ public final class MailEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (!Config.ENABLE_MAIL.get()) {
+        if (!SimpleServerUtilities.CORE.modules().isActive("mail")) {
             nextMaintenanceTick = 0L;
             return;
         }
@@ -35,7 +35,7 @@ public final class MailEvents {
 
     @SubscribeEvent
     public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
-        if (Config.ENABLE_MAIL.get() && event.getEntity() instanceof ServerPlayer player) {
+        if (SimpleServerUtilities.CORE.modules().isActive("mail") && event.getEntity() instanceof ServerPlayer player) {
             SimpleServerUtilities.MAIL.ensurePlayer(player);
         }
     }

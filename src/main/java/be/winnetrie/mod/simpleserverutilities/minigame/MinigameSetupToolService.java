@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.command.RegionCommands;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupToolConfigurePayload;
@@ -88,6 +89,7 @@ public final class MinigameSetupToolService {
     }
 
     public static void handleConfigure(MinigameSetupToolConfigurePayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("minigames")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> configure(player, payload));
     }
@@ -126,7 +128,7 @@ public final class MinigameSetupToolService {
                 case "clear_point" -> {
                     session.clearPoint();
                     RegionCommands.getSelectionManager().clear(player);
-                    SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+                    if(SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
                     open(player, "The pending first corner was cleared.", false, payload.requestId());
                 }
                 case "give_tool" -> {
@@ -158,7 +160,7 @@ public final class MinigameSetupToolService {
                         throw new IllegalArgumentException("Wait for the arena snapshot capture to finish first.");
                     }
                     String result = SimpleServerUtilities.MINIGAMES.restoreArenaSnapshot(definition.id, arena.id);
-                    SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "minigame.arena_restore", definition.id + "/" + arena.id, result);
+                    if(SsuModuleAccess.active("server_operations")) SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "minigame.arena_restore", definition.id + "/" + arena.id, result);
                     open(player, result, false, payload.requestId());
                 }
                 case "teleport_issue" -> {
@@ -173,14 +175,14 @@ public final class MinigameSetupToolService {
                     MinigameArenaDefinition clone = cloneArena(definition, source);
                     saveTarget(definition);
                     session.configure(definition.id, clone.id, MinigameSetupAction.ARENA_BOUNDS, 1, 0);
-                    SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "minigame.arena_clone", definition.id + "/" + source.id, clone.id);
+                    if(SsuModuleAccess.active("server_operations")) SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "minigame.arena_clone", definition.id + "/" + source.id, clone.id);
                     open(player, "Arena template cloned. Link or create a new region before enabling it.", false, payload.requestId());
                 }
                 case "export_arena" -> {
                     MinigameDefinition definition = targetDefinition(session);
                     MinigameArenaDefinition arena = targetArena(definition, session);
                     Path exported = exportArena(player.level().getServer(), definition, arena);
-                    SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "minigame.arena_export", definition.id + "/" + arena.id, exported.getFileName().toString());
+                    if(SsuModuleAccess.active("server_operations")) SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "minigame.arena_export", definition.id + "/" + arena.id, exported.getFileName().toString());
                     open(player, "Arena exported to " + exported.getFileName() + ".", false, payload.requestId());
                 }
                 case "import_arena" -> {
@@ -189,7 +191,7 @@ public final class MinigameSetupToolService {
                     MinigameArenaDefinition imported = importArena(player.level().getServer(), definition, selectedArena);
                     saveTarget(definition);
                     session.configure(definition.id, imported.id, MinigameSetupAction.ARENA_BOUNDS, 1, 0);
-                    SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "minigame.arena_import", definition.id, imported.id);
+                    if(SsuModuleAccess.active("server_operations")) SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "minigame.arena_import", definition.id, imported.id);
                     open(player, "Arena import added as a disabled template. Configure a unique region before enabling it.",
                             false, payload.requestId());
                 }
@@ -251,7 +253,7 @@ public final class MinigameSetupToolService {
             selections.setPoint2(player, clicked);
             player.sendSystemMessage(Component.literal("New arena bounds selected. Right-click the Setup Tool and choose Create new game."), true);
         }
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, selections.getSelection(player));
+        if(SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, selections.getSelection(player));
         session.clearPoint();
     }
 

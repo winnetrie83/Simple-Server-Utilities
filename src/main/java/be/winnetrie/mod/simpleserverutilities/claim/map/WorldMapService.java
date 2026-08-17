@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.mapmarker.MapMarkerService;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapRequestPayload;
@@ -70,7 +71,7 @@ public final class WorldMapService {
                 claims,
                 regions
         ));
-        MapMarkerService.sync(player);
+        if (SsuModuleAccess.active("map_markers")) MapMarkerService.sync(player);
     }
 
     private static List<WorldMapDataPayload.ClaimOverlay> collectClaims(
@@ -80,6 +81,7 @@ public final class WorldMapService {
             int centerChunkZ,
             int radius
     ) {
+        if (!SsuModuleAccess.active("claims")) return List.of();
         List<WorldMapDataPayload.ClaimOverlay> result = new ArrayList<>();
         for (var claim : SimpleServerUtilities.PLAYER_CLAIMS.getClaims()) {
             if (!dimension.equals(claim.getDimension())) {
@@ -110,6 +112,7 @@ public final class WorldMapService {
             int centerChunkZ,
             int radius
     ) {
+        if (!SsuModuleAccess.active("regions")) return List.of();
         int minBlockX = (centerChunkX - radius) << 4;
         int minBlockZ = (centerChunkZ - radius) << 4;
         int maxBlockX = ((centerChunkX + radius + 1) << 4) - 1;

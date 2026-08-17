@@ -22,6 +22,7 @@ import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimChunkStatus;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapBatchResult;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapChunk;
@@ -116,7 +117,9 @@ public class PlayerClaimManager {
 
         try {
             saveSplitClaims();
-            SimpleServerUtilities.BORDER_VISUALIZATIONS.markClaimsChanged();
+            if (SsuModuleAccess.active("visualization")) {
+                SimpleServerUtilities.BORDER_VISUALIZATIONS.markClaimsChanged();
+            }
         } catch (IOException e) {
             SimpleServerUtilities.LOGGER.error("Failed to save player claim groups.", e);
         }
@@ -145,7 +148,7 @@ public class PlayerClaimManager {
     }
 
     public ClaimOperationResult createClaimGroupResult(ServerPlayer player, String name) {
-        if (!Config.ENABLE_PLAYER_CLAIMS.get()) {
+        if (!SsuModuleAccess.active("claims")) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.PLAYER_CLAIMS_DISABLED,
                     ""
@@ -194,7 +197,7 @@ public class PlayerClaimManager {
     }
 
     public ClaimOperationResult createClaimGroupResult(Level level, String name, UUID owner) {
-        if (!Config.ENABLE_PLAYER_CLAIMS.get()) {
+        if (!SsuModuleAccess.active("claims")) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.PLAYER_CLAIMS_DISABLED,
                     ""
@@ -250,7 +253,9 @@ public class PlayerClaimManager {
 
     private boolean deleteClaimUnchecked(PlayerClaim claim) {
         if (claim == null) return false;
-        int removedHomes = SimpleServerUtilities.HOMES.deleteHomesInClaim(claim.getOwner(), claim);
+        int removedHomes = SsuModuleAccess.active("homes")
+                ? SimpleServerUtilities.HOMES.deleteHomesInClaim(claim.getOwner(), claim)
+                : 0;
         for (ClaimChunk chunk : claim.getChunks()) {
             chunkIndex.remove(createKey(claim.getDimension(), chunk.getX(), chunk.getZ()));
         }
@@ -273,7 +278,7 @@ public class PlayerClaimManager {
     }
 
     public ClaimOperationResult claimChunkResult(ServerPlayer player, ChunkPos chunkPos, String claimName) {
-        if (!Config.ENABLE_PLAYER_CLAIMS.get()) {
+        if (!SsuModuleAccess.active("claims")) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.PLAYER_CLAIMS_DISABLED,
                     ""
@@ -342,7 +347,7 @@ public class PlayerClaimManager {
         int minZ = chunkPos.getMinBlockZ();
         int maxZ = chunkPos.getMaxBlockZ();
 
-        if (SimpleServerUtilities.REGIONS.overlaps2D(
+        if (SsuModuleAccess.active("regions") && SimpleServerUtilities.REGIONS.overlaps2D(
                 level.dimension(),
                 minX,
                 minZ,
@@ -374,7 +379,7 @@ public class PlayerClaimManager {
     }
 
     public ClaimOperationResult claimChunkResult(Level level, ChunkPos chunkPos, UUID owner, String claimName) {
-        if (!Config.ENABLE_PLAYER_CLAIMS.get()) {
+        if (!SsuModuleAccess.active("claims")) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.PLAYER_CLAIMS_DISABLED,
                     ""
@@ -439,7 +444,7 @@ public class PlayerClaimManager {
         int minZ = chunkPos.getMinBlockZ();
         int maxZ = chunkPos.getMaxBlockZ();
 
-        if (SimpleServerUtilities.REGIONS.overlaps2D(
+        if (SsuModuleAccess.active("regions") && SimpleServerUtilities.REGIONS.overlaps2D(
                 level.dimension(),
                 minX,
                 minZ,
@@ -473,7 +478,7 @@ public class PlayerClaimManager {
             String rawClaimName,
             Collection<ChunkPos> requestedChunks
     ) {
-        if (!Config.ENABLE_PLAYER_CLAIMS.get()) {
+        if (!SsuModuleAccess.active("claims")) {
             return ClaimMapBatchResult.failure(ClaimOperationResult.fail(
                     ClaimOperationResult.Type.PLAYER_CLAIMS_DISABLED,
                     ""
@@ -677,8 +682,9 @@ public class PlayerClaimManager {
             chunkIndex.remove(createKey(dimension, chunkPos.x(), chunkPos.z()));
             removedClaimChunks.add(new ClaimChunk(chunkPos.x(), chunkPos.z()));
         }
-        int removedHomes = SimpleServerUtilities.HOMES.deleteHomesInChunks(
-                claim.getOwner(), dimension, removedClaimChunks);
+        int removedHomes = SsuModuleAccess.active("homes")
+                ? SimpleServerUtilities.HOMES.deleteHomesInChunks(claim.getOwner(), dimension, removedClaimChunks)
+                : 0;
         save();
         if (removedHomes > 0) {
             SimpleServerUtilities.LOGGER.info(
@@ -715,7 +721,7 @@ public class PlayerClaimManager {
     }
 
     private boolean overlapsRegion(Level level, ChunkPos chunkPos) {
-        return SimpleServerUtilities.REGIONS.overlaps2D(
+        return SsuModuleAccess.active("regions") && SimpleServerUtilities.REGIONS.overlaps2D(
                 level.dimension(),
                 chunkPos.getMinBlockX(),
                 chunkPos.getMinBlockZ(),
@@ -1462,7 +1468,9 @@ public class PlayerClaimManager {
                 ClaimPolicy.getMaxChunksPerClaim(player, context),
                 ClaimPolicy.canCreateClaim(player, context),
                 selectedClaim != null && SimpleServerUtilities.CLAIM_TAX.requiresDeleteSettlement(selectedClaim),
-                selectedClaim == null ? "" : SimpleServerUtilities.ECONOMY.format(SimpleServerUtilities.CLAIM_TAX.claimTax(selectedClaim)),
+                selectedClaim == null ? "" : (SsuModuleAccess.active("economy")
+                        ? SimpleServerUtilities.ECONOMY.format(SimpleServerUtilities.CLAIM_TAX.claimTax(selectedClaim))
+                        : "Economy unavailable"),
                 selectedClaim == null ? 0 : selectedClaim.getTaxPeakChunks(),
                 selectedClaim == null ? 0L : selectedClaim.getTaxDueAt(),
                 SimpleServerUtilities.PLAYER_CLAIMS.getConfiscatedChunks(player.getUUID()),

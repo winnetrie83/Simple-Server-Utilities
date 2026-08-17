@@ -1,5 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.economy;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import java.util.Set;
 
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModule;
@@ -19,14 +20,13 @@ public final class EconomyModule implements SsuModule {
         return "economy";
     }
 
-    @Override
-    public Set<String> dependencies() {
-        return Set.of("storage", "transactions");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage", "transactions"); }
+    @Override public boolean isEnabled() { return Config.ENABLE_ECONOMY.get(); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {
         services.register(EconomyManager.class, manager);
+        services.register(EconomyProvider.class, manager);
         services.register(EconomyService.class, manager);
     }
 

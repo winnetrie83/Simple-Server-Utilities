@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.command.RegionCommands;
 import be.winnetrie.mod.simpleserverutilities.content.ContentId;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobScheduler;
@@ -46,6 +47,7 @@ public final class MinigameSelectionService {
     }
 
     public static void handleCreate(MinigameSelectionCreatePayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("minigames")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> create(player, payload));
     }
@@ -169,7 +171,7 @@ public final class MinigameSelectionService {
             }
             if (actor != null) {
                 RegionCommands.getSelectionManager().clear(actor);
-                SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(actor);
+                if(SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(actor);
                 String label = MinigameGameType.parse(definition.gameType).label();
                 send(actor, true, label + " arena created and snapshotted. Review the settings, then enable the minigame.", requestId);
                 MinigameEditorService.open(actor, minigameId);

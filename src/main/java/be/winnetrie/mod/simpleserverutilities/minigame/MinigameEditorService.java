@@ -22,11 +22,13 @@ public final class MinigameEditorService {
     }
 
     public static void handleRequest(MinigameEditorRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("minigames")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> open(player, payload.minigameId(), payload.requestId()));
     }
 
     public static void handleSubmit(MinigameEditorSubmitPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("minigames")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> {
             if (!canAdmin(player)) {
@@ -47,6 +49,7 @@ public final class MinigameEditorService {
     }
 
     public static void handleRewardCapture(MinigameRewardCapturePayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("minigames")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> {
             if (!canAdmin(player)) {

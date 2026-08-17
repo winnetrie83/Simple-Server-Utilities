@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.protection;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameSetupToolService;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.core.BlockPos;
@@ -31,6 +32,7 @@ public class ClaimProtectionEvents {
 
     @SubscribeEvent
     public static void onBlockBreak(BreakBlockEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         if (!(event.getPlayer() instanceof ServerPlayer player)) {
             return;
         }
@@ -50,6 +52,7 @@ public class ClaimProtectionEvents {
 
     @SubscribeEvent
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
@@ -69,6 +72,7 @@ public class ClaimProtectionEvents {
 
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
@@ -86,7 +90,9 @@ public class ClaimProtectionEvents {
         }
 
         if (player.level().getBlockState(event.getPos()).getBlock() instanceof SignBlock) {
-            Region region = SimpleServerUtilities.REGIONS.getAt(player.level().dimension(), event.getPos());
+            Region region = SsuModuleAccess.active("regions")
+                    ? SimpleServerUtilities.REGIONS.getAt(player.level().dimension(), event.getPos())
+                    : null;
 
             if (region != null && region.getRentData().isRentable()) {
                 return;
@@ -119,6 +125,7 @@ public class ClaimProtectionEvents {
     }
     @SubscribeEvent
     public static void onItemPickup(ItemEntityPickupEvent.Pre event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         if (!(event.getPlayer() instanceof ServerPlayer player)) return;
         if (!ProtectionHelper.canTransferClaimItems(player, player.level(), event.getItemEntity().blockPosition())) {
             event.setCanPickup(TriState.FALSE);
@@ -127,6 +134,7 @@ public class ClaimProtectionEvents {
 
     @SubscribeEvent
     public static void onItemToss(ItemTossEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         if (!(event.getPlayer() instanceof ServerPlayer player)) return;
         if (ProtectionHelper.canTransferClaimItems(player, player.level(), event.getEntity().blockPosition())) return;
         var stack = event.getEntity().getItem().copy();
@@ -146,6 +154,7 @@ public class ClaimProtectionEvents {
      */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             suppressUnauthorizedPressurePlate(player, player.blockPosition());
             suppressUnauthorizedPressurePlate(player, player.blockPosition().below());

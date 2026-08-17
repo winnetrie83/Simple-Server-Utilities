@@ -8,6 +8,7 @@ public class FireProtectionEvents {
 
     @SubscribeEvent
     public static void onFluidPlaceBlock(BlockEvent.FluidPlaceBlockEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         if (!event.getNewState().is(Blocks.FIRE)) {
             return;
         }

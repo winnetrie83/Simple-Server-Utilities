@@ -7,8 +7,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.core.transaction.SsuTransactionManager;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionCatalog;
 import be.winnetrie.mod.simpleserverutilities.permission.PlayerPermissionData;
@@ -211,7 +211,7 @@ public final class ContentActionEngine {
         register("set_permission", (action, context, data) -> permissionStep(action, context, false));
         register("grant_permission", (action, context, data) -> permissionStep(action, context, true));
         register("unset_permission", (action, context, data) -> {
-            if (!Config.ENABLE_PERMISSION_SYSTEM.get()) {
+            if (!SsuModuleAccess.active("permissions")) {
                 throw new IllegalArgumentException("The permission system is disabled.");
             }
             ServerPlayer player = requirePlayer(context);
@@ -224,7 +224,7 @@ public final class ContentActionEngine {
     }
 
     private static PreparedContentAction permissionStep(ContentAction action, ContentActionContext context, boolean grantAlias) {
-        if (!Config.ENABLE_PERMISSION_SYSTEM.get()) {
+        if (!SsuModuleAccess.active("permissions")) {
             throw new IllegalArgumentException("The permission system is disabled.");
         }
         ServerPlayer player = requirePlayer(context);

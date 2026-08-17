@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.MinimapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinimapRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
@@ -74,6 +75,7 @@ public final class MinimapService {
             int centerChunkX,
             int centerChunkZ
     ) {
+        if (!SsuModuleAccess.active("claims")) return List.of();
         List<MinimapDataPayload.ClaimOverlay> result = new ArrayList<>();
         for (var claim : SimpleServerUtilities.PLAYER_CLAIMS.getClaims()) {
             if (!dimension.equals(claim.getDimension())) {
@@ -103,6 +105,7 @@ public final class MinimapService {
             int centerChunkX,
             int centerChunkZ
     ) {
+        if (!SsuModuleAccess.active("regions")) return List.of();
         int minBlockX = (centerChunkX - CHUNK_RADIUS) << 4;
         int minBlockZ = (centerChunkZ - CHUNK_RADIUS) << 4;
         int maxBlockX = ((centerChunkX + CHUNK_RADIUS + 1) << 4) - 1;

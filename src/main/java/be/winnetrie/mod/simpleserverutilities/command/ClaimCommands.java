@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapData;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapService;
@@ -42,7 +43,7 @@ public class ClaimCommands {
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("claims")
-                .requires(source -> Config.ENABLE_PLAYER_CLAIMS.get() && source.getEntity() instanceof ServerPlayer)
+                .requires(source -> SsuModuleAccess.active("claims") && source.getEntity() instanceof ServerPlayer)
 
                 .then(Commands.literal("help")
                         .executes(context -> help(context.getSource())))
@@ -214,6 +215,7 @@ public class ClaimCommands {
     }
 
     private static int create(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
@@ -238,6 +240,7 @@ public class ClaimCommands {
     }
 
     private static int delete(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!ClaimPolicy.canDeleteClaim(player)) {
@@ -268,12 +271,13 @@ public class ClaimCommands {
             return 0;
         }
 
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownClaim(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownClaim(player);
         player.sendSystemMessage(Component.literal("Claim '" + name + "' deleted."));
         return 1;
     }
 
     private static int list(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
@@ -304,6 +308,7 @@ public class ClaimCommands {
     }
 
     private static int info(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), name);
@@ -318,6 +323,7 @@ public class ClaimCommands {
     }
 
     private static int claimChunk(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
@@ -340,12 +346,13 @@ public class ClaimCommands {
             return 0;
         }
 
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownClaim(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownClaim(player);
         player.sendSystemMessage(Component.literal("Chunk " + chunkPos.x() + ", " + chunkPos.z() + " added to claim '" + name + "'."));
         return 1;
     }
 
     private static int unclaim(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         ChunkPos chunkPos = player.chunkPosition();
 
@@ -363,12 +370,13 @@ public class ClaimCommands {
             return 0;
         }
 
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownClaim(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownClaim(player);
         player.sendSystemMessage(Component.literal("Chunk " + chunkPos.x() + ", " + chunkPos.z() + " unclaimed."));
         return 1;
     }
 
     private static int trust(CommandSourceStack source, String playerName, String claimName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
 
@@ -407,6 +415,7 @@ public class ClaimCommands {
     }
 
     private static int untrust(CommandSourceStack source, String playerName, String claimName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
 
@@ -440,6 +449,7 @@ public class ClaimCommands {
     }
 
     private static int setFlag(CommandSourceStack source, String claimName, String flag, boolean value) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
 
@@ -484,6 +494,7 @@ public class ClaimCommands {
     }
 
     private static int flagInfo(CommandSourceStack source, String claimName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
 
@@ -497,6 +508,7 @@ public class ClaimCommands {
     }
 
     private static int setMessage(CommandSourceStack source, String claimName, String message) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
 
@@ -518,6 +530,7 @@ public class ClaimCommands {
     }
 
     private static int teleportToOwnClaim(CommandSourceStack source, String claimName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
 
@@ -537,6 +550,7 @@ public class ClaimCommands {
     }
 
     private static int adminList(CommandSourceStack source, String playerName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer executor = (ServerPlayer) source.getEntity();
         Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
 
@@ -566,6 +580,7 @@ public class ClaimCommands {
     }
 
     private static int adminInfo(CommandSourceStack source, String playerName, String claimName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer executor = (ServerPlayer) source.getEntity();
         Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
 
@@ -586,6 +601,7 @@ public class ClaimCommands {
     }
 
     private static int adminTeleport(CommandSourceStack source, String playerName, String claimName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer executor = (ServerPlayer) source.getEntity();
         Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
 
@@ -605,6 +621,7 @@ public class ClaimCommands {
     }
 
     private static int adminDelete(CommandSourceStack source, String playerName, String claimName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer executor = (ServerPlayer) source.getEntity();
         Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
 
@@ -777,6 +794,7 @@ public class ClaimCommands {
     }
 
     private static int help(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         source.sendSystemMessage(Component.literal("Claim commands:"));
         source.sendSystemMessage(Component.literal(" - /claims create <name>"));
         source.sendSystemMessage(Component.literal(" - /claims delete <name>"));
@@ -869,6 +887,7 @@ public class ClaimCommands {
 
 
     private static int showClaimBoundary(CommandSourceStack source, String claimName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!ClaimPolicy.canVisualizeClaims(player)) {
@@ -888,7 +907,7 @@ public class ClaimCommands {
             return 0;
         }
 
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showClaim(player, claim);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showClaim(player, claim);
         boolean enabled = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID()).isClaimBordersVisible();
         player.sendSystemMessage(Component.literal(enabled
                 ? "Showing border for claim '" + claim.getDisplayName() + "'. Use /claims hide to clear selected claim borders."
@@ -898,13 +917,15 @@ public class ClaimCommands {
     }
 
     private static int hideClaimBoundary(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player);
         player.sendSystemMessage(Component.literal("All individually selected claim borders are hidden."));
         return 1;
     }
 
     private static int mapText(CommandSourceStack source, String claimName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!ClaimPolicy.canUseMap(player)) {
@@ -978,6 +999,7 @@ public class ClaimCommands {
     }
 
     private static int gui(CommandSourceStack source, String claimName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!ClaimPolicy.canUseMap(player)) {
@@ -993,5 +1015,11 @@ public class ClaimCommands {
 
         ClaimMapService.open(player, claimName);
         return 1;
+    }
+
+    private static boolean requireModule(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("claims")) return true;
+        source.sendFailure(Component.literal("Player Claims is disabled or blocked by a required dependency."));
+        return false;
     }
 }

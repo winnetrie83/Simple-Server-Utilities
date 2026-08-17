@@ -1,5 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.spawn;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import java.util.Set;
 
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModule;
@@ -20,10 +21,9 @@ public final class SpawnModule implements SsuModule {
         return "spawn";
     }
 
-    @Override
-    public Set<String> dependencies() {
-        return Set.of("storage", "permissions", "teleport");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage"); }
+    @Override public boolean isEnabled() { return Config.ENABLE_SPAWN.get(); }
+    @Override public Set<String> optionalDependencies() { return Set.of("permissions", "teleport", "minigames", "dungeons"); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

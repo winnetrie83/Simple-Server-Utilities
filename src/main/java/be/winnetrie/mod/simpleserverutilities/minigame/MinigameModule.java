@@ -21,7 +21,9 @@ public final class MinigameModule implements SsuModule {
 
     @Override public String id() { return "minigames"; }
     @Override public boolean isEnabled() { return Config.ENABLE_MINIGAMES.get(); }
-    @Override public Set<String> dependencies() { return Set.of("content_core", "storage", "permissions"); }
+    @Override public Set<String> requiredDependencies() { return Set.of("content_core", "storage", "regions", "jobs"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("permissions", "moderation", "onboarding", "visualization", "server_operations", "mail", "economy"); }
+    @Override public Set<String> integrationDependencies() { return Set.of("npcs", "quests", "economy", "mail", "visualization"); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

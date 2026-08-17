@@ -22,15 +22,10 @@ public final class HomeModule implements SsuModule {
         return "homes";
     }
 
-    @Override
-    public boolean isEnabled() {
-        return Config.ENABLE_HOMES.get();
-    }
+    @Override public boolean isEnabled() { return Config.ENABLE_HOMES.get(); }
 
-    @Override
-    public Set<String> dependencies() {
-        return Set.of("storage");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("claims", "permissions", "teleport"); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

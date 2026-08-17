@@ -16,6 +16,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyResult;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyTransactionType;
@@ -109,7 +110,7 @@ public class WarpManager {
                     ? RentalResult.fail("You already rent that warp. Use its Move here button instead.")
                     : RentalResult.fail("That warp name is already in use.");
         }
-        if (!SimpleServerUtilities.ECONOMY.settings().isEnabled()) {
+        if (!SsuModuleAccess.active("economy") || !SimpleServerUtilities.ECONOMY.isEnabled()) {
             return RentalResult.fail("The economy is disabled, so a prepaid warp rental cannot be created.");
         }
         int maximum = WarpPolicy.getMaxRentedWarps(player, context);
@@ -210,7 +211,7 @@ public class WarpManager {
 
     /** Renews expired rentals or permanently frees their names when payment fails. */
     public synchronized void maintenanceTick() {
-        if (server == null || warps.isEmpty() || !SimpleServerUtilities.ECONOMY.settings().isEnabled()) return;
+        if (server == null || warps.isEmpty() || !SsuModuleAccess.active("economy") || !SimpleServerUtilities.ECONOMY.isEnabled()) return;
         long now = System.currentTimeMillis(); boolean changed = false;
         List<Warp> expired = warps.values().stream().filter(Warp::isPlayerRental)
                 .filter(warp -> warp.getPaidUntil() > 0L && warp.getPaidUntil() <= now).toList();

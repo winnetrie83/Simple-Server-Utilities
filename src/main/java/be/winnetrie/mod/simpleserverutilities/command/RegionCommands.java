@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.command;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionCatalog;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.RegionPolicy;
@@ -57,7 +58,7 @@ public class RegionCommands {
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("regions")
-                .requires(source -> Config.ENABLE_ADMIN_REGIONS.get() && source.getEntity() instanceof ServerPlayer)
+                .requires(source -> SsuModuleAccess.active("regions") && source.getEntity() instanceof ServerPlayer)
 
                 .then(Commands.literal("help")
                         .executes(context -> help(context.getSource())))
@@ -442,16 +443,19 @@ public class RegionCommands {
     }
 
     private static int setPoint1ToCurrentPosition(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         return setPoint1(source, player.blockPosition());
     }
 
     private static int setPoint2ToCurrentPosition(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         return setPoint2(source, player.blockPosition());
     }
 
     private static int setPoint1(CommandSourceStack source, BlockPos pos) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -459,12 +463,13 @@ public class RegionCommands {
         }
 
         SELECTIONS.setPoint1(player, pos);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, SELECTIONS.getSelection(player));
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, SELECTIONS.getSelection(player));
         player.sendSystemMessage(Component.literal("Region point 1 set to " + formatPos(pos) + "."));
         return 1;
     }
 
     private static int setPoint2(CommandSourceStack source, BlockPos pos) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -472,12 +477,13 @@ public class RegionCommands {
         }
 
         SELECTIONS.setPoint2(player, pos);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, SELECTIONS.getSelection(player));
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, SELECTIONS.getSelection(player));
         player.sendSystemMessage(Component.literal("Region point 2 set to " + formatPos(pos) + "."));
         return 1;
     }
 
     private static int create(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canCreateRegions(player)) {
@@ -497,7 +503,7 @@ public class RegionCommands {
             case SUCCESS -> {
                 player.sendSystemMessage(Component.literal("Region '" + name + "' created."));
                 SELECTIONS.clear(player);
-                SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+                if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
                 return 1;
             }
 
@@ -525,6 +531,7 @@ public class RegionCommands {
     }
 
     private static int delete(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canDeleteRegions(player)) {
@@ -560,12 +567,13 @@ public class RegionCommands {
             return 0;
         }
 
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownRegion(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownRegion(player);
         player.sendSystemMessage(Component.literal("Region '" + name + "' deleted."));
         return 1;
     }
 
     private static int info(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         Region region = SimpleServerUtilities.REGIONS.get(name);
 
@@ -595,7 +603,7 @@ public class RegionCommands {
         source.sendSystemMessage(Component.literal("Global renting enabled: " + SimpleServerUtilities.REGIONS.isRentingEnabled()));
         source.sendSystemMessage(Component.literal("Rentable: " + rentData.isRentable()));
         source.sendSystemMessage(Component.literal("Rented: " + rentData.isRented()));
-        source.sendSystemMessage(Component.literal("Rent amount: " + formatMoney(rentData.getPriceMinor(SimpleServerUtilities.ECONOMY.settings()))));
+        source.sendSystemMessage(Component.literal("Rent amount: " + formatRentPrice(rentData)));
         source.sendSystemMessage(Component.literal("Rent period days: " + rentData.getPeriodDays()));
         source.sendSystemMessage(Component.literal("Reset on expire: " + rentData.isResetOnExpire()));
         source.sendSystemMessage(Component.literal("Reset on unrent: " + rentData.isResetOnUnrent()));
@@ -623,6 +631,7 @@ public class RegionCommands {
 
 
     private static int list(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         boolean admin = isOp(player);
         int count = 0;
@@ -648,6 +657,7 @@ public class RegionCommands {
 
 
     private static int listRentals(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         boolean admin = isOp(player);
 
@@ -680,6 +690,7 @@ public class RegionCommands {
 
 
     private static int addManager(CommandSourceStack source, String name, String playerName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -708,6 +719,7 @@ public class RegionCommands {
     }
 
     private static int removeManager(CommandSourceStack source, String name, String playerName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -736,6 +748,7 @@ public class RegionCommands {
     }
 
     private static int addMember(CommandSourceStack source, String name, String playerName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -764,6 +777,7 @@ public class RegionCommands {
     }
 
     private static int removeMember(CommandSourceStack source, String name, String playerName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -792,6 +806,7 @@ public class RegionCommands {
     }
 
     private static int rent(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         Region region = SimpleServerUtilities.REGIONS.get(name);
 
@@ -811,7 +826,9 @@ public class RegionCommands {
 
 
     private static int unrent(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!requireEconomy(player)) return 0;
         Region region = SimpleServerUtilities.REGIONS.get(name);
 
         if (region == null) {
@@ -853,7 +870,9 @@ public class RegionCommands {
 
 
     private static int setRent(CommandSourceStack source, String name, String amountText, int days) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!requireEconomy(player)) return 0;
 
         if (!canEditRegions(player)) {
             return 0;
@@ -899,6 +918,7 @@ public class RegionCommands {
 
 
     private static int setRentable(CommandSourceStack source, String name, boolean value) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -931,6 +951,7 @@ public class RegionCommands {
 
 
     private static int myRentals(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         int count = 0;
 
@@ -954,7 +975,9 @@ public class RegionCommands {
     }
 
     private static int rentAccept(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!requireEconomy(player)) return 0;
         Region region = SimpleServerUtilities.REGIONS.get(name);
 
         if (region == null) {
@@ -973,13 +996,16 @@ public class RegionCommands {
     }
 
     private static int rentDecline(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         player.sendSystemMessage(Component.literal("Rent offer declined for region '" + name + "'."));
         return 1;
     }
 
     private static int confirmUnrent(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!requireEconomy(player)) return 0;
         Region region = SimpleServerUtilities.REGIONS.get(name);
 
         if (region == null) {
@@ -1000,7 +1026,9 @@ public class RegionCommands {
     }
 
     private static int extendOffer(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!requireEconomy(player)) return 0;
         Region region = SimpleServerUtilities.REGIONS.get(name);
         if (region == null) {
             player.sendSystemMessage(Component.literal("Region not found: " + name));
@@ -1028,7 +1056,9 @@ public class RegionCommands {
     }
 
     private static int extendRent(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!requireEconomy(player)) return 0;
         Region region = SimpleServerUtilities.REGIONS.get(name);
 
         if (region == null) {
@@ -1042,7 +1072,9 @@ public class RegionCommands {
     }
 
     private static int setRentPrice(CommandSourceStack source, String name, String amountText) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!requireEconomy(player)) return 0;
 
         if (!canEditRegions(player)) {
             return 0;
@@ -1074,6 +1106,7 @@ public class RegionCommands {
     }
 
     private static int setRentPeriod(CommandSourceStack source, String name, int days) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1099,6 +1132,7 @@ public class RegionCommands {
     }
 
     private static int addRentTime(CommandSourceStack source, String name, int days) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1118,6 +1152,7 @@ public class RegionCommands {
     }
 
     private static int pauseRent(CommandSourceStack source, String name, boolean value) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1137,6 +1172,7 @@ public class RegionCommands {
     }
 
     private static int setResetOnExpire(CommandSourceStack source, String name, boolean value) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1157,6 +1193,7 @@ public class RegionCommands {
     }
 
     private static int setResetOnUnrent(CommandSourceStack source, String name, boolean value) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1177,6 +1214,7 @@ public class RegionCommands {
     }
 
     private static int setWelcomeMessage(CommandSourceStack source, String name, String message) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         Region region = SimpleServerUtilities.REGIONS.get(name);
 
@@ -1199,6 +1237,7 @@ public class RegionCommands {
     }
 
     private static int setLeaveMessage(CommandSourceStack source, String name, String message) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         Region region = SimpleServerUtilities.REGIONS.get(name);
 
@@ -1221,6 +1260,7 @@ public class RegionCommands {
     }
 
     private static int clearSelection(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1228,12 +1268,13 @@ public class RegionCommands {
         }
 
         SELECTIONS.clear(player);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
         player.sendSystemMessage(Component.literal("Region selection cleared."));
         return 1;
     }
 
     private static int bindSelectionTool(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!RegionPolicy.canUseSelectionTool(player)) {
@@ -1253,6 +1294,7 @@ public class RegionCommands {
     }
 
     private static int unbindSelectionTool(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!RegionPolicy.canUseSelectionTool(player)) {
@@ -1266,6 +1308,7 @@ public class RegionCommands {
     }
 
     private static int fillSelection(CommandSourceStack source, String blocks) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1320,6 +1363,7 @@ public class RegionCommands {
     }
 
     private static int regenerateSelection(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1332,6 +1376,7 @@ public class RegionCommands {
     }
 
     private static int showRegionBoundary(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1353,6 +1398,7 @@ public class RegionCommands {
     }
 
     private static int hideRegionBoundary(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1371,6 +1417,7 @@ public class RegionCommands {
     }
 
     private static int hideAllRegionBoundaries(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         if (!canEditRegions(player)) {
             return 0;
@@ -1381,6 +1428,7 @@ public class RegionCommands {
     }
 
     private static int setFlag(CommandSourceStack source, String name, String flag, boolean value) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1419,6 +1467,7 @@ public class RegionCommands {
     }
 
     private static int listPermissionOverrides(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1452,6 +1501,7 @@ public class RegionCommands {
     }
 
     private static int setPermissionOverride(CommandSourceStack source, String name, String key, String value) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1484,6 +1534,7 @@ public class RegionCommands {
     }
 
     private static int unsetPermissionOverride(CommandSourceStack source, String name, String key) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1513,6 +1564,7 @@ public class RegionCommands {
     }
 
     private static int setSpawn(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1534,6 +1586,7 @@ public class RegionCommands {
     }
 
     private static int teleport(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         Region region = SimpleServerUtilities.REGIONS.get(name);
 
@@ -1603,6 +1656,7 @@ public class RegionCommands {
     }
 
     private static int redefine(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1652,8 +1706,8 @@ public class RegionCommands {
                     ));
                 }
                 SELECTIONS.clear(player);
-                SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
-                SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownRegion(player);
+                if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+                if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownRegion(player);
                 return 1;
             }
 
@@ -1682,6 +1736,7 @@ public class RegionCommands {
     }
 
     private static int save(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1751,6 +1806,7 @@ public class RegionCommands {
     }
 
     private static int reset(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1822,6 +1878,7 @@ public class RegionCommands {
     }
 
     private static int clear(CommandSourceStack source, String name) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1890,6 +1947,7 @@ public class RegionCommands {
     }
 
     private static int enableRenting(CommandSourceStack source, boolean value) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (!canEditRegions(player)) {
@@ -1929,6 +1987,7 @@ public class RegionCommands {
     }
 
     private static int setRentConfig(CommandSourceStack source, String key, int percent) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         if (!canEditRegions(player)) {
             return 0;
@@ -1946,6 +2005,34 @@ public class RegionCommands {
         SimpleServerUtilities.REGIONS.save();
         player.sendSystemMessage(Component.literal("Rent setting '" + key + "' is now " + percent + "%."));
         return 1;
+    }
+
+    private static boolean economyAvailable() {
+        return SsuModuleAccess.active("economy") && SimpleServerUtilities.ECONOMY.isEnabled();
+    }
+
+    private static boolean requireEconomy(ServerPlayer player) {
+        if (economyAvailable()) return true;
+        player.sendSystemMessage(Component.literal(
+                "The Economy module is disabled. Region rental payments and refunds are paused."
+        ));
+        return false;
+    }
+
+    /**
+     * Read-only rental price display that never interprets a legacy whole-unit
+     * value with unloaded/default Economy settings. Exact minor-unit prices can
+     * still be inspected while Economy is paused.
+     */
+    private static String formatRentPrice(RegionRentData rentData) {
+        if (economyAvailable()) {
+            return formatMoney(rentData.getPriceMinor(SimpleServerUtilities.ECONOMY.settings()));
+        }
+        long storedMinor = rentData.getStoredPriceMinor();
+        if (storedMinor >= 0L) {
+            return storedMinor + " minor unit(s) (Economy paused)";
+        }
+        return rentData.getAmount() + " legacy unit(s) (Economy paused)";
     }
 
     private static Long parseMoney(ServerPlayer player, String raw) {
@@ -2002,7 +2089,7 @@ public class RegionCommands {
 
         String line = " - " + region.getName()
                 + " | " + status
-                + " | " + formatMoney(rentData.getPriceMinor(SimpleServerUtilities.ECONOMY.settings()))
+                + " | " + formatRentPrice(rentData)
                 + " / " + period
                 + " | reset expire: " + rentData.isResetOnExpire();
 
@@ -2019,6 +2106,7 @@ public class RegionCommands {
     }
 
     private static void sendRentOffer(ServerPlayer player, Region region) {
+        if (!requireEconomy(player)) return;
         RegionRentData rentData = region.getRentData();
 
         if (!SimpleServerUtilities.REGIONS.isRentingEnabled()) {
@@ -2055,6 +2143,7 @@ public class RegionCommands {
     }
 
     private static int help(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         source.sendSystemMessage(Component.literal("Region commands:"));
         source.sendSystemMessage(Component.literal(" - /regions point1"));
         source.sendSystemMessage(Component.literal(" - /regions point1 <x y z>"));
@@ -2163,4 +2252,10 @@ public class RegionCommands {
         return minutes + "m";
     }
 
+
+    private static boolean requireModule(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("regions")) return true;
+        source.sendFailure(Component.literal("Regions is disabled or blocked by a required dependency."));
+        return false;
+    }
 }

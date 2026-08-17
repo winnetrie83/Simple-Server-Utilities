@@ -24,6 +24,7 @@ import com.google.gson.JsonElement;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.content.ContentAccessPolicy;
 import be.winnetrie.mod.simpleserverutilities.content.ContentAction;
 import be.winnetrie.mod.simpleserverutilities.content.ContentActionContext;
@@ -991,6 +992,7 @@ public final class MinigameManager {
     }
 
     public void handleScoreAction(MinigameScoreActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("minigames")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> processScoreAction(player, payload));
     }
@@ -1019,6 +1021,7 @@ public final class MinigameManager {
     }
 
     public void handleSpectatorAction(MinigameSpectatorActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("minigames")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> spectateParticipant(player, payload == null ? "" : payload.action()));
     }
@@ -1056,11 +1059,13 @@ public final class MinigameManager {
     }
 
     public void handleRequest(MinigameLobbyRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("minigames")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> processRequest(player, payload));
     }
 
     public void handleMatchOverviewRequest(MinigameMatchOverviewRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("minigames")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> processMatchOverviewRequest(player, payload));
     }
@@ -1069,16 +1074,19 @@ public final class MinigameManager {
         if (player == null || payload == null) return;
         String action = payload.action();
         if (("open".equals(action) || "refresh".equals(action))
+                && SsuModuleAccess.active("moderation")
                 && SimpleServerUtilities.MODERATION.frozen(player.getUUID())) {
             player.sendSystemMessage(Component.literal("You are frozen. The SSU dashboard is temporarily unavailable."), true);
             return;
         }
         if (("open".equals(action) || "refresh".equals(action))
+                && SsuModuleAccess.active("moderation")
                 && SimpleServerUtilities.MODERATION.jailed(player.getUUID())) {
             be.winnetrie.mod.simpleserverutilities.moderation.ModerationService.sendJail(player, "", false);
             return;
         }
         if (("open".equals(action) || "refresh".equals(action))
+                && SsuModuleAccess.active("onboarding")
                 && SimpleServerUtilities.ONBOARDING.restricted(player.getUUID())) {
             SimpleServerUtilities.ONBOARDING.handleAction(player, "open", 0, payload.requestId());
             return;
@@ -3805,12 +3813,43 @@ public final class MinigameManager {
         }
         String subject = definition.displayName + ("winner".equals(kind) ? " · Winner reward" : " · Participation reward");
         String correlation = "minigame:" + match.id + ":" + player.getUUID() + ":" + kind;
-        MailOperationResult delivered = SimpleServerUtilities.MAIL.deliverSystemMail(
-                player.getUUID(), player.getName().getString(), subject, body.toString(), mailItems, mailMoney,
-                MailSource.MINIGAME, correlation);
-        if (!delivered.successful()) {
-            rewardFailure(player, kind, delivered.message());
-            return false;
+        if (SsuModuleAccess.active("mail")) {
+            MailOperationResult delivered = SimpleServerUtilities.MAIL.deliverSystemMail(
+                    player.getUUID(), player.getName().getString(), subject, body.toString(), mailItems, mailMoney,
+                    MailSource.MINIGAME, correlation);
+            if (!delivered.successful()) {
+                rewardFailure(player, kind, delivered.message());
+                return false;
+            }
+            return true;
+        }
+
+        // Mail is an optional integration. Preserve the same durable Content Core
+        // transaction semantics by applying physical/economy rewards directly when
+        // no mail provider is active. A full inventory or disabled Economy fails
+        // closed and leaves match cleanup pending instead of losing the reward.
+        ArrayList<ContentAction> fallback = new ArrayList<>();
+        for (ItemStack stack : mailItems) {
+            if (stack == null || stack.isEmpty()) continue;
+            ItemStack template = stack.copy();
+            int count = Math.max(1, template.getCount());
+            template.setCount(1);
+            fallback.add(new ContentAction("give_item", Map.of(
+                    "stack_json", MailItemCodec.encode(server.registryAccess(), template).toString(),
+                    "count", Integer.toString(count))));
+        }
+        if (mailMoney > 0L) {
+            fallback.add(new ContentAction("give_money", Map.of("amount_minor", Long.toString(mailMoney))));
+        }
+        if (!fallback.isEmpty()) {
+            var result = SimpleServerUtilities.CONTENT_ACTIONS.execute(fallback,
+                    new ContentActionContext(server, player, "minigames", match.minigameId,
+                            correlation + ":direct-fallback",
+                            Map.of("minigame", match.minigameId, "match", match.id.toString(), "reward", kind)));
+            if (!result.successful()) {
+                rewardFailure(player, kind, result.error());
+                return false;
+            }
         }
         return true;
     }

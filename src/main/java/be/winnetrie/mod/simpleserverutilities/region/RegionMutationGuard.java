@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.region;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobLocks;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 
 /**
  * Central safety gate for administrative operations that can invalidate a
@@ -38,7 +39,8 @@ public final class RegionMutationGuard {
     }
 
     private static Check rejectManagedArena(Region region) {
-        if (region != null && SimpleServerUtilities.MINIGAMES.isManagedArenaRegion(region.getName())) {
+        if (region != null && SsuModuleAccess.active("minigames")
+                && SimpleServerUtilities.MINIGAMES.isManagedArenaRegion(region.getName())) {
             return Check.deny("Region '" + region.getName()
                     + "' is owned by a minigame. Manage or delete it through Admin Center > Minigames.");
         }

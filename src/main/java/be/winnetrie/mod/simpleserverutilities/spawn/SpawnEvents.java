@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
@@ -34,9 +35,10 @@ public final class SpawnEvents {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!SsuModuleAccess.active("spawn")) return;
         UUID playerId = player.getUUID();
-        if (SimpleServerUtilities.MINIGAMES.isInMatch(playerId, "")
-                || SimpleServerUtilities.DUNGEONS.isInRun(playerId, "")) {
+        if ((SsuModuleAccess.active("minigames") && SimpleServerUtilities.MINIGAMES.isInMatch(playerId, ""))
+                || (SsuModuleAccess.active("dungeons") && SimpleServerUtilities.DUNGEONS.isInRun(playerId, ""))) {
             FALLBACK_PENDING.remove(playerId);
             PERSONAL_RESPAWN_AT_DEATH.remove(playerId);
             return;
@@ -50,6 +52,7 @@ public final class SpawnEvents {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onRespawn(PlayerEvent.PlayerRespawnEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!SsuModuleAccess.active("spawn")) return;
         UUID playerId = player.getUUID();
         boolean directFallback = FALLBACK_PENDING.remove(playerId);
         boolean hadPersonal = PERSONAL_RESPAWN_AT_DEATH.getOrDefault(playerId, false);

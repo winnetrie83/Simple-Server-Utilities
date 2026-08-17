@@ -10,6 +10,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportOptions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -73,7 +74,12 @@ public class TeleportManager {
     ) {
         MinecraftServer server = player.level().getServer();
 
-        if (SimpleServerUtilities.MODERATION.jailed(player.getUUID())) {
+        if (!SsuModuleAccess.active("teleport")) {
+            player.sendSystemMessage(Component.literal("Teleport is disabled by the server."));
+            return 0;
+        }
+
+        if (SsuModuleAccess.active("moderation") && SimpleServerUtilities.MODERATION.jailed(player.getUUID())) {
             player.sendOverlayMessage(Component.literal("Teleport is disabled while jailed."));
             return 0;
         }
@@ -176,6 +182,10 @@ public class TeleportManager {
     }
 
     public void tick(MinecraftServer server) {
+        if (!SsuModuleAccess.active("teleport")) {
+            clear();
+            return;
+        }
         if (pendingTeleports.isEmpty()) {
             return;
         }

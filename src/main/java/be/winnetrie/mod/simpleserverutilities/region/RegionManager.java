@@ -22,6 +22,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.core.performance.RegionSpatialIndex;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
@@ -120,7 +121,7 @@ public class RegionManager {
         }
 
         // Region permission overrides are part of permission resolution.
-        SimpleServerUtilities.PERMISSIONS.invalidateResolutionCache();
+        if (SsuModuleAccess.active("permissions")) SimpleServerUtilities.PERMISSIONS.invalidateResolutionCache();
 
         try {
             Files.createDirectories(regionEntriesFolder);
@@ -142,7 +143,7 @@ public class RegionManager {
             }
 
             regionRecordStore.queueDeleteMissing(keptFiles);
-            SimpleServerUtilities.BORDER_VISUALIZATIONS.markRegionsChanged();
+            if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.markRegionsChanged();
         } catch (IOException e) {
             SimpleServerUtilities.LOGGER.error("Failed to save regions.", e);
         }
@@ -604,7 +605,15 @@ public class RegionManager {
         JsonObject rent = new JsonObject();
         rent.addProperty("rentable", region.getRentData().isRentable());
         rent.addProperty("amount", region.getRentData().getAmount());
-        rent.addProperty("priceMinor", region.getRentData().getPriceMinor(SimpleServerUtilities.ECONOMY.settings()));
+        long storedPriceMinor = region.getRentData().getStoredPriceMinor();
+        if (storedPriceMinor >= 0L) {
+            rent.addProperty("priceMinor", storedPriceMinor);
+        } else if (SsuModuleAccess.active("economy")) {
+            // Legacy whole-unit prices are migrated only when the active provider's
+            // decimal semantics are actually loaded. This avoids rewriting old rent
+            // data with default assumptions while Economy is intentionally disabled.
+            rent.addProperty("priceMinor", region.getRentData().getPriceMinor(SimpleServerUtilities.ECONOMY.settings()));
+        }
         rent.addProperty("periodDays", region.getRentData().getPeriodDays());
         rent.addProperty("rentEndTime", region.getRentData().getRentEndTime());
         rent.addProperty("renterName", region.getRentData().getRenterName());
@@ -695,6 +704,7 @@ public class RegionManager {
         int minZ = Math.min(point1.getZ(), point2.getZ());
         int maxZ = Math.max(point1.getZ(), point2.getZ());
 
+        if (!SsuModuleAccess.active("claims")) return null;
         for (PlayerClaim claim : SimpleServerUtilities.PLAYER_CLAIMS.getClaims()) {
             if (!claim.getDimension().equals(dimension.identifier().toString())) {
                 continue;

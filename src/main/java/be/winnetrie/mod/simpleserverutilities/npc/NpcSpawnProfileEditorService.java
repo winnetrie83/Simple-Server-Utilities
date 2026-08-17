@@ -51,6 +51,7 @@ public final class NpcSpawnProfileEditorService {
     }
 
     public static void handleSubmit(NpcSpawnProfileEditorSubmitPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player) || !NpcEditorService.canAdmin(player)) return;
         NpcSpawnProfile profile;
         try {

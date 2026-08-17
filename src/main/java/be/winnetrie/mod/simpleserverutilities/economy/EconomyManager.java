@@ -25,6 +25,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.core.transaction.SsuTransactionManager;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
@@ -40,7 +41,13 @@ import net.minecraft.server.level.ServerPlayer;
  * journal before in-memory balances are changed. Prepared or committed records
  * are replayed idempotently on startup by comparing account revisions.</p>
  */
-public final class EconomyManager implements EconomyService {
+public final class EconomyManager implements EconomyProvider {
+
+    @Override
+    public String providerId() { return "ssu_digital"; }
+
+    @Override
+    public String displayName() { return "SSU Digital Wallet"; }
 
     /** Removed in dev2.1; retained only to discard the experimental dev2 system account safely. */
     private static final UUID LEGACY_TREASURY_ID = UUID.nameUUIDFromBytes(
@@ -150,7 +157,7 @@ public final class EconomyManager implements EconomyService {
     }
 
     public synchronized boolean isEnabled() {
-        return settings.isEnabled();
+        return settings.isEnabled() && SsuModuleAccess.active("economy");
     }
 
     public synchronized EconomyAccount ensureAccount(ServerPlayer player) {

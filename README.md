@@ -1,4 +1,55 @@
-## Current development build: 1.9.0-dev3.40.6.1
+## Current development build: 1.9.0-dev3.41.3
+
+### Backport-preparation architecture freeze
+
+- Completed a final module-boundary audit before the Minecraft 1.21.1 backport. Feature event handlers, serverbound GUI/network entry points and legacy commands now fail closed when their effective module is `OFF` or `BLOCKED`.
+- Added shared `SsuModuleAccess.anyActive(...)` for cross-cutting protection hooks that legitimately serve either Claims or Regions. Protection hooks now skip work entirely when both systems are inactive.
+- Utility Mining world hooks now use effective module state in addition to their feature toggles, including delayed chain execution.
+- Shared Content Core money rewards now resolve the active `EconomyService` provider instead of directly binding portable credit/debit operations to `EconomyManager`. Provider-specific journal/settings consumers intentionally remain on SSU Digital APIs until the provider contract grows those semantics.
+- Removed orphaned, unregistered dev3.40.8 Arcane Missiles custom-VFX experiment classes/textures that were present in the source tree but were not part of the working dev3.40.6.1 runtime path. Active Arcane Missiles behavior is unchanged.
+- Corrected stale module config descriptions (Spawn/Teleport, Mail/Auction, Quests and Minigames) to match the actual dependency graph.
+- This build is the intended **26.2 architecture-freeze candidate** for branching the 1.21.1 backport. Network protocol remains `119`; no persistence schema changes.
+
+## Previous development build: 1.9.0-dev3.41.2
+
+### Dashboard module visibility & Module Settings polish
+
+- Player-facing Dashboard tiles now disappear completely when their feature module is effectively `OFF` or `BLOCKED`, matching the existing Auction House behavior.
+- General shell entries such as Travel, Support, Cosmetics and Profile remain visible because they are not single optional feature modules.
+- Admin Dashboard/module-management views still retain disabled entries so administrators can inspect and restore them.
+- Module Settings explanatory text is now split into two bounded lines, with pixel-width clipping and reserved space for the page counter/scroll controls.
+- Module switch rows start lower so the explanatory copy can no longer overlap the first row.
+- Network protocol remains `119`; no persistence schema changes.
+
+## Previous development build: 1.9.0-dev3.41.1
+
+### Startup lifecycle hotfix
+
+- Fixed `Cannot get config value before config is loaded` during NeoForge mod construction.
+- Module dependency validation during `CORE.initialize()` no longer evaluates feature config values.
+- Configured module states are snapshotted only during server/runtime refresh, after NeoForge COMMON config is available.
+- Dashboard/configured-state queries read the safe snapshot rather than calling `Config.*.get()` indirectly.
+- Network protocol remains `119`; no persistence schema changes.
+
+## Previous development build: 1.9.0-dev3.41
+
+### Dependency-safe modular architecture
+
+- Reworked SSU's module lifecycle around **configured** versus **effective** state. A feature can stay configured ON while a missing required module safely suspends it; it automatically returns when the dependency becomes available again.
+- Module links now distinguish **required**, **optional** and **integration** dependencies. Only required dependencies participate in activation and startup/shutdown ordering.
+- Core infrastructure (Storage, Transactions, Jobs, Performance, Content Core, UI Preferences and the Dashboard shell) is always available and is no longer presented as ordinary optional gameplay functionality.
+- **Permissions is standalone** and no longer depends on Player Claims. Claims, Regions, Teleport, NPCs and other systems use Permissions as an optional policy layer and fall back to their built-in ownership/server rules when Permissions is off.
+- The Dashboard is now a dependency-neutral shell. Module Settings shows `ON`, `OFF` and `BLOCKED` states plus the exact required/optional/integration links. Disabling a hard dependency cascades safely without changing the dependent module's configured preference.
+- Regions no longer require Economy: normal regions, protection and snapshots remain available while rent/economy integration pauses. Teleport no longer requires Claims/Regions/Permissions; those are optional safety/policy integrations.
+- Hard relationships remain only where the implementation genuinely needs them, e.g. Auction House -> Economy + Mail, NPC Shops -> NPC Core + Economy, Mines -> Regions + Jobs, Minigames -> Regions + Jobs, and Jails -> Regions + Moderation.
+- Runtime module changes save/stop dependants in reverse dependency order and restart restored modules in dependency order. Optional bridges receive a post-transition refresh after the effective graph is stable.
+- Added effective-state guards across commands, events, protection, rentals, moderation, onboarding, visualization, map markers, NPC shops, content rewards and reload handling so disabled/blocked modules cannot keep running through side entry points.
+- Added an `EconomyProvider` boundary and active-provider lookup facade. The current provider remains the proven **SSU Digital Wallet**; this prepares later item-backed/external providers without changing the current balance format or persistence schema.
+- Network protocol `119` (module-state metadata was added to Dashboard snapshots). No existing world/persistence schema is changed by this architecture pass.
+- See `docs/MODULE-ARCHITECTURE-1.9.0-dev3.41.md` and `docs/TESTING-1.9.0-dev3.41.md`.
+
+
+## Previous development build: 1.9.0-dev3.40.6.1
 
 - dev3.40.4.1 is an emergency client-render recovery build: the new Player-NPC equipment renderer from dev3.40.4 was rolled back because it caused a black screen during client startup. The movement and NPC Manager fixes from dev3.40.4 remain active.
 - dev3.40.4 fixes the actual NPC Tool Manager duplicate-widget cause: constructor-time payload handling no longer builds a pre-init widget set before the normal screen initialization.

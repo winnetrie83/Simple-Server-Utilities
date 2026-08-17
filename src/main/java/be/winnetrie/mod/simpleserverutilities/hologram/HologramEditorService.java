@@ -4,6 +4,7 @@ import java.net.URI;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.HologramEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.HologramEditorRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.HologramEditorResultPayload;
@@ -49,7 +50,7 @@ public final class HologramEditorService {
     }
 
     private static Result save(ServerPlayer player, HologramEditorSubmitPayload payload) {
-        if (!Config.ENABLE_HOLOGRAMS.get()) return Result.fail("The hologram module is disabled.");
+        if (!SsuModuleAccess.active("holograms")) return Result.fail("The hologram module is disabled or blocked.");
         if (!PermissionService.getBoolean(player, PermissionKeys.HOLOGRAMS_ADMIN, false)) {
             return Result.fail("You do not have permission to manage holograms.");
         }
@@ -150,7 +151,7 @@ public final class HologramEditorService {
     }
 
     private static boolean canAdmin(ServerPlayer player) {
-        return player != null && Config.ENABLE_HOLOGRAMS.get()
+        return player != null && SsuModuleAccess.active("holograms")
                 && PermissionService.getBoolean(player, PermissionKeys.HOLOGRAMS_ADMIN, false);
     }
 

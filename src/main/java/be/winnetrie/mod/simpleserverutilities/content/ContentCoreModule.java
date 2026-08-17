@@ -36,7 +36,8 @@ public final class ContentCoreModule implements SsuModule {
     }
 
     @Override public String id() { return "content_core"; }
-    @Override public Set<String> dependencies() { return Set.of("storage", "transactions"); }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage", "transactions"); }
+    @Override public boolean isCoreInfrastructure() { return true; }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

@@ -6,6 +6,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.SsuDimensionManagerDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuDimensionManagerRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuDimensionManagerSubmitPayload;
@@ -27,11 +28,13 @@ public final class ManagedDimensionService {
     }
 
     public static void handleRequest(SsuDimensionManagerRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("dimensions")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         PacketDistributor.sendToPlayer(player, data(player, payload.selectedId(), payload.requestId(), "", false));
     }
 
     public static void handleSubmit(SsuDimensionManagerSubmitPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("dimensions")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (!canAdmin(player)) {
             PacketDistributor.sendToPlayer(player, SsuDimensionManagerDataPayload.denied(
@@ -86,7 +89,7 @@ public final class ManagedDimensionService {
             notice = exception.getMessage() == null ? "Dimension action failed safely." : exception.getMessage();
             error = true;
         }
-        if (!error && !"teleport".equals(payload.action())) {
+        if (!error && !"teleport".equals(payload.action()) && SsuModuleAccess.active("server_operations")) {
             SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "dimension." + payload.action(),
                     payload.originalId() == null ? selected : payload.originalId(), notice);
         }
@@ -134,7 +137,7 @@ public final class ManagedDimensionService {
     }
 
     private static boolean canAdmin(ServerPlayer player) {
-        return PermissionService.isAdmin(player)
+        return SsuModuleAccess.active("dimensions") && PermissionService.isAdmin(player)
                 && PermissionService.getBoolean(player, PermissionKeys.DIMENSIONS_ADMIN, false);
     }
 }

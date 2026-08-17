@@ -13,6 +13,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentConditionContext;
 import be.winnetrie.mod.simpleserverutilities.content.ContentConditionResult;
 import be.winnetrie.mod.simpleserverutilities.content.ContentEvent;
 import be.winnetrie.mod.simpleserverutilities.content.ContentEventTypes;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueChoicePayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueEditorRequestPayload;
@@ -69,6 +70,7 @@ public final class NpcDialogueService {
     }
 
     public static void handleChoice(NpcDialogueChoicePayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         SimpleServerUtilities.NPC_DIALOGUES.handleChoice(player, payload);
     }
@@ -249,6 +251,7 @@ public final class NpcDialogueService {
     }
 
     public static void handleEditorRequest(NpcDialogueEditorRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (!NpcEditorService.canAdmin(player)) return;
         NpcInstance instance = SimpleServerUtilities.NPCS.instance(payload.instanceId());
@@ -273,25 +276,35 @@ public final class NpcDialogueService {
 
     private static List<NpcDialogueEditorOpenPayload.TargetEntry> editorTargets() {
         ArrayList<NpcDialogueEditorOpenPayload.TargetEntry> values = new ArrayList<>();
-        for (var warp : SimpleServerUtilities.WARPS.getWarps()) {
-            values.add(new NpcDialogueEditorOpenPayload.TargetEntry("warp", warp.getName(), warp.getDisplayName()));
+        if (SsuModuleAccess.active("warps")) {
+            for (var warp : SimpleServerUtilities.WARPS.getWarps()) {
+                values.add(new NpcDialogueEditorOpenPayload.TargetEntry("warp", warp.getName(), warp.getDisplayName()));
+            }
         }
-        for (var quest : SimpleServerUtilities.QUESTS.definitions()) {
-            String label = quest.title == null || quest.title.isBlank() ? quest.id : quest.title;
-            values.add(new NpcDialogueEditorOpenPayload.TargetEntry("quest_offer", quest.id, label));
-            values.add(new NpcDialogueEditorOpenPayload.TargetEntry("quest_turn_in", quest.id, label));
+        if (SsuModuleAccess.active("quests")) {
+            for (var quest : SimpleServerUtilities.QUESTS.definitions()) {
+                String label = quest.title == null || quest.title.isBlank() ? quest.id : quest.title;
+                values.add(new NpcDialogueEditorOpenPayload.TargetEntry("quest_offer", quest.id, label));
+                values.add(new NpcDialogueEditorOpenPayload.TargetEntry("quest_turn_in", quest.id, label));
+            }
         }
-        for (var minigame : SimpleServerUtilities.MINIGAMES.definitions()) {
-            String label = minigame.displayName == null || minigame.displayName.isBlank() ? minigame.id : minigame.displayName;
-            values.add(new NpcDialogueEditorOpenPayload.TargetEntry("minigame_queue", minigame.id, label));
+        if (SsuModuleAccess.active("minigames")) {
+            for (var minigame : SimpleServerUtilities.MINIGAMES.definitions()) {
+                String label = minigame.displayName == null || minigame.displayName.isBlank() ? minigame.id : minigame.displayName;
+                values.add(new NpcDialogueEditorOpenPayload.TargetEntry("minigame_queue", minigame.id, label));
+            }
         }
-        for (var dungeon : SimpleServerUtilities.DUNGEONS.definitions()) {
-            String label = dungeon.displayName == null || dungeon.displayName.isBlank() ? dungeon.id : dungeon.displayName;
-            values.add(new NpcDialogueEditorOpenPayload.TargetEntry("dungeon_queue", dungeon.id, label));
+        if (SsuModuleAccess.active("dungeons")) {
+            for (var dungeon : SimpleServerUtilities.DUNGEONS.definitions()) {
+                String label = dungeon.displayName == null || dungeon.displayName.isBlank() ? dungeon.id : dungeon.displayName;
+                values.add(new NpcDialogueEditorOpenPayload.TargetEntry("dungeon_queue", dungeon.id, label));
+            }
         }
-        for (var shop : SimpleServerUtilities.NPC_SHOPS.definitions()) {
-            String label = shop.displayName == null || shop.displayName.isBlank() ? shop.id : shop.displayName;
-            values.add(new NpcDialogueEditorOpenPayload.TargetEntry("shop", shop.id, label));
+        if (SsuModuleAccess.active("npc_shops")) {
+            for (var shop : SimpleServerUtilities.NPC_SHOPS.definitions()) {
+                String label = shop.displayName == null || shop.displayName.isBlank() ? shop.id : shop.displayName;
+                values.add(new NpcDialogueEditorOpenPayload.TargetEntry("shop", shop.id, label));
+            }
         }
         values.sort(java.util.Comparator.comparing(NpcDialogueEditorOpenPayload.TargetEntry::serviceId)
                 .thenComparing(NpcDialogueEditorOpenPayload.TargetEntry::label, String.CASE_INSENSITIVE_ORDER)
@@ -312,6 +325,7 @@ public final class NpcDialogueService {
     }
 
     public static void handleEditorSubmit(NpcDialogueEditorSubmitPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         long requestId = payload.requestId();
         if (!NpcEditorService.canAdmin(player)) {
