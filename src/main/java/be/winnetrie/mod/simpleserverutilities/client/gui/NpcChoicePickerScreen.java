@@ -13,7 +13,7 @@ import net.minecraft.network.chat.Component;
 
 /** Searchable bounded choice window used instead of manually typed shop and faction IDs. */
 public final class NpcChoicePickerScreen extends Screen {
-    public enum Kind { SHOP, RELATION_FACTION }
+    public enum Kind { SHOP, RELATION_FACTION, LOCAL_TEXTURE }
 
     private static final int W = 430, H = 300, ROWS = 9;
     private final NpcEditorScreen parent;
@@ -26,7 +26,7 @@ public final class NpcChoicePickerScreen extends Screen {
 
     public NpcChoicePickerScreen(NpcEditorScreen parent, Kind kind,
             List<NpcEditorOpenPayload.Choice> choices, String selectedId) {
-        super(Component.literal(kind == Kind.SHOP ? "Choose linked shop" : "Choose faction"));
+        super(Component.literal(title(kind)));
         this.parent = parent;
         this.kind = kind;
         this.choices = choices == null ? List.of() : List.copyOf(choices);
@@ -59,7 +59,7 @@ public final class NpcChoicePickerScreen extends Screen {
         Button next = addRenderableWidget(Button.builder(Component.literal("›"), ignored -> { page++; rebuildWidgets(); })
                 .bounds(x + 48, y + H - 27, 32, 18).build());
         next.active = page + 1 < pages;
-        addRenderableWidget(Button.builder(Component.literal("None"), ignored -> choose(""))
+        addRenderableWidget(Button.builder(Component.literal(kind == Kind.LOCAL_TEXTURE ? "Clear" : "None"), ignored -> choose(""))
                 .bounds(x + 88, y + H - 27, 64, 18).build()).active = !selectedId.isBlank();
         addRenderableWidget(Button.builder(Component.literal("Back"), ignored -> onClose())
                 .bounds(x + W - 76, y + H - 27, 64, 18).build());
@@ -86,11 +86,19 @@ public final class NpcChoicePickerScreen extends Screen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
-        g.fill(0, 0, width, height, 0xA9000000); g.fill(x, y, x + W, y + H, 0xF0161D25);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(x, y, x + W, y + H, 0xF0161D25);
         g.outline(x, y, W, H, 0xFF586978);
-        g.text(font, kind == Kind.SHOP ? "Choose linked shop" : "Choose target faction", x + 12, y + 12, 0xFFF3F5F7, true);
+        g.text(font, title(kind), x + 12, y + 12, 0xFFF3F5F7, true);
         g.text(font, filtered().size() + " option(s)", x + W - 90, y + 13, 0xFFAAB5BE, false);
         super.extractRenderState(g, mouseX, mouseY, partialTick);
+    }
+
+    private static String title(Kind kind) {
+        return switch (kind) {
+            case SHOP -> "Choose linked shop";
+            case RELATION_FACTION -> "Choose target faction";
+            case LOCAL_TEXTURE -> "Choose local NPC texture";
+        };
     }
 
     private int px() { return (width - W) / 2; }

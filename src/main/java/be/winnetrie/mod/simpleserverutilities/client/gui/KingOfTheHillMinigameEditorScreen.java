@@ -170,7 +170,7 @@ final class KingOfTheHillMinigameEditorScreen extends MinigameEditorScreen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = (width - W) / 2, y = (height - H) / 2;
-        g.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(x, y, x + W, y + H, PANEL);
         g.outline(x, y, W, H, BORDER);
         g.text(font, "King of the Hill Editor", x + 16, y + 42, TEXT, true);

@@ -167,7 +167,7 @@ public final class RichTextValueEditorScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         remember();
         int x = left(), y = top();
-        graphics.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
         graphics.outline(x, y, W, H, BORDER);
         graphics.text(font, heading, x + 16, y + 14, TEXT, true);

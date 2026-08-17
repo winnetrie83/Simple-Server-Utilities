@@ -46,10 +46,10 @@ public final class NpcFunctionMenuScreen extends Screen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = (width - W) / 2, y = top();
-        g.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(x, y, x + W, y + heightBox(), PANEL); g.outline(x, y, W, heightBox(), BORDER);
         g.text(font, data.npcName(), x + 16, y + 14, TEXT, true);
-        if (!data.roleLabel().isBlank()) g.text(font, data.roleLabel(), x + 16, y + 29, MUTED, false);
+        if (!data.roleLabel().isBlank()) g.text(font, data.roleLabel(), x + 16, y + 29, RichTextPalette.argb(data.roleColor()), false);
         super.extractRenderState(g, mouseX, mouseY, partialTick);
     }
 

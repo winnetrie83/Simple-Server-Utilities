@@ -81,7 +81,7 @@ public final class MinigameResultsScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
-        g.fill(0, 0, width, height, 0xB5000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xB5000000);
         g.fill(x, y, x + W, y + H, PANEL);
         g.outline(x, y, W, H, BORDER);
         g.text(font, data.title(), x + 14, y + 14, GOLD, true);

@@ -1,0 +1,14 @@
+SSU 1.9.0-dev3.29 validation notes
+
+Static validation performed in the ChatGPT build environment:
+- Java brace balance checked across src/main/java.
+- javac parse-oriented scan of the new spawn-profile/editor/payload sources found no syntax-like errors (dependency symbols are unavailable without the Gradle classpath).
+- New spawn-profile payload registrations and client handlers checked.
+- NPC Manager Spawning mode/action routing checked.
+- Spawn profile storage path, module lifecycle load/save/clear wiring checked.
+- Dynamic NPCs are excluded from persistent placement save/list flows and disk-restored orphan dynamic entities are rejected through EntityJoinLevelEvent.
+- Template rename/delete integration with spawn profiles checked.
+- NeoForge 26.2 BaseSpawner owner + MobSpawnEvent.PositionCheck hook verified against the official NeoForge port/26.2 source/patch.
+- Network protocol updated to 110; existing NPC definition/placement schemas unchanged.
+
+Full Gradle compile could not run in this environment because the Gradle 9.2.1 wrapper distribution is not cached and services.gradle.org cannot be resolved from the shell environment. The user-side Gradle build is therefore the authoritative compile test.

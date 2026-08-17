@@ -1,0 +1,8 @@
+SSU 1.9.0-dev3.29.1 validation notes
+
+Compile hotfix for NpcSpawnManager.java:
+- Heightmap import changed to net.minecraft.world.level.levelgen.Heightmap.
+- ServerLevel#getDayTime() changed to Level#getDefaultClockTime().
+- The latter matches existing SSU 26.x usages in NpcManager, NpcToolManager, NpcShopManager, MinimapClientState, and editor UI.
+- Protocol remains 110; spawn profile schema remains 1; NPC schemas unchanged.
+- Full Gradle compile could not be executed in the sandbox because Gradle 9.2.1 is not cached and services.gradle.org is unreachable from the environment.

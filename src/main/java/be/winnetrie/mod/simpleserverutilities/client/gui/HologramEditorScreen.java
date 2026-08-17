@@ -423,7 +423,7 @@ public final class HologramEditorScreen extends Screen {
         int x = panelX();
         int y = panelY();
         int right = x + 304;
-        g.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, PANEL);
         g.outline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
         g.text(font, initial.editing() ? "Edit Floating Hologram" : "Create Floating Hologram", x + 14, y + 11, TEXT, true);

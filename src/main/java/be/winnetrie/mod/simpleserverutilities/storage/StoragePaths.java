@@ -147,6 +147,14 @@ public final class StoragePaths {
         return npcs(root).resolve("instances");
     }
 
+    public static Path npcAbilities(Path root) {
+        return npcs(root).resolve("abilities");
+    }
+
+    public static Path npcSpawnProfiles(Path root) {
+        return npcs(root).resolve("spawn_profiles");
+    }
+
     public static Path npcDialogues(Path root) {
         return npcs(root).resolve("dialogues");
     }

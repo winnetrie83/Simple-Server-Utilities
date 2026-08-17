@@ -132,7 +132,7 @@ public final class NpcShopScreen extends Screen {
     @Override public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         int left = left();
         int top = top();
-        graphics.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(graphics, this, 0xA9000000);
         graphics.fill(left, top, left + WIDTH, top + HEIGHT, PANEL);
         graphics.outline(left, top, WIDTH, HEIGHT, BORDER);
         graphics.text(font, trim(data.shopName().isBlank() ? "NPC Shop" : data.shopName(), 22),

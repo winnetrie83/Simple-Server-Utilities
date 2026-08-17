@@ -144,7 +144,7 @@ public final class NpcShopAdminScreen extends Screen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int left = left(), top = top();
-        g.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(left, top, left + W, top + H, PANEL);
         g.outline(left, top, W, H, BORDER);
         g.text(font, "Shop Manager", left + 16, top + 13, TEXT, true);

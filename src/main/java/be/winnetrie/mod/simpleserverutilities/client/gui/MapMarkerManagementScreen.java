@@ -68,7 +68,7 @@ public final class MapMarkerManagementScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         List<MapMarkerSyncPayload.Entry> markers = MapMarkerClientState.markers();
         int pages = Math.max(1, (markers.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         int panelWidth = Math.min(560, width - 28);

@@ -13,7 +13,7 @@ public record NpcAdminListPayload(String mode,String query,int page,int pageCoun
     public static final Type<NpcAdminListPayload> TYPE=new Type<>(Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID,"npc_admin_list"));
     public static final StreamCodec<RegistryFriendlyByteBuf,NpcAdminListPayload> STREAM_CODEC=StreamCodec.of(NpcAdminListPayload::encode,NpcAdminListPayload::decode);
     public NpcAdminListPayload{
-        mode="templates".equalsIgnoreCase(mode)?"templates":"placements";query=query==null?"":query;page=Math.max(0,page);pageCount=Math.max(1,pageCount);total=Math.max(0,total);
+        mode="templates".equalsIgnoreCase(mode)?"templates":"spawns".equalsIgnoreCase(mode)?"spawns":"placements";query=query==null?"":query;page=Math.max(0,page);pageCount=Math.max(1,pageCount);total=Math.max(0,total);
         entries=entries==null?List.of():List.copyOf(entries.subList(0,Math.min(entries.size(),12)));notice=notice==null?"":notice;requestId=Math.max(0,requestId);
     }
     private static void encode(RegistryFriendlyByteBuf b,NpcAdminListPayload p){

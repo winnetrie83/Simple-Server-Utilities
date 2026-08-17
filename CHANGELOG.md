@@ -1,3 +1,729 @@
+# 1.9.0-dev3.40.6.1
+
+- Compile hotfix for the Arcane Missiles VFX pass.
+- Minecraft/NeoForge 26.2 changed `DRAGON_BREATH` to a typed `PowerParticleOption`, so it can no longer be passed directly to the simple `sendParticles(...)` overload.
+- Replaced the three dragon-breath haze calls with the simple purple `WITCH` particle. The custom purple dust beam, sinus ribbons, orb clusters, charge-up and impact visuals remain unchanged.
+- No network protocol or schema changes.
+
+# 1.9.0-dev3.40.6
+
+- Reworked **Arcane Missiles** into a more premium visual effect instead of the old simple end-rod line.
+- Added a dedicated purple charge-up telegraph swirl around the caster during the channel windup.
+- Each missile pulse now renders a sinus-wave arcane beam with layered purple dust/glow ribbons and dragon-breath haze.
+- Added visible purple arcane orb clusters moving along the beam path so the spell reads like real missiles instead of a flat laser.
+- Added a brighter arcane impact burst on the target plus an amethyst-style sound accent.
+- Keeps the proven dev3.40.5.2 safe Player-NPC mainhand/offhand renderer path and the dev3.40.4.1 AI/Manager fixes.
+- No network protocol or schema changes.
+
+# Simple Server Utilities 1.9.0-dev3.40.4.1
+
+## Emergency client-render recovery hotfix
+
+- Fixes the black-screen-at-startup regression introduced by dev3.40.4.
+- The regression was isolated to the new Player-NPC humanoid/equipment renderer bootstrap. That renderer path is rolled back to the known-working dev3.40.3 implementation so Minecraft can initialize and draw the title/world UI normally again.
+- The dev3.40.4 NPC movement ownership/pathfinding fixes remain included.
+- The dev3.40.4 NPC Manager duplicate-widget fix remains included.
+- Player-NPC visual armor/held-item rendering is temporarily disabled again in this rescue build and will be reintroduced separately after the startup renderer path is validated. Server-side loadout data/gameplay remains unchanged.
+- Network protocol remains `118`; NPC definition/placement/ability schemas remain unchanged.
+
+# Simple Server Utilities 1.9.0-dev3.40.4
+
+## NPC runtime recovery + visible Player-NPC loadouts + Manager render hotfix
+
+### NPC movement ownership
+- Normal reconcile/refresh/sync no longer hard-positions a living NPC at its placement anchor. Hard positioning is now reserved for spawn, respawn and explicit administrator moves such as Bring or edited placement coordinates.
+- After combat, STATIONARY/LOOK_AT/WANDER/NATIVE NPCs return to their configured home through the shared path-navigation controller instead of snapping back. PATROL resumes its logical patrol route without resetting its waypoint state.
+- Scheduled NPCs recover from combat by pathfinding to the currently active schedule destination. Explicit TELEPORT schedule entries still teleport on normal time-slot activation, but never as a combat-return shortcut.
+- Static/no-AI gravity settling may only correct the saved Y coordinate while the NPC is still at its home X/Z anchor; combat or knockback can no longer silently rewrite the placement/home position.
+- Live template refreshes no longer respawn an NPC for ordinary stat, equipment, gravity or behavior edits. A runtime respawn is limited to changes that require a different physical entity shell.
+- Periodic reconcile preserves temporary combat/return AI ownership so stationary shells cannot be re-frozen halfway through a return path.
+
+### Player-NPC equipment rendering
+- Player-model NPCs now use the humanoid renderer path so main-hand/off-hand equipment is rendered using the standard held-item layer.
+- Added dedicated humanoid armor layers for helmet, chest, legs and boots using the real equipped ItemStacks, preserving normal equipment material/tint/glint rendering.
+- Added combat arm poses for bow, crossbow and shield loadouts; swords and other held items retain normal humanoid item/attack animation behavior.
+- Both Wide/Steve and Slim/Alex player models remain supported, including held-item attachment alignment for slim arms.
+
+### NPC Manager duplicate-widget fix
+- Fixed the actual cause of the apparent double NPC Manager when right-clicking air with the NPC Tool. The initial network payload was calling `rebuildWidgets()` from the screen constructor before the real display-size initialization, leaving an orphaned set of tabs/search/row buttons behind the correctly initialized manager.
+- Initial construction now leaves widget creation to the normal screen init pass. Later list/search/action payloads only rebuild widgets when that exact NPC Manager is already the active screen.
+- The existing server-side duplicate-open guard and top-level manager replacement behavior remain in place as additional protection.
+
+### Compatibility
+- Network protocol remains `118`.
+- NPC definition schema remains `19`; NPC placement schema remains `4`; Ability Library schema remains `1`.
+- No world/persistence migration is required.
+
+# Simple Server Utilities 1.9.0-dev3.40.3
+
+## NPC Manager single-render hotfix
+- Fixed the NPC Manager opened by right-clicking air with the NPC Tool being visible twice: a scaled manager in front with an older/unscaled manager layer behind it.
+- The NPC Manager now opens as a replacement top-level tool screen through `Gui#setScreen`, which clears NeoForge background screen layers instead of allowing a stale manager layer to remain behind it.
+- Closing the NPC Manager uses the same replacement semantics when returning to its optional parent.
+- The NPC Manager is now non-pausing, matching SSU's other in-world setup/tool screens.
+- Added a short server-side duplicate-open guard for one physical NPC Tool right-click.
+- No network protocol or persistence schema changes.
+
+# Simple Server Utilities 1.9.0-dev3.40.2
+
+## Dashboard fixed 4-column layout
+
+- Dashboard/Home textured module tiles no longer switch from four columns to three when Minecraft exposes less than 500 logical GUI pixels of content width.
+- The compact/plain-button fallback for Home also uses four columns.
+- Dashboard pages now use a fixed canonical logical canvas (680×390, or 544×312 for Wallet/Profile) instead of shrinking/reflowing their layout when Minecraft exposes a smaller logical viewport.
+- SSU GUI Scale now has an automatic fit safeguard for fixed-canvas screens: the configured 60–100% remains the maximum, but the effective scale may become smaller when necessary to keep the canonical Dashboard canvas fully on-screen.
+- The portrait sidebar therefore remains part of the same Dashboard layout on narrow displays instead of disappearing and causing a different module arrangement.
+- This keeps the canonical Dashboard layout stable across resolutions and Minecraft GUI Scale settings; the independent SSU GUI Scale is responsible for shrinking the complete SSU screen when desired.
+- Prevents 12-module dashboards from becoming 4 rows tall and extending below the panel on narrower logical displays.
+- No network, NPC, ability-library, placement or community-statistics schema changes.
+
+# Simple Server Utilities 1.9.0-dev3.40.1
+
+## Shared ability phase-gate hotfix
+
+- Fixed NPC Editor saves failing with messages such as `Ability 'charge_1' references missing boss phase ...`.
+- Boss-phase gating belongs to the NPC-specific ability assignment, not the shared library definition. A stale/missing assignment phase is now repaired to blank (`All phases`) instead of hard-failing the whole NPC save.
+- The client editor also sanitizes ability-assignment and attack-pattern phase gates after boss phases are loaded, so old/migrated references no longer remain visible as `(missing)`.
+- Disabling boss mode or deleting/renaming phases can no longer strand shared ability assignments behind an invalid phase reference.
+- No network protocol or persistence schema changes versus dev3.40.
+
+# Simple Server Utilities 1.9.0-dev3.40
+
+## Shared Ability Library + smarter ability AI
+
+### Server-wide reusable Ability Library
+- NPC abilities are no longer authored as private copies inside every NPC template. SSU now persists a server-wide reusable ability catalogue under `simpleserverutilities/npcs/abilities/`.
+- NPC templates store only ability assignments/references plus an optional NPC-specific boss-phase restriction. Editing one shared ability immediately changes the behavior of every NPC template that uses it.
+- Added **Admin Tools -> Ability Library**. The Ability Workshop is now fully independent from the NPC Tool/editor and supports up to 256 shared definitions.
+- The NPC **Abilities** page is now an assignment page. Open the shared library, select an ability and press **Assign**; Unassign only removes the link from that NPC and keeps the shared definition.
+- Shared abilities cannot be deleted while they are assigned to NPC templates. The library shows usage counts.
+- Attack Patterns and Boss phase Trigger Ability actions continue to reference stable ability IDs.
+
+### Smarter cast/ability eligibility
+- Added explicit **Requires stationary** and **Min targets** AI requirements to reusable abilities and the standalone Ability Workshop.
+- Stationary casts stop native `PathNavigation`, put `MoveControl` in WAIT, face the target and suppress horizontal movement before the cast starts. This prevents Arcane Missiles from cancelling itself because an old chase path was still active.
+- Interrupt-on-move now observes real displacement after cast start rather than residual path velocity; interrupt-on-damage remains independent.
+- Thunderclap and other Around-self AoE abilities validate actual hostile targets inside their configured AoE shape before the AI may select them. Merely seeing a distant enemy is no longer enough.
+- Around-self AoE selection is independent of the distance to the current primary combat target; if an enemy is actually inside the radius the ability can fire, otherwise it stays unavailable.
+- Cone eligibility aims its selection cone toward the current combat target instead of relying on potentially stale body yaw.
+- Presets now provide sensible movement/target requirements: Arcane Missiles, Thunderclap, Slash, Arrow Volley, Fire/Ice Ball, ranged weapon casts and Self Heal default to stationary where appropriate; Thunderclap requires at least one enemy in its AoE.
+
+### Migration / compatibility
+- NPC definition schema `18 -> 19`.
+- Network protocol `117 -> 118` for the standalone Ability Library/Workshop payloads.
+- New shared Ability Library persistence schema `1`.
+- Existing dev3.39 embedded abilities are migrated automatically into the shared catalogue while preserving each NPC's assignment, attack-pattern references and boss phase-action references. Existing NPC-specific ability copies are deliberately not merged together automatically, preventing an edit on one migrated NPC from unexpectedly changing another.
+- NPC placement schema remains `4`; Community Statistics schema remains `1`.
+
+# Simple Server Utilities 1.9.0-dev3.39
+
+## Equipment-driven NPC combat + Ability Workshop
+
+### Equipment is now gameplay
+- NPC Attack Damage, Armor and Armor Toughness are no longer manually authored Stats-page values. The equipped ItemStacks are the combat baseline.
+- Full encoded equipment stacks are preserved instead of stripping gameplay attribute modifiers/enchantments.
+- Physical equipment-backed melee delegates to the normal Mob attack path when available so equipped gameplay hit/enchantment behavior can participate.
+- The generic ranged executor derives power from the equipped ranged weapon; bow Power modifies damage and Flame/Punch are represented.
+- Configured NPC equipment is authoritative, has zero normal equipment-drop chance and is continuously restored/repaired so durability never permanently decreases or destroys the configured item.
+- Armor multiplier scales both equipment armor and toughness.
+
+### Independent combat tuning
+- Retained configurable stats: Max Health, Magic Resistance, Armor multiplier, Melee damage multiplier, Ranged damage multiplier, Magic damage multiplier, Walking speed, Running speed, Follow range, Knockback resistance and Scale.
+- Patrol/wander/schedules use Walking speed; active combat chase uses Running speed. Running speed cannot be configured below Walking speed.
+- Melee, Ranged and Magic attack channels can be toggled independently in any combination.
+- Sword-mainhand + ranged-offhand loadouts can use melee nearby and ranged at distance; ranged mainhand loadouts prefer ranged attacks.
+
+### Ability Workshop
+- Replaced the cramped ability editing flow with a dedicated `NPC Ability Workshop` screen while keeping abilities directly attached to the NPC template and compatible with Attack Patterns/Boss Phase actions.
+- Added editable preset starting points: Regular Melee, Regular Ranged, Charge, Thunderclap, Slash, Arcane Missiles, Arrow Volley, Fireball, Ice Ball, Leap, Mortal Strike, Bladestorm, Self Heal and Custom.
+- Added attack-channel classification (Melee/Ranged/Magic), target shapes (Single/Around self/Around target/Cone) and damage schools (Physical/Fire/Arcane/Ice/Nature/Shadow).
+- Custom ability fields cover direct or equipment-scaled damage, healing, range/chance/cooldown, radius/cone/knockback, stun/slow, arbitrary mob-effect/debuff IDs, bleed, DoT, HoT, multi-hit/projectile count, pulse interval, wind-up/recovery, channeling interruption and charge speed.
+- Charge uses pathing-aware movement, refreshes its configurable target stun during the charge and exits cleanly on timeout/contact.
+- Thunderclap emits thunder, AoE knockback and slow. Slash defaults to three rapid half-strength equipment hits. Arcane Missiles defaults to a three-pulse interruptible Arcane channel.
+- Periodic bleed/DoT/HoT effects tick on the server tick path independently of target-selection cadence.
+
+### Migration / compatibility
+- NPC definition schema `17 -> 18`.
+- Network protocol `116 -> 117` because the NPC editor ability payload format and combat/stat fields changed.
+- Existing schema <=17 NPCs migrate old behavior speed into Walking/Running speed; old manual attack/armor/toughness values are retired; existing abilities are mapped onto the new channel/shape semantics.
+- NPC placement schema remains `4`; Community Statistics schema remains `1`.
+- See `docs/NPC-COMBAT-1.9.0-dev3.39.md` and `docs/TESTING-1.9.0-dev3.39.md`.
+
+# Simple Server Utilities 1.9.0-dev3.38.3
+
+## SSU GUI scale duplicate backdrop fix
+
+- Fixed the still-visible centered dark rectangle around reduced-scale SSU screens. The dev3.38.2 suppression happened too late: Minecraft extracts its own screen background before the concrete SSU screen calls `SsuGuiScale.fullscreenDim(...)`, so the previous per-frame "managed backdrop already drawn" check could never suppress that earlier vanilla pass.
+- At SSU GUI scales below 100%, Minecraft's `extractTransparentBackground` / `extractMenuBackground` layer is now suppressed up front for every SSU screen. This prevents any fullscreen vanilla background from ever being captured inside the centered SSU scale transform.
+- Normal SSU menu screens continue to render their explicit `SsuGuiScale.fullscreenDim(...)` edge-to-edge, leaving exactly one uniform dim layer plus the scaled SSU panel.
+- Legacy screens that previously relied on Minecraft's vanilla background receive a reduced-scale-only SSU fullscreen fallback: Mail Compose, World Map, Claim Map and Claim Tax Delete. Their 100% behavior is unchanged.
+- Region Snapshot Preview and the World Edit compact overlay intentionally remain transparent at reduced scale, matching their existing no-background behavior.
+- Dashboard avatar scaling/input fixes from dev3.38.1 remain unchanged. No layout coordinates were altered.
+
+### Compatibility
+- Network protocol remains `116`.
+- NPC definition schema remains `17`; NPC placement schema remains `4`.
+- Community Statistics persistence remains schema `1`.
+- No server/world migration is required.
+
+# Simple Server Utilities 1.9.0-dev3.38.2
+
+## SSU GUI scale background cleanup
+
+- Fixed the remaining dark/translucent rectangle around reduced-scale SSU screens. This was Minecraft's own default transparent/menu screen background being extracted inside SSU's centered scale transform after SSU's dedicated fullscreen dim had already been drawn.
+- At SSU GUI scales below 100%, the redundant vanilla `extractTransparentBackground` / `extractMenuBackground` layer is suppressed only after a screen has drawn SSU's managed fullscreen dim. The SSU-owned backdrop remains edge-to-edge and becomes the only darkening layer for those screens.
+- Overlay/map screens that do not use `SsuGuiScale.fullscreenDim(...)` keep Minecraft's normal background path, avoiding a global behavior change.
+- At 100% the vanilla screen-background path is deliberately left untouched, preserving the existing full-size appearance.
+- No SSU panel geometry, widget coordinates, avatar scaling or input mapping changed.
+
+### Compatibility
+- Network protocol remains `116`.
+- NPC definition schema remains `17`; NPC placement schema remains `4`.
+- Community Statistics persistence remains schema `1`.
+- No server/world migration is required.
+
+# Simple Server Utilities 1.9.0-dev3.38.1
+
+## SSU GUI scale visual hotfix
+
+- Fullscreen black/dim backdrops are no longer part of the centered SSU scale transform. At reduced SSU scale they keep the screen's original opacity and always cover the complete viewport instead of becoming a smaller dark rectangle behind the panel.
+- Centralized fullscreen dim rendering through `SsuGuiScale.fullscreenDim(...)`; existing screen-specific dim alpha values are preserved.
+- Removed the temporary extra edge-dim pass from the global scale mixin because each SSU screen's own backdrop now renders correctly unscaled.
+- Dashboard `PlayerSkinWidget` portrait is a special 3D widget that does not inherit the normal screen pose transform consistently. Its position and dimensions are now explicitly mapped from the original logical portrait opening into physical scaled coordinates.
+- Portrait mouse-look continues to use logical coordinates, so rotation remains aligned with the scaled avatar.
+- No SSU layout coordinates, panel geometry or page composition changed.
+
+### Compatibility
+- Network protocol remains `116`.
+- NPC definition schema remains `17`; NPC placement schema remains `4`.
+- Community Statistics persistence remains schema `1`.
+- No server/world migration is required.
+
+# Simple Server Utilities 1.9.0-dev3.38
+
+## Independent SSU GUI scale
+
+### Client-only SSU scaling
+- Added a dedicated **SSU GUI Scale** setting under `Dashboard -> Settings -> Interface`.
+- `100%` is exactly the pre-dev3.38/current SSU size. Players can reduce SSU screens to `90%`, `80%`, `70%` or `60%` without changing Minecraft's own GUI Scale option.
+- Scaling is client-only and persists in the SSU client config as `ssuGuiScalePercent`; servers do not control a player's preferred SSU screen size.
+- Existing SSU layouts are intentionally unchanged. Screen width/height, panel calculations, columns, widget coordinates and editor geometry continue to operate in the original 100% logical coordinate space.
+- A central screen render transform scales the final SSU UI around the screen centre, so future SSU screens inherit the setting automatically instead of each screen maintaining separate scale math.
+- Mouse click/drag/release coordinates are inverse-mapped to the same logical coordinate space so buttons, text fields, custom hitboxes, map widgets and container interactions stay aligned with their scaled visuals.
+- Hover/render mouse coordinates and normal Screen scrolling are mapped as well; custom SSU scroll handlers that inspect pointer position use the same logical mapping.
+- Minecraft's global GUI Scale value is never modified, so inventories/chat/vanilla menus outside SSU retain the player's normal size.
+- A subtle unscaled edge dim remains behind shrunken SSU screens so scaling a full-screen backdrop does not leave visually harsh undimmed borders.
+
+### Compatibility
+- Network protocol remains `116`.
+- NPC definition schema remains `17`; NPC placement schema remains `4`.
+- Community Statistics persistence remains schema `1`.
+- No server/world migration is required.
+
+# Simple Server Utilities 1.9.0-dev3.37
+
+## Community statistics foundation + website analytics API
+
+### Curated community statistics
+- Added a new built-in **Community Statistics** service on top of the existing Content Event Core. It does not duplicate gameplay hooks and therefore stays aligned with achievements, quests and administrator-defined statistics.
+- Community statistics are collected automatically when `enableCommunityStatistics=true` (default) and do not require admins to create statistic definitions first.
+- Every tracked player and the server aggregate now maintain separate **Lifetime, Day, Week, Month and Season** buckets. Day/week/month use stable UTC keys; the current season is controlled by `communityStatsSeasonId`. Changing the season id starts a fresh season bucket while archiving the previous one.
+- Completed daily snapshots are retained for 90 days by default (`communityStatsHistoryDays`, configurable 7-730). Weekly history retains 104 buckets, monthly 36 and season history 16.
+- Current buckets retain bounded breakdowns such as target/block/entity/minigame id, dimension, movement mode, role and team when the source event supplies that metadata. This lays the foundation for pages such as top mined blocks, popular minigames and travel-by-dimension.
+- Derived engagement metrics include Active days, Active players, Player-active-days, Unique biomes and Unique dimensions.
+- Initial automatic metric catalog includes sessions/playtime, blocks, combat, crafting/consumption, travel/exploration, claims, auctions, quests, NPC interactions, achievements, minigames and dungeons.
+- Metric metadata exposes display name, category, unit, raw-value scale and a `leaderboardSafe` hint. Easily farmed raw counters such as block breaking remain useful for community goals without automatically being treated as trusted competitive leaderboards.
+- Large teleport/correction jumps remain excluded by the existing Content Core distance sampler.
+- Durable Content Events keep per-player event-id dedupe protection to avoid duplicate counting when a durable source retries an event.
+- Fixed an older Content Core issue where login/logout events were published both by `ContentCoreEvents` and `ContentGameplayEvents`; the gameplay adapter now owns movement/exploration state only, preventing new session/login stats from double-counting.
+
+### Website analytics API
+- Web API v1 remains read-only and gains community-stat endpoints without exposing Minecraft collections to HTTP worker threads. The statistics service publishes an immutable analytics snapshot on the server thread.
+- Added `statistics` to `/api/v1/capabilities`.
+- Added endpoints:
+  - `GET /api/v1/stats/catalog`
+  - `GET /api/v1/stats/server`
+  - `GET /api/v1/stats/players?period=week&limit=100`
+  - `GET /api/v1/stats/player/<uuid-or-name>`
+  - `GET /api/v1/stats/leaderboard?metric=minigame_wins&period=week&limit=10`
+  - `GET /api/v1/stats/history?metric=play_time_seconds&period=day`
+- Leaderboards are generated from the immutable web snapshot, not by reading player files/world state on HTTP threads.
+- Raw values are intentionally lossless integers. Metric catalog `scale=100` marks values such as damage/auction money that should be divided by 100 for display.
+- Remote actions remain disabled. This build is analytics/read-only only.
+
+### Persistence / compatibility
+- New Community Statistics persistence schema: `1`, stored under `simpleserverutilities/statistics/community/`.
+- Existing administrator-defined custom-statistics schema remains unchanged (`definitions=2`, player values `2`).
+- Network protocol remains `116`; NPC definition schema remains `17`; NPC placement schema remains `4`.
+- Existing worlds start collecting community history from the moment dev3.37 is first run; SSU does not invent historical data that was never tracked.
+
+# Simple Server Utilities 1.9.0-dev3.36
+
+## Advanced boss phase actions + website API foundation
+
+### Boss encounter phase actions
+- Boss phases can now contain up to 8 ordered **entry actions** that execute once when an active encounter enters that phase.
+- Added a dedicated in-game **Phase actions** editor reachable from the Boss page; no JSON editing is required.
+- Initial action set:
+  - **Announce**: custom encounter overlay text (blank uses the phase name).
+  - **Trigger ability**: deterministically starts an existing NPC ability when the phase begins.
+  - **Spawn adds**: spawns 1-16 dynamic SSU NPCs from another NPC template around the boss.
+  - **Heal %**: heals the boss by a percentage of maximum health.
+  - **Reset threat**: clears the current encounter threat table.
+  - **Fixate random player**: forces the boss onto one valid nearby player for 1-60 seconds.
+  - **Despawn adds**: removes adds previously spawned by the encounter.
+- Every phase also has a **Taunt immune** toggle. External tank/taunt hooks are ignored during that phase while scripted Fixate still works. Scripted Fixate is encounter-owned and does not require normal Threat/Aggro to be enabled.
+- Spawned adds are encounter-owned runtime NPCs. They are not persisted as normal placements and are automatically removed when the boss resets or dies.
+- Phase-entry state is encounter-aware: the initial phase actions do not fire merely because a boss exists in the world; they begin when SSU combat actually starts.
+- Existing phase announcements remain as a compatibility fallback when a changed phase has no explicit Announce action.
+- Ability renames/deletes update phase-action references in the editor, and server validation rejects missing scripted ability references.
+
+### Website integration foundation
+- Added an opt-in **read-only HTTP API v1** intended for websites, dashboards and status pages.
+- The API is disabled by default and defaults to `127.0.0.1:8765` for reverse-proxy use.
+- Authentication uses an `Authorization: Bearer <token>` header. SSU refuses to start the API when the configured/effective token has fewer than 16 characters.
+- `SSU_WEB_API_TOKEN` may be supplied as an environment variable so production servers do not have to store the token in a committed config file.
+- Minecraft state is copied into an immutable snapshot on the server thread once per second; HTTP worker threads never read live world/player collections directly.
+- Initial endpoints:
+  - `GET /api/v1/health`
+  - `GET /api/v1/status`
+  - `GET /api/v1/players`
+  - `GET /api/v1/capabilities`
+- Status includes online players, player UUID/name/dimension and a compact NPC runtime summary.
+- Optional exact-origin CORS support is available through `webApiAllowedOrigin`; blank keeps cross-origin browser access disabled.
+- **Remote commands/admin actions are intentionally not exposed yet.** API capabilities report `remoteActions=false`; the read-only authenticated/versioned bridge is the foundation for a later permission-scoped action layer.
+
+### Compatibility
+- Network protocol is `116` (was `115`) because boss phase actions are synchronized through the NPC editor payload.
+- NPC definition schema is `17` (was `16`) for persisted phase actions. Older NPCs migrate with empty phase-action lists.
+- NPC placement schema remains `4`; spawn-profile/dialogue/quest schemas remain `1/2/2`.
+
+# Simple Server Utilities 1.9.0-dev3.35
+
+## NPC AI-family polish + free-form role styling
+
+### Cosmetic role/title editor
+- Replaced the old fixed NPC role selector with a free-form **Role / occupation** text field (up to 64 characters). The role remains cosmetic metadata and no longer implies NPC functionality.
+- Added a compact **2 x 8 palette** beside the role field with all 16 classic Minecraft formatting colors. The selected color is used by the overhead role/title label and the generated NPC service menu.
+- Schema-15 and older NPCs migrate their legacy role IDs once to the same human-readable labels (`guard` -> `Guard`, `merchant` -> `Merchant`, etc.) and default to the existing gray role color.
+- A blank role is valid and simply removes the role/title line from the SSU overhead label.
+- NPC shop controls are no longer gated by the old `Merchant` role. Any NPC can link/create a shop independently of its cosmetic title.
+
+### Species-family AI polish
+- Added a higher-level runtime `NpcAiProfile` layer on top of dev3.34.4 locomotion. SSU now differentiates Humanoid ground, Ground creature, Hopping, Flying, Aquatic, Amphibious and Native-special families.
+- The profile is derived automatically from the actual NPC shell/model; it is not another setting admins have to maintain.
+- Each family has its own route/combat repath cadence and arrival tolerances so a Slime/Rabbit, Vex, fish and Villager are no longer evaluated as if they were the same walking body. Special shells such as Breeze/Enderman/Shulker/Warden stay in a conservative native-special family.
+- Flying/swimming combat chasers aim around the target body rather than always steering at the target's feet.
+- Wander is now movement-family aware: flying/aquatic NPCs can choose 3-D destinations, aquatic families prefer water targets, while normal ground NPCs retain 2-D ground wandering.
+- The navigation controller now permits the faster family-specific combat repath intervals while keeping patrol/schedule profiles conservative enough to avoid the old every-few-ticks path thrashing.
+- Patrol, schedule and wander share species-aware route-arrival logic, accepting a valid finished native path near the requested point instead of requiring every model to hit one exact XYZ.
+
+### Combat return + diagnostics
+- Combat cleanly interrupts patrol/schedule movement without discarding the logical patrol index or active schedule slot. When combat ends, SSU clears the chase route once and resumes the ambient route from the correct state.
+- The NPC Editor Behavior page now shows a compact **AI family** and **runtime state** snapshot (Patrol point, Schedule slot, Combat/return state, pathing state and route speed where relevant) to make movement debugging substantially easier.
+- Existing Threat/Aggro, Attack Pattern and Boss state remains compatible with the new AI-family routing.
+
+### Compatibility
+- Network protocol is `115` (was `114`) because role color and NPC editor/runtime diagnostic fields are now synchronized.
+- NPC definition schema is `16` (was `15`) for the free-form role/title + role color migration.
+- NPC placement schema remains `4`; NPC Spawn Profile schema remains `1`; NPC dialogue schema remains `2`; Quest definition schema remains `2`.
+
+# Simple Server Utilities 1.9.0-dev3.34.4
+
+## NPC label + locomotion polish
+
+- Native Player NPCs now suppress Minecraft's own entity/type nametag at renderer level. SSU's role/name/faction/quest stack is the only intended overhead identity display.
+- SSU NPC overhead labels now use the entity's partial-tick interpolated render position instead of its last tick position, preventing role/name/faction text from visibly trailing behind a smoothly moving NPC.
+- Added automatic runtime locomotion profiles derived from the actual entity shell. This is not a second editor setting and requires no migration.
+- Ground walkers (including the native Player NPC and normal ground mobs) continue through their native `PathNavigation`/`MoveControl`.
+- Slime and Magma Cube shells keep their native hopping controller instead of receiving Player-style physical steering.
+- Vex/Ghast/Phantom/Bat/Wither-style free-flight shells are driven through their specialised native `MoveControl`; Allay/Bee/Parrot-style flying path navigators keep native path navigation.
+- Aquatic/amphibious shells retain native water-oriented navigation where available. Modded mobs get a conservative runtime fallback based on their native navigation/control implementation.
+- Native flying shells keep airborne/no-gravity semantics automatically even if the generic `Can fly` override is off. The explicit `Can fly` option remains available for intentionally making an otherwise-grounded shell fly.
+- Stopping an SSU route also puts specialised native MoveControls into `WAIT`, preventing old Vex/Ghast-style wanted positions from continuing to pull an NPC after arrival.
+- The shared smooth-path rule from dev3.34.1 remains: SSU chooses the destination, while the shell's own native movement controller owns how it gets there and unchanged paths are not rebuilt every behavior tick.
+- This build is a locomotion/pathfinding foundation, not a claim that every Minecraft species already has bespoke SSU decision-making/brain behavior. Species-specific higher-level behaviors can now be layered on top without forcing every model through Player movement.
+- Network protocol stays `114`; NPC definition schema stays `15`; placement schema stays `4`.
+
+# Simple Server Utilities 1.9.0-dev3.34.3
+
+## Patrol arrival / route-state hotfix
+
+- Fixed patrols that visually reached waypoint 1 but never advanced because SSU required an overly strict exact 3-D distance to the stored waypoint coordinate.
+- Patrol arrival now uses horizontal/vertical route tolerances appropriate for a living mob instead of one exact floating-point sphere.
+- When vanilla `PathNavigation` has completed and the NPC is already close to the requested waypoint, that completed native path is accepted as arrival. This prevents a valid final path node from leaving the logical patrol index stuck forever.
+- Waypoint transitions now clear both SSU route bookkeeping and the completed native navigation path before installing the next segment in the same behavior update. Entity velocity is deliberately preserved for smooth movement.
+- Unreachable-point recovery immediately starts the replacement waypoint instead of waiting for another behavior update.
+- Loop/Ping-pong/Random all share the corrected transition path.
+- Network protocol stays `114`; NPC definition schema stays `15`; placement schema stays `4`.
+
+# Simple Server Utilities 1.9.0-dev3.34.2
+
+## Patrol continuation hotfix
+
+- Fixed native Player NPC patrols being able to reach the current waypoint and then remain on the completed native navigation segment instead of reliably starting the next point.
+- Every patrol waypoint advance now updates the active patrol index and invalidates the old SSU navigation cache as one operation. The following move call immediately supplies the next destination to Minecraft `PathNavigation`.
+- The transition intentionally does not zero velocity or hard-stop the entity, preserving the smoother dev3.34.1 steering behavior.
+- `Loop` continues from the final point back to point 1; Ping-pong and Random use the same safe segment transition.
+- New GUI/world-editor patrol points now default to zero seconds pause. Existing configured pauses are unchanged.
+- Network protocol stays `114`; NPC definition schema stays `15`.
+
+# Simple Server Utilities 1.9.0-dev3.34.1
+
+## NPC movement / native Player NPC hotfix
+
+- Player NPC base `MOVEMENT_SPEED` is fixed at the SSU native default `0.25`; admins now use the Behavior route-speed multiplier instead of accidentally multiplying two separate speed settings.
+- Player-mode Stats no longer exposes the duplicate movement-speed attribute.
+- Route-speed UI now explicitly describes `1.0` as normal speed; slower decimal values such as `0.5` remain valid.
+- `NpcNavigationController` keeps an existing vanilla path stable instead of requesting a new path every four ticks.
+- Moving targets only trigger a re-path after meaningful destination drift and a short cooldown; true stalls still force recovery.
+- Patrol points with `0` seconds pause no longer hard-stop the NPC between nodes.
+- Manual static/no-AI gravity physics now backs off whenever a Mob's native AI is active, preventing SSU from zeroing velocity while `MoveControl` is steering.
+- Added the `entity.simpleserverutilities.player_npc` English translation as a safe fallback for contexts outside SSU's own NPC label.
+- Network protocol stays `114`; NPC definition schema stays `15`.
+
+# Simple Server Utilities 1.9.0-dev3.34
+
+## Advanced combat patterns
+- Added optional ordered **Attack Patterns** for combat NPCs and bosses. Existing NPCs keep the dev3.33 random/legacy ability scheduler until the feature is explicitly enabled.
+- A pattern can contain up to 24 enabled/disabled steps and can mix normal **Melee** actions with a specific configured **Ability**.
+- Every step can be restricted by target distance, the NPC's own health percentage and an optional boss phase.
+- Pattern state is encounter-local, advances after completed melee/actions or intentionally skipped unavailable/chance-failed ability steps, and resets cleanly on boss phase changes, encounter reset, definition edits or runtime removal.
+- Ability and boss-phase renames now update matching pattern references; deleting either clears stale references instead of leaving broken editor data.
+
+## Threat / aggro
+- Added opt-in per-NPC threat tables with configurable range, damage multiplier, healing multiplier, decay per second and target-switch ratio.
+- Confirmed incoming damage adds threat only after SSU's damage protection/authorization checks have passed.
+- Target selection uses switch hysteresis so a tiny threat difference does not make an NPC rapidly bounce between players.
+- Creative/spectator players, dead/removed entities, friendly targets and targets outside the configured threat range are rejected/pruned.
+- Added a bounded taunt hook for future tank/role mechanics. A taunt raises the target above current threat and can force it for a limited duration.
+- Added source-attributed healing-threat support for SSU systems that know the healer. The existing SSU Self Heal ability now reports its actual healed amount through this hook. Generic vanilla/NeoForge heals are not guessed when no healer source exists.
+- Boss reset clears threat, casts/cooldowns and pattern state so a restarted encounter never inherits stale aggro.
+
+## NPC Editor / compatibility
+- Added a dedicated **Tactics** page to the NPC Editor for Threat and Attack Pattern setup, including step browsing, action/ability/phase selection and range/HP conditions.
+- Server-side payload bounding and validation reject missing ability/phase references and cap pattern/threat values.
+- Network protocol is `114` (was `113`) because NPC editor payloads carry threat and attack-pattern settings.
+- NPC definition schema is `15` (was `14`). Existing definitions migrate with both new systems disabled, preserving previous combat behaviour by default.
+- NPC placement schema remains `4`; NPC Spawn Profile schema remains `1`; NPC dialogue schema remains `2`; Quest definition schema remains `2`.
+
+---
+
+# Simple Server Utilities 1.9.0-dev3.33
+
+## Native Player NPC runtime
+- Replaced the Player visual mode's mannequin runtime shell with SSU's own registered `simpleserverutilities:player_npc` entity.
+- The native Player NPC extends `PathfinderMob`, so schedule, patrol, wander, chase, flee and recovery movement can use Minecraft's normal mob collision and `PathNavigation` instead of the non-Mob fallback movement path.
+- The entity deliberately registers no vanilla goals. SSU remains authoritative for behavior, schedules, patrols, reactions, combat and boss/ability control, avoiding competing AI controllers.
+- Existing Player NPCs migrate at runtime without rewriting their saved definitions: reconciliation notices the old shell type, discards it and recreates the same managed placement on the native SSU entity.
+- The saved fallback `entityType` is retained for data compatibility and is not exposed as the physical Player runtime.
+
+## Player rendering
+- Added a dedicated dependency-free SSU Player NPC renderer and 64x64 model with **Wide / Steve** and **Slim / Alex** arm geometry plus normal skin overlay parts (hat, jacket, sleeves and pants).
+- Player NPC skins continue to use the existing server-authoritative local/HTTPS validation, hashing, caching and client texture sync.
+- Wide/Slim choice is also synchronized for Player NPCs using the default Steve/Alex texture, so Slim geometry no longer depends on having a custom PNG. This reuses the existing texture-sync packet shape and does not require a protocol bump.
+- Removed the client mannequin skin mixin and the mannequin-specific `PlayerSkin` cache path; dynamic NPC texture registration is now shared cleanly by Player and Entity appearance modes.
+- Added basic walk, look, crouch and SSU melee-swing animation to the native Player model.
+- The internal `simpleserverutilities:player_npc` runtime type is hidden from the normal Entity model picker.
+
+## Compatibility
+- Network protocol remains `113`.
+- NPC definition schema remains `14`; NPC placement schema remains `4`; NPC Spawn Profile schema remains `1`; NPC dialogue schema remains `2`; Quest definition schema remains `2`.
+- No GeckoLib/custom-geometry dependency is introduced.
+- The dev3.30.1 safe melee fallback for living shells without `minecraft:attack_damage` remains unchanged; the native Player NPC itself registers the combat/navigation attributes SSU requires.
+
+---
+
+# Simple Server Utilities 1.9.0-dev3.32
+
+## Native NPC appearance & custom textures
+- Reduced the active NPC visual system to **Entity** and **Player**. Custom geometry is parked and no external renderer dependency is used.
+- Entity NPCs can now use optional server-local or HTTPS PNG overrides per NPC template while retaining the selected Minecraft living entity's native model, animation, pose, hitbox, equipment and AI/runtime shell.
+- Added a per-entity render-state texture bridge plus a narrow `LivingEntityRenderer` base-texture redirect; shared vanilla renderer instances are never globally mutated.
+- Player NPCs retain Wide/Steve and Slim/Alex support with strict 64x64 PNG validation.
+- Entity PNGs accept normal Minecraft texture dimensions up to the existing safety bounds and should follow the selected entity's vanilla UV layout.
+- Legacy dev3.31 `Custom model` definitions normalize back to Entity using their persisted fallback entity type. Legacy custom-geometry fields remain serialized only for safe development-data compatibility and are not exposed in the editor.
+- Removed the unused optional external-renderer support helper and all active GeckoLib planning from SSU.
+- Added `docs/NPC-TEXTURES.md` and a dev3.32 test checklist.
+
+## Compatibility
+- Network protocol is `113` (was `112`).
+- NPC definition schema is `14` (was `13`).
+- NPC placement schema remains `4`; NPC Spawn Profile schema remains `1`; NPC dialogue schema remains `2`; Quest definition schema remains `2`.
+- The dev3.30.1 safe melee fallback for shells without `minecraft:attack_damage` remains intact.
+
+---
+
+# Simple Server Utilities 1.9.0-dev3.31
+
+## NPC custom-model & animation foundation
+- Added explicit NPC visual modes: **Entity**, **Player skin**, and **Custom model**. Existing entity/player-skin definitions migrate automatically.
+- Custom-model templates now persist a provider-neutral model resource, texture resource and animation resource while retaining a normal living entity as a safe physical fallback shell.
+- Added a dedicated **Animations** NPC editor page with mappings for Idle, Walk, Attack, Cast/Ability, Hurt and Death.
+- Added strict resource-ID validation and safe normalization for `.geo.json`, `.animation.json` and `.png` references.
+- Added `NpcAnimationBridge`, a renderer-independent semantic state layer. SSU melee combat now publishes ATTACK and ability casts publish CAST; WALK/IDLE/HURT/DEATH are derivable from the living runtime shell.
+- Added `NpcCustomModelSupport` as an optional-provider boundary. Core SSU contains no direct GeckoLib references, so a missing animation library cannot stop SSU or an existing world from loading.
+- Custom model mode deliberately keeps rendering the configured fallback living entity until an animated renderer provider is registered; all AI, collision, combat, schedules, natural spawning and boss logic continue to function on that shell.
+- Added `docs/CUSTOM-NPC-MODELS.md` and a dedicated dev3.31 migration/runtime test checklist.
+
+## Compatibility
+- Network protocol is `112` (was `111`) because NPC editor payloads now carry visual-mode, model-resource and animation mapping data.
+- NPC definition schema is `13` (was `12`). Existing custom player skins migrate to Player skin mode; other definitions migrate to Entity mode.
+- NPC placement schema remains `4`; NPC Spawn Profile schema remains `1`; NPC dialogue schema remains `2`; Quest definition schema remains `2`.
+- The dev3.30.1 safe melee fallback for mob shells without `minecraft:attack_damage` is retained.
+
+---
+
+# Simple Server Utilities 1.9.0-dev3.30.1
+
+## NPC combat crash hotfix
+- Fixed a server-tick crash when an SSU combat NPC uses a vanilla/modded `Mob` shell that does not expose the `minecraft:attack_damage` attribute.
+- SSU now uses vanilla `Mob#doHurtTarget` only when the shell actually has `ATTACK_DAMAGE`; otherwise it performs a safe `MOB_ATTACK` fallback using the NPC template's configured attack damage (or 1 damage when inheriting from a shell with no attack attribute).
+- This prevents persistent world-load crash loops caused by the same NPC immediately retrying the invalid melee attack after the world is opened.
+
+## Compatibility
+- Network protocol and all persistence schemas are unchanged.
+- No world/NPC data migration is required.
+
+---
+
+# Simple Server Utilities 1.9.0-dev3.30
+
+## NPC Abilities
+- Added reusable per-template NPC abilities. The same ability loadout works for persistent placements and dev3.29 dynamic natural/spawner NPCs.
+- First built-in ability types: **Power Strike**, **Ranged Blast**, **Shockwave**, **Self Heal**, and **Leap**.
+- Abilities support enabled state, unique ID/display name, cooldown, wind-up, recovery, use chance, minimum/maximum range, damage, radius, knockback, healing and an optional boss-phase binding.
+- Ability casting temporarily owns combat movement when required, uses a visible End Rod telegraph during wind-up, and resumes normal chase/melee flow after recovery.
+- Ability damage respects SSU combat authorization/faction hostility rather than blindly damaging every nearby living entity.
+- Saving an NPC definition clears in-flight casts/cooldowns from the previous definition so edited abilities cannot finish with stale configuration.
+
+## Boss / bossfight foundation
+- Added optional **Boss encounter** configuration directly to NPC templates; bosses reuse the normal NPC navigation, factions, reactions, combat profiles and ability engine rather than using a separate AI stack.
+- Added a real server boss bar with configurable visibility/range and live health progress.
+- Added up to 8 health-threshold boss phases. Each phase can independently scale movement speed, attack/ability cooldown cadence and ability damage.
+- Abilities can be bound to one phase or left unbound to remain available in every phase.
+- Phase transitions are announced to nearby players through an overlay message.
+- Added encounter reset/leash behaviour: configurable reset distance and idle timeout, return to the placement/spawn anchor, optional full heal, ability cooldown reset and restoration of configured stationary/no-AI state.
+- Healthy idle bosses are not forcibly pinned to their anchor, so scheduled/patrol bosses remain possible outside active/reset encounters.
+
+## NPC Editor
+- Added dedicated **Abilities** and **Boss** pages while keeping the existing compact editor footprint.
+- Ability page supports create/delete/cycle, ability type selection and all timing/range/effect/phase parameters.
+- Boss page supports encounter/bossbar/reset toggles, arena/reset settings and phase creation/editing with health and combat multipliers.
+- Phase renames update linked ability phase IDs; deleting a phase safely clears links that referenced it.
+
+## Compatibility
+- Network protocol is `111` (was `110`) because NPC editor payloads now carry ability and boss configuration.
+- NPC definition schema is `12` (was `11`). Existing definitions migrate with no abilities and boss encounters disabled.
+- NPC placement schema remains `4`; NPC Spawn Profile schema remains `1`; NPC dialogue schema remains `2`; Quest definition schema remains `2`.
+- Existing placements, schedules, patrols, spawn profiles, dialogue and quest data require no migration.
+
+---
+
+# Simple Server Utilities 1.9.0-dev3.29.1
+
+## Compile hotfix
+- Fixed `NpcSpawnManager` importing `Heightmap` from the obsolete package; 26.2 uses `net.minecraft.world.level.levelgen.Heightmap`.
+- Replaced removed `ServerLevel#getDayTime()` usage with `Level#getDefaultClockTime()` for spawn-profile day/night checks.
+
+## Compatibility
+- Network protocol remains `110`.
+- NPC Spawn Profile schema remains `1`.
+- NPC definition/placement/dialogue/quest schemas remain `11/4/2/2`.
+- No persistence migration is required.
+
+---
+
+# Simple Server Utilities 1.9.0-dev3.29
+
+## Dynamic NPC Spawning
+- Added persistent **NPC Spawn Profiles** under `npcs/spawn_profiles`, separated from reusable NPC templates and persistent NPC placements.
+- Added natural spawning with exact dimension selection, optional biome allow-list, day/night filtering, Y/light ranges, chance/cycle/attempt controls, group sizes, player-distance bands, nearby caps, global caps and despawn distance.
+- Added vanilla-Spawner-backed NPC population. Profiles bind to an actual Spawner block and support cooldown, radius, activation range, group/cap rules and the shared environmental filters.
+- Bound enabled SSU spawners suppress their original vanilla mob spawn through the NeoForge spawner position-check path, preventing duplicate vanilla + SSU population from the same block.
+- Dynamic NPCs reuse the normal NPC template runtime (appearance, faction, labels, loot, stats, reactions/combat) but are not written as persistent placements.
+- Dynamic population is removed when its profile is deleted/renamed, when its runtime entity disappears, or when no player remains within its configured despawn distance.
+
+## NPC Manager / editor
+- Added **Spawning** as a third NPC Manager tab beside Templates and Placements.
+- Added Spawn Profile create/edit/test/delete actions, live-population counts and source/location summaries.
+- Added dedicated Spawn Profile GUI with Natural/Spawner source selection, template cycling, environmental filters, population limits and source-specific controls.
+- Added **Rebind looked-at spawner** for moving a profile to another physical vanilla Spawner.
+- NPC template renames update linked spawn profiles; deleting a template is blocked while spawn profiles still use it.
+
+## Compatibility
+- Network protocol is `110` (was `109`) for the new spawn-profile editor payloads and NPC Manager mode.
+- NPC Spawn Profile schema is `1`.
+- NPC definition schema remains `11`; NPC placement schema remains `4`; NPC dialogue schema remains `2`; Quest definition schema remains `2`.
+- Existing NPC templates, placements, schedules, patrols and dialogue/quest data need no migration.
+
+---
+
+# Simple Server Utilities 1.9.0-dev3.28
+
+## NPC Combat & Reactions foundation
+- Added independent NPC combat reactions so **attitude** (friendly/neutral/hostile) no longer directly dictates behaviour.
+- New **When attacked** reactions: Ignore, Flee, Fight back, and Fight + call allies.
+- New **When friendly attacked** reactions: Ignore, Assist, and Assist + call allies. Friendly assistance works against otherwise-neutral attackers and respects configured faction friendliness.
+- New **Hostile seen** reactions: Ignore, Avoid, and Attack. A HOSTILE relation can therefore be used for avoidance/fear behaviour without forcing combat.
+- Direct retaliation/flee reactions have priority over ally assistance and normal hostile sight acquisition.
+- Recent attacks are remembered for a bounded 10 seconds; schedules/patrols pause while SSU owns an active combat/flee state and resume afterwards.
+
+## Combat profiles
+- Added reusable first-generation combat profiles: **Passive**, **Melee**, **Defender**, and **Aggressive**.
+- Passive NPCs never initiate/perform SSU attacks; Melee uses the baseline chase/cadence; Defender chases more cautiously; Aggressive closes distance faster and attacks more frequently.
+- Added configurable **assist range**, **flee distance**, and base **attack cooldown**.
+- Managed melee attacks may now hit explicit retaliation/assist targets even when those attackers were not already HOSTILE, while SSU still blocks arbitrary friendly/neutral damage.
+- Stationary/look-at Mob shells temporarily enable AI while SSU combat owns them and restore their configured AI state when combat ends.
+- Non-Mob shells can participate in flee/avoid movement through the dev3.27 collision-aware navigation layer; active melee attacks still require a Mob-backed shell.
+
+## NPC Editor
+- Added a dedicated **Combat** page to the NPC editor for combat profile, self-defense reaction, friendly-defense reaction, hostile-sight reaction, assist range, flee distance, and attack cooldown.
+- Repacked the editor tabs into two compact six-column rows so the new page does not increase the editor height.
+
+## Compatibility
+- Network protocol is `109` (was `108`) because NPC editor payloads carry the new combat configuration.
+- NPC definition schema is `11` (was `10`). Existing definitions migrate with Fight back / Assist / Attack, Melee profile, 16-block assist range, 12-block flee distance, and 20-tick attack cooldown defaults.
+- NPC placement schema remains `4`; schedule, patrol, dialogue and quest data formats are unchanged.
+- NPC dialogue schema remains `2`; Quest definition schema remains `2`.
+- No other persistence schema changes.
+
+---
+
+# Simple Server Utilities 1.9.0-dev3.27
+
+## NPC AI foundation — navigation, routes and schedules
+- Added a shared `NpcNavigationController` used by schedule, patrol and wander movement instead of maintaining separate movement loops.
+- Mob-backed NPCs continue to use Minecraft `PathNavigation`; non-Mob living shells (including custom player-skin mannequins) no longer use incremental `snapTo()` for normal ground travel and now move through collision-resolving entity movement.
+- Added progress/stuck detection with bounded recovery. Wander chooses a new destination when unreachable, patrol skips an unreachable waypoint instead of freezing the whole route, and schedules stop/retry rather than phasing through geometry.
+- Fixed relation/combat updates cancelling normal navigation every 10 ticks when no hostile target existed.
+- Hostile combat now temporarily interrupts schedule/patrol movement and the normal route resumes after the managed target is gone.
+- Fixed scheduled no-AI shells dragging their persistent placement/home anchor along while walking their schedule.
+
+## In-world route editing
+- Patrol editor now draws route segments between waypoints instead of only isolated End Rod markers.
+- Added session undo: sneak + right-click air restores the previous patrol edit; normal right-click air still finishes and reopens the NPC editor.
+- Added an in-world **Schedule destination editor**. Right-click blocks to add destinations, sneak-right-click near a destination to remove it, sneak-right-click air to undo, and right-click air to finish.
+- New in-world schedule destinations use the current in-game time; if that exact minute is already occupied SSU picks the next free 30-minute slot. Exact times remain editable afterwards.
+
+## Schedule UX and arrival actions
+- Schedule **Add** now creates a destination at the administrator's current location, facing and in-game time instead of a generic origin/default time.
+- Added quick **Use my location** and **Now** controls.
+- Reworded activity as **On arrival** and added explicit `Work / use main hand` and `Guard area` activities while preserving legacy `chop_tree` schedules.
+- Arrival actions run after the NPC reaches its active schedule point and remain active until the next schedule time.
+
+## Compatibility
+- Network protocol remains `108`; no payload shape changed.
+- NPC definition schema remains `10`.
+- NPC placement schema remains `4`; existing schedules/patrols remain compatible.
+- NPC dialogue schema remains `2`; Quest definition schema remains `2`.
+- No other persistence schema changes.
+
+---
+
+# Simple Server Utilities 1.9.0-dev3.26.2.1
+
+## Compile hotfix
+- Added the missing `NpcManager.syncAll()` API used by the dev3.26.2 NPC/Quest workflow changes.
+- `syncAll()` performs a full NPC runtime refresh and immediately resends NPC labels/quest markers.
+- Fixes the six `cannot find symbol: method syncAll()` Java compile errors reported from `NpcCommands`, `NpcAdminService`, `NpcEditorService`, `NpcQuestWorkflowService`, `QuestEditorService`, and `QuestManager`.
+- No gameplay, protocol, persistence-schema, or data-format changes.
+
+---
+
+# Simple Server Utilities 1.9.0-dev3.26.2
+
+## NPC Quest workflow UX
+- Added **Manage quests…** directly to the NPC Interaction editor. Admins can search/select a quest and set the NPC relationship with one click: Offer, Turn-in, Both, or Unlink.
+- Added a simple per-quest NPC dialogue editor for Available / Accept / In Progress / Ready / Turn-in / Completed text plus the `!`, `•`, and `?` markers.
+- SSU now generates and maintains the underlying `quest_ready` / `quest_available` / `quest_active` / `quest_completed` condition routing, fallbacks, `quest_offer`, and `quest_turn_in` services automatically for simple NPC quest links.
+- Multiple linked quests on the same NPC receive an automatic player-specific quest selector with paging. Simple workflow links are bounded to 12 quests per NPC to remain inside the existing dialogue-node limits.
+- Deleting a linked quest rebuilds generated dialogue; deleting an NPC placement from the editor, admin browser or NPC command clears simple quest links to that placement.
+- The existing full graph editor is preserved as **Advanced dialogue** for custom branches, AND/OR/NOT conditions, services, and complex conversations.
+
+## Quest access
+- Quest access now supports **Quest Menu**, **NPCs**, or **Both** instead of an exclusive Menu/NPC toggle.
+- When the first NPC quest is linked while access is still Quest Menu only, SSU explicitly asks whether to enable **NPCs only** or **Both** before saving the link.
+- The same three-way access mode is available from SSU Settings and the NPC quest workflow.
+
+## Compact Quest Definition Editor
+- Reduced the editor from `720×474` to `550×344`, approximately 24% narrower and 27% shorter, fixing the editor extending outside the visible game area at common GUI scales.
+- Reorganized editing into **General**, **Objectives**, **Rewards**, and **NPC Integration** tabs.
+- Added clear labels throughout and removed raw entry fields from the normal path wherever a guided control is possible.
+- Objective event, prerequisite type, and reward type now use searchable option pickers instead of long click-to-cycle/raw syntax workflows.
+- Quest icons, item/block objective targets, and item rewards use inventory-style registry pickers.
+- Quest prerequisites use a searchable quest picker; NPC integration uses searchable placement pickers.
+- Objective IDs are generated automatically and collision-safe after add/delete operations.
+- New quest IDs follow the title automatically and avoid existing quest IDs until the admin manually edits the ID.
+- Raw objective metadata and uncommon/custom condition/reward parameters remain behind explicit advanced controls for compatibility.
+
+## NPC integration from Quest Editor
+- Quests can directly select a **Quest giver** and a separate **Turn-in NPC**.
+- Added quick marker controls for Available `!`, Active `•`, and Ready `?`.
+- Added a simple six-state NPC dialogue text editor directly from the quest.
+- Selecting a turn-in NPC automatically requires turn-in semantics server-side.
+
+## Compatibility
+- Network protocol: `108` (was `107`).
+- Quest definition schema: `2` (was `1`). Existing schema-1 quests migrate with no NPC links and retain their existing objectives/rewards/prerequisites.
+- NPC dialogue schema remains `2`.
+- NPC definition schema remains `10`.
+- NPC placement schema remains `4`.
+- Other persistence schemas are unchanged from dev3.26.1.
+
+# Simple Server Utilities 1.9.0-dev3.26.1
+
+## NPC Dialogue condition editor hotfix
+- Fixed the Dialogue Editor 2.1 condition `Type` cycle getting stuck when the next registered type was `not` but the selected condition did not have exactly one child.
+- Invalid direct `not` transitions are now skipped automatically; `Wrap NOT` remains the intended way to negate an existing condition tree.
+- Quest condition types such as `quest_available`, `quest_active`, `quest_ready` and `quest_completed` are reachable normally again from the condition editor.
+- No network protocol or persistence schema changes versus dev3.26.
+
+# Simple Server Utilities 1.9.0-dev3.26
+
+## NPC Dialogue, Interaction & Quest integration
+- Added **player-specific dialogue node gates**. A dialogue node can now have its own Content Condition, not just individual choices.
+- Added an optional **fallback node** per dialogue node. When the selected node is not available for the interacting player, SSU follows the configured fallback chain without executing the blocked node's entry actions.
+- Fallback routes are bounded and cycle-safe. Missing/self/cyclic fallback references are rejected by both editor validation and authoritative normalization.
+- Added the new `quest_available` condition, which uses the real NPC quest-access/start validation including prerequisites, repeatability and cooldowns.
+- Existing `quest_active`, `quest_ready` and `quest_completed` conditions can now be used on whole dialogue nodes as well as choices, enabling state-dependent conversation branches.
+- Dialogue Editor 2.1 can switch its Conditions page between the selected **Node** and **Choice**, exposes the node fallback route, and provides a server-backed quest picker for quest conditions.
+- Dialogue node text can now be edited with SSU's reusable **rich-text editor** (16 colours plus bold/italic/underline/strikethrough), and the player dialogue/preview screens render that formatting.
+- Quest offer/turn-in choices continue to use the existing server-authoritative `quest_offer` / `quest_turn_in` NPC services and their live quest target catalogue.
+- Added **player-specific quest markers above NPCs**:
+  - `!` = at least one linked quest can currently be started from this NPC
+  - `?` = at least one linked turn-in quest is ready
+  - `•` = a linked quest is active
+- Quest markers are inferred from the NPC's configured quest services and linked dialogue conditions, so no duplicate quest-link storage has to be maintained.
+- Marker priority is `?` > `!` > `•`, respects NPC quest permissions/access policy, updates through the existing bounded label sync, and scales with the NPC's live SCALE attribute.
+- Quest markers can remain visible even when the normal NPC identity label is hidden.
+
+## Compatibility
+- Network protocol: `107` (was `106`) because NPC label snapshots now include the player-specific quest marker.
+- NPC dialogue schema: `2` (was `1`) for node conditions and fallback routing.
+- NPC definition schema remains `10`.
+- NPC placement schema remains `4`.
+- Quest persistence schemas and all other schemas are unchanged from dev3.25.
+
+# Simple Server Utilities 1.9.0-dev3.25
+
+## NPC Editor, Appearance, Behaviour & Patrols
+- Split NPC configuration into clearer **Behavior** and **Movement** pages without removing the existing editor workflows.
+- Added persisted NPC behaviour modes: Native AI, Stationary, Look at players, Wander and Patrol. Legacy schema-9 definitions migrate automatically from the former No AI flag.
+- Added configurable look-at range/body rotation, wander radius/retarget interval/speed and patrol movement speed.
+- Added placement-specific patrol routes with up to 32 waypoints. Each waypoint stores X/Y/Z, facing yaw and pause time; traversal can Loop, Ping-Pong or Random.
+- Added an in-world patrol route editor. Right-click blocks to add waypoints, sneak-right-click near a waypoint to remove it, and right-click air to finish and reopen the NPC editor. End Rod particles mark existing waypoints while the edit session is active.
+- Added a searchable local NPC skin browser for files found under `<world>/simpleserverutilities/npcs/textures/`, including bounded recursive discovery.
+- Local PNG selection is validated synchronously during NPC Save, so missing/invalid/wrong-size local skins return an editor error immediately.
+- Behaviour updates run at a bounded 5 Hz and prefer vanilla Mob navigation; schedule routes continue to override normal behaviour.
+- Linked NPC placement copies keep independent world-space patrol routes and shift route coordinates with the copied placement.
+
+## Compatibility
+- Network protocol: `106` (was `105`) due to expanded NPC editor payloads.
+- NPC definition schema: `10` (was `9`).
+- NPC placement schema: `4` (was `3`).
+- NPC dialogue schema remains `1`; NPC Shop schema remains `4`; other persistence schemas are unchanged from dev3.24.2.
+
 # Simple Server Utilities 1.9.0-dev3.24.2
 
 ## NPC custom skin renderer hotfix

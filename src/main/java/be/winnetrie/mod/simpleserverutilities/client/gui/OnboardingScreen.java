@@ -108,7 +108,7 @@ public final class OnboardingScreen extends Screen {
         int x = left();
         int y = top();
         boolean rules = rulesStage(data);
-        graphics.fill(0, 0, width, height, 0xB0000000);
+        SsuGuiScale.fullscreenDim(graphics, this, 0xB0000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
         graphics.outline(x, y, W, H, BORDER);
         graphics.text(font, "Welcome to the server", x + 18, y + 16, TEXT, true);

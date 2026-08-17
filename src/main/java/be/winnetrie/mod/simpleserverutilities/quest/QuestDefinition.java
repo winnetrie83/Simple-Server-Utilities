@@ -12,7 +12,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentId;
 
 /** Reusable data-driven quest definition, independent from NPC Core. */
 public final class QuestDefinition {
-    public static final int STORAGE_SCHEMA = 1;
+    public static final int STORAGE_SCHEMA = 2;
     public static final int MAX_OBJECTIVES = 32;
     public static final int MAX_REWARDS = 32;
 
@@ -32,6 +32,19 @@ public final class QuestDefinition {
     public List<QuestObjectiveDefinition> objectives = new ArrayList<>();
     public List<ContentAction> rewards = new ArrayList<>();
 
+    /** Optional simple NPC workflow. These fields are intentionally placement IDs, not reusable NPC definition IDs. */
+    public String giverNpcInstanceId = "";
+    public String turnInNpcInstanceId = "";
+    public boolean npcShowAvailableMarker = true;
+    public boolean npcShowActiveMarker = true;
+    public boolean npcShowReadyMarker = true;
+    public String npcAvailableText = "Could you help me with something?";
+    public String npcAcceptText = "I'll help you";
+    public String npcActiveText = "How is it going?";
+    public String npcReadyText = "Excellent! You did it.";
+    public String npcTurnInText = "Here you go";
+    public String npcCompletedText = "Thanks again for your help!";
+
     public QuestDefinition normalize() {
         schema = STORAGE_SCHEMA;
         id = ContentId.require(id, "Quest ID");
@@ -40,6 +53,14 @@ public final class QuestDefinition {
         description = limit(description == null ? "" : description.trim(), 8_192);
         iconItem = limit(iconItem == null || iconItem.isBlank() ? "minecraft:book" : iconItem.trim(), 128);
         cooldownSeconds = Math.max(0L, Math.min(31_536_000L, cooldownSeconds));
+        giverNpcInstanceId = normalizeUuid(giverNpcInstanceId);
+        turnInNpcInstanceId = normalizeUuid(turnInNpcInstanceId);
+        npcAvailableText = limit(defaultText(npcAvailableText, "Could you help me with something?"), 4_096);
+        npcAcceptText = limit(defaultText(npcAcceptText, "I'll help you"), 256);
+        npcActiveText = limit(defaultText(npcActiveText, "How is it going?"), 4_096);
+        npcReadyText = limit(defaultText(npcReadyText, "Excellent! You did it."), 4_096);
+        npcTurnInText = limit(defaultText(npcTurnInText, "Here you go"), 256);
+        npcCompletedText = limit(defaultText(npcCompletedText, "Thanks again for your help!"), 4_096);
         prerequisites = prerequisites == null
                 ? new ContentCondition("always", Map.of(), List.of()) : prerequisites.normalize();
         if (objectives == null || objectives.isEmpty()) {
@@ -93,7 +114,28 @@ public final class QuestDefinition {
         copy.prerequisites = prerequisites;
         copy.objectives = objectives.stream().map(QuestObjectiveDefinition::copy).toList();
         copy.rewards = new ArrayList<>(rewards);
+        copy.giverNpcInstanceId = giverNpcInstanceId;
+        copy.turnInNpcInstanceId = turnInNpcInstanceId;
+        copy.npcShowAvailableMarker = npcShowAvailableMarker;
+        copy.npcShowActiveMarker = npcShowActiveMarker;
+        copy.npcShowReadyMarker = npcShowReadyMarker;
+        copy.npcAvailableText = npcAvailableText;
+        copy.npcAcceptText = npcAcceptText;
+        copy.npcActiveText = npcActiveText;
+        copy.npcReadyText = npcReadyText;
+        copy.npcTurnInText = npcTurnInText;
+        copy.npcCompletedText = npcCompletedText;
         return copy;
+    }
+
+    private static String normalizeUuid(String value) {
+        if (value == null || value.isBlank()) return "";
+        try { return java.util.UUID.fromString(value.trim()).toString(); }
+        catch (IllegalArgumentException ignored) { return ""; }
+    }
+
+    private static String defaultText(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
     }
 
     private static String limit(String value, int maximum) {

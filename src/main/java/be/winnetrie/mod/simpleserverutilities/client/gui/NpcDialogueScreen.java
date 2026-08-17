@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 
 import java.util.List;
 
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextComponents;
 import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueChoicePayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueViewPayload;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -85,12 +86,12 @@ public final class NpcDialogueScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = panelX();
         int y = panelY();
-        g.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, PANEL);
         g.outline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
         g.text(font, data.npcName(), x + 20, y + 14, TEXT, true);
         g.text(font, data.speaker().isBlank() ? data.npcName() : data.speaker(), x + 20, y + 38, GOOD, false);
-        List<FormattedCharSequence> lines = font.split(Component.literal(data.text()), PANEL_WIDTH - 40);
+        List<FormattedCharSequence> lines = font.split(SsuRichTextComponents.parse(data.text()), PANEL_WIDTH - 40);
         for (int i = 0; i < Math.min(10, lines.size()); i++) g.text(font, lines.get(i), x + 20, y + 56 + i * 10, TEXT, false);
         if (!data.notice().isBlank()) g.text(font, trim(data.notice(), 82), x + 20, y + 160, data.error() ? ERROR : GOOD, false);
         else if (awaiting) g.text(font, "Processing choice…", x + 20, y + 160, MUTED, false);

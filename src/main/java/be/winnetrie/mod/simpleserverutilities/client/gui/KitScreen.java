@@ -153,7 +153,7 @@ public final class KitScreen extends Screen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top(), w = panelWidth(), h = panelHeight();
-        g.fill(0, 0, width, height, 0xA5000000); g.fill(x, y, x + w, y + h, PANEL); g.outline(x, y, w, h, BORDER);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(x, y, x + w, y + h, PANEL); g.outline(x, y, w, h, BORDER);
         g.text(font, data.admin() ? "Kit Administration" : "Available Kits", x + 14, y + 14, TEXT, true);
         if (!rows.isEmpty() && !creating) {
             Row row = rows.get(selected); KitDefinition d = row.definition; int dx = data.admin() ? x + 174 : x + 174;

@@ -1,0 +1,22 @@
+SSU 1.9.0-dev3.40.5 static validation
+
+Base: 1.9.0-dev3.40.4.1
+Protocol: 118 (unchanged)
+NPC definition schema: 19 (unchanged)
+NPC placement schema: 4 (unchanged)
+Ability Library schema: 1 (unchanged)
+
+Player-NPC renderer changes:
+- SsuPlayerNpcRenderState now extends HumanoidRenderState.
+- SsuPlayerNpcModel now extends HumanoidModel while retaining Wide/Steve + Slim/Alex skin geometry.
+- HumanoidMobRenderer path restores standard main/off-hand submission.
+- Added complete outer/inner humanoid armor models; no baked root-part deletion/retainExactParts.
+- Added equipment RenderLayer that selects body-part visibility per slot at submission time.
+- Armor initialization is guarded with RuntimeException fallback so optional visual armor does not intentionally block the full client renderer.
+- Model-layer registration includes player_npc main + player_npc_armor outer/inner only.
+
+Environment limitation:
+- Full Gradle/NeoForge compilation was not certified in the assistant container because the project requires Java 25 and the container does not contain the required NeoForge/Minecraft dependency cache/toolchain.
+- The equipment layer API call and renderer inheritance are based on the same 26.2 signatures already accepted by the user's dev3.40.4 project; the runtime design was changed specifically to remove the unsafe slot-pruned armor model construction.
+
+Required first runtime test: title screen before entering a world.

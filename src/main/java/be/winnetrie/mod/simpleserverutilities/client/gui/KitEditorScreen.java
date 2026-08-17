@@ -45,7 +45,7 @@ public final class KitEditorScreen extends AbstractContainerScreen<KitEditorMenu
     public void accept(KitContentsResultPayload payload) { notice = payload.message(); }
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
-        g.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(leftPos, topPos, leftPos + W, topPos + H, 0xF0161D25);
         g.outline(leftPos, topPos, W, H, 0xFF586978);
         g.text(font, "Kit contents — " + menu.kitId(), leftPos + 14, topPos + 12, 0xFFF3F5F7, true);

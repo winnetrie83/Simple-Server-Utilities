@@ -71,7 +71,7 @@ public final class RegionSelectionToolScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = left();
         int y = top();
-        g.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + WIDTH, y + HEIGHT, PANEL);
         g.outline(x, y, WIDTH, HEIGHT, BORDER);
         g.text(font, "Region Selection", x + 18, y + 14, TEXT, true);

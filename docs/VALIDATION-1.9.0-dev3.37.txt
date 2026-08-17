@@ -1,0 +1,26 @@
+SSU 1.9.0-dev3.37 static validation
+====================================
+
+Environment limitations
+- Full Gradle/NeoForge compile could not be started in the sandbox because the Gradle wrapper distribution at services.gradle.org is unreachable.
+- Sandbox JDK is Java 21; the project build is configured for Java 25.
+
+Completed checks
+- 854 Java source files scanned with balanced (), [] and {} delimiters: 0 errors.
+- Community pure data classes compiled with local javac:
+  - ContentEventTypes
+  - CommunityMetric
+  - CommunityStatBucket
+  - CommunityPeriodBucket
+  - CommunityPeriodKeys
+  - CommunityStatisticsRecord
+- Community metric catalog: 45 direct event metrics, 45 unique metric IDs, 45 unique Content Event mappings.
+- Rollover smoke test passed:
+  - daily bucket archives and resets without resetting weekly data;
+  - distinct keys do not double-count;
+  - season id rollover archives the previous season.
+- Canonical Content Core publisher grep confirms PLAYER_LOGIN/PLAYER_LOGOUT gameplay publication is no longer duplicated by ContentGameplayEvents.
+- Updated standalone Web API tester JavaScript passes `node --check`.
+- Network protocol intentionally unchanged at 116; no client/server payload shape changed.
+- NPC definition schema intentionally unchanged at 17.
+- New Community Statistics persistence schema is 1.

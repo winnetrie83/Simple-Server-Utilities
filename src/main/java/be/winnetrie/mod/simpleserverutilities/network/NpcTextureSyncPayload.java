@@ -11,7 +11,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/** Bounded server-to-client binary custom-skin assets for visible SSU NPC definitions. */
+/** Bounded server-to-client binary custom textures for visible SSU NPC definitions. */
 public record NpcTextureSyncPayload(List<Entry> entries) implements CustomPacketPayload {
     public static final int MAX_ENTRIES = 256;
     public static final Type<NpcTextureSyncPayload> TYPE = new Type<>(
@@ -60,7 +60,8 @@ public record NpcTextureSyncPayload(List<Entry> entries) implements CustomPacket
         public Entry {
             definitionId = NpcDefinition.sanitizeId(definitionId);
             hash = PayloadBounds.string(hash, 64);
-            model = "slim".equalsIgnoreCase(model) ? "slim" : "wide";
+            model = "remove".equalsIgnoreCase(model) ? "remove"
+                    : ("slim".equalsIgnoreCase(model) ? "slim" : "wide");
             if (png == null || png.length > NpcTextureAssetService.MAX_TEXTURE_BYTES) {
                 throw new IllegalArgumentException("Invalid NPC texture payload");
             }

@@ -63,12 +63,15 @@ import be.winnetrie.mod.simpleserverutilities.mapmarker.MapMarkerModule;
 import be.winnetrie.mod.simpleserverutilities.menu.MenuModule;
 import be.winnetrie.mod.simpleserverutilities.network.ModNetworking;
 import be.winnetrie.mod.simpleserverutilities.npc.ModNpcMenus;
+import be.winnetrie.mod.simpleserverutilities.npc.ModNpcEntities;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcEvents;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcDialogueManager;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcDialogueService;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcFunctionService;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcServiceRegistry;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcManager;
+import be.winnetrie.mod.simpleserverutilities.npc.NpcAbilityLibraryManager;
+import be.winnetrie.mod.simpleserverutilities.npc.NpcSpawnManager;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcModule;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcToolManager;
 import be.winnetrie.mod.simpleserverutilities.npcshop.NpcShopManager;
@@ -132,6 +135,9 @@ import be.winnetrie.mod.simpleserverutilities.serverops.ServerOperationsEvents;
 import be.winnetrie.mod.simpleserverutilities.statistics.PlayerStatisticsManager;
 import be.winnetrie.mod.simpleserverutilities.statistics.StatisticsEvents;
 import be.winnetrie.mod.simpleserverutilities.statistics.StatisticsModule;
+import be.winnetrie.mod.simpleserverutilities.statistics.community.CommunityStatisticsEvents;
+import be.winnetrie.mod.simpleserverutilities.statistics.community.CommunityStatisticsManager;
+import be.winnetrie.mod.simpleserverutilities.statistics.community.CommunityStatisticsModule;
 import be.winnetrie.mod.simpleserverutilities.teleport.TeleportEvents;
 import be.winnetrie.mod.simpleserverutilities.teleport.TeleportModule;
 import be.winnetrie.mod.simpleserverutilities.teleport.TeleportManager;
@@ -142,6 +148,8 @@ import be.winnetrie.mod.simpleserverutilities.visualization.BorderVisualizationS
 import be.winnetrie.mod.simpleserverutilities.warp.WarpManager;
 import be.winnetrie.mod.simpleserverutilities.warp.WarpRentalEvents;
 import be.winnetrie.mod.simpleserverutilities.warp.WarpModule;
+import be.winnetrie.mod.simpleserverutilities.web.SsuWebBridge;
+import be.winnetrie.mod.simpleserverutilities.web.SsuWebEvents;
 import be.winnetrie.mod.simpleserverutilities.utilitymining.UtilityMiningEvents;
 import be.winnetrie.mod.simpleserverutilities.utilitymining.UtilityMiningManager;
 import be.winnetrie.mod.simpleserverutilities.utilitymining.UtilityMiningModule;
@@ -196,9 +204,12 @@ public class SimpleServerUtilities {
     public static final HologramManager HOLOGRAMS = new HologramManager();
     public static final HologramToolManager HOLOGRAM_TOOLS = new HologramToolManager();
     public static final PlayerStatisticsManager STATISTICS = new PlayerStatisticsManager();
+    public static final CommunityStatisticsManager COMMUNITY_STATISTICS = new CommunityStatisticsManager();
     public static final AchievementManager ACHIEVEMENTS = new AchievementManager();
     public static final MapMarkerManager MAP_MARKERS = new MapMarkerManager();
-    public static final NpcManager NPCS = new NpcManager();
+    public static final NpcAbilityLibraryManager NPC_ABILITIES = new NpcAbilityLibraryManager();
+    public static final NpcManager NPCS = new NpcManager(NPC_ABILITIES);
+    public static final NpcSpawnManager NPC_SPAWNS = new NpcSpawnManager(NPCS);
     public static final NpcToolManager NPC_TOOLS = new NpcToolManager();
     public static final NpcDialogueManager NPC_DIALOGUE_DEFINITIONS = new NpcDialogueManager();
     public static final NpcServiceRegistry NPC_SERVICES = new NpcServiceRegistry();
@@ -217,11 +228,13 @@ public class SimpleServerUtilities {
     public static final be.winnetrie.mod.simpleserverutilities.moderation.ModerationManager MODERATION = new be.winnetrie.mod.simpleserverutilities.moderation.ModerationManager();
     public static final be.winnetrie.mod.simpleserverutilities.kits.KitManager KITS = new be.winnetrie.mod.simpleserverutilities.kits.KitManager();
     public static final ServerOperationsManager SERVER_OPERATIONS = new ServerOperationsManager();
+    public static final SsuWebBridge WEB_API = new SsuWebBridge();
 
     public SimpleServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
         ModMailMenus.MENU_TYPES.register(modEventBus);
         ModAuctionMenus.MENU_TYPES.register(modEventBus);
         ModNpcMenus.MENU_TYPES.register(modEventBus);
+        ModNpcEntities.ENTITY_TYPES.register(modEventBus);
         be.winnetrie.mod.simpleserverutilities.kits.ModKitMenus.MENU_TYPES.register(modEventBus);
         be.winnetrie.mod.simpleserverutilities.moderation.ModModerationMenus.MENU_TYPES.register(modEventBus);
         CORE.modules().register(new StorageModule(STORAGE));
@@ -231,6 +244,7 @@ public class SimpleServerUtilities {
         CORE.modules().register(new ContentCoreModule(
                 CONTENT_PROGRESS, CONTENT_CONDITIONS, CONTENT_ACTIONS, CONTENT_EVENTS, CONTENT_DEPENDENCIES,
                 CONTENT_REWARD_LEDGER, TEMPORARY_PERMISSIONS));
+        CORE.modules().register(new CommunityStatisticsModule(COMMUNITY_STATISTICS));
         CORE.modules().register(new EconomyModule(ECONOMY));
         CORE.modules().register(new ClaimModule(PLAYER_CLAIMS, CLAIM_TAX));
         CORE.modules().register(new PermissionModule(PERMISSIONS));
@@ -255,7 +269,7 @@ public class SimpleServerUtilities {
         CORE.modules().register(new StatisticsModule(STATISTICS));
         CORE.modules().register(new AchievementModule(ACHIEVEMENTS));
         CORE.modules().register(new MapMarkerModule(MAP_MARKERS));
-        CORE.modules().register(new NpcModule(NPCS, NPC_TOOLS, NPC_DIALOGUE_DEFINITIONS, NPC_DIALOGUES));
+        CORE.modules().register(new NpcModule(NPCS, NPC_ABILITIES, NPC_SPAWNS, NPC_TOOLS, NPC_DIALOGUE_DEFINITIONS, NPC_DIALOGUES));
         CORE.modules().register(new NpcShopModule(NPC_SHOPS));
         CORE.modules().register(new QuestModule(QUESTS));
         CORE.modules().register(new MinigameModule(MINIGAMES));
@@ -266,6 +280,7 @@ public class SimpleServerUtilities {
         CORE.initialize();
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(ModNetworking::register);
+        modEventBus.addListener(ModNpcEntities::registerAttributes);
 
         NeoForge.EVENT_BUS.register(this);
 
@@ -295,6 +310,7 @@ public class SimpleServerUtilities {
         NeoForge.EVENT_BUS.register(HologramEvents.class);
         NeoForge.EVENT_BUS.register(HologramToolEvents.class);
         NeoForge.EVENT_BUS.register(StatisticsEvents.class);
+        NeoForge.EVENT_BUS.register(CommunityStatisticsEvents.class);
         NeoForge.EVENT_BUS.register(AchievementEvents.class);
         NeoForge.EVENT_BUS.register(BlockInformationEvents.class);
         NeoForge.EVENT_BUS.register(MapMarkerEvents.class);
@@ -311,6 +327,7 @@ public class SimpleServerUtilities {
         NeoForge.EVENT_BUS.register(be.winnetrie.mod.simpleserverutilities.moderation.ModerationEvents.class);
         NeoForge.EVENT_BUS.register(be.winnetrie.mod.simpleserverutilities.onboarding.OnboardingEvents.class);
         NeoForge.EVENT_BUS.register(ServerOperationsEvents.class);
+        NeoForge.EVENT_BUS.register(SsuWebEvents.class);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
         modContainer.registerConfig(ModConfig.Type.CLIENT, Config.CLIENT_SPEC);
@@ -323,11 +340,13 @@ public class SimpleServerUtilities {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         CORE.onServerStarting(event.getServer());
+        WEB_API.start(event.getServer());
         LOGGER.info("Simple Server Utilities server starting");
     }
 
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
+        WEB_API.stop();
         CORE.beforeServerStopping(event.getServer());
         CORE.onServerStopping(event.getServer());
         LOGGER.info("Simple Server Utilities server stopping");

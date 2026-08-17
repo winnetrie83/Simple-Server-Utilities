@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 
 import java.util.List;
 
+import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextComponents;
 import be.winnetrie.mod.simpleserverutilities.content.ContentCondition;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcDialogueChoice;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcDialogueDefinition;
@@ -126,7 +127,7 @@ public final class NpcDialoguePreviewScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
-        graphics.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
         graphics.outline(x, y, W, H, BORDER);
         graphics.text(font, "Dialogue preview • " + trim(dialogue.displayName, 52), x + 20, y + 14, TEXT, true);
@@ -136,7 +137,7 @@ public final class NpcDialoguePreviewScreen extends Screen {
             graphics.text(font, trim(notice, 84), x + 20, y + 66, TEXT, false);
         } else {
             graphics.text(font, node.speaker == null || node.speaker.isBlank() ? npcName : node.speaker, x + 20, y + 38, GOOD, false);
-            List<FormattedCharSequence> lines = font.split(Component.literal(node.text == null ? "" : node.text), W - 40);
+            List<FormattedCharSequence> lines = font.split(SsuRichTextComponents.parse(node.text == null ? "" : node.text), W - 40);
             for (int index = 0; index < Math.min(10, lines.size()); index++) {
                 graphics.text(font, lines.get(index), x + 20, y + 56 + index * 10, TEXT, false);
             }

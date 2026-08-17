@@ -1,0 +1,9 @@
+SSU 1.9.0-dev3.38 static validation
+- Dedicated client config: ssuGuiScalePercent, bounded 60..100, default 100.
+- Central Screen render transform targets extractRenderStateWithTooltipAndSubtitles.
+- MouseButtonEvent x/y accessors inverse-map input only while an SSU Screen is active.
+- Screen render mouse coordinates use the same inverse transform; Screen scroll mapping is optional-safe and custom pointer-sensitive SSU scroll handlers are explicitly mapped.
+- Existing SSU layout constants and screen width/height are not rescaled/recomputed.
+- Network protocol unchanged: 116.
+- NPC definition schema unchanged: 17.
+- NPC placement schema unchanged: 4.

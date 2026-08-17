@@ -80,6 +80,13 @@ public final class NpcDialogueValidation {
             NpcDialogueNode node = entry.getValue();
             String nodeLocation = "node '" + nodeId + "'";
             if (safe(node.text).isBlank()) issues.add(warning(nodeLocation, "Dialogue text is blank."));
+            validateCondition(node.condition, nodeLocation + " condition", conditionTypes, issues, 0, new int[] {0});
+            String fallback = safe(node.fallbackNode);
+            if (!fallback.isBlank() && !byId.containsKey(fallback)) {
+                issues.add(error(nodeLocation, "Fallback node '" + fallback + "' does not exist."));
+            } else if (nodeId.equals(fallback)) {
+                issues.add(error(nodeLocation, "Fallback node cannot point to itself."));
+            }
             validateActions(node.enterActions, nodeLocation + " entry actions", actionTypes, issues);
 
             List<NpcDialogueChoice> choices = node.choices == null ? List.of() : node.choices;
@@ -129,6 +136,7 @@ public final class NpcDialogueValidation {
             }
         }
 
+        detectFallbackCycles(byId, issues);
         if (byId.containsKey(start)) {
             Set<String> reachable = reachableNodes(start, byId);
             for (String nodeId : byId.keySet()) {
@@ -198,6 +206,23 @@ public final class NpcDialogueValidation {
         }
     }
 
+    private static void detectFallbackCycles(Map<String, NpcDialogueNode> nodes, List<Issue> issues) {
+        LinkedHashSet<String> reported = new LinkedHashSet<>();
+        for (String start : nodes.keySet()) {
+            LinkedHashSet<String> seen = new LinkedHashSet<>();
+            String current = start;
+            while (!current.isBlank() && nodes.containsKey(current)) {
+                if (!seen.add(current)) {
+                    if (reported.add(current)) {
+                        issues.add(error("node '" + current + "'", "Fallback routing contains a cycle."));
+                    }
+                    break;
+                }
+                current = safe(nodes.get(current).fallbackNode);
+            }
+        }
+    }
+
     private static Set<String> reachableNodes(String start, Map<String, NpcDialogueNode> nodes) {
         LinkedHashSet<String> reachable = new LinkedHashSet<>();
         Deque<String> pending = new ArrayDeque<>();
@@ -206,7 +231,12 @@ public final class NpcDialogueValidation {
             String id = pending.removeFirst();
             if (!reachable.add(id)) continue;
             NpcDialogueNode node = nodes.get(id);
-            if (node == null || node.choices == null) continue;
+            if (node == null) continue;
+            String fallback = safe(node.fallbackNode);
+            if (!fallback.isBlank() && nodes.containsKey(fallback) && !reachable.contains(fallback)) {
+                pending.addLast(fallback);
+            }
+            if (node.choices == null) continue;
             for (NpcDialogueChoice choice : node.choices) {
                 if (choice == null) continue;
                 String next = safe(choice.nextNode);
@@ -225,6 +255,12 @@ public final class NpcDialogueValidation {
             for (Map.Entry<String, NpcDialogueNode> entry : nodes.entrySet()) {
                 if (canExit.contains(entry.getKey())) continue;
                 NpcDialogueNode node = entry.getValue();
+                String fallback = safe(node.fallbackNode);
+                if (!fallback.isBlank() && canExit.contains(fallback)) {
+                    canExit.add(entry.getKey());
+                    changed = true;
+                    continue;
+                }
                 List<NpcDialogueChoice> choices = node.choices == null ? List.of() : node.choices;
                 if (choices.isEmpty()) {
                     canExit.add(entry.getKey());

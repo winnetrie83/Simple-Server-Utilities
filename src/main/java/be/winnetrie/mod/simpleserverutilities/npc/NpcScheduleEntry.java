@@ -9,6 +9,8 @@ public final class NpcScheduleEntry {
     public static final String ACTIVITY_IDLE = "idle";
     public static final String ACTIVITY_LOOK_AROUND = "look_around";
     public static final String ACTIVITY_CHOP_TREE = "chop_tree";
+    public static final String ACTIVITY_WORK = "work";
+    public static final String ACTIVITY_GUARD = "guard";
 
     /** Minecraft clock time as real clock minutes, 0..1439. */
     public int minuteOfDay;
@@ -18,7 +20,7 @@ public final class NpcScheduleEntry {
     public float yaw;
     /** walk or teleport. Flying/swimming movement is derived from the NPC movement settings. */
     public String movement = MOVEMENT_WALK;
-    /** idle, look_around or chop_tree. */
+    /** Activity performed after arrival. See {@link NpcScheduleActivity}. */
     public String activity = ACTIVITY_IDLE;
     /** Pathing speed multiplier. */
     public double speed = 1.0D;
@@ -58,12 +60,7 @@ public final class NpcScheduleEntry {
     }
 
     public static String normalizedActivity(String raw) {
-        String value = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
-        return switch (value) {
-            case ACTIVITY_LOOK_AROUND -> ACTIVITY_LOOK_AROUND;
-            case ACTIVITY_CHOP_TREE -> ACTIVITY_CHOP_TREE;
-            default -> ACTIVITY_IDLE;
-        };
+        return NpcScheduleActivity.parse(raw).id();
     }
 
     private static double finite(double value, double fallback) {

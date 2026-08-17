@@ -77,7 +77,7 @@ public final class QuestBookScreen extends Screen {
 
     @Override public void onClose(){if(minecraft!=null)minecraft.setScreenAndShow(parent);}
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float partialTick){
-        int x=px(),y=py();g.fill(0,0,width,height,0xA5000000);g.fill(x,y,x+W,y+H,PANEL);g.outline(x,y,W,H,BORDER);
+        int x=px(),y=py();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+W,y+H,PANEL);g.outline(x,y,W,H,BORDER);
         g.text(font,"Questbook",x+16,y+17,TEXT,true);g.text(font,"Access: "+data.source().toUpperCase()+"  •  Page "+(data.page()+1)+"/"+data.totalPages()+"  •  "+data.totalQuests()+" quests",x+100,y+18,MUTED,false);
         g.fill(x+LEFT,y+42,x+LEFT+1,y+H-40,BORDER);
         List<QuestBookDataPayload.QuestEntry> visible=visible();int from=0,to=Math.min(visible.size(),ROWS);

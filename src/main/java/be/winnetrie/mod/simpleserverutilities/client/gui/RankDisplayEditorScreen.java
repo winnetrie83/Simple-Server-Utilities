@@ -144,7 +144,7 @@ public final class RankDisplayEditorScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         remember();
         int x = left(), y = top();
-        g.fill(0, 0, width, height, 0xA5000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
         g.text(font, "Rank Prefix Editor — " + data.rankName(), x + 18, y + 15, TEXT, true);
         g.text(font, "The prefix is shown before the normal player name and in chat.", x + 18, y + 31, MUTED, false);
         g.text(font, "Select text, then apply B / I / U / S or one of the fixed 16 Minecraft colors.", x + 18, y + 48, MUTED, false);

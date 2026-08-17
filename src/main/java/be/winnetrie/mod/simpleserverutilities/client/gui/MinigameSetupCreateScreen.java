@@ -102,7 +102,7 @@ public final class MinigameSetupCreateScreen extends Screen {
     @Override public boolean isPauseScreen() { return false; }
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
-        g.fill(0, 0, width, height, 0xA5000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
         g.text(font, "Create a managed minigame arena", x + 20, y + 14, TEXT, true);
         g.text(font, selection.selectionVolume() + " selected blocks in " + shortDimension(selection.selectionDimension()), x + 20, y + 32, MUTED, false);
         g.text(font, "Internal ID", x + 20, y + 47, MUTED, false); g.text(font, "Display name", x + 215, y + 47, MUTED, false);

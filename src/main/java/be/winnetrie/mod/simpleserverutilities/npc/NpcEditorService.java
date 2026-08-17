@@ -39,15 +39,29 @@ public final class NpcEditorService {
         PacketDistributor.sendToPlayer(player, new NpcEditorOpenPayload(
                 true, instance.id, definition.id, instance.dimension,
                 instance.x, instance.y, instance.z, instance.yaw, instance.pitch,
-                definition.id, definition.displayName, definition.entityType, definition.textureSource, definition.textureValue, definition.textureModel, definition.interactionText, definition.dialogueId,
-                definition.roleId, definition.shopId, definition.interactionMode, definition.functions,
+                definition.id, definition.displayName, definition.entityType, definition.visualMode, definition.textureSource, definition.textureValue, definition.textureModel,
+                definition.customModelResource, definition.customTextureResource, definition.customAnimationResource,
+                definition.idleAnimation, definition.walkAnimation, definition.attackAnimation, definition.castAnimation, definition.hurtAnimation, definition.deathAnimation,
+                definition.interactionText, definition.dialogueId,
+                definition.roleId, definition.roleColor, definition.shopId, definition.interactionMode, definition.functions,
                 instance.enabled, definition.customNameVisible, definition.noAi, definition.invulnerable,
                 definition.silent, definition.glowing,
                 definition.affectedByGravity, definition.canSwim, definition.canFly,
+                definition.behaviorMode, definition.lookAtRange, definition.lookAtBody,
+                definition.wanderRadius, definition.wanderIntervalSeconds, definition.walkingSpeed,
+                SimpleServerUtilities.NPCS.aiProfileLabel(instance), SimpleServerUtilities.NPCS.aiRuntimeSummary(instance),
                 definition.factionId, definition.factionDisplayName, definition.minimumReputation, definition.reputationDeniedText,
                 definition.reputationLossOnAttack, definition.playerAttitude, definition.factionRelations,
-                definition.maxHealth, definition.movementSpeed, definition.attackDamage,
-                definition.armor, definition.armorToughness, definition.followRange,
+                definition.whenAttacked, definition.whenFriendlyAttacked, definition.whenHostileSeen, definition.combatProfile,
+                definition.assistRange, definition.fleeDistance, definition.attackCooldownTicks,
+                definition.meleeAttacksEnabled, definition.rangedAttacksEnabled, definition.magicAttacksEnabled,
+                definition.threatEnabled, definition.threatRange, definition.threatDamageMultiplier, definition.threatHealingMultiplier,
+                definition.threatDecayPerSecond, definition.threatSwitchRatio, definition.attackPatternEnabled, definition.attackPattern,
+                assignedAbilityViews(definition), definition.bossEnabled, definition.bossBarVisible, definition.bossBarRange,
+                definition.bossResetDistance, definition.bossResetSeconds, definition.bossHealOnReset, definition.bossPhases,
+                definition.maxHealth, definition.magicResistance, definition.armorMultiplier,
+                definition.meleeDamageMultiplier, definition.rangedDamageMultiplier, definition.magicDamageMultiplier,
+                definition.walkingSpeed, definition.runningSpeed, definition.followRange,
                 definition.knockbackResistance, definition.scale, definition.homeRadius,
                 NpcItemCodec.decode(registries, definition.mainHandStack, definition.mainHandItem, 1),
                 NpcItemCodec.decode(registries, definition.offHandStack, definition.offHandItem, 1),
@@ -56,11 +70,12 @@ public final class NpcEditorService {
                 NpcItemCodec.decode(registries, definition.legsStack, definition.legsItem, 1),
                 NpcItemCodec.decode(registries, definition.feetStack, definition.feetItem, 1),
                 definition.lootRolls, loot,
-                instance.scheduleEnabled, instance.schedule,
+                instance.scheduleEnabled, instance.schedule, instance.patrolMode, instance.patrol,
                 instance.respawnEnabled, instance.respawnDelaySeconds, instance.respawnDimension,
                 instance.respawnX, instance.respawnY, instance.respawnZ, instance.respawnYaw, instance.respawnPitch,
                 SimpleServerUtilities.NPCS.supportedLivingEntityTypes(player.level()),
-                SimpleServerUtilities.NPC_SERVICES.serviceIds(), shopChoices(), factionChoices()));
+                SimpleServerUtilities.NPC_SERVICES.serviceIds(), shopChoices(), factionChoices(),
+                SimpleServerUtilities.NPCS.localTextureNames()));
         return true;
     }
 
@@ -98,6 +113,20 @@ public final class NpcEditorService {
                 .toList();
     }
 
+    private static List<NpcAbilityDefinition> assignedAbilityViews(NpcDefinition definition) {
+        List<NpcAbilityDefinition> result = new ArrayList<>();
+        if (definition == null || definition.abilityAssignments == null) return result;
+        for (NpcAbilityAssignment assignment : definition.abilityAssignments) {
+            if (assignment == null || !assignment.configured()) continue;
+            NpcAbilityDefinition shared = SimpleServerUtilities.NPC_ABILITIES.get(assignment.abilityId);
+            if (shared == null) continue;
+            shared.phaseId = assignment.phaseId;
+            result.add(shared);
+            if (result.size() >= NpcAbilityAssignment.MAX_ASSIGNMENTS) break;
+        }
+        return result;
+    }
+
     private static String title(String id) {
         StringBuilder result = new StringBuilder();
         for (String word : id.replace('.', '_').replace('-', '_').split("_")) {
@@ -129,9 +158,13 @@ public final class NpcEditorService {
 
         if (payload.deleteRequested()) {
             if (!editing) return Result.fail("Only an existing NPC placement can be deleted.");
-            return SimpleServerUtilities.NPCS.deleteInstance(existingInstance.id)
-                    ? Result.ok("NPC placement deleted. Its reusable template was kept.")
-                    : Result.fail("The NPC placement could not be deleted.");
+            if (!SimpleServerUtilities.NPCS.deleteInstance(existingInstance.id)) {
+                return Result.fail("The NPC placement could not be deleted.");
+            }
+            be.winnetrie.mod.simpleserverutilities.quest.QuestNpcBridge.unlinkDeletedNpc(
+                    SimpleServerUtilities.QUESTS, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS, existingInstance.id);
+            SimpleServerUtilities.NPCS.syncAll();
+            return Result.ok("NPC placement deleted. Simple quest links were cleared; its reusable template was kept.");
         }
 
         Result validation = validate(payload, player);
@@ -141,12 +174,23 @@ public final class NpcEditorService {
         definition.id = payload.definitionId();
         definition.displayName = payload.displayName();
         definition.entityType = payload.entityType();
+        definition.visualMode = payload.visualMode();
         definition.textureSource = payload.textureSource();
         definition.textureValue = payload.textureValue();
         definition.textureModel = payload.textureModel();
+        definition.customModelResource = payload.customModelResource();
+        definition.customTextureResource = payload.customTextureResource();
+        definition.customAnimationResource = payload.customAnimationResource();
+        definition.idleAnimation = payload.idleAnimation();
+        definition.walkAnimation = payload.walkAnimation();
+        definition.attackAnimation = payload.attackAnimation();
+        definition.castAnimation = payload.castAnimation();
+        definition.hurtAnimation = payload.hurtAnimation();
+        definition.deathAnimation = payload.deathAnimation();
         definition.interactionText = payload.interactionText();
         definition.dialogueId = payload.dialogueId();
         definition.roleId = payload.roleId();
+        definition.roleColor = payload.roleColor();
         definition.shopId = payload.shopId();
         definition.interactionMode = payload.interactionMode();
         definition.functions = new ArrayList<>();
@@ -159,6 +203,12 @@ public final class NpcEditorService {
         definition.affectedByGravity = payload.affectedByGravity();
         definition.canSwim = payload.canSwim();
         definition.canFly = payload.canFly();
+        definition.behaviorMode = payload.behaviorMode();
+        definition.lookAtRange = payload.lookAtRange();
+        definition.lookAtBody = payload.lookAtBody();
+        definition.wanderRadius = payload.wanderRadius();
+        definition.wanderIntervalSeconds = payload.wanderIntervalSeconds();
+        definition.behaviorSpeed = payload.walkingSpeed();
         definition.enabled = true;
         definition.factionId = payload.factionId();
         definition.factionDisplayName = payload.factionDisplayName();
@@ -168,11 +218,53 @@ public final class NpcEditorService {
         definition.playerAttitude = payload.playerAttitude();
         definition.factionRelations = new ArrayList<>();
         for (NpcFactionRelation relation : payload.factionRelations()) definition.factionRelations.add(relation.copy());
+        definition.whenAttacked = payload.whenAttacked();
+        definition.whenFriendlyAttacked = payload.whenFriendlyAttacked();
+        definition.whenHostileSeen = payload.whenHostileSeen();
+        definition.combatProfile = payload.combatProfile();
+        definition.assistRange = payload.assistRange();
+        definition.fleeDistance = payload.fleeDistance();
+        definition.attackCooldownTicks = payload.attackCooldownTicks();
+        definition.meleeAttacksEnabled = payload.meleeAttacksEnabled();
+        definition.rangedAttacksEnabled = payload.rangedAttacksEnabled();
+        definition.magicAttacksEnabled = payload.magicAttacksEnabled();
+        definition.threatEnabled = payload.threatEnabled();
+        definition.threatRange = payload.threatRange();
+        definition.threatDamageMultiplier = payload.threatDamageMultiplier();
+        definition.threatHealingMultiplier = payload.threatHealingMultiplier();
+        definition.threatDecayPerSecond = payload.threatDecayPerSecond();
+        definition.threatSwitchRatio = payload.threatSwitchRatio();
+        definition.attackPatternEnabled = payload.attackPatternEnabled();
+        definition.attackPattern = new ArrayList<>();
+        for (NpcAttackPatternStep step : payload.attackPattern()) definition.attackPattern.add(step.copy());
+        definition.abilityAssignments = new ArrayList<>();
+        for (NpcAbilityDefinition ability : payload.abilities()) {
+            if (ability == null) continue;
+            NpcAbilityAssignment assignment = new NpcAbilityAssignment(ability.id, ability.phaseId).normalize();
+            if (assignment.configured()) definition.abilityAssignments.add(assignment);
+        }
+        definition.abilities = new ArrayList<>();
+        definition.bossEnabled = payload.bossEnabled();
+        definition.bossBarVisible = payload.bossBarVisible();
+        definition.bossBarRange = payload.bossBarRange();
+        definition.bossResetDistance = payload.bossResetDistance();
+        definition.bossResetSeconds = payload.bossResetSeconds();
+        definition.bossHealOnReset = payload.bossHealOnReset();
+        definition.bossPhases = new ArrayList<>();
+        for (NpcBossPhase phase : payload.bossPhases()) definition.bossPhases.add(phase.copy());
         definition.maxHealth = payload.maxHealth();
-        definition.movementSpeed = payload.movementSpeed();
-        definition.attackDamage = payload.attackDamage();
-        definition.armor = payload.armor();
-        definition.armorToughness = payload.armorToughness();
+        definition.magicResistance = payload.magicResistance();
+        definition.armorMultiplier = payload.armorMultiplier();
+        definition.meleeDamageMultiplier = payload.meleeDamageMultiplier();
+        definition.rangedDamageMultiplier = payload.rangedDamageMultiplier();
+        definition.magicDamageMultiplier = payload.magicDamageMultiplier();
+        definition.walkingSpeed = payload.walkingSpeed();
+        definition.runningSpeed = payload.runningSpeed();
+        definition.behaviorSpeed = payload.walkingSpeed();
+        definition.movementSpeed = -1.0D;
+        definition.attackDamage = -1.0D;
+        definition.armor = -1.0D;
+        definition.armorToughness = -1.0D;
         definition.followRange = payload.followRange();
         definition.knockbackResistance = payload.knockbackResistance();
         definition.scale = payload.scale();
@@ -218,6 +310,9 @@ public final class NpcEditorService {
             instance.scheduleEnabled = payload.scheduleEnabled();
             instance.schedule = new java.util.ArrayList<>();
             for (NpcScheduleEntry entry : payload.schedule()) instance.schedule.add(entry.copy());
+            instance.patrolMode = payload.patrolMode();
+            instance.patrol = new java.util.ArrayList<>();
+            for (NpcPatrolPoint point : payload.patrol()) instance.patrol.add(point.copy());
             instance.respawnEnabled = payload.respawnEnabled();
             instance.respawnDelaySeconds = payload.respawnDelaySeconds();
             instance.respawnDimension = payload.respawnDimension();
@@ -231,9 +326,17 @@ public final class NpcEditorService {
             return Result.ok("NPC '" + definition.displayName + "' created.");
         }
 
-        if (!SimpleServerUtilities.NPCS.saveDefinition(existingDefinition.id, definition)) {
+        boolean placementMoved = Double.compare(existingInstance.x, payload.x()) != 0
+                || Double.compare(existingInstance.y, payload.y()) != 0
+                || Double.compare(existingInstance.z, payload.z()) != 0
+                || Float.compare(existingInstance.yaw, payload.yaw()) != 0
+                || Float.compare(existingInstance.pitch, payload.pitch()) != 0;
+
+        String previousDefinitionId = existingDefinition.id;
+        if (!SimpleServerUtilities.NPCS.saveDefinition(previousDefinitionId, definition)) {
             return Result.fail("The reusable NPC template could not be saved. Its new ID may already exist.");
         }
+        SimpleServerUtilities.NPC_SPAWNS.renameDefinition(previousDefinitionId, definition.id);
         existingInstance.definitionId = definition.id;
         existingInstance.x = payload.x(); existingInstance.y = payload.y(); existingInstance.z = payload.z();
         existingInstance.yaw = payload.yaw(); existingInstance.pitch = payload.pitch();
@@ -241,12 +344,15 @@ public final class NpcEditorService {
         existingInstance.scheduleEnabled = payload.scheduleEnabled();
         existingInstance.schedule = new java.util.ArrayList<>();
         for (NpcScheduleEntry entry : payload.schedule()) existingInstance.schedule.add(entry.copy());
+        existingInstance.patrolMode = payload.patrolMode();
+        existingInstance.patrol = new java.util.ArrayList<>();
+        for (NpcPatrolPoint point : payload.patrol()) existingInstance.patrol.add(point.copy());
         existingInstance.respawnEnabled = payload.respawnEnabled();
         existingInstance.respawnDelaySeconds = payload.respawnDelaySeconds();
         existingInstance.respawnDimension = payload.respawnDimension();
         existingInstance.respawnX = payload.respawnX(); existingInstance.respawnY = payload.respawnY(); existingInstance.respawnZ = payload.respawnZ();
         existingInstance.respawnYaw = payload.respawnYaw(); existingInstance.respawnPitch = payload.respawnPitch();
-        if (!SimpleServerUtilities.NPCS.saveInstance(existingInstance)) {
+        if (!SimpleServerUtilities.NPCS.saveInstance(existingInstance, placementMoved)) {
             return Result.fail("The NPC placement could not be saved.");
         }
         return Result.ok("NPC '" + definition.displayName + "' updated. Linked copies use the same template settings.");
@@ -257,8 +363,9 @@ public final class NpcEditorService {
             return Result.fail("Use 1-64 letters, numbers, dots, underscores or dashes for the template ID.");
         }
         if (payload.displayName().trim().isBlank()) return Result.fail("Enter an NPC name.");
+        NpcVisualMode visualMode = NpcVisualMode.parse(payload.visualMode());
         NpcTextureSource textureSource = NpcTextureSource.parse(payload.textureSource());
-        if (textureSource.custom()) {
+        if ((visualMode == NpcVisualMode.PLAYER_SKIN || visualMode == NpcVisualMode.ENTITY) && textureSource.custom()) {
             if (payload.textureValue().isBlank()) {
                 return Result.fail(textureSource == NpcTextureSource.LOCAL
                         ? "Enter a PNG filename relative to simpleserverutilities/npcs/textures."
@@ -270,6 +377,8 @@ public final class NpcEditorService {
                         || value.contains(":") || !value.toLowerCase(java.util.Locale.ROOT).endsWith(".png")) {
                     return Result.fail("Local NPC textures must be relative PNG paths inside simpleserverutilities/npcs/textures.");
                 }
+                String textureError = SimpleServerUtilities.NPCS.validateLocalTexture(value, visualMode == NpcVisualMode.PLAYER_SKIN);
+                if (!textureError.isBlank()) return Result.fail("Local NPC texture: " + textureError);
             } else {
                 try {
                     java.net.URI uri = java.net.URI.create(payload.textureValue().trim());
@@ -282,14 +391,29 @@ public final class NpcEditorService {
                 }
             }
         }
-        String effectiveEntityType = textureSource.custom() ? "minecraft:mannequin" : payload.entityType();
-        if (!SimpleServerUtilities.NPCS.isSupportedLivingEntityType(player.level(), effectiveEntityType)) {
-            return Result.fail(textureSource.custom()
-                    ? "Custom NPC textures require the minecraft:mannequin entity on this server."
-                    : "Use a registered living entity type, for example minecraft:villager.");
+        if (!SimpleServerUtilities.NPCS.isSupportedLivingEntityType(player.level(), payload.entityType())) {
+            return Result.fail("Use a registered living entity fallback shell, for example minecraft:villager.");
+        }
+        if (visualMode == NpcVisualMode.PLAYER_SKIN
+                && !SimpleServerUtilities.NPCS.isSupportedLivingEntityType(player.level(), ModNpcEntities.PLAYER_NPC_ID)) {
+            return Result.fail("The native SSU player NPC runtime is unavailable on this server.");
         }
         if (!validCoordinates(payload.x(), payload.y(), payload.z())) {
             return Result.fail("Enter coordinates inside the Minecraft world bounds.");
+        }
+        if (!Double.isFinite(payload.lookAtRange()) || payload.lookAtRange() < 0.0D || payload.lookAtRange() > 64.0D
+                || !Double.isFinite(payload.wanderRadius()) || payload.wanderRadius() < 0.0D || payload.wanderRadius() > 128.0D
+                || payload.wanderIntervalSeconds() < 1 || payload.wanderIntervalSeconds() > 300
+                || !Double.isFinite(payload.walkingSpeed()) || payload.walkingSpeed() < 0.05D || payload.walkingSpeed() > 4.0D
+                || !Double.isFinite(payload.runningSpeed()) || payload.runningSpeed() < 0.05D || payload.runningSpeed() > 6.0D) {
+            return Result.fail("One or more NPC movement values are outside their allowed range.");
+        }
+        if (payload.patrol().size() > 32) return Result.fail("An NPC patrol may contain at most 32 points.");
+        for (NpcPatrolPoint point : payload.patrol()) {
+            if (point == null || !validCoordinates(point.x, point.y, point.z)
+                    || point.pauseSeconds < 0 || point.pauseSeconds > 300) {
+                return Result.fail("One or more patrol points contain an invalid position or pause.");
+            }
         }
         if (!payload.factionId().isBlank() && !payload.factionId().trim().matches("[A-Za-z0-9._-]{1,64}")) {
             return Result.fail("Faction ID: use letters, numbers, dots, underscores or dashes.");
@@ -327,20 +451,98 @@ public final class NpcEditorService {
             return Result.fail("Attack reputation loss must be between 0 and 1,000,000.");
         }
         if (payload.factionRelations().size() > 16) return Result.fail("At most 16 faction relations are allowed.");
+        if (!Double.isFinite(payload.assistRange()) || payload.assistRange() < 0.0D || payload.assistRange() > 64.0D)
+            return Result.fail("Assist range must be between 0 and 64.");
+        if (!Double.isFinite(payload.fleeDistance()) || payload.fleeDistance() < 2.0D || payload.fleeDistance() > 64.0D)
+            return Result.fail("Flee distance must be between 2 and 64.");
+        if (payload.attackCooldownTicks() < 4 || payload.attackCooldownTicks() > 200)
+            return Result.fail("Attack cooldown must be between 4 and 200 ticks.");
+        if (!Double.isFinite(payload.threatRange()) || payload.threatRange() < 4.0D || payload.threatRange() > 128.0D
+                || !Double.isFinite(payload.threatDamageMultiplier()) || payload.threatDamageMultiplier() < 0.0D || payload.threatDamageMultiplier() > 100.0D
+                || !Double.isFinite(payload.threatHealingMultiplier()) || payload.threatHealingMultiplier() < 0.0D || payload.threatHealingMultiplier() > 100.0D
+                || !Double.isFinite(payload.threatDecayPerSecond()) || payload.threatDecayPerSecond() < 0.0D || payload.threatDecayPerSecond() > 10_000.0D
+                || !Double.isFinite(payload.threatSwitchRatio()) || payload.threatSwitchRatio() < 1.0D || payload.threatSwitchRatio() > 10.0D) {
+            return Result.fail("One or more threat settings are outside their allowed range.");
+        }
+        if (payload.attackPattern().size() > NpcAttackPatternStep.MAX_STEPS)
+            return Result.fail("An attack pattern may contain at most " + NpcAttackPatternStep.MAX_STEPS + " steps.");
+        if (payload.abilities().size() > NpcAbilityAssignment.MAX_ASSIGNMENTS)
+            return Result.fail("An NPC may have at most " + NpcAbilityAssignment.MAX_ASSIGNMENTS + " assigned abilities.");
+        if (payload.bossPhases().size() > NpcBossPhase.MAX_PHASES)
+            return Result.fail("A boss may have at most " + NpcBossPhase.MAX_PHASES + " phases.");
+        java.util.HashSet<String> phaseIds = new java.util.HashSet<>();
+        for (NpcBossPhase rawPhase : payload.bossPhases()) {
+            NpcBossPhase phase = rawPhase == null ? NpcBossPhase.phaseOne() : rawPhase.copy();
+            if (!phaseIds.add(phase.id)) return Result.fail("Each boss phase needs a unique ID.");
+        }
+        if (payload.bossEnabled() && phaseIds.isEmpty()) return Result.fail("A boss encounter needs at least one phase.");
+        java.util.HashSet<String> abilityIds = new java.util.HashSet<>();
+        for (NpcAbilityDefinition rawAbility : payload.abilities()) {
+            if (rawAbility == null) return Result.fail("An assigned ability is missing.");
+            String abilityId = NpcDefinition.sanitizeId(rawAbility.id);
+            if (abilityId.isBlank() || SimpleServerUtilities.NPC_ABILITIES.get(abilityId) == null)
+                return Result.fail("Assigned ability '" + rawAbility.id + "' no longer exists in the shared Ability Library.");
+            if (!abilityIds.add(abilityId)) return Result.fail("Each shared ability may only be assigned once to an NPC.");
+            String phaseId = NpcDefinition.sanitizeId(rawAbility.phaseId);
+            // Phase gating is optional and NPC-specific. A stale phase reference can be left behind by
+            // migration, disabling boss mode or deleting a phase. Do not make the whole NPC unsaveable:
+            // fall back to All phases and let the normalized definition persist the repair.
+            if (!phaseId.isBlank() && !phaseIds.contains(phaseId)) {
+                rawAbility.phaseId = "";
+            }
+        }
+        for (NpcBossPhase rawPhase : payload.bossPhases()) {
+            NpcBossPhase phase = rawPhase == null ? NpcBossPhase.phaseOne() : rawPhase.copy();
+            if (phase.actions.size() > NpcBossPhaseAction.MAX_ACTIONS_PER_PHASE)
+                return Result.fail("Boss phase '" + phase.displayName + "' may have at most " + NpcBossPhaseAction.MAX_ACTIONS_PER_PHASE + " actions.");
+            for (NpcBossPhaseAction action : phase.actions) {
+                if (action == null) return Result.fail("Boss phase '" + phase.displayName + "' contains a missing action.");
+                NpcBossPhaseAction normalized = action.copy();
+                if (normalized.actionType() == NpcBossPhaseActionType.TRIGGER_ABILITY
+                        && (normalized.value.isBlank() || !abilityIds.contains(normalized.value)))
+                    return Result.fail("Boss phase '" + phase.displayName + "' references a missing scripted ability.");
+                if (normalized.actionType() == NpcBossPhaseActionType.SPAWN_ADDS && normalized.value.isBlank())
+                    return Result.fail("Boss phase '" + phase.displayName + "' needs an NPC template ID for Spawn adds.");
+            }
+        }
+        for (int i = 0; i < payload.attackPattern().size(); i++) {
+            NpcAttackPatternStep step = payload.attackPattern().get(i);
+            if (step == null) return Result.fail("Attack pattern step " + (i + 1) + " is missing.");
+            NpcAttackPatternStep normalized = step.copy().normalize();
+            if (!Double.isFinite(normalized.minRange) || !Double.isFinite(normalized.maxRange)
+                    || normalized.minRange < 0.0D || normalized.maxRange < normalized.minRange || normalized.maxRange > 128.0D
+                    || !Double.isFinite(normalized.minHealthPercent) || !Double.isFinite(normalized.maxHealthPercent)
+                    || normalized.minHealthPercent < 0.0D || normalized.maxHealthPercent > 100.0D
+                    || normalized.maxHealthPercent < normalized.minHealthPercent) {
+                return Result.fail("Attack pattern step " + (i + 1) + " has an invalid range or health condition.");
+            }
+            if (!normalized.phaseId.isBlank() && !phaseIds.contains(normalized.phaseId)) {
+                // Same repair policy as ability assignments: missing optional phase gates mean All phases.
+                step.phaseId = "";
+                normalized.phaseId = "";
+            }
+            if (normalized.actionType() == NpcAttackPatternAction.ABILITY
+                    && (normalized.abilityId.isBlank() || !abilityIds.contains(normalized.abilityId)))
+                return Result.fail("Attack pattern step " + (i + 1) + " needs an existing ability.");
+        }
         java.util.HashSet<String> relationIds = new java.util.HashSet<>();
         for (NpcFactionRelation relation : payload.factionRelations()) {
             if (relation == null || !relation.copy().normalize().configured()) continue;
             if (!relationIds.add(relation.factionId)) return Result.fail("Each target faction may appear only once.");
         }
         if (!optionalRange(payload.maxHealth(), 1.0D, 2_048.0D)
-                || !optionalRange(payload.movementSpeed(), 0.0D, 4.0D)
-                || !optionalRange(payload.attackDamage(), 0.0D, 2_048.0D)
-                || !optionalRange(payload.armor(), 0.0D, 2_048.0D)
-                || !optionalRange(payload.armorToughness(), 0.0D, 2_048.0D)
+                || !finiteRange(payload.magicResistance(), 0.0D, 0.95D)
+                || !finiteRange(payload.armorMultiplier(), 0.0D, 10.0D)
+                || !finiteRange(payload.meleeDamageMultiplier(), 0.0D, 20.0D)
+                || !finiteRange(payload.rangedDamageMultiplier(), 0.0D, 20.0D)
+                || !finiteRange(payload.magicDamageMultiplier(), 0.0D, 20.0D)
+                || !finiteRange(payload.walkingSpeed(), 0.05D, 4.0D)
+                || !finiteRange(payload.runningSpeed(), 0.05D, 6.0D)
+                || payload.runningSpeed() < payload.walkingSpeed()
                 || !optionalRange(payload.followRange(), 1.0D, 2_048.0D)
                 || !optionalRange(payload.knockbackResistance(), 0.0D, 1.0D)
                 || !optionalRange(payload.scale(), 0.0625D, 16.0D)) {
-            return Result.fail("One or more NPC attribute values are outside their allowed range.");
+            return Result.fail("One or more NPC combat/stat values are outside their allowed range.");
         }
         if (!Double.isFinite(payload.homeRadius()) || payload.homeRadius() < 0.0D || payload.homeRadius() > 2_048.0D) {
             return Result.fail("Home radius must be between 0 and 2,048 blocks.");
@@ -348,7 +550,7 @@ public final class NpcEditorService {
         for (ItemStack equipment : List.of(payload.mainHandItem(), payload.offHandItem(), payload.headItem(),
                 payload.chestItem(), payload.legsItem(), payload.feetItem())) {
             if (!equipment.isEmpty() && equipment.getCount() != 1) {
-                return Result.fail("Visual equipment slots may contain exactly one item.");
+                return Result.fail("Equipment slots may contain exactly one item.");
             }
         }
         if (payload.lootRolls() < 1 || payload.lootRolls() > 100 || payload.loot().size() != 9) {
@@ -378,8 +580,17 @@ public final class NpcEditorService {
         return Result.ok("Validated.");
     }
 
+    private static boolean validPeriodic(double amount, int duration, int interval) {
+        return Double.isFinite(amount) && amount >= 0.0D && amount <= 2_048.0D
+                && duration >= 0 && duration <= 72_000 && interval >= 1 && interval <= 1_200;
+    }
+
     private static boolean optionalRange(double value, double minimum, double maximum) {
         return Double.isFinite(value) && (Double.compare(value, -1.0D) == 0 || value >= minimum && value <= maximum);
+    }
+
+    private static boolean finiteRange(double value, double minimum, double maximum) {
+        return Double.isFinite(value) && value >= minimum && value <= maximum;
     }
 
     public static boolean canAdmin(ServerPlayer player) {

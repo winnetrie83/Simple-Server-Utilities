@@ -146,7 +146,7 @@ public final class StatisticEditorScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = panelX();
         int y = panelY();
-        g.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, PANEL);
         g.outline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
         g.text(font, initial.editing() ? "Edit Custom Player Statistic" : "Create Custom Player Statistic", x + 16, y + 14, TEXT, true);

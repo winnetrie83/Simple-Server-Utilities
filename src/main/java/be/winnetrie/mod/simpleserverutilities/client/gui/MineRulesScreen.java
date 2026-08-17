@@ -81,7 +81,7 @@ public final class MineRulesScreen extends Screen {
     private void back(){if(minecraft!=null)minecraft.setScreenAndShow(parent);}
 
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float partialTick){
-        int x=left(),y=top();g.fill(0,0,width,height,0xA5000000);g.fill(x,y,x+W,y+H,PANEL);g.outline(x,y,W,H,BORDER);g.text(font,"Mining rules — "+mine.displayName,x+16,y+14,TEXT,true);
+        int x=left(),y=top();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+W,y+H,PANEL);g.outline(x,y,W,H,BORDER);g.text(font,"Mining rules — "+mine.displayName,x+16,y+14,TEXT,true);
         g.text(font,"Drops",x+18,y+34,MUTED,false);g.text(font,"XP multiplier",x+140,y+34,MUTED,false);g.text(font,"Vanilla enchantment behaviour",x+208,y+34,MUTED,false);
         g.text(font,"Reset warning",x+18,y+70,MUTED,false);g.text(font,"Generated mine status display",x+274,y+70,MUTED,false);g.text(font,"Range",x+412,y+70,MUTED,false);
         g.text(font,"Custom drops",x+18,y+118,"CUSTOM".equals(dropMode)?GOOD:MUTED,false);g.text(font,"Select a slot, then click an inventory item. Right-click a drop slot to clear it.",x+18,y+128,MUTED,false);

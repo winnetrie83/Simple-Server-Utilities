@@ -1,0 +1,38 @@
+SSU 1.9.0-dev3.39 static validation
+====================================
+
+Base: 1.9.0-dev3.38.3
+Target: 1.9.0-dev3.39
+Network protocol: 117
+NPC definition schema: 18
+NPC placement schema: 4 (unchanged)
+Community Statistics schema: 1 (unchanged)
+
+Checks performed in the sandbox:
+- Java delimiter-aware source scan: 863 Java files, 0 structural delimiter problems.
+- Pure combat data layer compiled successfully with local javac:
+  NpcAttackKind, NpcAbilityShape, NpcDamageSchool, NpcAbilityType,
+  NpcAbilityDefinition and NpcAbilityPreset.
+- NpcEditorOpenPayload: 119 record components; all 3 constructor call sites have arity 119.
+- NpcEditorSubmitPayload: 112 record components; both constructor call sites have arity 112.
+- Ability network codec: 41 serialized fields and 41 decoded fields in identical order.
+- simpleserverutilities.mixins.json parses successfully.
+- Required preset families present: Regular Melee/Ranged, Charge, Thunderclap,
+  Slash, Arcane Missiles, Arrow Volley, Fireball, Ice Ball, Leap, Mortal Strike,
+  Bladestorm, Self Heal and Custom.
+- Required combat fields present: independent Melee/Ranged/Magic channels,
+  Magic Resistance, Armor multiplier, Melee/Ranged/Magic damage multipliers,
+  Walking speed and Running speed.
+
+NeoForge/API verification notes:
+- NeoForge 26.2's mob equipment calculations use ItemStack gameplay attribute modifiers.
+- ItemStack gameplay enchantments are the intended enchantment source for gameplay logic.
+- LivingDamageEvent.Post occurs after health modification and after resources such as armor
+  durability have already been consumed; SSU uses this point to restore managed NPC equipment.
+
+Full Gradle/NeoForge build status:
+NOT EXECUTED in this sandbox. `./gradlew compileJava --offline --no-daemon` stops before
+project compilation because the Gradle wrapper distribution (9.2.1) is not cached and
+services.gradle.org is unreachable from the sandbox (UnknownHostException). The sandbox
+also provides Java 21 while the SSU project targets Java 25. A local Java 25/NeoForge 26.2
+build remains the authoritative compile test.

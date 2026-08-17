@@ -32,7 +32,7 @@ public final class NpcFunctionService {
             return false;
         }
         PacketDistributor.sendToPlayer(player, new NpcFunctionMenuPayload(
-                instance.id, definition.displayName, definition.role().label(), entries));
+                instance.id, definition.displayName, definition.roleLabel(), definition.roleColor, entries));
         return true;
     }
 

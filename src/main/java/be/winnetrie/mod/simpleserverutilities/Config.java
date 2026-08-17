@@ -120,6 +120,18 @@ public class Config {
             .comment("Enable administrator-defined persistent player statistics and statistic holograms.")
             .define("enableCustomStatistics", true);
 
+    public static final ModConfigSpec.BooleanValue ENABLE_COMMUNITY_STATISTICS = BUILDER
+            .comment("Track curated lifetime/daily/weekly/monthly/season community activity statistics for websites, leaderboards and future community goals.")
+            .define("enableCommunityStatistics", true);
+
+    public static final ModConfigSpec.IntValue COMMUNITY_STATS_HISTORY_DAYS = BUILDER
+            .comment("Number of completed daily community-stat snapshots retained per player and for the server aggregate.")
+            .defineInRange("communityStatsHistoryDays", 90, 7, 730);
+
+    public static final ModConfigSpec.ConfigValue<String> COMMUNITY_STATS_SEASON_ID = BUILDER
+            .comment("Current community-stat season identifier. Change this value to start a fresh season bucket while keeping the previous season in history.")
+            .define("communityStatsSeasonId", "season-1", value -> value instanceof String text && !text.isBlank() && text.length() <= 64);
+
     public static final ModConfigSpec.BooleanValue ENABLE_ACHIEVEMENTS = BUILDER
             .comment("Enable administrator-defined persistent achievements, progress tracking and rewards.")
             .define("enableAchievements", true);
@@ -161,10 +173,10 @@ public class Config {
             .define("enableDungeons", false);
 
     public static final ModConfigSpec.ConfigValue<String> QUEST_ACCESS_MODE = BUILDER
-            .comment("Exclusive quest entry point when Quests is enabled: menu or npc. If NPCs is disabled, menu is always used effectively.")
+            .comment("Quest entry point when Quests is enabled: menu, npc, or both. If NPCs is disabled, menu remains available effectively.")
             .define("questAccessMode", "menu", value -> {
                 if (!(value instanceof String text)) return false;
-                return text.equalsIgnoreCase("menu") || text.equalsIgnoreCase("npc");
+                return text.equalsIgnoreCase("menu") || text.equalsIgnoreCase("npc") || text.equalsIgnoreCase("both");
             });
 
     public static final ModConfigSpec.IntValue MAIL_VISIBLE_RETENTION_DAYS = BUILDER
@@ -175,12 +187,36 @@ public class Config {
             .comment("Enable the internal rank and permission system.")
             .define("enablePermissionSystem", true);
 
+    public static final ModConfigSpec.BooleanValue ENABLE_WEB_API = BUILDER
+            .comment("Enable the opt-in read-only SSU HTTP API for website integrations. Disabled by default.")
+            .define("enableWebApi", false);
+
+    public static final ModConfigSpec.ConfigValue<String> WEB_API_BIND_ADDRESS = BUILDER
+            .comment("Bind address for the SSU Web API. Keep 127.0.0.1 when using a local reverse proxy.")
+            .define("webApiBindAddress", "127.0.0.1", value -> value instanceof String text && !text.isBlank() && text.length() <= 255);
+
+    public static final ModConfigSpec.IntValue WEB_API_PORT = BUILDER
+            .comment("TCP port for the SSU Web API. This is NOT the Minecraft server port.")
+            .defineInRange("webApiPort", 8765, 1024, 65535);
+
+    public static final ModConfigSpec.ConfigValue<String> WEB_API_TOKEN = BUILDER
+            .comment("Bearer token for the SSU Web API. When the API is enabled SSU refuses to start it unless this has at least 16 characters.")
+            .define("webApiToken", "", value -> value instanceof String text && text.length() <= 256);
+
+    public static final ModConfigSpec.ConfigValue<String> WEB_API_ALLOWED_ORIGIN = BUILDER
+            .comment("Optional exact website origin for CORS, for example https://example.com. Blank disables cross-origin browser access.")
+            .define("webApiAllowedOrigin", "", value -> value instanceof String text && text.length() <= 512);
+
     /**
      * Old name kept as code compatibility alias.
      * Use MAX_PLAYER_CLAIM_CHUNKS instead.
      */
     @Deprecated
     public static final ModConfigSpec.IntValue MAX_PLAYER_CLAIMS = MAX_PLAYER_CLAIM_CHUNKS;
+
+    public static final ModConfigSpec.IntValue SSU_GUI_SCALE_PERCENT = CLIENT_BUILDER
+            .comment("Scale applied only to SSU screens. 100 keeps the original SSU size; lower values shrink SSU without changing Minecraft GUI Scale.")
+            .defineInRange("ssuGuiScalePercent", 100, 60, 100);
 
     public static final ModConfigSpec.IntValue AERIAL_MAP_CACHE_MIB = CLIENT_BUILDER
             .comment("Maximum disk space for explored SSU aerial-map tiles, in MiB.")

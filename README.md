@@ -1,4 +1,252 @@
-## Current development build: 1.9.0-dev3.24.2
+## Current development build: 1.9.0-dev3.40.6.1
+
+- dev3.40.4.1 is an emergency client-render recovery build: the new Player-NPC equipment renderer from dev3.40.4 was rolled back because it caused a black screen during client startup. The movement and NPC Manager fixes from dev3.40.4 remain active.
+- dev3.40.4 fixes the actual NPC Tool Manager duplicate-widget cause: constructor-time payload handling no longer builds a pre-init widget set before the normal screen initialization.
+- NPC runtime sync no longer snaps active NPCs back to their placement during combat/movement; combat recovery returns through pathfinding to home, patrol or the active schedule destination.
+- Player-model NPC held main/off-hand items are now visible again on the proven safe renderer path for Wide/Steve and Slim/Alex models.
+- Arcane Missiles has received a first-pass premium VFX upgrade: purple sinus-wave beam, visible arcane orb projectiles, richer charge-up telegraph and brighter impact burst.
+- dev3.40.2's canonical 4-column Dashboard layout remains unchanged.
+### Shared Ability Library + smarter NPC casting
+
+- NPC abilities are now reusable server-wide definitions rather than copies owned by individual NPC templates.
+- Open **Dashboard -> Admin Tools -> Ability Library** to create/edit abilities without the NPC Tool. One shared edit applies to every assigned NPC.
+- NPC Editor -> Abilities is now an assignment flow: open the library, choose **Assign**, optionally restrict the assignment to a boss phase, and keep using the same stable ability ID in Attack Patterns / phase actions.
+- Existing dev3.39 NPC abilities migrate automatically into the shared library without accidentally merging unrelated NPC-local copies.
+- Smarter ability eligibility adds **Requires stationary** and **Min targets**. Arcane Missiles can stop its old navigation before channeling; Thunderclap only becomes eligible when real enemies are inside its AoE instead of when a far-away enemy is merely seen.
+- Around-self AoE and cone selection use shape-aware target validation; channel interruption now reacts to actual post-cast displacement/damage.
+- Equipment-driven combat, walking/running combat movement, attack channels, boss encounters, GUI scaling, community statistics and the read-only website API remain intact.
+- Network protocol `118`; NPC definition schema `19`; NPC Ability Library schema `1`; NPC placement schema `4`; Community Statistics schema `1`.
+- Hotfix dev3.40.1 repairs stale/missing NPC-specific boss-phase gates on shared ability assignments instead of blocking NPC saves. Blank/invalid gates safely fall back to **All phases**.
+- See `docs/NPC-ABILITIES-1.9.0-dev3.40.md` and `docs/TESTING-1.9.0-dev3.40.1.md`.
+
+
+## Previous development build: 1.9.0-dev3.39
+
+### Equipment-driven NPC combat + Ability Workshop
+
+- NPC armor/toughness/ordinary weapon damage come from equipped items and gameplay enchantments; managed equipment remains unbreakable and non-dropping.
+- Separate Walking/Running speed and Melee/Ranged/Magic damage multipliers/channels remain the combat-stat foundation.
+- dev3.39 introduced the editable combat-ability presets and workshop that dev3.40 now promotes into a shared server-wide library.
+- Network protocol `117`; NPC definition schema `18`.
+
+
+## Previous development build: 1.9.0-dev3.38.3
+
+### SSU GUI scale visual hotfix
+
+- Fullscreen menu dim/backdrop now remains unscaled and always covers the complete viewport at 60-100%.
+- Dashboard PlayerSkinWidget avatar now explicitly follows the centered SSU scale for both position and rendered size.
+- The underlying SSU layout remains unchanged; 100% is still identical to the pre-scaling layout.
+- Inherits the independent client-only SSU GUI scale from dev3.38.
+
+### Independent SSU GUI scale
+
+- Added a client-only `SSU GUI Scale` under Dashboard -> Settings -> Interface.
+- 100% preserves the exact existing SSU size; players can select 90%, 80%, 70% or 60% without changing Minecraft's global GUI Scale.
+- SSU keeps its original logical screen dimensions/layout and applies one centered final render transform, with matching inverse mouse/input mapping.
+- The preference persists in the client config as `ssuGuiScalePercent`; no network protocol or world/persistence migration is required.
+- Community Statistics and the read-only Website Analytics API from dev3.37 remain unchanged.
+- See `docs/TESTING-1.9.0-dev3.38.3.md`.
+
+
+## Previous development build: 1.9.0-dev3.37
+
+### Community statistics + website analytics foundation
+
+- Automatic curated community stats track Lifetime, Day, Week, Month and administrator-controlled Season buckets without requiring custom statistic definitions.
+- Rolling histories and Web API statistic/leaderboard/history endpoints remain the analytics foundation.
+- Community Statistics schema `1`; network protocol `116`; NPC definition schema `17`.
+- See `docs/TESTING-1.9.0-dev3.37.md` and `docs/WEB-API-1.9.0-dev3.37.md`.
+
+
+## Previous development build: 1.9.0-dev3.36
+
+### Advanced boss encounters + website foundation
+
+- Boss phase actions, encounter-owned adds, Fixate/Taunt immunity and the initial authenticated read-only Web API v1 remain the foundation inherited by dev3.37.
+- Network protocol `116`; NPC definition schema `17`.
+
+
+## Previous development build: 1.9.0-dev3.35
+
+### NPC AI-family polish + free-form role styling
+
+- Free-form cosmetic Role / occupation text plus the 2 x 8 Minecraft color palette.
+- Species-family AI profiles for humanoid/ground/hopping/flying/aquatic/amphibious/native-special movement.
+- Species-aware patrol/schedule arrival and clean combat return to ambient movement.
+- Behavior-page AI family/runtime diagnostics.
+- Network protocol `115`; NPC definition schema `16`.
+
+
+## Previous development build: 1.9.0-dev3.34.4
+
+### Smooth labels + model-aware locomotion
+
+- Player NPC renderer suppresses the native Minecraft/type nametag so only SSU's role/name/faction/quest identity stack should be visible.
+- NPC overhead text follows the entity's interpolated render position, removing the visible tick-lag behind a moving model.
+- SSU now derives a locomotion family from the selected physical entity shell and delegates movement to that shell's native navigation/control style:
+  - Player/Villager/normal ground shells: native ground path navigation.
+  - Slime/Magma Cube: native hopping movement.
+  - Vex/Ghast/Phantom/Bat/Wither families: specialised free-flight MoveControl.
+  - Allay/Bee/Parrot-style fliers: native flying path navigation.
+  - Fish/Guardian/etc.: native water navigation where the shell supplies it.
+  - Amphibious shells keep their water/ground-capable native controller.
+- SSU remains responsible for route/schedule/combat destinations; it no longer tries to make every model physically move like the Player NPC.
+- Native fliers retain no-gravity flight automatically; the editor's `Can fly` remains an explicit override for ground shells.
+- This is the locomotion foundation for later species-specific AI/decision behavior, not a one-size-fits-all replacement for vanilla species brains.
+- Network protocol remains `114`; NPC definition schema remains `15`; no persistence migration is required.
+- See `docs/TESTING-1.9.0-dev3.34.4.md`.
+
+
+## Previous development build: 1.9.0-dev3.34.3
+
+### dev3.34.3 patrol arrival / route-state hotfix
+
+- Patrol waypoint arrival no longer depends on hitting one exact XYZ within a strict 1-block 3-D sphere.
+- A native Player NPC that reaches the valid final `PathNavigation` node near a waypoint now advances to the next logical waypoint instead of parking forever on point 1.
+- Switching waypoints clears the completed native path as well as SSU route state, then starts the next path in the same behavior update while preserving entity momentum.
+- STUCK recovery immediately requests the replacement waypoint.
+- Route modes Loop, Ping-pong and Random all use the same corrected transition code.
+- Network protocol remains `114`; NPC definition schema remains `15`; no persistence migration is required.
+- See `docs/TESTING-1.9.0-dev3.34.3.md`.
+
+
+## Previous development build: 1.9.0-dev3.34.2
+
+### dev3.34.2 patrol continuation hotfix
+
+- First attempt at invalidating SSU navigation state on waypoint advance. dev3.34.3 supersedes this by also fixing arrival recognition and clearing the completed native path.
+- Newly created patrol waypoints default to `Pause = 0`; existing saved pause values are preserved.
+- Network protocol remains `114`; NPC definition schema remains `15`.
+
+
+## Previous development build: 1.9.0-dev3.34.1
+
+### dev3.34.1 movement hotfix
+
+- Native Player NPC movement now keeps a fixed vanilla-like base movement attribute (`0.25`); the Behavior route-speed value is the single user-facing speed multiplier for Player NPC patrol/wander movement.
+- The duplicate Player NPC Movement Speed field is removed from Stats. `1.0` means normal speed; values such as `0.5` are valid slower movement multipliers.
+- Native `PathNavigation` is no longer rebuilt every four ticks for the same destination. Repathing now happens only for meaningful target drift, a finished path, or stall recovery.
+- Zero-pause patrol points flow directly into the next waypoint instead of forcing a stop every node.
+- SSU's manual no-AI gravity fallback no longer clears movement from a Mob whose native AI/navigation is currently active.
+- Network protocol remains `114`; NPC definition schema remains `15`.
+- See `docs/TESTING-1.9.0-dev3.34.1.md`.
+
+
+### Advanced Combat Patterns + Threat/Aggro
+
+- New optional **Threat targeting** tracks damage aggro with configurable range, multipliers, decay and switch hysteresis.
+- SSU systems with a known healer can add healing threat; the built-in Self Heal ability already reports its actual healing through this hook.
+- New optional **Attack Patterns** let NPCs/bosses run ordered Melee/Ability sequences instead of only choosing random eligible abilities.
+- Pattern steps can be conditioned by target range, own HP percentage and boss phase.
+- New **Tactics** page in the NPC Editor exposes both systems without requiring JSON editing.
+- Boss phase transitions/reset cleanly reset pattern/threat encounter state, and a taunt API foundation is available for future tank mechanics.
+- Existing NPCs keep previous combat behaviour because Threat and Attack Patterns default to OFF.
+- Network protocol is `114`; NPC definition schema is `15`; placement/spawn-profile/dialogue/quest schemas remain `4/1/2/2`.
+- See `docs/TESTING-1.9.0-dev3.34.md`.
+
+## Previous development build: 1.9.0-dev3.33
+
+### Native Player NPC runtime
+
+- Player NPCs moved from the mannequin shell to the native `simpleserverutilities:player_npc` PathfinderMob runtime.
+- Wide/Steve and Slim/Alex skins, native pathfinding, SSU combat/schedules/patrols and the dependency-free player renderer were retained.
+- Network protocol `113`; NPC definition schema `14`.
+
+## Previous development build: 1.9.0-dev3.29.1
+
+### NPC spawning compile hotfix
+
+- Fixed the `Heightmap` import in `NpcSpawnManager` for Minecraft/NeoForge 26.2 (`net.minecraft.world.level.levelgen.Heightmap`).
+- Replaced the removed legacy `ServerLevel#getDayTime()` call with `getDefaultClockTime()`, matching SSU's existing 26.x clock usage.
+- No network, NPC schema, placement schema, dialogue schema, quest schema, or Spawn Profile schema changes.
+
+## Previous development build: 1.9.0-dev3.29
+
+### Dynamic NPC Spawning
+
+- Added reusable **NPC Spawn Profiles**. A normal NPC template can now be used by persistent placements, natural population, or a physical vanilla Spawner without duplicating the NPC definition.
+- New **NPC Manager → Spawning** tab with create/edit/test/delete workflows and a dedicated GUI-first Spawn Profile editor.
+- Natural profiles support dimension, biome allow-list, day/night, Y range, light range, chance, cycle time, attempts, group size, player-distance band, nearby cap, global cap, and despawn distance.
+- Spawner profiles bind to an actual vanilla Spawner block and support group size, cooldown, spawn radius, activation range, nearby/global caps, time/light/Y/biome conditions, and rebinding by looking at another spawner.
+- While an enabled SSU profile owns a vanilla Spawner, its old vanilla mob spawn is suppressed; disabling/removing the profile releases the spawner back to vanilla behaviour.
+- Spawned population is **dynamic runtime population**, not permanent NPC placements. It still uses the linked template's appearance, labels, faction relations, loot, stats and dev3.28 combat/reaction behaviour, but is automatically cleaned up away from players and does not pollute placement JSON.
+- Spawn profiles follow NPC template renames, and a template cannot be deleted while a spawn profile still references it.
+- Network protocol is `110`; new NPC Spawn Profile schema is `1`; NPC definition schema remains `11`; NPC placement schema remains `4`; dialogue/quest schemas remain `2`.
+
+## Previous development build: 1.9.0-dev3.28
+
+### NPC Combat & Reactions foundation
+
+- NPC relations now separate **attitude** from **reaction**: being HOSTILE can mean Ignore, Avoid, or Attack instead of always forcing combat.
+- Self-defense supports **Ignore / Flee / Fight back / Fight + call allies**.
+- Friendly-defense supports **Ignore / Assist / Assist + call allies**, allowing guards/allies to react when a friendly NPC is attacked.
+- Added **Passive / Melee / Defender / Aggressive** combat profiles plus assist range, flee distance, and attack cooldown settings.
+- Schedules, patrols and wander behaviour yield to active SSU combat/flee states and resume afterwards.
+- The NPC editor has a dedicated **Combat** page; tabs remain in the same compact 510×350 editor footprint.
+- Network protocol is `109`; NPC definition schema is `11`; NPC placement schema remains `4`; NPC dialogue and Quest schemas remain `2`.
+
+## Previous development build: 1.9.0-dev3.27
+
+### NPC AI foundation — navigation, routes and schedules
+
+- Shared navigation for schedules, patrols and wander behaviour.
+- Collision-aware fallback movement for custom-skin mannequin shells instead of incremental `snapTo()` movement through blocks.
+- Stuck detection/recovery, in-world patrol and schedule editors with undo, and configurable schedule arrival actions.
+- Network protocol remained `108`; NPC definition schema remained `10`; placement schema remained `4`.
+
+## Previous development build: 1.9.0-dev3.26.2.1
+
+**dev3.26.2.1 compile hotfix:** restores the missing `NpcManager.syncAll()` method required by the NPC/Quest workflow refresh paths. Protocol and schemas are unchanged from dev3.26.2.
+
+### Simplified NPC Quest workflow + compact guided Quest Editor
+
+- Added a normal **NPC → Manage quests** workflow. Select a quest and choose **Offer**, **Turn-in**, **Both**, or **Unlink**; SSU generates the quest-state dialogue routing internally.
+- Simple NPC quest dialogue is now edited as six friendly texts: Available, Accept, In Progress, Ready, Turn-in, and Completed. The graph/condition editor remains available separately as **Advanced dialogue**.
+- Added direct **NPC Integration** to the Quest Definition Editor with searchable Quest Giver and Turn-in NPC pickers, `!` / `•` / `?` marker switches, and a simple dialogue editor.
+- Added **Quest Menu / NPCs / Both** access modes. Linking the first NPC quest while NPC access is disabled now opens an explicit choice instead of silently making `quest_available` false.
+- Multiple simple quests on one NPC use an automatically generated player-specific quest selector. Generated simple links are capped at 12 per NPC; larger/custom hubs can use Advanced Dialogue.
+- Deleting a linked quest rebuilds the managed quest dialogue, and deleting an NPC placement through the editor/admin browser/command clears its simple giver/turn-in links instead of leaving stale references.
+- The Quest Definition Editor was reduced from **720×474 to 550×344** (about 24% narrower and 27% shorter) and reorganized into **General / Objectives / Rewards / NPC Integration** tabs.
+- Normal quest editing uses labelled pickers and contextual controls instead of raw IDs/parameter fields wherever practical: searchable event/reward/prerequisite selectors, registry item pickers, quest/NPC pickers, automatic objective IDs, and an auto-generated unique Quest ID for new quests until manually overridden.
+- Advanced metadata/custom parameters remain available only when an existing/custom definition actually needs them.
+- Network protocol is `108` because quest-editor and NPC-quest workflow payloads changed.
+- Quest definition schema is `2`; NPC dialogue schema remains `2`; NPC definition schema remains `10`; NPC placement schema remains `4`. Other persistence schemas are unchanged from dev3.26.1.
+
+## Previous development build: 1.9.0-dev3.26.1
+
+### NPC Dialogue condition editor hotfix
+
+- Fixed the Dialogue Editor condition type selector becoming trapped at an invalid `NOT` transition.
+- The selector now skips `not` when the selected condition does not contain exactly one child; use **Wrap NOT** to negate an existing condition safely.
+- Network protocol remains `107`; NPC dialogue schema remains `2`; all other schemas are unchanged from dev3.26.
+
+## Previous development build: 1.9.0-dev3.26
+
+### NPC Dialogue, Interaction & Quest integration
+
+- Dialogue nodes now support their own **player-specific Content Condition** plus an optional fallback node, allowing one NPC to route players to different conversation states safely.
+- Added `quest_available` alongside the existing `quest_active`, `quest_ready` and `quest_completed` conditions. Quest availability uses the real NPC quest access, prerequisite, cooldown and repeatability rules.
+- Dialogue Editor 2.1 can edit conditions on either the whole node or a single choice, exposes fallback routing, and includes a live quest-definition picker for quest conditions.
+- NPC dialogue text supports SSU rich text through the reusable 16-colour + B/I/U/S editor and renders formatted in both live dialogue and preview.
+- Quest offers and turn-ins continue through the existing authoritative `quest_offer` and `quest_turn_in` NPC services.
+- NPC overhead labels now support player-specific quest state markers: **`!` available**, **`?` ready to turn in**, **`•` active**. Links are inferred from configured NPC services/dialogue data and the marker scales with NPC scale.
+- Network protocol is `107`; NPC dialogue schema is `2`; NPC definition schema remains `10`; NPC placement schema remains `4`. Other persistence schemas are unchanged from dev3.25.
+
+## Previous development build: 1.9.0-dev3.25
+
+### NPC Editor, Appearance, Behaviour & Patrol expansion
+
+- Reorganized the NPC editor into dedicated **Behavior** and **Movement** pages while preserving Identity, Appearance, Interaction, Relations, Stats, Loadout, Schedule and Respawn workflows.
+- Added persistent NPC behaviour modes: **Native AI**, **Stationary**, **Look at players**, **Wander** and **Patrol**. Existing schema-9 NPCs migrate from their legacy No AI setting.
+- Look-at behaviour supports configurable range and optional body rotation; wander supports radius, retarget interval and speed; patrol supports configurable speed.
+- Added placement-specific patrol routes with up to 32 waypoints, per-point yaw/pause and Loop / Ping-Pong / Random traversal. Linked placement copies shift their own route coordinates instead of sharing world waypoints.
+- Added an in-world patrol route editor: right-click a block to add, sneak-right-click near a point to remove, and right-click air to finish/reopen the editor. Active route points are marked with End Rod particles while editing.
+- Added a searchable local-skin browser backed by `<world>/simpleserverutilities/npcs/textures/`; local PNGs are synchronously validated on Save instead of failing only after the editor closes.
+- Behaviour runtime is bounded to 5 Hz and uses vanilla Mob navigation where available, with non-Mob/flying/swimming fallbacks. Schedules retain priority over normal behaviour.
+- Network protocol is `106`; NPC definition schema is `10`; NPC placement schema is `4`. Other persistence schemas are unchanged from dev3.24.2.
+
+## Previous development build: 1.9.0-dev3.24.2
 
 ### NPC custom skin renderer hotfix
 
@@ -37,7 +285,7 @@
 - Minimap Settings adds `Frame: CLASSIC / TEXTURED`. Classic preserves the existing SSU border and remains the migration default; Textured uses the supplied square/round frame automatically for the active minimap shape. The textured round map is circularly clipped.
 - Network protocol is `105`; Player UI preference schema is `13`; all other persistence schemas remain unchanged from dev3.22.
 
-## Current development build: 1.9.0-dev3.22
+## Previous development build: 1.9.0-dev3.22
 
 ### Achievement UX, server-health clarity and GUI polish
 

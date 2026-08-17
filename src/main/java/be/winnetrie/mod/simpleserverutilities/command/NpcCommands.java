@@ -107,11 +107,15 @@ public final class NpcCommands {
     }
 
     private static int delete(CommandSourceStack source, String rawId) {
-        if (!SimpleServerUtilities.NPCS.deleteInstance(rawId)) {
+        NpcInstance instance = SimpleServerUtilities.NPCS.instance(rawId);
+        if (instance == null || !SimpleServerUtilities.NPCS.deleteInstance(instance.id)) {
             source.sendFailure(Component.literal("Unknown NPC placement: " + rawId));
             return 0;
         }
-        source.sendSystemMessage(Component.literal("Deleted NPC placement " + rawId + ". The reusable template was kept."));
+        be.winnetrie.mod.simpleserverutilities.quest.QuestNpcBridge.unlinkDeletedNpc(
+                SimpleServerUtilities.QUESTS, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS, instance.id);
+        SimpleServerUtilities.NPCS.syncAll();
+        source.sendSystemMessage(Component.literal("Deleted NPC placement " + rawId + ". Simple quest links were cleared; the reusable template was kept."));
         return 1;
     }
 
@@ -165,7 +169,7 @@ public final class NpcCommands {
         instance.dimension = player.level().dimension().identifier().toString();
         instance.x = player.getX(); instance.y = player.getY(); instance.z = player.getZ();
         instance.yaw = player.getYRot(); instance.pitch = 0.0F;
-        if (!SimpleServerUtilities.NPCS.saveInstance(instance)) { source.sendFailure(Component.literal("NPC could not be moved.")); return 0; }
+        if (!SimpleServerUtilities.NPCS.saveInstance(instance, true)) { source.sendFailure(Component.literal("NPC could not be moved.")); return 0; }
         source.sendSystemMessage(Component.literal("NPC moved to your position."));
         return 1;
     }

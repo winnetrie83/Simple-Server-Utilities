@@ -45,9 +45,10 @@ final class NpcDialogueParameterCatalog {
             case "module_enabled" -> info("Checks whether an SSU content module is enabled.",
                     req("feature", "quests", "Feature: npcs, quests, minigames or dungeons."),
                     opt("value", "true", "Expected enabled state: true or false."));
-            case "quest_completed" -> target("Allows the choice after a quest has been completed.", "quest", "quest_id", "Quest ID.");
-            case "quest_active" -> target("Allows the choice while a quest is active.", "quest", "quest_id", "Quest ID.");
-            case "quest_ready" -> target("Allows the choice when a quest can be turned in.", "quest", "quest_id", "Quest ID.");
+            case "quest_available" -> target("Allows the node/choice when this quest can currently be started from an NPC.", "quest", "quest_id", "Quest ID.");
+            case "quest_completed" -> target("Allows the node/choice after a quest has been completed.", "quest", "quest_id", "Quest ID.");
+            case "quest_active" -> target("Allows the node/choice while a quest is active.", "quest", "quest_id", "Quest ID.");
+            case "quest_ready" -> target("Allows the node/choice when a quest can be turned in.", "quest", "quest_id", "Quest ID.");
             case "minigame_queued" -> target("Checks whether the player is queued for a minigame.", "minigame", "minigame_id", "Minigame ID.");
             case "minigame_active" -> target("Checks whether the player is in a minigame match.", "minigame", "minigame_id", "Minigame ID.");
             case "dungeon_queued" -> target("Checks whether the player is queued for a dungeon.", "dungeon", "dungeon_id", "Dungeon ID.");

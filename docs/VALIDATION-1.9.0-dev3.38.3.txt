@@ -1,0 +1,7 @@
+SSU 1.9.0-dev3.38.3 static validation
+- Reduced-scale SSU screens suppress vanilla transparent/menu background extraction before concrete screen rendering.
+- Managed SSU fullscreen dims remain inverse-transformed to physical viewport coordinates.
+- MailComposeScreen, WorldMapScreen, ClaimMapScreen and ClaimTaxDeleteScreen have a reduced-scale-only managed fallback dim.
+- RegionSnapshotPreviewScreen and WorldEditCompactOverlayScreen retain their intentional transparent background overrides.
+- 100% scale leaves vanilla background extraction untouched.
+- No network or persistence schema changes.

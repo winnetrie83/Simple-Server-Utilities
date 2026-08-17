@@ -196,7 +196,7 @@ final class BlockPartyMinigameEditorScreen extends MinigameEditorScreen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = (width - W) / 2, y = (height - H) / 2;
-        g.fill(0, 0, width, height, 0xA9000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
         g.text(font, "Block Party Editor", x + 16, y + 42, TEXT, true);
         if (page == 0) {
             g.text(font, "Free-for-all elimination mode. Every participant gets an independent player slot.", x + 16, y + 56, MUTED, false);

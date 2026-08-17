@@ -13,7 +13,7 @@ public class ModNetworking {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("105");
+        PayloadRegistrar registrar = event.registrar(SimpleServerUtilities.MODID).versioned("118");
 
         registrar.playToClient(
                 ClaimMapDataPayload.TYPE,
@@ -363,6 +363,22 @@ public class ModNetworking {
                 be.winnetrie.mod.simpleserverutilities.npc.NpcAdminService::handleAction
         );
 
+        registrar.playToClient(
+                NpcSpawnProfileEditorOpenPayload.TYPE,
+                NpcSpawnProfileEditorOpenPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                NpcSpawnProfileEditorSubmitPayload.TYPE,
+                NpcSpawnProfileEditorSubmitPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.npc.NpcSpawnProfileEditorService::handleSubmit
+        );
+
+        registrar.playToClient(
+                NpcSpawnProfileEditorResultPayload.TYPE,
+                NpcSpawnProfileEditorResultPayload.STREAM_CODEC
+        );
+
 
         registrar.playToClient(
                 NpcDialogueViewPayload.TYPE,
@@ -437,6 +453,39 @@ public class ModNetworking {
         );
 
         registrar.playToServer(
+                NpcAbilityLibraryRequestPayload.TYPE,
+                NpcAbilityLibraryRequestPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.npc.NpcAbilityEditorService::handleRequest
+        );
+
+        registrar.playToClient(
+                NpcAbilityLibraryDataPayload.TYPE,
+                NpcAbilityLibraryDataPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                NpcAbilityLibraryActionPayload.TYPE,
+                NpcAbilityLibraryActionPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.npc.NpcAbilityEditorService::handleAction
+        );
+
+        registrar.playToClient(
+                NpcAbilityEditorOpenPayload.TYPE,
+                NpcAbilityEditorOpenPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                NpcAbilityEditorSubmitPayload.TYPE,
+                NpcAbilityEditorSubmitPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.npc.NpcAbilityEditorService::handleSubmit
+        );
+
+        registrar.playToClient(
+                NpcAbilityEditorResultPayload.TYPE,
+                NpcAbilityEditorResultPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
                 NpcItemPriceCatalogRequestPayload.TYPE,
                 NpcItemPriceCatalogRequestPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.npcshop.NpcItemPriceCatalogService::handleRequest
@@ -473,6 +522,23 @@ public class ModNetworking {
         registrar.playToClient(
                 NpcDialogueEditorResultPayload.TYPE,
                 NpcDialogueEditorResultPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                NpcQuestWorkflowRequestPayload.TYPE,
+                NpcQuestWorkflowRequestPayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.quest.NpcQuestWorkflowService::handleRequest
+        );
+
+        registrar.playToClient(
+                NpcQuestWorkflowOpenPayload.TYPE,
+                NpcQuestWorkflowOpenPayload.STREAM_CODEC
+        );
+
+        registrar.playToServer(
+                NpcQuestWorkflowUpdatePayload.TYPE,
+                NpcQuestWorkflowUpdatePayload.STREAM_CODEC,
+                be.winnetrie.mod.simpleserverutilities.quest.NpcQuestWorkflowService::handleUpdate
         );
 
         registrar.playToServer(

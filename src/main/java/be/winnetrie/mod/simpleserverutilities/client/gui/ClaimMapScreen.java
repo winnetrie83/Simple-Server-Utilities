@@ -193,6 +193,7 @@ public final class ClaimMapScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        SsuGuiScale.fullscreenDimWhenScaled(graphics, this, 0xA5000000);
         int right = controlLeft + CONTROL_WIDTH;
         graphics.fill(shellLeft, MARGIN, right, height - MARGIN, PANEL);
         graphics.outline(shellLeft, MARGIN, right - shellLeft, height - MARGIN * 2, FRAME);

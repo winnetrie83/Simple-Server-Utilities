@@ -56,7 +56,7 @@ public final class NpcDialogueParameterGuideScreen extends Screen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
-        g.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(x, y, x + W, y + H, 0xF0161D25);
         g.outline(x, y, W, H, 0xFF586978);
         g.text(font, (condition ? "Condition" : "Action") + " parameters: " + type, x + 12, y + 12, 0xFFF3F5F7, true);

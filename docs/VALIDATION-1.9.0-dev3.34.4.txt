@@ -1,0 +1,17 @@
+SSU 1.9.0-dev3.34.4 validation notes
+
+Target base: 1.9.0-dev3.34.3
+Protocol: 114 (unchanged)
+NPC definition schema: 15 (unchanged)
+NPC placement schema: 4 (unchanged)
+
+Static validation scope:
+- Player renderer has an explicit shouldShowName(entity, distanceToCameraSq) suppression.
+- Entity Insight already excludes/tag-suppresses SSU NPCs; the renderer suppression is an additional hard boundary for the native Player shell.
+- NPC label base position uses getPosition(partialTicks).
+- Locomotion profile is derived at runtime; no persisted fields or network payload fields added.
+- Native Mob shells retain their own PathNavigation/MoveControl path where applicable.
+- Special direct-flight controllers use MoveControl wanted-position steering; route stop also sets MoveControl to WAIT.
+- Generic manual flight remains only an explicit override for shells that are not already native fliers.
+
+A full Gradle/NeoForge compile could not be executed in this sandbox because the Gradle distribution endpoint is not reachable here and the available local JDK is Java 21 while the project toolchain is Java 25. The user must perform the authoritative Java 25 / NeoForge 26.2 compile and runtime test.

@@ -26,7 +26,7 @@ public final class MineStatisticsScreen extends Screen {
     @Override protected void init(){int x=left(),y=top();addRenderableWidget(Button.builder(Component.literal("Back"),v->back()).bounds(x+16,y+H-27,66,19).build());}
 
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float partialTick){
-        int x=left(),y=top();g.fill(0,0,width,height,0xA5000000);g.fill(x,y,x+W,y+H,PANEL);g.outline(x,y,W,H,BORDER);g.text(font,"Mine statistics — "+mine.displayName,x+16,y+14,TEXT,true);
+        int x=left(),y=top();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+W,y+H,PANEL);g.outline(x,y,W,H,BORDER);g.text(font,"Mine statistics — "+mine.displayName,x+16,y+14,TEXT,true);
         int lx=x+18,rx=x+260;
         g.text(font,"Current cycle",lx,y+40,MUTED,false);g.text(font,"Mined blocks: "+mine.blocksMined+" / "+mine.volume(),lx,y+57,TEXT,false);g.text(font,String.format(Locale.ROOT,"Mined: %.1f%%  •  Remaining: %.1f%%",mine.minedPercent(),mine.remainingPercent()),lx,y+73,GOOD,false);g.text(font,"Next reset: "+resetLabel(),lx,y+89,TEXT,false);
         g.text(font,"Lifetime",rx,y+40,MUTED,false);g.text(font,"Blocks mined: "+mine.totalBlocksMined,rx,y+57,TEXT,false);g.text(font,"Mine teleports: "+mine.totalUses,rx,y+73,TEXT,false);g.text(font,"Resets: "+mine.resetCount+"  (manual "+mine.manualResetCount+", auto "+mine.automaticResetCount+")",rx,y+89,TEXT,false);

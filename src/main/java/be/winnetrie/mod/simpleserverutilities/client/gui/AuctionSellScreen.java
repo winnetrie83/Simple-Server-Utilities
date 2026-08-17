@@ -118,7 +118,7 @@ public final class AuctionSellScreen extends AbstractContainerScreen<AuctionSell
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
-        g.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, PANEL);
         g.outline(leftPos, topPos, imageWidth, imageHeight, BORDER);
 

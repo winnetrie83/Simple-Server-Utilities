@@ -47,6 +47,6 @@ public final class NpcModelPickerScreen extends Screen {
     private List<String> filtered(){String q=searchValue.trim().toLowerCase(Locale.ROOT);if(q.isBlank())return models;List<String>out=new ArrayList<>();for(String id:models)if(id.toLowerCase(Locale.ROOT).contains(q))out.add(id);return out;}
     private void choose(String id){selected=id;parent.acceptModel(id);if(minecraft!=null)minecraft.setScreenAndShow(parent);}
     @Override public void onClose(){if(minecraft!=null)minecraft.setScreenAndShow(parent);}
-    @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float partialTick){int x=px(),y=py();g.fill(0,0,width,height,0xA9000000);g.fill(x,y,x+W,y+H,0xF0161D25);g.outline(x,y,W,H,0xFF586978);g.text(font,"Choose NPC model",x+12,y+12,0xFFF3F5F7,true);g.text(font,filtered().size()+" models",x+W-90,y+13,0xFFAAB5BE,false);super.extractRenderState(g,mouseX,mouseY,partialTick);}
+    @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float partialTick){int x=px(),y=py();SsuGuiScale.fullscreenDim(g, this, 0xA9000000);g.fill(x,y,x+W,y+H,0xF0161D25);g.outline(x,y,W,H,0xFF586978);g.text(font,"Choose NPC model",x+12,y+12,0xFFF3F5F7,true);g.text(font,filtered().size()+" models",x+W-90,y+13,0xFFAAB5BE,false);super.extractRenderState(g,mouseX,mouseY,partialTick);}
     private int px(){return(width-W)/2;}private int py(){return(height-H)/2;}private static String trim(String value,int max){return value.length()<=max?value:value.substring(0,max-1)+"…";}
 }

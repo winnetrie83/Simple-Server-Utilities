@@ -442,7 +442,7 @@ public final class NpcShopEditorScreen extends Screen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int left = left(), top = top();
-        g.fill(0, 0, width, height, 0xA9000000); g.fill(left, top, left + W, top + H, PANEL); g.outline(left, top, W, H, BORDER);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(left, top, left + W, top + H, PANEL); g.outline(left, top, W, H, BORDER);
         String position = initial.shopIndex() >= 0 ? (initial.shopIndex() + 1) + "/" + initial.shopCount() : "New";
         g.text(font, "Shop Editor · " + position, left + W - 148, top + 15, TEXT, true);
         if (page == 0) renderGeneral(g, left, top);

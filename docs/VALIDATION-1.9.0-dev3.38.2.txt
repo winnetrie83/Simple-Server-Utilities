@@ -1,0 +1,6 @@
+SSU 1.9.0-dev3.38.2 static validation
+- Reduced-scale SSU screens suppress the redundant vanilla transparent/menu background only after their managed fullscreen dim has been emitted.
+- SSU screens without a managed fullscreen dim keep vanilla background handling.
+- SSU-owned fullscreen dim remains centralized in SsuGuiScale.fullscreenDim(...).
+- 100% scale leaves vanilla background extraction untouched.
+- No network or persistence schema changes.

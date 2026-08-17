@@ -1,0 +1,11 @@
+SSU 1.9.0-dev3.34.3 validation notes
+
+- Based on dev3.34.2.
+- Patrol arrival uses horizontal/vertical tolerance and native completed-path proximity.
+- Waypoint advance clears both SSU route state and completed native PathNavigation without zeroing entity velocity.
+- STUCK transition requests the replacement waypoint immediately.
+- No protocol change: 114.
+- No NPC definition schema change: 15.
+- No placement schema change: 4.
+- gradle.properties mod_version: 1.9.0-dev3.34.3.
+- Full Gradle/NeoForge compilation still requires the user Java 25 environment.

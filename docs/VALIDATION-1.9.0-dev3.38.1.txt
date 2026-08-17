@@ -1,0 +1,14 @@
+SSU 1.9.0-dev3.38.1 static validation
+
+- 857 Java source files scanned for balanced Java delimiters: PASS
+- 93 SSU fullscreen black/dim fills centralized through SsuGuiScale.fullscreenDim: PASS
+- No remaining raw fill(0,0,width,height,0x..000000) calls in SSU GUI screens outside the central helper: PASS
+- ScreenSsuGuiScaleMixin no longer renders a separate scaled/edge dim pass: PASS
+- Dashboard PlayerSkinWidget constructor dimensions use physicalLength(scale): PASS
+- Dashboard portrait position uses physicalX/physicalY centered scale mapping: PASS
+- Network protocol unchanged: 116
+- NPC definition schema unchanged: 17
+- NPC placement schema unchanged: 4
+- Community Statistics schema unchanged: 1
+
+Full Gradle/NeoForge compile was not run in the sandbox because the project requires Java 25 and the environment cannot fetch the Gradle distribution from services.gradle.org.

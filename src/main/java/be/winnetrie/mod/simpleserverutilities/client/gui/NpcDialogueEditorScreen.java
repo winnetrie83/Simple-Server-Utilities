@@ -27,7 +27,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
-/** Dialogue Editor 2.0: bounded graph, entry actions, all choice actions and server-synchronised catalogues. */
+/** Dialogue Editor 2.1: bounded graph, entry actions, all choice actions and server-synchronised catalogues. */
 public final class NpcDialogueEditorScreen extends Screen {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final int W = 540, H = 370;
@@ -46,6 +46,8 @@ public final class NpcDialogueEditorScreen extends Screen {
     private Page page = Page.NODE;
     private int nodeIndex, choiceIndex, entryActionIndex, choiceActionIndex;
     private final List<Integer> conditionPath = new ArrayList<>();
+    /** Conditions page can edit either the selected node gate or selected choice gate. */
+    private boolean conditionTargetNode;
 
     private EditBox dialogueId, dialogueName, startNode, nodeId, speaker;
     private MultiLineEditBox nodeText;
@@ -63,7 +65,7 @@ public final class NpcDialogueEditorScreen extends Screen {
     private long nextRequestId = 1L;
 
     public NpcDialogueEditorScreen(NpcDialogueEditorOpenPayload initial, Screen parent) {
-        super(Component.literal("NPC Dialogue Editor 2.0"));
+        super(Component.literal("NPC Dialogue Editor 2.1"));
         this.initial = initial;
         this.parent = parent;
         this.conditionTypes = catalogue(initial.availableConditions(), "always");
@@ -180,11 +182,19 @@ public final class NpcDialogueEditorScreen extends Screen {
         nodeId = field(x + 164, y + 120, 145, 64, node().id);
         speaker = field(x + 317, y + 120, 145, 64, node().speaker);
 
+        addRenderableWidget(Button.builder(Component.literal("Entry condition: " + trim(conditionSummary(nodeCondition()), 28)),
+                button -> openNodeConditions()).bounds(x + 12, y + 146, 250, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("Fallback: "
+                        + trim(node().fallbackNode == null || node().fallbackNode.isBlank() ? "none / unavailable" : node().fallbackNode, 28)),
+                button -> cycleFallbackNode()).bounds(x + 270, y + 146, 258, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("Edit rich text"), button -> editNodeRichText())
+                .bounds(x + W - 112, y + 172, 100, 18).build());
+
         nodeTextValue = node().text == null ? "" : node().text;
-        nodeText = MultiLineEditBox.builder().setX(x + 12).setY(y + 166)
+        nodeText = MultiLineEditBox.builder().setX(x + 12).setY(y + 196)
                 .setPlaceholder(Component.literal("Dialogue text"))
                 .setShowBackground(true).setShowDecorations(true)
-                .build(font, W - 24, 138, Component.literal("Dialogue text"));
+                .build(font, W - 24, 108, Component.literal("Dialogue text"));
         nodeText.setCharacterLimit(4096);
         nodeText.setLineLimit(24);
         nodeText.setValue(nodeTextValue);
@@ -193,7 +203,8 @@ public final class NpcDialogueEditorScreen extends Screen {
     }
 
     private void initConditions(int x, int y) {
-        choiceNavigation(x, y + 74);
+        if (conditionTargetNode) nodeNavigation(x, y + 74);
+        else choiceNavigation(x, y + 74);
         normalizeConditionPath();
         List<ConditionRef> nodes = flattenedConditions();
         int selectedIndex = selectedConditionIndex(nodes);
@@ -227,12 +238,15 @@ public final class NpcDialogueEditorScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("Wrap OR"), button -> wrapCondition("any"))
                 .bounds(x + 452, y + 166, 76, 18).build());
 
-        conditionParameters = field(x + 12, y + 218, 310, 1024, parameters(selected.condition().parameters()));
+        conditionParameters = field(x + 12, y + 218, 260, 1024, parameters(selected.condition().parameters()));
         conditionParameters.setHint(Component.literal("key=value; key=value"));
-        addRenderableWidget(Button.builder(Component.literal("Parameter guide"), button -> openParameterGuide(true))
-                .bounds(x + 330, y + 218, 96, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("Guide"), button -> openParameterGuide(true))
+                .bounds(x + 280, y + 218, 80, 18).build());
+        Button questTarget = addRenderableWidget(Button.builder(Component.literal(questConditionButtonLabel()),
+                button -> cycleQuestConditionTarget()).bounds(x + 368, y + 218, 76, 18).build());
+        questTarget.active = isQuestCondition(selected.condition().type()) && !questTargets().isEmpty();
         addRenderableWidget(Button.builder(Component.literal("Wrap NOT"), button -> wrapCondition("not"))
-                .bounds(x + 434, y + 218, 94, 18).build());
+                .bounds(x + 452, y + 218, 76, 18).build());
     }
 
     private void initEntryActions(int x, int y) {
@@ -255,9 +269,9 @@ public final class NpcDialogueEditorScreen extends Screen {
         choiceId = field(x + 164, y + 74, 120, 64, choice().id);
         choiceText = field(x + 292, y + 74, 236, 256, choice().text);
 
-        ContentCondition root = rootCondition();
+        ContentCondition root = choiceCondition();
         addRenderableWidget(Button.builder(Component.literal("Condition: " + trim(conditionSummary(root), 30)),
-                button -> switchPage(Page.CONDITIONS)).bounds(x + 12, y + 120, 250, 18).build());
+                button -> openChoiceConditions()).bounds(x + 12, y + 120, 250, 18).build());
 
         nextNodeValue = choice().nextNode == null ? "" : choice().nextNode;
         serviceValue = choice().service == null ? "" : choice().service;
@@ -344,8 +358,111 @@ public final class NpcDialogueEditorScreen extends Screen {
 
     private void switchPage(Page next) {
         saveCurrent();
+        if (next == Page.CONDITIONS) {
+            if (page == Page.NODE || page == Page.ENTRY_ACTIONS) conditionTargetNode = true;
+            else if (page == Page.CHOICE || page == Page.CHOICE_ACTIONS) conditionTargetNode = false;
+            conditionPath.clear();
+        }
         page = next;
         actionParameters = null;
+        rebuildWidgets();
+    }
+
+    private void openNodeConditions() {
+        saveCurrent();
+        conditionTargetNode = true;
+        conditionPath.clear();
+        page = Page.CONDITIONS;
+        rebuildWidgets();
+    }
+
+    private void openChoiceConditions() {
+        saveCurrent();
+        conditionTargetNode = false;
+        conditionPath.clear();
+        page = Page.CONDITIONS;
+        rebuildWidgets();
+    }
+
+    private void cycleFallbackNode() {
+        saveCurrent();
+        ArrayList<String> options = new ArrayList<>();
+        options.add("");
+        for (NpcDialogueNode candidate : draft.nodes) {
+            if (!candidate.id.equals(node().id)) options.add(candidate.id);
+        }
+        node().fallbackNode = cycle(node().fallbackNode, options, true);
+        rebuildWidgets();
+    }
+
+    private void editNodeRichText() {
+        saveCurrent();
+        if (minecraft == null) return;
+        String current = node().text == null ? "" : node().text;
+        minecraft.setScreenAndShow(new RichTextValueEditorScreen(this, "NPC dialogue text",
+                "Use SSU's 16 colours and B/I/U/S formatting for this dialogue line.", current,
+                NpcDialogueEditorScreen::normalizeDialogueText, 4096, 4096, 24, value -> {
+                    node().text = value;
+                    nodeTextValue = value;
+                    if (minecraft != null) rebuildWidgets();
+                }));
+    }
+
+    private static String normalizeDialogueText(String raw) {
+        String value = raw == null ? "" : raw.replace("\r\n", "\n").replace('\r', '\n');
+        return value.length() <= 4096 ? value : value.substring(0, 4096);
+    }
+
+    private static boolean isQuestCondition(String type) {
+        return "quest_available".equals(type) || "quest_completed".equals(type)
+                || "quest_active".equals(type) || "quest_ready".equals(type);
+    }
+
+    private List<NpcDialogueEditorOpenPayload.TargetEntry> questTargets() {
+        LinkedHashMap<String, NpcDialogueEditorOpenPayload.TargetEntry> unique = new LinkedHashMap<>();
+        for (NpcDialogueEditorOpenPayload.TargetEntry entry : targetsForService("quest_offer")) {
+            unique.putIfAbsent(entry.targetId(), entry);
+        }
+        for (NpcDialogueEditorOpenPayload.TargetEntry entry : targetsForService("quest_turn_in")) {
+            unique.putIfAbsent(entry.targetId(), entry);
+        }
+        return List.copyOf(unique.values());
+    }
+
+    private String questConditionButtonLabel() {
+        ContentCondition selected = selectedCondition();
+        if (!isQuestCondition(selected.type())) return "Quest…";
+        String current = selected.parameter("quest");
+        for (NpcDialogueEditorOpenPayload.TargetEntry entry : questTargets()) {
+            if (entry.targetId().equals(current)) return trim(entry.label(), 11);
+        }
+        return current.isBlank() ? "Quest…" : trim(current, 11);
+    }
+
+    private void cycleQuestConditionTarget() {
+        saveCurrent();
+        ContentCondition current = selectedCondition();
+        if (!isQuestCondition(current.type())) return;
+        List<NpcDialogueEditorOpenPayload.TargetEntry> quests = questTargets();
+        if (quests.isEmpty()) {
+            setNotice("No quest definitions are available.", true);
+            rebuildWidgets();
+            return;
+        }
+        String selected = current.parameter("quest");
+        int index = -1;
+        for (int candidate = 0; candidate < quests.size(); candidate++) {
+            if (quests.get(candidate).targetId().equals(selected)) {
+                index = candidate;
+                break;
+            }
+        }
+        NpcDialogueEditorOpenPayload.TargetEntry next = quests.get((index + 1) % quests.size());
+        LinkedHashMap<String, String> values = new LinkedHashMap<>(current.parameters());
+        values.put("quest", next.targetId());
+        setRootCondition(replaceCondition(rootCondition(), conditionPath, 0,
+                new ContentCondition(current.type(), values, current.children())));
+        setNotice("Selected quest " + next.label() + " (" + next.targetId() + ").", false);
         rebuildWidgets();
     }
 
@@ -363,7 +480,7 @@ public final class NpcDialogueEditorScreen extends Screen {
             ContentCondition current = selectedCondition();
             ContentCondition replacement = new ContentCondition(conditionTypeValue,
                     parseParameters(conditionParameters.getValue()), current.children());
-            choice().condition = replaceCondition(rootCondition(), conditionPath, 0, replacement);
+            setRootCondition(replaceCondition(rootCondition(), conditionPath, 0, replacement));
         } else if (page == Page.CHOICE && choiceId != null) {
             NpcDialogueChoice current = choice();
             current.id = choiceId.getValue().trim();
@@ -417,6 +534,7 @@ public final class NpcDialogueEditorScreen extends Screen {
         nodeIndex = Math.max(0, nodeIndex - 1);
         if (removed.equals(draft.startNode)) draft.startNode = node().id;
         for (NpcDialogueNode candidate : draft.nodes) {
+            if (removed.equals(candidate.fallbackNode)) candidate.fallbackNode = "";
             for (NpcDialogueChoice candidateChoice : candidate.choices) {
                 if (removed.equals(candidateChoice.nextNode)) candidateChoice.nextNode = "";
             }
@@ -534,17 +652,20 @@ public final class NpcDialogueEditorScreen extends Screen {
         ContentCondition current = selectedCondition();
         String previousType = current.type();
         Map<String, String> values = current.parameters();
-        conditionTypeValue = cycle(previousType, conditionTypes, false);
-        if ("not".equals(conditionTypeValue) && current.children().size() != 1) {
-            setNotice("NOT requires exactly one child. Use Wrap NOT instead.", true);
-            rebuildWidgets();
-            return;
+
+        String nextType = previousType;
+        for (int attempts = 0; attempts < Math.max(1, conditionTypes.size()); attempts++) {
+            nextType = cycle(nextType, conditionTypes, false);
+            if (!"not".equals(nextType) || current.children().size() == 1) break;
         }
+        if (nextType.equals(previousType)) return;
+        conditionTypeValue = nextType;
+
         if (values.isEmpty() || values.equals(defaultConditionParameters(previousType))) {
             values = defaultConditionParameters(conditionTypeValue);
         }
         ContentCondition replacement = new ContentCondition(conditionTypeValue, values, current.children());
-        choice().condition = replaceCondition(rootCondition(), conditionPath, 0, replacement);
+        setRootCondition(replaceCondition(rootCondition(), conditionPath, 0, replacement));
         rebuildWidgets();
     }
 
@@ -670,8 +791,8 @@ public final class NpcDialogueEditorScreen extends Screen {
             ContentCondition current = selectedCondition();
             LinkedHashMap<String, String> values = new LinkedHashMap<>(current.parameters());
             values.put(key, value == null ? "" : value);
-            choice().condition = replaceCondition(rootCondition(), conditionPath, 0,
-                    new ContentCondition(current.type(), values, current.children()));
+            setRootCondition(replaceCondition(rootCondition(), conditionPath, 0,
+                    new ContentCondition(current.type(), values, current.children())));
         } else {
             boolean entry = page == Page.ENTRY_ACTIONS;
             List<ContentAction> actions = actionList(entry);
@@ -708,7 +829,7 @@ public final class NpcDialogueEditorScreen extends Screen {
     private static String pageDescription(Page page) {
         return switch (page) {
             case NODE -> "A node is one dialogue page: speaker text plus the player choices attached to it.";
-            case CONDITIONS -> "Conditions decide whether the current choice is available or hidden for this player.";
+            case CONDITIONS -> "Conditions decide whether the selected node or choice is available for this player.";
             case ENTRY_ACTIONS -> "On open actions run once when the player enters the selected node.";
             case CHOICE -> "A choice is a clickable player reply that leads to another node or an SSU service.";
             case CHOICE_ACTIONS -> "On choose actions run after the click, before the next node or service opens.";
@@ -764,10 +885,10 @@ public final class NpcDialogueEditorScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
-        graphics.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(graphics, this, 0xA9000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
         graphics.outline(x, y, W, H, BORDER);
-        graphics.text(font, "NPC Dialogue Editor 2.0", x + 12, y + 12, TEXT, true);
+        graphics.text(font, "NPC Dialogue Editor 2.1", x + 12, y + 12, TEXT, true);
         graphics.text(font, pageDescription(page), x + 12, y + 52, MUTED, false);
 
         switch (page) {
@@ -778,7 +899,8 @@ public final class NpcDialogueEditorScreen extends Screen {
                 label(graphics, "Node " + (nodeIndex + 1) + "/" + draft.nodes.size(), x + 80, y + 109);
                 label(graphics, "Node ID", x + 164, y + 109);
                 label(graphics, "Speaker", x + 317, y + 109);
-                label(graphics, "Dialogue text", x + 12, y + 155);
+                label(graphics, "Player-specific entry route and fallback", x + 12, y + 139);
+                label(graphics, "Dialogue text", x + 12, y + 185);
             }
             case CONDITIONS -> renderConditions(graphics, x, y);
             case ENTRY_ACTIONS -> {
@@ -801,11 +923,12 @@ public final class NpcDialogueEditorScreen extends Screen {
                 label(graphics, "Next dialogue node", x + 12, y + 155);
                 label(graphics, "Optional server service", x + 240, y + 155);
                 label(graphics, targetHint(serviceValue), x + 12, y + 207);
-                graphics.text(font, conditionNodeCount(rootCondition()) + " condition node(s); open Conditions to edit the tree.",
+                graphics.text(font, conditionNodeCount(choiceCondition()) + " condition node(s); open Conditions to edit the tree.",
                         x + 12, y + 258, MUTED, false);
             }
             case CHOICE_ACTIONS -> {
-                label(graphics, "Choice " + (choiceIndex + 1) + "/" + node().choices.size() + ": " + choice().id, x + 80, y + 63);
+                label(graphics, "Choice " + (choiceIndex + 1) + "/" + node().choices.size() + ": " + choice().id,
+                        x + 80, y + 63);
                 label(graphics, actionCountLabel("Choice action", choiceActionIndex, choice().actions.size()), x + 12, y + 107);
                 if (choice().actions.isEmpty()) {
                     graphics.text(font, "No choice actions. Add one to execute it before the next node/service.", x + 12, y + 166, MUTED, false);
@@ -851,11 +974,29 @@ public final class NpcDialogueEditorScreen extends Screen {
     private record ConditionRef(List<Integer> path, ContentCondition condition, int depth,
                                 int siblingIndex, int siblingCount) {}
 
-    private ContentCondition rootCondition() {
+    private ContentCondition nodeCondition() {
+        if (node().condition == null) {
+            node().condition = new ContentCondition("always", Map.of(), List.of());
+        }
+        return node().condition;
+    }
+
+    private ContentCondition choiceCondition() {
         if (choice().condition == null) {
             choice().condition = new ContentCondition("always", Map.of(), List.of());
         }
         return choice().condition;
+    }
+
+    private ContentCondition rootCondition() {
+        return conditionTargetNode ? nodeCondition() : choiceCondition();
+    }
+
+    private void setRootCondition(ContentCondition condition) {
+        ContentCondition safe = condition == null
+                ? new ContentCondition("always", Map.of(), List.of()) : condition;
+        if (conditionTargetNode) node().condition = safe;
+        else choice().condition = safe;
     }
 
     private ContentCondition selectedCondition() {
@@ -930,11 +1071,11 @@ public final class NpcDialogueEditorScreen extends Screen {
         if (isComposite(current.type())) {
             children.add(added);
             ContentCondition replacement = new ContentCondition(current.type(), current.parameters(), children);
-            choice().condition = replaceCondition(rootCondition(), conditionPath, 0, replacement);
+            setRootCondition(replaceCondition(rootCondition(), conditionPath, 0, replacement));
             conditionPath.add(children.size() - 1);
         } else {
             ContentCondition wrapper = new ContentCondition("all", Map.of(), List.of(current, added));
-            choice().condition = replaceCondition(rootCondition(), conditionPath, 0, wrapper);
+            setRootCondition(replaceCondition(rootCondition(), conditionPath, 0, wrapper));
             conditionPath.add(1);
         }
         rebuildWidgets();
@@ -943,7 +1084,7 @@ public final class NpcDialogueEditorScreen extends Screen {
     private void deleteCondition() {
         saveCurrent();
         if (conditionPath.isEmpty()) {
-            choice().condition = new ContentCondition("always", Map.of(), List.of());
+            setRootCondition(new ContentCondition("always", Map.of(), List.of()));
             setNotice("Root condition reset to always.", false);
             rebuildWidgets();
             return;
@@ -961,7 +1102,7 @@ public final class NpcDialogueEditorScreen extends Screen {
         ContentCondition replacement = children.isEmpty()
                 ? new ContentCondition("always", Map.of(), List.of())
                 : new ContentCondition(parent.type(), parent.parameters(), children);
-        choice().condition = replaceCondition(rootCondition(), parentPath, 0, replacement);
+        setRootCondition(replaceCondition(rootCondition(), parentPath, 0, replacement));
         conditionPath.clear();
         conditionPath.addAll(parentPath);
         rebuildWidgets();
@@ -979,7 +1120,7 @@ public final class NpcDialogueEditorScreen extends Screen {
         ContentCondition selected = children.remove(index);
         children.add(target, selected);
         ContentCondition replacement = new ContentCondition(parent.type(), parent.parameters(), children);
-        choice().condition = replaceCondition(rootCondition(), parentPath, 0, replacement);
+        setRootCondition(replaceCondition(rootCondition(), parentPath, 0, replacement));
         conditionPath.set(conditionPath.size() - 1, target);
         rebuildWidgets();
     }
@@ -991,7 +1132,7 @@ public final class NpcDialogueEditorScreen extends Screen {
             return;
         }
         ContentCondition wrapper = new ContentCondition(type, Map.of(), List.of(selectedCondition()));
-        choice().condition = replaceCondition(rootCondition(), conditionPath, 0, wrapper);
+        setRootCondition(replaceCondition(rootCondition(), conditionPath, 0, wrapper));
         rebuildWidgets();
     }
 
@@ -1000,7 +1141,7 @@ public final class NpcDialogueEditorScreen extends Screen {
         ContentCondition current = selectedCondition();
         ContentCondition replacement = new ContentCondition(current.type(),
                 defaultConditionParameters(current.type()), current.children());
-        choice().condition = replaceCondition(rootCondition(), conditionPath, 0, replacement);
+        setRootCondition(replaceCondition(rootCondition(), conditionPath, 0, replacement));
         if (minecraft != null && minecraft.gui.screen() == this) rebuildWidgets();
     }
 
@@ -1044,10 +1185,15 @@ public final class NpcDialogueEditorScreen extends Screen {
         List<ConditionRef> nodes = flattenedConditions();
         int selectedIndex = selectedConditionIndex(nodes);
         ConditionRef selected = nodes.get(selectedIndex);
-        label(graphics, "Choice " + (choiceIndex + 1) + "/" + node().choices.size() + ": " + choice().id, x + 80, y + 63);
+        label(graphics, conditionTargetNode
+                ? "Node " + (nodeIndex + 1) + "/" + draft.nodes.size() + ": " + node().id
+                : "Choice " + (choiceIndex + 1) + "/" + node().choices.size() + ": " + choice().id,
+                x + 80, y + 63);
         label(graphics, "Condition node " + (selectedIndex + 1) + "/" + nodes.size()
                 + " • depth " + selected.depth() + " • path " + conditionPathText(selected.path()), x + 12, y + 107);
-        label(graphics, "Condition type — controls whether this player choice is available", x + 12, y + 155);
+        label(graphics, conditionTargetNode
+                ? "Condition type — controls whether this dialogue node is available"
+                : "Condition type — controls whether this player choice is available", x + 12, y + 155);
         label(graphics, "Parameters — use the guide or keep custom key=value entries", x + 12, y + 207);
 
         graphics.text(font, trim(NpcDialogueParameterCatalog.condition(selected.condition().type()).summary(), 82),
@@ -1106,7 +1252,7 @@ public final class NpcDialogueEditorScreen extends Screen {
             case "player_counter_at_least", "player_counter_at_most", "server_counter_at_least", "server_counter_at_most" -> Map.of("key", "counter", "amount", "1");
             case "reputation_at_least", "reputation_at_most" -> Map.of("faction", "faction", "amount", "0");
             case "module_enabled" -> Map.of("feature", "quests", "value", "true");
-            case "quest_completed", "quest_active", "quest_ready" -> Map.of("quest", "quest_id");
+            case "quest_available", "quest_completed", "quest_active", "quest_ready" -> Map.of("quest", "quest_id");
             case "minigame_queued", "minigame_active" -> Map.of("minigame", "minigame_id");
             case "dungeon_queued", "dungeon_active" -> Map.of("dungeon", "dungeon_id");
             default -> Map.of();

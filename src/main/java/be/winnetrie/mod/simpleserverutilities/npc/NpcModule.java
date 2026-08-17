@@ -10,13 +10,17 @@ import net.minecraft.server.MinecraftServer;
 /** Independent NPC module; it deliberately has no quest dependency. */
 public final class NpcModule implements SsuModule {
     private final NpcManager manager;
+    private final NpcAbilityLibraryManager abilities;
+    private final NpcSpawnManager spawns;
     private final NpcToolManager tools;
     private final NpcDialogueManager dialogues;
     private final NpcDialogueService dialogueService;
 
-    public NpcModule(NpcManager manager, NpcToolManager tools,
+    public NpcModule(NpcManager manager, NpcAbilityLibraryManager abilities, NpcSpawnManager spawns, NpcToolManager tools,
                      NpcDialogueManager dialogues, NpcDialogueService dialogueService) {
         this.manager = manager;
+        this.abilities = abilities;
+        this.spawns = spawns;
         this.tools = tools;
         this.dialogues = dialogues;
         this.dialogueService = dialogueService;
@@ -29,6 +33,8 @@ public final class NpcModule implements SsuModule {
     @Override
     public void initialize(SsuServiceRegistry services) {
         services.register(NpcManager.class, manager);
+        services.register(NpcAbilityLibraryManager.class, abilities);
+        services.register(NpcSpawnManager.class, spawns);
         services.register(NpcToolManager.class, tools);
         services.register(NpcDialogueManager.class, dialogues);
         services.register(NpcDialogueService.class, dialogueService);
@@ -37,12 +43,16 @@ public final class NpcModule implements SsuModule {
     @Override
     public void onServerStarting(MinecraftServer server) {
         dialogues.load(server);
+        abilities.load(server);
         manager.load(server);
+        spawns.load(server);
     }
 
     @Override
     public void beforeServerStopping(MinecraftServer server) {
+        abilities.saveAll();
         manager.saveAll();
+        spawns.saveAll();
         dialogues.saveAll();
     }
 
@@ -50,7 +60,9 @@ public final class NpcModule implements SsuModule {
     public void onServerStopping(MinecraftServer server) {
         dialogueService.clear();
         manager.shutdownRuntime(false);
+        spawns.clear();
         manager.clear();
+        abilities.clear();
         dialogues.clear();
         tools.clear();
     }

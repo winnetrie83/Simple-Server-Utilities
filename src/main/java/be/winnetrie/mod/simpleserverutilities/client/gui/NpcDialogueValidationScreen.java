@@ -50,7 +50,7 @@ public final class NpcDialogueValidationScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
-        graphics.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(graphics, this, 0xA9000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
         graphics.outline(x, y, W, H, BORDER);
         graphics.text(font, "Dialogue validation", x + 12, y + 12, TEXT, true);

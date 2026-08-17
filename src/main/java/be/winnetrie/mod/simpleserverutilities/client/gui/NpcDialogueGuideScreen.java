@@ -27,17 +27,18 @@ public final class NpcDialogueGuideScreen extends Screen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
-        g.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(x, y, x + W, y + H, 0xF0161D25);
         g.outline(x, y, W, H, 0xFF586978);
         g.text(font, "Dialogue Editor — how the pages work", x + 12, y + 12, 0xFFF3F5F7, true);
-        section(g, x, y + 40, "Node", "One dialogue page: speaker, text and the player choices attached to it.");
-        section(g, x, y + 79, "Conditions", "Rules that decide whether the current player choice is available or hidden.");
+        section(g, x, y + 40, "Node", "One dialogue page. Nodes can now have a player-specific condition and fallback route.");
+        section(g, x, y + 79, "Conditions", "Edit either a node gate or a choice gate. Quest conditions include available/active/ready/completed.");
         section(g, x, y + 118, "On open", "Actions executed once when the player enters the selected node.");
-        section(g, x, y + 157, "Choice", "The clickable player reply and where it leads: another node, closing, or an SSU service.");
+        section(g, x, y + 157, "Choice", "A reply can lead to another node or call quest_offer / quest_turn_in and other SSU services.");
         section(g, x, y + 196, "On choose", "Actions executed after the player clicks the choice, before its next node or service.");
-        g.text(font, "Parameters use key=value pairs separated by semicolons.", x + 12, y + 242, 0xFFAAB5BE, false);
-        g.text(font, "Use Parameter guide to see known keys; custom keys remain available for extensions.",
+        g.text(font, "Node text supports SSU rich text. Quest targets can be picked from the live server quest catalogue.",
+                x + 12, y + 242, 0xFFAAB5BE, false);
+        g.text(font, "Fallback routing lets one NPC show different dialogue for available, active and completed quests.",
                 x + 12, y + 256, 0xFFAAB5BE, false);
         super.extractRenderState(g, mouseX, mouseY, partialTick);
     }
