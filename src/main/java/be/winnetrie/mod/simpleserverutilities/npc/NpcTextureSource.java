@@ -2,9 +2,9 @@ package be.winnetrie.mod.simpleserverutilities.npc;
 
 import java.util.Locale;
 
-/** Source used for an SSU player-style NPC skin. */
+/** Source used for an optional SSU NPC texture override. */
 public enum NpcTextureSource {
-    NONE("none", "Vanilla / entity default"),
+    NONE("none", "Default texture"),
     LOCAL("local", "Local server PNG"),
     URL("url", "HTTPS URL");
 

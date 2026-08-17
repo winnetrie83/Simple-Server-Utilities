@@ -704,16 +704,19 @@ public final class SsuMenuService {
     private ActionResult questAccessMode(ServerPlayer player, String rawValue) {
         if (!isAdministrator(player)) return ActionResult.fail("Administrator access is required.", "");
         String normalized = rawValue == null ? "" : rawValue.trim().toLowerCase(Locale.ROOT);
-        if (!"menu".equals(normalized) && !"npc".equals(normalized)) {
-            return ActionResult.fail("Quest access mode must be menu or npc.", "");
+        if (!"menu".equals(normalized) && !"npc".equals(normalized) && !"both".equals(normalized)) {
+            return ActionResult.fail("Quest access mode must be menu, npc, or both.", "");
         }
         QuestAccessMode requested = QuestAccessMode.parse(normalized);
         if (requested == QuestAccessMode.NPC && !Config.ENABLE_NPCS.get()) {
             return ActionResult.fail("NPC quest access cannot be selected while the NPC module is disabled.", "");
         }
         setAndSave(Config.QUEST_ACCESS_MODE, requested.serializedName());
-        return ActionResult.shell("Quest access now uses "
-                + (requested == QuestAccessMode.NPC ? "NPCs" : "the SSU menu") + " exclusively.");
+        return ActionResult.shell("Quest access now uses " + switch (requested) {
+            case NPC -> "NPCs only.";
+            case BOTH -> "both NPCs and the SSU menu.";
+            default -> "the SSU menu only.";
+        });
     }
 
     private static void setAndSave(net.neoforged.neoforge.common.ModConfigSpec.ConfigValue<Boolean> value,
@@ -857,6 +860,14 @@ public final class SsuMenuService {
                 }
                 SimpleServerUtilities.NPC_TOOLS.giveTool(player);
                 yield ActionResult.ok("NPC Tool added. Right-click to create/edit; sneak-right-click to copy and paste.", "");
+            }
+            case "abilities" -> {
+                if (!Config.ENABLE_NPCS.get()
+                        || !PermissionService.getBoolean(player, PermissionKeys.NPCS_ADMIN, false)) {
+                    yield ActionResult.fail("The NPC module is disabled or you lack its admin permission.", "");
+                }
+                be.winnetrie.mod.simpleserverutilities.npc.NpcAbilityEditorService.openManager(player);
+                yield ActionResult.ok("Opening Ability Library.", "");
             }
             case "shops" -> {
                 if (!Config.ENABLE_NPCS.get()

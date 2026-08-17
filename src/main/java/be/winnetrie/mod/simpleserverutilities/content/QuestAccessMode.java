@@ -2,10 +2,11 @@ package be.winnetrie.mod.simpleserverutilities.content;
 
 import java.util.Locale;
 
-/** Exclusive player-facing quest entry point. */
+/** Player-facing quest entry-point policy: menu, NPCs, or both. */
 public enum QuestAccessMode {
     MENU,
-    NPC;
+    NPC,
+    BOTH;
 
     public static QuestAccessMode parse(String raw) {
         if (raw == null || raw.isBlank()) return MENU;

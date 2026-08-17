@@ -2,7 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.npc;
 
 import java.util.Locale;
 
-/** Descriptive occupation shown in the NPC editor and overhead identity label. */
+/** Legacy fixed occupations retained only to migrate pre-schema-16 NPC definitions. */
 public enum NpcRole {
     CITIZEN("citizen", "Citizen"),
     QUEST_GIVER("quest_giver", "Quest giver"),

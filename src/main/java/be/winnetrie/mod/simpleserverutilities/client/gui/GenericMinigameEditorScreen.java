@@ -58,7 +58,7 @@ final class GenericMinigameEditorScreen extends MinigameEditorScreen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = (width - W) / 2, y = (height - H) / 2;
-        g.fill(0, 0, width, height, 0xA9000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
         g.text(font, "Generic Minigame Editor", x + 24, y + 22, TEXT, true);
         g.text(font, "Generic mode has its own editor. Concrete modes such as Spleef use a dedicated tabbed editor.", x + 24, y + 43, MUTED, false);
         label(g, "Internal ID", "Unique technical key used by commands and storage. Avoid changing it after release.", x + 24, y + 58);

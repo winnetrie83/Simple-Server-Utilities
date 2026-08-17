@@ -55,7 +55,7 @@ public final class NpcLoadoutService {
         player.openMenu(new SimpleMenuProvider(
                 (containerId, inventory, ignored) -> new NpcLoadoutMenu(containerId, inventory, ghost,
                         instance.id, mode, rolls, chances),
-                Component.literal(mode == NpcLoadoutMenu.MODE_LOOT ? "NPC Loot Table" : "NPC Visual Equipment")
+                Component.literal(mode == NpcLoadoutMenu.MODE_LOOT ? "NPC Loot Table" : "NPC Combat Equipment")
         ), buffer -> {
             buffer.writeUtf(instance.id, 36); buffer.writeVarInt(mode); buffer.writeVarInt(rolls);
             for (int chance : chances) buffer.writeVarInt(chance);
@@ -112,7 +112,7 @@ public final class NpcLoadoutService {
             return Result.fail("The NPC loadout could not be saved.");
         }
         return Result.ok(menu.mode() == NpcLoadoutMenu.MODE_LOOT
-                ? "NPC loot table saved." : "NPC visual equipment saved.");
+                ? "NPC loot table saved." : "NPC combat equipment saved.");
     }
 
     private static ItemStack item(List<ItemStack> values, int index, boolean equipment) {

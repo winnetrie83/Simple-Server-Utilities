@@ -173,7 +173,7 @@ public final class RegionPermissionScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         Layout l = layout();
-        g.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(l.left(), l.top(), l.right(), l.bottom(), PANEL);
         g.outline(l.left(), l.top(), l.width(), l.height(), BORDER);
         g.text(font, "Region permissions — " + data.selectedLabel(), l.left() + 10, l.top() + 10, TEXT, false);

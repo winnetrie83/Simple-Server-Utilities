@@ -1,0 +1,64 @@
+SSU 1.9.0-dev3.26.2 validation
+================================
+
+Baseline
+--------
+- Built on user-confirmed SSU 1.9.0-dev3.26.1 source.
+- Target mod version: 1.9.0-dev3.26.2.
+- Network protocol: 108 (was 107).
+- Quest definition schema: 2 (was 1).
+- NPC dialogue schema: 2 (unchanged).
+- NPC definition schema: 10 (unchanged).
+- NPC placement schema: 4 (unchanged).
+
+Static source checks
+--------------------
+- 53/53 targeted invariants passed.
+- Checked Quest Menu/NPC/Both access enum, config, server policy and dashboard cycle.
+- Checked compact Quest Editor dimensions: 550x344 (previously 720x474).
+- Width reduction: 23.6%; height reduction: 27.4%; panel area reduction: 44.6%.
+- Checked General/Objectives/Rewards/NPC Integration tabs.
+- Checked searchable option pickers for prerequisite, objective event and reward type.
+- Checked registry item, quest and NPC pickers.
+- Checked automatic unique Quest ID and collision-safe automatic objective IDs.
+- Checked NPC Manage quests and separate Advanced dialogue entry points.
+- Checked workflow request/open/update network payload registrations and client receiver.
+- Checked first-link NPC/Both access prompt and server-side enforcement.
+- Checked managed quest dialogue generation and quest_offer/quest_turn_in routing.
+- Checked player-specific ! / bullet / ? marker flags.
+- Checked deletion cleanup for linked quest deletion and NPC deletion via editor/admin browser/command.
+- Changed/new Java sources compared with dev3.26.1: 33.
+- Total Java sources: 806.
+
+Managed dialogue bounds
+-----------------------
+- Simple links are capped at 12 quests per NPC.
+- Worst-case generated nodes: 51 <= NpcDialogueDefinition.MAX_NODES (64).
+- Selector page size: 5 quests.
+- Worst-case selector choices: 8 <= NpcDialogueNode.MAX_CHOICES (8), including Previous + Next + Goodbye.
+
+Pure Java checks
+----------------
+- ContentId + QuestAccessMode compiled directly with javac.
+- Runtime test result: DEV3262_PURE_TEST_OK.
+- Verified QuestAccessMode.parse("both") == BOTH and serializedName() == "both".
+- Verified title normalization example: "NPC Test Quest" -> "npc_test_quest".
+
+Parse-oriented Java check
+-------------------------
+- javac -proc:none was run over all changed/new Java files without the Minecraft/NeoForge classpath.
+- Expected unresolved Minecraft/NeoForge/import diagnostics were produced.
+- No syntax-like diagnostics were found (no missing semicolon, illegal start, unclosed literal, orphaned case, unmatched parse EOF, etc.).
+- This is not a substitute for a real NeoForge compile.
+
+Gradle compile status
+---------------------
+- ./gradlew compileJava --no-daemon was attempted.
+- The wrapper attempted to download Gradle 9.2.1 from services.gradle.org.
+- The environment has no external network access; the attempt stopped with java.net.UnknownHostException: services.gradle.org.
+- Therefore a full NeoForge/Java 25 compile was not possible in this container and must be confirmed by the user's local toolchain.
+
+Runtime
+-------
+- Runtime validation is intentionally left to the local Minecraft 26.2 client/server.
+- See docs/TESTING-1.9.0-dev3.26.2.md for the focused test plan.

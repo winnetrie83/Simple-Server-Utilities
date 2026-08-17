@@ -302,7 +302,7 @@ public final class RegionSelectionEditScreen extends Screen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int left = left(), top = top();
-        g.fill(0, 0, width, height, 0xA5000000); g.fill(left, top, left + W, top + H, PANEL); g.outline(left, top, W, H, BORDER);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(left, top, left + W, top + H, PANEL); g.outline(left, top, W, H, BORDER);
         g.text(font, "World Edit Tool", left + 16, top + 13, TEXT, true);
         BlockPos p1 = BlockPos.of(selection.point1()), p2 = BlockPos.of(selection.point2());
         g.text(font, compact(p1) + " → " + compact(p2) + " · " + selection.volume() + " blocks · " + shortDim(selection.dimension()), left + 16, top + 30, MUTED, false);

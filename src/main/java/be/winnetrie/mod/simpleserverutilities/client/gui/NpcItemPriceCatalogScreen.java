@@ -125,7 +125,7 @@ public final class NpcItemPriceCatalogScreen extends Screen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int left = left(), top = top();
-        g.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(left, top, left + W, top + H, PANEL);
         g.outline(left, top, W, H, BORDER);
         g.text(font, "Item Price Catalog", left + 16, top + 14, TEXT, true);

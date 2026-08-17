@@ -329,7 +329,7 @@ public final class ManagedDimensionScreen extends Screen {
         int h = panelHeight();
         int listW = Math.min(205, Math.max(165, w / 3));
         int rightX = x + listW + 18;
-        g.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + w, y + h, PANEL);
         g.outline(x, y, w, h, BORDER);
         g.fill(x + 8, y + 64, x + listW + 4, y + h - 36, CARD);

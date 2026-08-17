@@ -368,6 +368,10 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        double rawMouseX = mouseX;
+        double rawMouseY = mouseY;
+        mouseX = SsuGuiScale.logicalX(this, mouseX);
+        mouseY = SsuGuiScale.logicalY(this, mouseY);
         if (playersExpanded && dropdownBounds().contains(mouseX, mouseY)) {
             int maxScroll = Math.max(0, suggestions.size() - visibleRows());
             if (scrollY < 0) {
@@ -377,12 +381,13 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
             }
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return super.mouseScrolled(rawMouseX, rawMouseY, scrollX, scrollY);
     }
 
     @Override
     public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         super.extractBackground(g, mouseX, mouseY, delta);
+        SsuGuiScale.fullscreenDimWhenScaled(g, this, 0xA5000000);
 
         g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, PANEL);
         g.outline(leftPos, topPos, imageWidth, imageHeight, BORDER);

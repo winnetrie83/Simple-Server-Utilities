@@ -53,7 +53,7 @@ import net.minecraft.resources.Identifier;
  * Page-driven dashboard. The shell contains only compact status/counts; lists
  * are requested in bounded pages and every mutation uses a closed typed action.
  */
-public final class SsuDashboardScreen extends Screen {
+public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalCanvas {
     private static String pendingHomesClaimName = "";
 
     private static final int PANEL = 0xF012171E;
@@ -341,9 +341,18 @@ public final class SsuDashboardScreen extends Screen {
         clearReferences();
         Layout l = layout();
         if (l.sidebarVisible() && minecraft.player != null) {
-            skin = new PlayerSkinWidget(32, 48, minecraft.getEntityModels(), () -> minecraft.player.getSkin());
+            // PlayerSkinWidget submits its 3D player render in physical GUI coordinates
+            // instead of inheriting the surrounding Screen pose transform. Keep its
+            // logical anchor identical, but explicitly map position + size to the SSU scale.
+            skin = new PlayerSkinWidget(
+                    SsuGuiScale.physicalLength(this, 32),
+                    SsuGuiScale.physicalLength(this, 48),
+                    minecraft.getEntityModels(),
+                    () -> minecraft.player.getSkin());
             // The transparent opening in portrait_framework.png is x=11..42, y=17..64.
-            skin.setPosition(l.sidebarX() + 34, l.panelY() + 71);
+            skin.setPosition(
+                    SsuGuiScale.physicalX(this, l.sidebarX() + 34),
+                    SsuGuiScale.physicalY(this, l.panelY() + 71));
             addRenderableWidget(skin);
 
             Rect profile = profileBounds(l);
@@ -401,7 +410,7 @@ public final class SsuDashboardScreen extends Screen {
     }
 
     private void addHomeButtons(Layout l) {
-        if (!useTexturedTiles(l)) addModuleGrid(l, homeModules(l));
+        if (!useTexturedTiles(l)) addModuleGrid(l, homeModules(l), 4);
     }
 
     private void addAdminButtons(Layout l) {
@@ -506,6 +515,7 @@ public final class SsuDashboardScreen extends Screen {
                 new AdminTool("World Edit Tool", "Left-click sets point 1; right-click a block sets point 2; right-click air opens the full editor. The World Edit key (default W) opens compact in-world move/transform controls.", "world_edit"),
                 new AdminTool("Hologram Tool", "Right-click to create one block ahead. Right-click an existing hologram with the tool to edit or delete it.", "hologram"),
                 new AdminTool("NPC Tool", "Right-click to create/edit. Sneak-right-click an NPC to copy and elsewhere to paste a linked placement.", "npc"),
+                new AdminTool("Ability Library", "Create reusable combat abilities once and assign them to any number of NPC templates.", "abilities"),
                 new AdminTool("Shop Manager", "Create and edit shared NPC shops and inspect every linked NPC.", "shops"),
                 new AdminTool("Item Price Catalog", "Edit what players pay and receive for every vanilla and modded item.", "item_prices"),
                 new AdminTool("Quest Editor", "Create and edit quest prerequisites, objectives, rewards and lifecycle settings.", "quest"),
@@ -529,12 +539,13 @@ public final class SsuDashboardScreen extends Screen {
             AdminTool tool = tools.get(index);
             int y = rowStart + local * rowStep;
             Button getTool = Button.builder(Component.literal(("quest".equals(tool.id())
-                            || "dungeon".equals(tool.id()) || "shops".equals(tool.id()) || "item_prices".equals(tool.id()))
+                            || "dungeon".equals(tool.id()) || "shops".equals(tool.id()) || "item_prices".equals(tool.id()) || "abilities".equals(tool.id()))
                             ? "Open Editor" : "Get Tool"), ignored -> action("admin_tool_get", tool.id(), "", ""))
                     .bounds(l.contentRight() - 84, y + 10, 84, 20).build();
             getTool.active = !((("region".equals(tool.id()) || "world_edit".equals(tool.id())) && !snapshot.moduleSettings().regions())
                     || ("hologram".equals(tool.id()) && !snapshot.moduleSettings().holograms())
                     || ("npc".equals(tool.id()) && !snapshot.moduleSettings().npcs())
+                    || ("abilities".equals(tool.id()) && !snapshot.moduleSettings().npcs())
                     || ("shops".equals(tool.id()) && !snapshot.moduleSettings().npcs())
                     || ("item_prices".equals(tool.id()) && !snapshot.moduleSettings().npcs())
                     || ("quest".equals(tool.id()) && !snapshot.moduleSettings().quests())
@@ -604,14 +615,15 @@ public final class SsuDashboardScreen extends Screen {
 
         int rows = (switches.size() + columns - 1) / columns;
         int questModeY = top + rows * rowStep + 3;
-        String configuredMode = "npc".equalsIgnoreCase(settings.questAccessMode()) ? "NPCs" : "SSU Menu";
-        String effectiveSuffix = settings.questAccessMode().equalsIgnoreCase(settings.effectiveQuestAccessMode())
-                ? "" : " (effective: SSU Menu)";
-        String nextMode = "npc".equalsIgnoreCase(settings.questAccessMode()) ? "menu" : "npc";
+        String configuredRaw = settings.questAccessMode() == null ? "menu" : settings.questAccessMode().toLowerCase(java.util.Locale.ROOT);
+        String configuredMode = switch (configuredRaw) { case "npc" -> "NPCs"; case "both" -> "Both"; default -> "SSU Menu"; };
+        String effectiveRaw = settings.effectiveQuestAccessMode() == null ? configuredRaw : settings.effectiveQuestAccessMode().toLowerCase(java.util.Locale.ROOT);
+        String effectiveSuffix = configuredRaw.equals(effectiveRaw) ? "" : " (effective: " + ("npc".equals(effectiveRaw) ? "NPCs" : "both".equals(effectiveRaw) ? "Both" : "SSU Menu") + ")";
+        String nextMode = switch (configuredRaw) { case "menu" -> "npc"; case "npc" -> "both"; default -> "menu"; };
         Button questMode = Button.builder(Component.literal("Quest access: " + configuredMode + effectiveSuffix), ignored ->
                         action("quest_access_mode", "", "", nextMode))
                 .bounds(l.contentX(), questModeY, Math.min(260, l.contentWidth()), 18).build();
-        questMode.active = settings.quests() && (settings.npcs() || "npc".equalsIgnoreCase(settings.questAccessMode()));
+        questMode.active = settings.quests();
         addRenderableWidget(questMode);
 
         int distanceTop = questModeY + 24;
@@ -725,8 +737,20 @@ public final class SsuDashboardScreen extends Screen {
 
     private void addModuleGrid(Layout l, List<Module> modules) {
         int columns = l.contentWidth() >= 420 ? 3 : 2;
+        addModuleGrid(l, modules, columns);
+    }
+
+    /**
+     * Fixed-column variant used by the Dashboard. The SSU GUI scale is
+     * responsible for adapting the complete screen to smaller displays; the
+     * Dashboard itself must keep its four-column design so modules never gain
+     * an extra row and overflow the panel merely because Minecraft exposes a
+     * smaller logical GUI width.
+     */
+    private void addModuleGrid(Layout l, List<Module> modules, int requestedColumns) {
+        int columns = Math.max(1, requestedColumns);
         int gap = 8;
-        int w = (l.contentWidth() - gap * (columns - 1)) / columns;
+        int w = Math.max(1, (l.contentWidth() - gap * (columns - 1)) / columns);
         int startY = l.contentTop() + 35;
         for (int i = 0; i < modules.size(); i++) {
             Module m = modules.get(i); int col = i % columns; int row = i / columns;
@@ -1645,6 +1669,32 @@ public final class SsuDashboardScreen extends Screen {
         boolean twoColumns = available >= 310;
 
         switch (settingsCategory) {
+            case INTERFACE -> {
+                int currentScale = SsuGuiScale.percent();
+                int buttonWidth = Math.max(58, Math.min(86, (w - 8) / 2));
+                Button smaller = Button.builder(Component.literal("Smaller"), ignored -> {
+                            SsuGuiScale.setPercent(SsuGuiScale.smallerPercent());
+                            rebuildWidgets();
+                        })
+                        .bounds(x, y + 27, buttonWidth, 20).build();
+                smaller.active = currentScale > SsuGuiScale.MIN_PERCENT;
+                addRenderableWidget(smaller);
+                Button larger = Button.builder(Component.literal("Larger"), ignored -> {
+                            SsuGuiScale.setPercent(SsuGuiScale.largerPercent());
+                            rebuildWidgets();
+                        })
+                        .bounds(x + buttonWidth + 6, y + 27, buttonWidth, 20).build();
+                larger.active = currentScale < SsuGuiScale.MAX_PERCENT;
+                addRenderableWidget(larger);
+                addRenderableWidget(Button.builder(Component.literal("SSU GUI scale: " + currentScale + "%"), ignored -> {
+                            SsuGuiScale.setPercent(100);
+                            rebuildWidgets();
+                        })
+                        .bounds(x, y, Math.min(w, buttonWidth * 2 + 6), 20).build());
+                settingsTooltips.add(new SettingsTooltip(new Rect(x, y, Math.min(w, buttonWidth * 2 + 6), 20), List.of(
+                        Component.literal("Scales only SSU screens; Minecraft's GUI Scale is unchanged."),
+                        Component.literal("100% is the original/current SSU size. Click this value to reset to 100%."))));
+            }
             case GENERAL -> {
                 addSetting(x, y, w, "Dashboard hints: " + onOff(s.dashboardHints()),
                         "hints", !s.dashboardHints());
@@ -2893,7 +2943,7 @@ public final class SsuDashboardScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         Layout l = layout();
         updatePortraitRotation(l, mouseX, mouseY);
-        g.fill(0,0,width,height,0xA5000000); g.fill(l.panelX(),l.panelY(),l.panelRight(),l.panelBottom(),PANEL);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(l.panelX(),l.panelY(),l.panelRight(),l.panelBottom(),PANEL);
         g.outline(l.panelX(),l.panelY(),l.panelWidth(),l.panelHeight(),PANEL_BORDER);
         if (l.sidebarVisible()) g.text(font,"Simple Server Utilities",l.panelX()+11,l.panelY()+13,ACCENT,true);
         drawPageTitle(g, l);
@@ -3288,9 +3338,10 @@ public final class SsuDashboardScreen extends Screen {
     private List<ModuleTile> moduleTiles(Layout l) {
         if (page != Page.HOME && page != Page.ADMIN) return List.of();
         List<Module> modules = page == Page.HOME ? homeModules(l) : adminModules();
-        int columns = page == Page.ADMIN && modules.size() > 9
-                ? 4
-                : l.contentWidth() >= 500 ? 4 : 3;
+        // HOME/ADMIN tile pages deliberately keep the canonical four-column
+        // layout at every logical screen width. Smaller physical displays are
+        // handled by SsuGuiScale, not by reflowing the Dashboard into 3 columns.
+        int columns = 4;
         int gapX = Math.max(10, (l.contentWidth() - columns * TILE_SIZE) / Math.max(1, columns - 1));
         int startX = l.contentX() + Math.max(0, (l.contentWidth() - (columns * TILE_SIZE + gapX * (columns - 1))) / 2);
         int startY = l.contentTop() + 10;
@@ -3305,6 +3356,11 @@ public final class SsuDashboardScreen extends Screen {
     }
 
     private void drawSettingsIntro(GuiGraphicsExtractor g, Layout l) {
+        if (settingsCategory == SettingsCategory.INTERFACE) {
+            g.text(font, "SSU scale changes only SSU screens; Minecraft GUI Scale stays untouched.",
+                    l.contentX(), l.contentTop() + 4, TEXT, false);
+            return;
+        }
         if (settingsCategory == SettingsCategory.BORDERS) {
             g.text(font, "Enable claim borders is the master permission for in-world claim outlines.",
                     l.contentX(), l.contentTop() + 2, TEXT, false);
@@ -3746,8 +3802,19 @@ public final class SsuDashboardScreen extends Screen {
 
     private int rowY(Layout l,int i){return rowY(l,i,58);} private int rowY(Layout l,int i,int offset){return l.contentTop()+offset+i*27;}
     private int rowTextY(Layout l,int i){return rowY(l,i)+6;} private int rowTextY(Layout l,int i,int offset){return rowY(l,i,offset)+6;}
-    private Layout layout(){boolean compactPage=page==Page.WALLET||page==Page.PROFILE;int maxW=compactPage?544:680;int maxH=compactPage?312:390;int pw=Math.max(360,Math.min(maxW,width-8));int ph=Math.max(250,Math.min(maxH,height-8));int px=(width-pw)/2;int py=(height-ph)/2;
-        boolean side=pw>=540;int sx=px+10;int cx=side?sx+112:px+12;int cw=px+pw-12-cx;return new Layout(px,py,pw,ph,sx,cx,cw,side);}
+    private boolean compactDashboardPage() { return page == Page.WALLET || page == Page.PROFILE; }
+
+    @Override
+    public int ssuLogicalCanvasWidth() { return compactDashboardPage() ? 544 : 680; }
+
+    @Override
+    public int ssuLogicalCanvasHeight() { return compactDashboardPage() ? 312 : 390; }
+
+    private Layout layout(){int pw=ssuLogicalCanvasWidth();int ph=ssuLogicalCanvasHeight();int px=(width-pw)/2;int py=(height-ph)/2;
+        // The Dashboard uses one canonical logical layout on every display.
+        // SsuGuiScale automatically fits this canvas when Minecraft exposes a
+        // smaller logical viewport, so the sidebar/columns never reflow.
+        boolean side=true;int sx=px+10;int cx=sx+112;int cw=px+pw-12-cx;return new Layout(px,py,pw,ph,sx,cx,cw,side);}
     private static String activationLabel(String value) { return "KEYBIND".equals(value) ? "Keybind" : "Crouch"; }
     private static String nextActivation(String value) { return "KEYBIND".equals(value) ? "SNEAK" : "KEYBIND"; }
     private static int nextBrightness(int value) { return value >= 100 ? 25 : Math.min(100, value + 15); }
@@ -3797,7 +3864,7 @@ public final class SsuDashboardScreen extends Screen {
     @Override public boolean isPauseScreen(){return false;}
 
     private enum SettingsCategory {
-        GENERAL("General"), IDENTITY("Identity"), COMBAT("Combat"), MINIMAP("Minimap"), WORLD_MAP("World map"), UTILITY_MINING("Mining"), BORDERS("Borders"), MAIL("Mail");
+        INTERFACE("Interface"), GENERAL("General"), IDENTITY("Identity"), COMBAT("Combat"), MINIMAP("Minimap"), WORLD_MAP("World map"), UTILITY_MINING("Mining"), BORDERS("Borders"), MAIL("Mail");
         private final String label;
         SettingsCategory(String label) { this.label = label; }
     }

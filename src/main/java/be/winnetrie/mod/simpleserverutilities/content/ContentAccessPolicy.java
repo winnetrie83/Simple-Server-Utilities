@@ -90,19 +90,23 @@ public final class ContentAccessPolicy {
      * effective quest entry point is the SSU menu, regardless of the saved preference.
      */
     public static QuestAccessMode effectiveQuestAccessMode() {
+        QuestAccessMode configured = configuredQuestAccessMode();
         if (!Config.ENABLE_NPCS.get() || !SimpleServerUtilities.CORE.modules().isActive("npcs")) {
-            return QuestAccessMode.MENU;
+            return configured == QuestAccessMode.NPC ? QuestAccessMode.MENU : configured;
         }
-        return configuredQuestAccessMode();
+        return configured;
     }
 
     public static boolean questsAvailableFromMenu(ServerPlayer player) {
-        return canUse(player, ContentFeature.QUESTS) && effectiveQuestAccessMode() == QuestAccessMode.MENU;
+        QuestAccessMode mode = effectiveQuestAccessMode();
+        return canUse(player, ContentFeature.QUESTS)
+                && (mode == QuestAccessMode.MENU || mode == QuestAccessMode.BOTH);
     }
 
     public static boolean questsAvailableFromNpc(ServerPlayer player) {
+        QuestAccessMode mode = effectiveQuestAccessMode();
         return canUse(player, ContentFeature.QUESTS)
-                && effectiveQuestAccessMode() == QuestAccessMode.NPC
+                && (mode == QuestAccessMode.NPC || mode == QuestAccessMode.BOTH)
                 && canInteractWithNpc(player);
     }
 }

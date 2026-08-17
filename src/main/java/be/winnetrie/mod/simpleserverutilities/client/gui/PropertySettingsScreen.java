@@ -281,6 +281,10 @@ public final class PropertySettingsScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        double rawMouseX = mouseX;
+        double rawMouseY = mouseY;
+        mouseX = SsuGuiScale.logicalX(this, mouseX);
+        mouseY = SsuGuiScale.logicalY(this, mouseY);
         if (!expandedOptionKey.isBlank()) {
             Rect bounds = dropdownBounds();
             SsuPropertySettingsDataPayload.Entry entry = findEntry(expandedOptionKey);
@@ -291,13 +295,13 @@ public final class PropertySettingsScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return super.mouseScrolled(rawMouseX, rawMouseY, scrollX, scrollY);
     }
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         Layout layout = layout();
-        graphics.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         graphics.fill(layout.left(), layout.top(), layout.right(), layout.bottom(), PANEL);
         graphics.outline(layout.left(), layout.top(), layout.width(), layout.height(), BORDER);
         graphics.text(font, data.title(), layout.left() + 10, layout.top() + 10, TEXT, false);

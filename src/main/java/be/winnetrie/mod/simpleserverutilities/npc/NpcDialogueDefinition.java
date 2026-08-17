@@ -9,7 +9,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentId;
 
 /** Reusable graph-based NPC dialogue stored independently from NPC placements. */
 public final class NpcDialogueDefinition {
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
     public static final int MAX_NODES = 64;
     public static final int MAX_ID_LENGTH = 64;
 
@@ -47,12 +47,21 @@ public final class NpcDialogueDefinition {
             throw new IllegalArgumentException("Dialogue start node does not exist: " + startNode);
         }
         for (NpcDialogueNode node : unique.values()) {
+            if (!node.fallbackNode.isBlank()) {
+                if (!unique.containsKey(node.fallbackNode)) {
+                    throw new IllegalArgumentException("Node '" + node.id + "' references missing fallback node '" + node.fallbackNode + "'.");
+                }
+                if (node.id.equals(node.fallbackNode)) {
+                    throw new IllegalArgumentException("Node '" + node.id + "' cannot fall back to itself.");
+                }
+            }
             for (NpcDialogueChoice choice : node.choices) {
                 if (!choice.nextNode.isBlank() && !unique.containsKey(choice.nextNode)) {
                     throw new IllegalArgumentException("Choice '" + choice.id + "' references missing node '" + choice.nextNode + "'.");
                 }
             }
         }
+        validateFallbackCycles(unique);
         nodes = new ArrayList<>(unique.values());
         return this;
     }
@@ -97,6 +106,19 @@ public final class NpcDialogueDefinition {
         return Map.copyOf(result);
     }
 
+
+    private static void validateFallbackCycles(Map<String, NpcDialogueNode> nodes) {
+        for (NpcDialogueNode start : nodes.values()) {
+            java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
+            NpcDialogueNode current = start;
+            while (current != null && !current.fallbackNode.isBlank()) {
+                if (!seen.add(current.id)) {
+                    throw new IllegalArgumentException("Dialogue fallback cycle detected at node '" + current.id + "'.");
+                }
+                current = nodes.get(current.fallbackNode);
+            }
+        }
+    }
 
     static String requireId(String raw, String label) {
         String value = ContentId.require(raw, label);

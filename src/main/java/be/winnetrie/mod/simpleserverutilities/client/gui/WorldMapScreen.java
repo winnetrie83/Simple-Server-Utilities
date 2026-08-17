@@ -146,6 +146,7 @@ public final class WorldMapScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        SsuGuiScale.fullscreenDimWhenScaled(graphics, this, 0xA5000000);
         int shellLeft = mapLeft - TOOLBAR_WIDTH - 6;
         graphics.fill(shellLeft, MARGIN, infoLeft + INFO_WIDTH, height - MARGIN, PANEL);
         graphics.outline(shellLeft, MARGIN, infoLeft + INFO_WIDTH - shellLeft, height - MARGIN * 2, FRAME);

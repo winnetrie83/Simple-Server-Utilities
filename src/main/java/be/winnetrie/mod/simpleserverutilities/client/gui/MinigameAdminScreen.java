@@ -146,7 +146,7 @@ public final class MinigameAdminScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
-        g.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
         g.outline(x, y, W, H, BORDER);
         g.text(font, "Admin Center > Minigames", x + 12, y + 14, TEXT, true);

@@ -14,7 +14,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
-/** Compact real-inventory editor for visual equipment and the NPC's only loot table. */
+/** Compact real-inventory editor for combat equipment and the NPC's only loot table. */
 public final class NpcLoadoutScreen extends AbstractContainerScreen<NpcLoadoutMenu> {
     private static final int WIDTH = 360;
     private static final int HEIGHT = 270;
@@ -101,10 +101,10 @@ public final class NpcLoadoutScreen extends AbstractContainerScreen<NpcLoadoutMe
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
-        g.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, PANEL);
         g.outline(leftPos, topPos, imageWidth, imageHeight, BORDER);
-        g.text(font, menu.mode() == NpcLoadoutMenu.MODE_LOOT ? "NPC Loot Table" : "NPC Visual Equipment",
+        g.text(font, menu.mode() == NpcLoadoutMenu.MODE_LOOT ? "NPC Loot Table" : "NPC Combat Equipment",
                 leftPos + 14, topPos + 11, TEXT, false);
         if (menu.mode() == NpcLoadoutMenu.MODE_LOOT) {
             g.text(font, "Each filled slot rolls independently", leftPos + 14, topPos + 28, MUTED, false);
@@ -112,7 +112,7 @@ public final class NpcLoadoutScreen extends AbstractContainerScreen<NpcLoadoutMe
             g.text(font, "Rolls", leftPos + 14, topPos + 110, MUTED, false);
             for (int i = 0; i < 9; i++) drawSlot(g, leftPos + 16 + i * 36, topPos + 54);
         } else {
-            g.text(font, "Main, offhand, head, chest, legs and feet — visual only", leftPos + 14, topPos + 28, MUTED, false);
+            g.text(font, "Main, offhand, head, chest, legs and feet — gameplay stats + enchants", leftPos + 14, topPos + 28, MUTED, false);
             String[] labels = {"Main", "Off", "Head", "Chest", "Legs", "Feet"};
             for (int i = 0; i < 6; i++) {
                 int x = leftPos + 42 + i * 46;

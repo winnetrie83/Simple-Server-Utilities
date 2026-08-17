@@ -11,7 +11,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -22,7 +24,8 @@ import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.server.MinecraftServer;
 
 /**
- * Server-authoritative loader/cache for optional custom NPC skins.
+ * Server-authoritative loader/cache for optional NPC textures.
+ * Player textures must be 64x64; entity textures may use the native vanilla/model texture size.
  * Local paths are sandboxed below simpleserverutilities/npcs/textures and URLs are HTTPS-only.
  */
 public final class NpcTextureAssetService {
@@ -89,6 +92,42 @@ public final class NpcTextureAssetService {
         return root == null ? "simpleserverutilities/npcs/textures" : root.toString();
     }
 
+    /** Bounded relative PNG paths available to the in-game local skin browser. */
+    public List<String> localSkins() {
+        Path root = localRoot;
+        if (root == null || !Files.isDirectory(root)) return List.of();
+        List<String> result = new ArrayList<>();
+        try (var stream = Files.walk(root, 4)) {
+            stream.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".png"))
+                    .forEach(path -> {
+                        if (result.size() >= 256) return;
+                        try {
+                            long size = Files.size(path);
+                            if (size <= 0L || size > MAX_TEXTURE_BYTES) return;
+                            String relative = root.relativize(path.toAbsolutePath().normalize()).toString().replace('\\', '/');
+                            if (!relative.startsWith("../") && !relative.startsWith("/")) result.add(relative);
+                        } catch (Exception ignored) {
+                        }
+                    });
+        } catch (Exception exception) {
+            SimpleServerUtilities.LOGGER.warn("Could not list local NPC textures below {}: {}", root, exception.getMessage());
+        }
+        result.sort(String.CASE_INSENSITIVE_ORDER);
+        return List.copyOf(result);
+    }
+
+    /** Synchronous validation used only by the admin editor before saving a local texture path. */
+    public String validateLocalPath(String raw, boolean playerSkin) {
+        try {
+            byte[] bytes = loadLocal(raw);
+            validatePng(bytes, playerSkin);
+            return "";
+        } catch (Exception exception) {
+            return exception.getMessage() == null ? "Local texture could not be loaded." : exception.getMessage();
+        }
+    }
+
     private CacheEntry load(NpcDefinition definition, String sourceKey) {
         try {
             byte[] bytes = switch (definition.textureSource()) {
@@ -97,7 +136,7 @@ public final class NpcTextureAssetService {
                 default -> null;
             };
             if (bytes == null) return CacheEntry.failed(sourceKey);
-            validatePng(bytes);
+            validatePng(bytes, definition.usesPlayerSkin());
             String hash = sha256(bytes);
             return CacheEntry.success(sourceKey, new Asset(definition.id, hash, definition.textureModel, bytes));
         } catch (Exception exception) {
@@ -147,15 +186,18 @@ public final class NpcTextureAssetService {
         }
     }
 
-    public static void validatePng(byte[] bytes) {
+    public static void validatePng(byte[] bytes, boolean playerSkin) {
         if (bytes == null || bytes.length < 24 || !Arrays.equals(Arrays.copyOf(bytes, 8), PNG_SIGNATURE)) {
             throw new IllegalArgumentException("Texture must be a PNG image");
         }
         ByteBuffer dimensions = ByteBuffer.wrap(bytes, 16, 8).order(ByteOrder.BIG_ENDIAN);
         int width = dimensions.getInt();
         int height = dimensions.getInt();
-        if (width != 64 || height != 64) {
-            throw new IllegalArgumentException("NPC custom skins must be 64x64 PNG files");
+        if (width <= 0 || height <= 0 || width > 4096 || height > 4096) {
+            throw new IllegalArgumentException("Texture dimensions must be between 1x1 and 4096x4096");
+        }
+        if (playerSkin && (width != 64 || height != 64)) {
+            throw new IllegalArgumentException("Player NPC skins must be 64x64 PNG files");
         }
     }
 

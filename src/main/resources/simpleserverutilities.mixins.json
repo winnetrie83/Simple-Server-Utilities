@@ -18,10 +18,12 @@
   },
   "client": [
     "PlayerSkinWidgetAccessor",
-    "ClientMannequinSkinMixin",
+    "LivingEntityRendererTextureMixin",
     "LevelRendererAccessor",
     "MultiLineEditBoxAccessor",
     "MultilineTextFieldAccessor",
-    "MultiLineEditBoxRichTextMixin"
+    "MultiLineEditBoxRichTextMixin",
+    "ScreenSsuGuiScaleMixin",
+    "MouseButtonEventSsuGuiScaleMixin"
   ]
 }

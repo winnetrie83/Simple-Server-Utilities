@@ -29,6 +29,16 @@ public final class QuestModule implements SsuModule {
     }
 
     private void registerConditions() {
+        if (!SimpleServerUtilities.CONTENT_CONDITIONS.isRegistered("quest_available")) {
+            SimpleServerUtilities.CONTENT_CONDITIONS.register("quest_available", (condition, context, engine, progression) -> {
+                ServerPlayer player = requirePlayer(context == null ? null : context.player());
+                String quest = requireQuest(condition.parameter("quest"));
+                String problem = manager.validateStart(player, quest, "npc");
+                return problem.isBlank()
+                        ? ContentConditionResult.allow("Quest available: " + quest)
+                        : ContentConditionResult.deny(problem);
+            });
+        }
         if (!SimpleServerUtilities.CONTENT_CONDITIONS.isRegistered("quest_completed")) {
             SimpleServerUtilities.CONTENT_CONDITIONS.register("quest_completed", (condition, context, engine, progression) -> {
                 ServerPlayer player = requirePlayer(context == null ? null : context.player());

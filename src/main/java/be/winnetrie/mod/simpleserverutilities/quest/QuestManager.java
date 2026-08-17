@@ -399,6 +399,8 @@ public final class QuestManager {
         }
         String id = ContentId.require(rawQuestId, "Quest ID");
         if (!deleteDefinition(id)) throw new IllegalArgumentException("Quest not found: " + id);
+        QuestNpcBridge.rebuildManagedDialogues(this, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS);
+        SimpleServerUtilities.NPCS.syncAll();
         return "Quest deleted: " + id;
     }
 

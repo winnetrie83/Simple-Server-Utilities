@@ -1,0 +1,33 @@
+SSU 1.9.0-dev3.40.4 — validation notes
+========================================
+
+Implemented scope
+-----------------
+1. NPC runtime placement reconciliation no longer acts as a movement/leash teleport system.
+2. Post-combat home/patrol/schedule recovery uses the shared navigation controller.
+3. Player-model NPCs render held items and armor, with Wide/Slim support and combat arm poses.
+4. NPC Manager constructor-time duplicate widget initialization is prevented.
+
+Source/static checks
+--------------------
+- Version/protocol/schema references checked.
+- Hard-position call sites reviewed: normal reconcile does not snap; the remaining schedule TELEPORT
+  call is an intentional schedule action, and apply(...) snaps only when forceMove=true.
+- Refresh/definition refresh paths use reconcile(..., false).
+- Explicit create/respawn/admin placement move paths retain forceMove=true.
+- NPC Manager payload refresh rebuilds widgets only when that exact screen is already active.
+- Four SSU player-NPC armor model layers are registered.
+- Java source was checked for basic parse/structural errors with the available local JDK.
+
+Build/runtime limitation of this workspace
+------------------------------------------
+A full Gradle/NeoForge build cannot be certified in this workspace because the project requests
+Java 25 while the available local JDK is Java 21, and the Gradle wrapper cannot download its
+required Gradle distribution/dependencies from the container network.
+
+Run locally with JDK 25:
+  Windows: gradlew.bat clean build
+  Linux/macOS: ./gradlew clean build
+
+After a successful build, execute docs/TESTING-1.9.0-dev3.40.4.md in Minecraft before treating
+this hotfix as runtime-confirmed stable.

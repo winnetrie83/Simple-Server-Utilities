@@ -76,7 +76,7 @@ public final class JailDashboardScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         int x = left();
         int y = top();
-        graphics.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
         graphics.outline(x, y, W, H, BORDER);
         graphics.text(font, "Jail dashboard", x + 18, y + 15, TEXT, true);

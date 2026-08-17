@@ -1,0 +1,8 @@
+SSU 1.9.0-dev3.34.2 validation notes
+
+- Based on dev3.34.1 movement hotfix.
+- Patrol segment transitions now invalidate stale SSU navigation state on index advance.
+- No protocol change: 114.
+- No NPC schema change: 15.
+- gradle.properties mod_version: 1.9.0-dev3.34.2.
+- Full Gradle/NeoForge compilation still requires the user Java 25 environment.

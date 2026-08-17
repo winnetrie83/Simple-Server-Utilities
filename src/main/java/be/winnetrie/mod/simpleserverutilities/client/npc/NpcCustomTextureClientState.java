@@ -11,14 +11,11 @@ import be.winnetrie.mod.simpleserverutilities.npc.NpcDefinition;
 import be.winnetrie.mod.simpleserverutilities.network.NpcTextureSyncPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.core.ClientAsset;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.entity.player.PlayerModelType;
-import net.minecraft.world.entity.player.PlayerSkin;
 
-/** Client cache of server-authoritative SSU custom mannequin skins. */
+/** Client cache of server-authoritative SSU NPC textures. */
 public final class NpcCustomTextureClientState {
-    private static final Map<String, SkinEntry> BY_DEFINITION = new HashMap<>();
+    private static final Map<String, TextureEntry> BY_DEFINITION = new HashMap<>();
 
     private NpcCustomTextureClientState() {}
 
@@ -26,80 +23,90 @@ public final class NpcCustomTextureClientState {
         if (payload == null) return;
         Minecraft minecraft = Minecraft.getInstance();
         for (NpcTextureSyncPayload.Entry entry : payload.entries()) {
-            SkinEntry current = BY_DEFINITION.get(entry.definitionId());
+            TextureEntry current = BY_DEFINITION.get(entry.definitionId());
+            String normalizedModel = "slim".equalsIgnoreCase(entry.model()) ? "slim" : "wide";
             if (entry.png().length == 0 || entry.hash().isBlank()) {
-                if (current != null) {
+                if (current != null && current.textureId != null) {
                     minecraft.getTextureManager().release(current.textureId);
+                }
+                if ("remove".equalsIgnoreCase(entry.model())) {
                     BY_DEFINITION.remove(entry.definitionId());
+                } else {
+                    // Player NPCs still need Wide/Slim state when they use the default Steve/Alex skin.
+                    BY_DEFINITION.put(entry.definitionId(), new TextureEntry("", normalizedModel, null));
                 }
                 continue;
             }
-            String normalizedModel = "slim".equalsIgnoreCase(entry.model()) ? "slim" : "wide";
-            PlayerModelType model = "slim".equals(normalizedModel) ? PlayerModelType.SLIM : PlayerModelType.WIDE;
             if (current != null && current.hash.equals(entry.hash()) && current.model.equals(normalizedModel)) continue;
             try {
                 String definitionPath = NpcDefinition.sanitizeId(entry.definitionId());
                 Identifier textureId = Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID,
-                        "npc_skin/" + definitionPath + "/"
+                        "npc_texture/" + definitionPath + "/"
                                 + entry.hash().toLowerCase(java.util.Locale.ROOT));
 
-                // A model-only Wide/Slim change can reuse the already registered pixels.
-                if (current != null && current.hash.equals(entry.hash()) && current.textureId.equals(textureId)) {
-                    PlayerSkin skin = PlayerSkin.insecure(
-                            new ClientAsset.ResourceTexture(textureId, textureId), null, null, model);
+                // A Wide/Slim-only change can reuse the already registered pixels.
+                if (current != null && current.hash.equals(entry.hash()) && textureId.equals(current.textureId)) {
                     BY_DEFINITION.put(entry.definitionId(),
-                            new SkinEntry(entry.hash(), normalizedModel, textureId, skin));
+                            new TextureEntry(entry.hash(), normalizedModel, textureId));
                     continue;
                 }
 
                 NativeImage image = NativeImage.read(new ByteArrayInputStream(entry.png()));
                 int width = image.getWidth();
                 int height = image.getHeight();
-                if (width != 64 || height != 64) {
+                if (width <= 0 || height <= 0 || width > 4096 || height > 4096) {
                     image.close();
                     SimpleServerUtilities.LOGGER.warn(
-                            "Rejected custom NPC skin {} on the client: decoded size is {}x{}, expected 64x64",
+                            "Rejected custom NPC texture {} on the client: decoded size is {}x{}",
                             entry.definitionId(), width, height);
                     continue;
                 }
                 DynamicTexture texture = new DynamicTexture(() -> "SSU NPC " + entry.definitionId(), image);
                 minecraft.getTextureManager().register(textureId, texture);
 
-                // ClientAsset's one-argument ResourceTexture constructor derives a resource-pack
-                // path (textures/<id>.png). DynamicTexture is registered directly at textureId,
-                // so explicitly use that same identifier as the render texture path.
-                PlayerSkin skin = PlayerSkin.insecure(
-                        new ClientAsset.ResourceTexture(textureId, textureId), null, null, model);
-                if (current != null && !current.textureId.equals(textureId)) {
+                // Player-model textures are validated server-side as 64x64 PNGs. Entity-model
+                // textures may use other dimensions and share this same DynamicTexture cache.
+                if (current != null && current.textureId != null && !current.textureId.equals(textureId)) {
                     minecraft.getTextureManager().release(current.textureId);
                 }
                 BY_DEFINITION.put(entry.definitionId(),
-                        new SkinEntry(entry.hash(), normalizedModel, textureId, skin));
+                        new TextureEntry(entry.hash(), normalizedModel, textureId));
                 SimpleServerUtilities.LOGGER.debug(
-                        "Installed custom NPC skin {} as {} ({})",
-                        entry.definitionId(), textureId, normalizedModel);
+                        "Installed custom NPC texture {} as {} ({}x{})",
+                        entry.definitionId(), textureId, width, height);
             } catch (Exception exception) {
                 // A malformed/unsupported texture never takes down the client, but do not hide
                 // the failure: the log must make texture-pipeline problems diagnosable.
                 SimpleServerUtilities.LOGGER.warn(
-                        "Could not install custom NPC skin {} (hash {}): {}",
+                        "Could not install custom NPC texture {} (hash {}): {}",
                         entry.definitionId(), entry.hash(), exception.getMessage(), exception);
             }
         }
     }
 
-    public static PlayerSkin skinForEntity(int entityId) {
+    /** Returns whether a managed player-model NPC uses the Slim/Alex arm geometry. */
+    public static boolean isSlimModelForEntity(int entityId) {
+        String definitionId = NpcLabelClientState.definitionIdForEntity(entityId);
+        if (definitionId == null || definitionId.isBlank()) return false;
+        TextureEntry entry = BY_DEFINITION.get(definitionId);
+        return entry != null && "slim".equals(entry.model);
+    }
+
+    /** Returns the dynamically registered texture for any managed NPC render family. */
+    public static Identifier textureForEntity(int entityId) {
         String definitionId = NpcLabelClientState.definitionIdForEntity(entityId);
         if (definitionId == null || definitionId.isBlank()) return null;
-        SkinEntry entry = BY_DEFINITION.get(definitionId);
-        return entry == null ? null : entry.skin;
+        TextureEntry entry = BY_DEFINITION.get(definitionId);
+        return entry == null ? null : entry.textureId;
     }
 
     public static void clear() {
         Minecraft minecraft = Minecraft.getInstance();
-        for (SkinEntry entry : BY_DEFINITION.values()) minecraft.getTextureManager().release(entry.textureId);
+        for (TextureEntry entry : BY_DEFINITION.values()) {
+            if (entry.textureId != null) minecraft.getTextureManager().release(entry.textureId);
+        }
         BY_DEFINITION.clear();
     }
 
-    private record SkinEntry(String hash, String model, Identifier textureId, PlayerSkin skin) {}
+    private record TextureEntry(String hash, String model, Identifier textureId) {}
 }

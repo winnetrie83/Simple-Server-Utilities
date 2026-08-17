@@ -68,7 +68,7 @@ public final class MinigameMatchOverviewScreen extends Screen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
-        g.fill(0, 0, width, height, 0xB5000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
+        SsuGuiScale.fullscreenDim(g, this, 0xB5000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
         g.text(font, trim(data.displayName(), 38), x + 12, y + 10, GOLD, true);
         String phase = phaseLabel(data.phase()); String timer = data.remainingSeconds() < 0L ? "No limit" : formatTime(data.remainingSeconds());
         String header = typeLabel(data.gameType()) + " • " + phase + " • " + timer;

@@ -5,13 +5,12 @@ import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcAttitude;
-import be.winnetrie.mod.simpleserverutilities.npc.NpcRole;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/** Lightweight client snapshot for the three-line SSU NPC overhead identity label. */
+/** Lightweight client snapshot for the SSU NPC overhead identity/quest label. */
 public record NpcLabelSyncPayload(List<Entry> entries) implements CustomPacketPayload {
     private static final int MAX_ENTRIES = 2_048;
 
@@ -33,9 +32,11 @@ public record NpcLabelSyncPayload(List<Entry> entries) implements CustomPacketPa
             buffer.writeUtf(entry.definitionId, 64);
             buffer.writeBoolean(entry.labelVisible);
             buffer.writeUtf(entry.displayName, 64);
-            buffer.writeUtf(entry.roleId, 32);
+            buffer.writeUtf(entry.roleId, 64);
+            buffer.writeVarInt(entry.roleColor);
             buffer.writeUtf(entry.factionName, 64);
             buffer.writeUtf(entry.attitude, 16);
+            buffer.writeUtf(entry.questMarker, 8);
         }
     }
 
@@ -45,7 +46,7 @@ public record NpcLabelSyncPayload(List<Entry> entries) implements CustomPacketPa
         ArrayList<Entry> entries = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
             entries.add(new Entry(buffer.readVarInt(), buffer.readUtf(36), buffer.readUtf(64), buffer.readBoolean(), buffer.readUtf(64),
-                    buffer.readUtf(32), buffer.readUtf(64), buffer.readUtf(16)));
+                    buffer.readUtf(64), buffer.readVarInt(), buffer.readUtf(64), buffer.readUtf(16), buffer.readUtf(8)));
         }
         return new NpcLabelSyncPayload(entries);
     }
@@ -53,15 +54,17 @@ public record NpcLabelSyncPayload(List<Entry> entries) implements CustomPacketPa
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 
     public record Entry(int entityId, String entityUuid, String definitionId, boolean labelVisible, String displayName,
-                        String roleId, String factionName, String attitude) {
+                        String roleId, int roleColor, String factionName, String attitude, String questMarker) {
         public Entry {
             entityId = Math.max(0, entityId);
             entityUuid = PayloadBounds.string(entityUuid, 36);
             definitionId = PayloadBounds.string(definitionId, 64);
             displayName = PayloadBounds.string(displayName, 64);
-            roleId = NpcRole.parse(roleId).id();
+            roleId = PayloadBounds.string(roleId, 64);
+            roleColor = Math.max(0, Math.min(15, roleColor));
             factionName = PayloadBounds.string(factionName, 64);
             attitude = NpcAttitude.parse(attitude).id();
+            questMarker = PayloadBounds.string(questMarker, 8);
         }
     }
 

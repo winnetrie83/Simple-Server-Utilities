@@ -102,7 +102,7 @@ public final class MineScreen extends Screen {
     private void send(String action,String id,String json){ClientPacketDistributor.sendToServer(new MineActionPayload(action,id,json,request++));}
 
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float partialTick){
-        int x=left(),y=top(),w=widthPanel(),h=heightPanel();g.fill(0,0,width,height,0xA5000000);g.fill(x,y,x+w,y+h,PANEL);g.outline(x,y,w,h,BORDER);g.text(font,data.admin()?"Mine Administration":"Mines",x+14,y+13,TEXT,true);if(mines.size()>rowsPerPage()){int maxPage=(mines.size()-1)/rowsPerPage();g.centeredText(font,"Page "+(page+1)+"/"+(maxPage+1),x+99,y+h-46,MUTED);}
+        int x=left(),y=top(),w=widthPanel(),h=heightPanel();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+w,y+h,PANEL);g.outline(x,y,w,h,BORDER);g.text(font,data.admin()?"Mine Administration":"Mines",x+14,y+13,TEXT,true);if(mines.size()>rowsPerPage()){int maxPage=(mines.size()-1)/rowsPerPage();g.centeredText(font,"Page "+(page+1)+"/"+(maxPage+1),x+99,y+h-46,MUTED);}
         if(data.admin())drawAdmin(g,x,y,mouseX,mouseY);else drawPlayer(g,x,y,mouseX,mouseY);if(!data.notice().isBlank()){var lines=font.split(Component.literal(data.notice()),Math.max(120,w-270));for(int i=0;i<Math.min(3,lines.size());i++)g.text(font,lines.get(i),x+170,y+h-66+i*11,data.error()?0xFFFF8585:GOOD,false);}super.extractRenderState(g,mouseX,mouseY,partialTick);
     }
 

@@ -41,12 +41,18 @@ public final class NpcDialogueService {
     }
 
     public boolean open(ServerPlayer player, NpcInstance instance) {
+        NpcDefinition npc = SimpleServerUtilities.NPCS.definitionFor(instance);
+        return npc != null && open(player, instance, npc.dialogueId);
+    }
+
+    /** Opens a specific stored dialogue for this NPC without changing its normal advanced-dialogue link. */
+    public boolean open(ServerPlayer player, NpcInstance instance, String dialogueId) {
         if (player == null || instance == null || !canUseDialogue(player)) return false;
         NpcDefinition npc = SimpleServerUtilities.NPCS.definitionFor(instance);
-        if (npc == null || npc.dialogueId.isBlank()) return false;
-        NpcDialogueDefinition dialogue = dialogues.get(npc.dialogueId);
+        if (npc == null || dialogueId == null || dialogueId.isBlank()) return false;
+        NpcDialogueDefinition dialogue = dialogues.get(dialogueId);
         if (dialogue == null || !dialogue.enabled) return false;
-        NpcDialogueNode start = dialogue.node(dialogue.startNode);
+        NpcDialogueNode start = resolveAvailableNode(player, npc, instance, dialogue, dialogue.startNode);
         if (start == null) return false;
         UUID sessionId = UUID.randomUUID();
         long expiry = player.level().getServer().getTickCount() + SESSION_TICKS;
@@ -89,6 +95,18 @@ public final class NpcDialogueService {
         NpcDialogueNode node = dialogue == null ? null : dialogue.node(session.currentNode());
         if (instance == null || npc == null || dialogue == null || node == null || !near(player, instance)) {
             close(player, sessionId, "The NPC is no longer available.", true);
+            return;
+        }
+        NpcDialogueNode resolvedCurrent = resolveAvailableNode(player, npc, instance, dialogue, node.id);
+        if (resolvedCurrent == null) {
+            close(player, sessionId, "This dialogue route is no longer available.", false);
+            return;
+        }
+        if (!resolvedCurrent.id.equals(node.id)) {
+            NpcDialogueSession rerouted = session.advance(resolvedCurrent.id,
+                    player.level().getServer().getTickCount() + SESSION_TICKS, payload.requestId());
+            synchronized (sessions) { sessions.put(sessionId, rerouted); }
+            enterAndSend(player, rerouted, npc, instance, dialogue, resolvedCurrent, "", false);
             return;
         }
         NpcDialogueChoice choice = null;
@@ -135,9 +153,9 @@ public final class NpcDialogueService {
             return;
         }
         if (!choice.nextNode.isBlank()) {
-            NpcDialogueNode next = dialogue.node(choice.nextNode);
+            NpcDialogueNode next = resolveAvailableNode(player, npc, instance, dialogue, choice.nextNode);
             if (next == null) {
-                sendNode(player, session, npc, instance, dialogue, node, "The next dialogue node is missing.", true);
+                close(player, sessionId, "That dialogue route is not available for you right now.", false);
                 return;
             }
             NpcDialogueSession advanced = session.advance(next.id,
@@ -146,10 +164,34 @@ public final class NpcDialogueService {
             enterAndSend(player, advanced, npc, instance, dialogue, next, serviceResult.message(), false);
             return;
         }
-        NpcDialogueSession continued = session.advance(node.id,
+        NpcDialogueNode continuedNode = resolveAvailableNode(player, npc, instance, dialogue, node.id);
+        if (continuedNode == null) {
+            close(player, sessionId, serviceResult.message(), false);
+            return;
+        }
+        NpcDialogueSession continued = session.advance(continuedNode.id,
                 player.level().getServer().getTickCount() + SESSION_TICKS, payload.requestId());
         synchronized (sessions) { sessions.put(sessionId, continued); }
-        sendNode(player, continued, npc, instance, dialogue, node, serviceResult.message(), false);
+        if (!continuedNode.id.equals(node.id)) {
+            enterAndSend(player, continued, npc, instance, dialogue, continuedNode, serviceResult.message(), false);
+        } else {
+            sendNode(player, continued, npc, instance, dialogue, continuedNode, serviceResult.message(), false);
+        }
+    }
+
+    /** Resolves player-specific node gates without executing actions. Fallback chains are bounded and cycle-safe. */
+    private static NpcDialogueNode resolveAvailableNode(ServerPlayer player, NpcDefinition npc, NpcInstance instance,
+                                                        NpcDialogueDefinition dialogue, String requestedNode) {
+        NpcDialogueNode current = dialogue == null ? null : dialogue.node(requestedNode);
+        java.util.LinkedHashSet<String> visited = new java.util.LinkedHashSet<>();
+        while (current != null && visited.add(current.id)) {
+            ContentConditionResult result = SimpleServerUtilities.CONTENT_CONDITIONS.evaluate(current.condition,
+                    conditionContext(player, npc, instance, dialogue, current, null));
+            if (result.matched()) return current;
+            if (current.fallbackNode == null || current.fallbackNode.isBlank()) return null;
+            current = dialogue.node(current.fallbackNode);
+        }
+        return null;
     }
 
     private boolean enterAndSend(ServerPlayer player, NpcDialogueSession session, NpcDefinition npc,
@@ -306,6 +348,7 @@ public final class NpcDialogueService {
                 sendEditorResult(player, false, "A different dialogue with ID '" + dialogue.id + "' already exists.", "", requestId); return;
             }
             for (NpcDialogueNode node : dialogue.nodes) {
+                validateConditionHandlers(node.condition, "node '" + node.id + "'");
                 for (NpcDialogueChoice choice : node.choices) {
                     if (!choice.service.isBlank() && !SimpleServerUtilities.NPC_SERVICES.isRegistered(choice.service)) {
                         throw new IllegalArgumentException("Unknown service '" + choice.service + "' in node '" + node.id + "'.");

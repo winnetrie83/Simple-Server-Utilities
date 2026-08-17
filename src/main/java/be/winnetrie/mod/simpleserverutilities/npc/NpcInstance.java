@@ -7,7 +7,7 @@ import java.util.UUID;
 
 /** One placed NPC in a world. Multiple instances may share one reusable definition. */
 public final class NpcInstance {
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
 
     public int schemaVersion = SCHEMA_VERSION;
     public String id = UUID.randomUUID().toString();
@@ -22,6 +22,11 @@ public final class NpcInstance {
     /** Schedule belongs to this placement because its targets are world coordinates. */
     public boolean scheduleEnabled;
     public List<NpcScheduleEntry> schedule = new ArrayList<>();
+
+    /** Patrol routing belongs to this placement because waypoints are world coordinates. */
+    public String patrolMode = NpcPatrolMode.LOOP.id();
+    public List<NpcPatrolPoint> patrol = new ArrayList<>();
+
     /** Respawn settings belong to this placement because their anchor is world-specific. */
     public boolean respawnEnabled;
     public int respawnDelaySeconds = 30;
@@ -38,6 +43,12 @@ public final class NpcInstance {
 
     /** UUID of the vanilla entity shell; used to rebind after saves and restarts. */
     public String runtimeEntityId = "";
+
+    /** Runtime-only population metadata. Dynamic instances are never written to placement JSON. */
+    public transient boolean dynamic;
+    public transient String dynamicSpawnProfileId = "";
+    public transient double dynamicDespawnDistance = 96.0D;
+    public transient long dynamicSpawnedAtTick;
 
     public NpcInstance normalize() {
         int loadedSchema = schemaVersion;
@@ -74,6 +85,15 @@ public final class NpcInstance {
         }
         normalizedSchedule.sort(Comparator.comparingInt(entry -> entry.minuteOfDay));
         schedule = normalizedSchedule;
+        patrolMode = NpcPatrolMode.parse(patrolMode).id();
+        if (patrol == null) patrol = new ArrayList<>();
+        List<NpcPatrolPoint> normalizedPatrol = new ArrayList<>();
+        for (NpcPatrolPoint point : patrol) {
+            if (point == null) continue;
+            normalizedPatrol.add(point.normalize());
+            if (normalizedPatrol.size() >= 32) break;
+        }
+        patrol = normalizedPatrol;
         try {
             runtimeEntityId = runtimeEntityId == null || runtimeEntityId.isBlank()
                     ? "" : UUID.fromString(runtimeEntityId).toString();
@@ -95,6 +115,33 @@ public final class NpcInstance {
         }
     }
 
+    /** Defensive persistent copy that keeps this placement identity. */
+    public NpcInstance copy() {
+        NpcInstance copy = new NpcInstance();
+        copy.schemaVersion = schemaVersion;
+        copy.id = id;
+        copy.definitionId = definitionId;
+        copy.dimension = dimension;
+        copy.x = x; copy.y = y; copy.z = z;
+        copy.yaw = yaw; copy.pitch = pitch;
+        copy.enabled = enabled;
+        copy.scheduleEnabled = scheduleEnabled;
+        copy.schedule = new ArrayList<>();
+        for (NpcScheduleEntry entry : schedule) copy.schedule.add(entry.copy());
+        copy.patrolMode = patrolMode;
+        copy.patrol = new ArrayList<>();
+        for (NpcPatrolPoint point : patrol) copy.patrol.add(point.copy());
+        copy.respawnEnabled = respawnEnabled;
+        copy.respawnDelaySeconds = respawnDelaySeconds;
+        copy.respawnDimension = respawnDimension;
+        copy.respawnX = respawnX; copy.respawnY = respawnY; copy.respawnZ = respawnZ;
+        copy.respawnYaw = respawnYaw; copy.respawnPitch = respawnPitch;
+        copy.dead = dead;
+        copy.respawnAtEpochMillis = respawnAtEpochMillis;
+        copy.runtimeEntityId = runtimeEntityId;
+        return copy.normalize();
+    }
+
     public NpcInstance copyAt(String targetDimension, double targetX, double targetY, double targetZ, float targetYaw, float targetPitch) {
         NpcInstance copy = new NpcInstance();
         copy.definitionId = definitionId;
@@ -114,6 +161,8 @@ public final class NpcInstance {
         copy.dead = false;
         copy.respawnAtEpochMillis = 0L;
         copy.schedule = new ArrayList<>();
+        copy.patrolMode = patrolMode;
+        copy.patrol = new ArrayList<>();
         double offsetX = targetX - x;
         double offsetY = targetY - y;
         double offsetZ = targetZ - z;
@@ -123,6 +172,13 @@ public final class NpcInstance {
             shifted.y += offsetY;
             shifted.z += offsetZ;
             copy.schedule.add(shifted);
+        }
+        for (NpcPatrolPoint point : patrol) {
+            NpcPatrolPoint shifted = point.copy();
+            shifted.x += offsetX;
+            shifted.y += offsetY;
+            shifted.z += offsetZ;
+            copy.patrol.add(shifted);
         }
         return copy.normalize();
     }

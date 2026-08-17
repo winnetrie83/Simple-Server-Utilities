@@ -749,7 +749,7 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int left = left(), top = top();
-        g.fill(0, 0, width, height, 0xA9000000); g.fill(left, top, left + W, top + H, PANEL); g.outline(left, top, W, H, BORDER);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(left, top, left + W, top + H, PANEL); g.outline(left, top, W, H, BORDER);
         if (page == 0) renderGeneral(g, left, top);
         else if (page == 1) renderArena(g, left, top);
         else if (page == 2) renderSpawns(g, left, top);

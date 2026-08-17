@@ -138,7 +138,7 @@ public final class MapMarkerEditorScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, width, height, 0xA5000000);
+        SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         int panelWidth = Math.min(420, width - 28);
         int left = (width - panelWidth) / 2;
         int top = Math.max(28, (height - 250) / 2);

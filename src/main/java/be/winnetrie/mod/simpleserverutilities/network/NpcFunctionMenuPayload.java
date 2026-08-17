@@ -10,7 +10,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
 /** Bounded player-facing service menu generated from one NPC definition. */
-public record NpcFunctionMenuPayload(String instanceId, String npcName, String roleLabel,
+public record NpcFunctionMenuPayload(String instanceId, String npcName, String roleLabel, int roleColor,
                                      List<Entry> entries) implements CustomPacketPayload {
     public static final Type<NpcFunctionMenuPayload> TYPE = new Type<>(
             Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_function_menu"));
@@ -21,6 +21,7 @@ public record NpcFunctionMenuPayload(String instanceId, String npcName, String r
         instanceId = PayloadBounds.string(instanceId, 36);
         npcName = PayloadBounds.string(npcName, 64);
         roleLabel = PayloadBounds.string(roleLabel, 64);
+        roleColor = Math.max(0, Math.min(15, roleColor));
         List<Entry> safe = new ArrayList<>();
         if (entries != null) {
             for (Entry entry : entries) {
@@ -32,7 +33,7 @@ public record NpcFunctionMenuPayload(String instanceId, String npcName, String r
     }
 
     private static void encode(RegistryFriendlyByteBuf b, NpcFunctionMenuPayload p) {
-        b.writeUtf(p.instanceId, 36); b.writeUtf(p.npcName, 64); b.writeUtf(p.roleLabel, 64);
+        b.writeUtf(p.instanceId, 36); b.writeUtf(p.npcName, 64); b.writeUtf(p.roleLabel, 64); b.writeVarInt(p.roleColor);
         b.writeVarInt(p.entries.size());
         for (Entry entry : p.entries) {
             b.writeUtf(entry.id, 64); b.writeUtf(entry.label, 64); b.writeBoolean(entry.available);
@@ -41,13 +42,13 @@ public record NpcFunctionMenuPayload(String instanceId, String npcName, String r
     }
 
     private static NpcFunctionMenuPayload decode(RegistryFriendlyByteBuf b) {
-        String instance = b.readUtf(36), name = b.readUtf(64), role = b.readUtf(64);
+        String instance = b.readUtf(36), name = b.readUtf(64), role = b.readUtf(64); int roleColor = b.readVarInt();
         int count = b.readVarInt();
         if (count < 0 || count > 8) throw new IllegalArgumentException("Invalid NPC function count");
         List<Entry> entries = new ArrayList<>(count);
         for (int i = 0; i < count; i++) entries.add(new Entry(
                 b.readUtf(64), b.readUtf(64), b.readBoolean(), b.readUtf(256)));
-        return new NpcFunctionMenuPayload(instance, name, role, entries);
+        return new NpcFunctionMenuPayload(instance, name, role, roleColor, entries);
     }
 
 

@@ -19,7 +19,6 @@ public final class NpcAdminScreen extends Screen {
     private static final int PANEL = 0xF0161D25, BORDER = 0xFF586978, TEXT = 0xFFF3F5F7;
     private static final int MUTED = 0xFFAAB5BE, ERROR = 0xFFFF8585, GOOD = 0xFF83E39A;
 
-    private final Screen parent;
     private String mode = "placements";
     private String query = "";
     private int page;
@@ -31,9 +30,8 @@ public final class NpcAdminScreen extends Screen {
     private boolean noticeError;
     private long nextRequestId = 1L;
 
-    public NpcAdminScreen(NpcAdminListPayload payload, Screen parent) {
+    public NpcAdminScreen(NpcAdminListPayload payload) {
         super(Component.literal("NPC Manager"));
-        this.parent = parent;
         accept(payload);
     }
 
@@ -42,16 +40,27 @@ public final class NpcAdminScreen extends Screen {
         mode = payload.mode(); query = payload.query(); page = payload.page(); pageCount = payload.pageCount();
         total = payload.total(); entries = payload.entries(); notice = payload.notice(); noticeError = payload.error();
         nextRequestId = Math.max(nextRequestId, payload.requestId() + 1L);
-        if (minecraft != null) rebuildWidgets();
+        // Minecraft 26.2 assigns Screen#minecraft in the Screen constructor.  Calling
+        // rebuildWidgets() from our own constructor therefore initializes one complete
+        // widget set while width/height are still their pre-display values.  Gui#setScreen
+        // then performs the real init and adds a second, correctly positioned set.  The
+        // result is exactly the apparent "second NPC Manager" seen behind the panel: it is
+        // the orphaned pre-init button/search set, not a second rendered screen.
+        //
+        // Only rebuild for later network refreshes after this exact screen is already the
+        // active Gui screen.  Initial construction is left to Screen#init(width, height).
+        if (minecraft != null && minecraft.gui.screen() == this) rebuildWidgets();
     }
 
     @Override protected void init() {
         int x = px(), y = py();
         addRenderableWidget(Button.builder(Component.literal("Placements"), b -> switchMode("placements"))
-                .bounds(x + 12, y + 30, 92, 18).build()).active = !"placements".equals(mode);
+                .bounds(x + 12, y + 30, 86, 18).build()).active = !"placements".equals(mode);
         addRenderableWidget(Button.builder(Component.literal("Templates"), b -> switchMode("templates"))
-                .bounds(x + 108, y + 30, 92, 18).build()).active = !"templates".equals(mode);
-        addRenderableWidget(Button.builder(Component.literal("Create new"), b -> action("create_new", ""))
+                .bounds(x + 102, y + 30, 86, 18).build()).active = !"templates".equals(mode);
+        addRenderableWidget(Button.builder(Component.literal("Spawning"), b -> switchMode("spawns"))
+                .bounds(x + 192, y + 30, 86, 18).build()).active = !"spawns".equals(mode);
+        addRenderableWidget(Button.builder(Component.literal("Create new"), b -> action("spawns".equals(mode) ? "create_spawn_profile" : "create_new", ""))
                 .bounds(x + W - 104, y + 30, 92, 18).build());
         search = new EditBox(font, x + 12, y + 54, W - 106, 18, Component.literal("Search NPCs"));
         search.setMaxLength(64); search.setValue(query); addRenderableWidget(search);
@@ -62,7 +71,8 @@ public final class NpcAdminScreen extends Screen {
         for (int i = 0; i < entries.size() && i < ROWS; i++) {
             NpcAdminEntry entry = entries.get(i);
             int yy = rowY + i * 34;
-            if (entry.template()) addTemplateButtons(entry, x, yy);
+            if ("spawns".equals(mode)) addSpawnButtons(entry, x, yy);
+            else if (entry.template()) addTemplateButtons(entry, x, yy);
             else addPlacementButtons(entry, x, yy);
         }
         Button previous = addRenderableWidget(Button.builder(Component.literal("‹"), b -> request(page - 1))
@@ -80,6 +90,16 @@ public final class NpcAdminScreen extends Screen {
         Button delete = addRenderableWidget(Button.builder(Component.literal("Delete"), b -> action("delete_template", entry.id()))
                 .bounds(x + 402, y + 7, 66, 18).build());
         delete.active = entry.placements() == 0;
+    }
+
+    private void addSpawnButtons(NpcAdminEntry entry, int x, int y) {
+        int bx = x + 330;
+        addRenderableWidget(Button.builder(Component.literal("Edit"), b -> action("edit_spawn_profile", entry.id()))
+                .bounds(bx, y + 7, 44, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("Test"), b -> action("test_spawn_profile", entry.id()))
+                .bounds(bx + 48, y + 7, 44, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("Delete"), b -> action("delete_spawn_profile", entry.id()))
+                .bounds(bx + 96, y + 7, 60, 18).build());
     }
 
     private void addPlacementButtons(NpcAdminEntry entry, int x, int y) {
@@ -109,22 +129,32 @@ public final class NpcAdminScreen extends Screen {
         ClientPacketDistributor.sendToServer(new NpcAdminActionPayload(action, target, nextRequestId++));
     }
     @Override public void onClose() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.gui.setScreen(null);
     }
+
+    @Override public boolean isPauseScreen() { return false; }
 
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
-        g.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
         g.text(font, "NPC Manager", x + 12, y + 12, TEXT, true);
-        g.text(font, total + ("templates".equals(mode) ? " templates" : " placements"), x + 118, y + 13, MUTED, false);
+        String totalLabel = "templates".equals(mode) ? " templates" : "spawns".equals(mode) ? " spawn profiles" : " placements";
+        g.text(font, total + totalLabel, x + 118, y + 13, MUTED, false);
         int rowY = y + 82;
         for (int i = 0; i < entries.size() && i < ROWS; i++) {
             NpcAdminEntry entry = entries.get(i); int yy = rowY + i * 34;
             g.fill(x + 12, yy, x + W - 12, yy + 30, 0x8A0B1015);
             String status = entry.dead() ? "dead" : entry.enabled() ? "active" : "disabled";
             g.text(font, trim(entry.name(), 30), x + 20, yy + 5, TEXT, false);
-            if (entry.template()) {
+            if ("spawns".equals(mode)) {
+                String source = entry.model();
+                String location = "spawner".equals(source)
+                        ? shortDim(entry.dimension()) + " @ " + (int) entry.x() + ", " + (int) entry.y() + ", " + (int) entry.z()
+                        : shortDim(entry.dimension());
+                g.text(font, trim(entry.definitionId(), 20) + " • " + source + " • " + trim(location, 24)
+                        + " • " + entry.placements() + " live • " + status, x + 20, yy + 17, MUTED, false);
+            } else if (entry.template()) {
                 g.text(font, trim(entry.id(), 32) + " • " + entry.placements() + " placed", x + 20, yy + 17, MUTED, false);
             } else {
                 g.text(font, trim(entry.definitionId(), 19) + " • " + shortDim(entry.dimension()) + " • "

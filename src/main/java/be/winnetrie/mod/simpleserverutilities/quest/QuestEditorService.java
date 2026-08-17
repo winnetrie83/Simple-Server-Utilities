@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.quest;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.content.QuestAccessMode;
 import be.winnetrie.mod.simpleserverutilities.network.QuestEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.QuestEditorRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.QuestEditorResultPayload;
@@ -26,7 +27,8 @@ public final class QuestEditorService {
                 ? new QuestDefinition().normalize() : SimpleServerUtilities.QUESTS.definition(payload.questId());
         if (definition == null) definition = new QuestDefinition().normalize();
         PacketDistributor.sendToPlayer(player, new QuestEditorOpenPayload(
-                payload.questId(), SimpleServerUtilities.QUESTS.toJson(definition.copy()), payload.requestId()));
+                payload.questId(), SimpleServerUtilities.QUESTS.toJson(definition.copy()), NpcQuestWorkflowService.npcChoices(), NpcQuestWorkflowService.questChoices(),
+                QuestAccessMode.parse(Config.QUEST_ACCESS_MODE.get()).serializedName(), payload.requestId()));
     }
 
     public static void handleSubmit(QuestEditorSubmitPayload payload, IPayloadContext context) {
@@ -37,10 +39,28 @@ public final class QuestEditorService {
         }
         try {
             QuestDefinition definition = SimpleServerUtilities.QUESTS.fromJson(payload.questJson());
+            if (!definition.turnInNpcInstanceId.isBlank()) definition.requireTurnIn = true;
+            if ((!definition.giverNpcInstanceId.isBlank() || !definition.turnInNpcInstanceId.isBlank())
+                    && QuestAccessMode.parse(Config.QUEST_ACCESS_MODE.get()) == QuestAccessMode.MENU) {
+                String requested = payload.requestedAccessMode() == null ? "" : payload.requestedAccessMode().trim().toLowerCase(java.util.Locale.ROOT);
+                if (!"npc".equals(requested) && !"both".equals(requested)) {
+                    send(player, false, "NPC quest links require NPC or Both quest access.", "", payload.requestId());
+                    return;
+                }
+                if ("npc".equals(requested) && !Config.ENABLE_NPCS.get()) {
+                    send(player, false, "NPC quest access requires the NPC module.", "", payload.requestId());
+                    return;
+                }
+                Config.QUEST_ACCESS_MODE.set(requested);
+                Config.QUEST_ACCESS_MODE.save();
+            }
+            QuestNpcBridge.validateSimpleLinkCapacity(SimpleServerUtilities.QUESTS, definition);
             if (!SimpleServerUtilities.QUESTS.saveDefinition(payload.originalQuestId(), definition)) {
                 send(player, false, "The quest ID already exists or the quest library limit was reached.", "", payload.requestId());
                 return;
             }
+            QuestNpcBridge.rebuildManagedDialogues(SimpleServerUtilities.QUESTS, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS);
+            SimpleServerUtilities.NPCS.syncAll();
             send(player, true, "Quest '" + definition.title + "' saved.", definition.id, payload.requestId());
         } catch (RuntimeException exception) {
             send(player, false, exception.getMessage() == null ? "Quest validation failed." : exception.getMessage(), "", payload.requestId());
@@ -56,7 +76,8 @@ public final class QuestEditorService {
                 ? new QuestDefinition().normalize() : SimpleServerUtilities.QUESTS.definition(questId);
         if (definition == null) definition = new QuestDefinition().normalize();
         PacketDistributor.sendToPlayer(player, new QuestEditorOpenPayload(
-                questId == null ? "" : questId, SimpleServerUtilities.QUESTS.toJson(definition.copy()), 0L));
+                questId == null ? "" : questId, SimpleServerUtilities.QUESTS.toJson(definition.copy()), NpcQuestWorkflowService.npcChoices(), NpcQuestWorkflowService.questChoices(),
+                QuestAccessMode.parse(Config.QUEST_ACCESS_MODE.get()).serializedName(), 0L));
     }
 
     private static boolean canAdmin(ServerPlayer player) {

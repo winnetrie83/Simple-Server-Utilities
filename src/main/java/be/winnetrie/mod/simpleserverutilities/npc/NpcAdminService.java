@@ -48,32 +48,75 @@ public final class NpcAdminService {
                 result = Result.ok("Opening a new NPC editor.");
                 opensOtherScreen = true;
             }
+            case "create_spawn_profile" -> {
+                NpcSpawnProfileEditorService.openCreate(player);
+                result = Result.ok("Opening spawn profile editor.");
+                opensOtherScreen = true;
+            }
+            case "edit_spawn_profile" -> {
+                boolean opened = NpcSpawnProfileEditorService.openEdit(player, target);
+                result = opened ? Result.ok("Opening spawn profile editor.") : Result.fail("The spawn profile no longer exists.");
+                opensOtherScreen = opened;
+            }
+            case "delete_spawn_profile" -> result = SimpleServerUtilities.NPC_SPAWNS.deleteProfile(target)
+                    ? Result.ok("NPC spawn profile deleted. Its live dynamic population was removed.")
+                    : Result.fail("The spawn profile no longer exists.");
+            case "test_spawn_profile" -> result = SimpleServerUtilities.NPC_SPAWNS.spawnTest(player, target)
+                    ? Result.ok("Spawned a test NPC from the profile.")
+                    : Result.fail("No test NPC could be spawned. Check the profile conditions or spawner anchor.");
             case "spawn_template" -> result = spawnTemplate(player, target);
             case "edit" -> {
                 boolean opened = NpcEditorService.openEditor(player, target);
                 result = opened ? Result.ok("Opening NPC editor.") : Result.fail("The NPC placement no longer exists.");
                 opensOtherScreen = opened;
             }
-            case "delete" -> result = SimpleServerUtilities.NPCS.deleteInstance(target)
-                    ? Result.ok("NPC placement deleted. Its reusable template was kept.")
-                    : Result.fail("The NPC placement no longer exists.");
-            case "delete_template" -> result = SimpleServerUtilities.NPCS.deleteDefinition(target, false)
-                    ? Result.ok("Unused NPC template deleted.")
-                    : Result.fail("The template is still used by one or more placements.");
+            case "delete" -> result = deletePlacement(target);
+            case "delete_template" -> {
+                if (SimpleServerUtilities.NPC_SPAWNS.usesDefinition(target)) {
+                    result = Result.fail("The template is still used by one or more spawn profiles.");
+                } else {
+                    result = SimpleServerUtilities.NPCS.deleteDefinition(target, false)
+                            ? Result.ok("Unused NPC template deleted.")
+                            : Result.fail("The template is still used by one or more placements.");
+                }
+            }
             case "teleport" -> result = teleportTo(player, target);
             case "bring" -> result = bringToPlayer(player, target);
             case "copy" -> result = copy(player, target);
+            case "patrol_route" -> {
+                boolean started = SimpleServerUtilities.NPC_TOOLS.beginPatrolEdit(player, target);
+                result = started ? Result.ok("Patrol route editor started.")
+                        : Result.fail("The patrol route editor could not be started.");
+                opensOtherScreen = started;
+            }
+            case "schedule_route" -> {
+                boolean started = SimpleServerUtilities.NPC_TOOLS.beginScheduleEdit(player, target);
+                result = started ? Result.ok("Schedule route editor started.")
+                        : Result.fail("The schedule route editor could not be started.");
+                opensOtherScreen = started;
+            }
             case "respawn" -> result = SimpleServerUtilities.NPCS.respawnNow(target)
                     ? Result.ok("NPC respawned at its configured respawn location.")
                     : Result.fail("The NPC could not be respawned.");
             default -> result = Result.fail("Unknown NPC administration action.");
         }
         if (!opensOtherScreen) {
-            String responseMode = action.endsWith("_template") || "spawn_template".equals(action)
-                    ? "templates" : "placements";
+            String responseMode = action.contains("spawn_profile") ? "spawns"
+                    : action.endsWith("_template") || "spawn_template".equals(action) ? "templates" : "placements";
             sendPage(player, responseMode, "", 0, DEFAULT_PAGE_SIZE,
                     result.message(), !result.success(), payload.requestId());
         }
+    }
+
+    private static Result deletePlacement(String target) {
+        NpcInstance instance = SimpleServerUtilities.NPCS.instance(target);
+        if (instance == null || !SimpleServerUtilities.NPCS.deleteInstance(instance.id)) {
+            return Result.fail("The NPC placement no longer exists.");
+        }
+        be.winnetrie.mod.simpleserverutilities.quest.QuestNpcBridge.unlinkDeletedNpc(
+                SimpleServerUtilities.QUESTS, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS, instance.id);
+        SimpleServerUtilities.NPCS.syncAll();
+        return Result.ok("NPC placement deleted. Simple quest links were cleared; its reusable template was kept.");
     }
 
     public static void open(ServerPlayer player) {
@@ -91,10 +134,12 @@ public final class NpcAdminService {
     public static void sendPage(ServerPlayer player, String rawMode, String rawQuery, int rawPage, int rawPageSize,
             String notice, boolean error, long requestId) {
         if (!NpcEditorService.canAdmin(player)) return;
-        String mode = "templates".equalsIgnoreCase(rawMode) ? "templates" : "placements";
+        String mode = "templates".equalsIgnoreCase(rawMode) ? "templates"
+                : "spawns".equalsIgnoreCase(rawMode) ? "spawns" : "placements";
         String query = rawQuery == null ? "" : rawQuery.trim().toLowerCase(Locale.ROOT);
         int pageSize = Math.max(1, Math.min(12, rawPageSize <= 0 ? DEFAULT_PAGE_SIZE : rawPageSize));
-        List<NpcAdminEntry> rows = "templates".equals(mode) ? templateRows(query) : placementRows(query);
+        List<NpcAdminEntry> rows = "templates".equals(mode) ? templateRows(query)
+                : "spawns".equals(mode) ? spawnRows(query) : placementRows(query);
         int pageCount = Math.max(1, (rows.size() + pageSize - 1) / pageSize);
         int page = Math.max(0, Math.min(rawPage, pageCount - 1));
         int from = page * pageSize;
@@ -113,6 +158,26 @@ public final class NpcAdminService {
             if (!matches(query, definition.id, definition.displayName, definition.entityType, definition.roleId)) continue;
             result.add(new NpcAdminEntry(true, definition.id, definition.id, definition.displayName,
                     definition.entityType, "", 0, 0, 0, placements, definition.enabled, false));
+        }
+        result.sort(Comparator.comparing(NpcAdminEntry::name, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(NpcAdminEntry::id));
+        return result;
+    }
+
+    private static List<NpcAdminEntry> spawnRows(String query) {
+        List<NpcAdminEntry> result = new ArrayList<>();
+        for (NpcSpawnProfile profile : SimpleServerUtilities.NPC_SPAWNS.profiles()) {
+            NpcDefinition definition = SimpleServerUtilities.NPCS.definition(profile.definitionId);
+            String name = definition == null ? profile.id : definition.displayName;
+            String dimension = profile.source() == NpcSpawnSource.SPAWNER
+                    ? (profile.spawnerDimension.isBlank() ? profile.dimension : profile.spawnerDimension) : profile.dimension;
+            double x = profile.source() == NpcSpawnSource.SPAWNER ? profile.spawnerX : 0.0D;
+            double y = profile.source() == NpcSpawnSource.SPAWNER ? profile.spawnerY : 0.0D;
+            double z = profile.source() == NpcSpawnSource.SPAWNER ? profile.spawnerZ : 0.0D;
+            if (!matches(query, profile.id, profile.definitionId, name, profile.source, dimension, profile.biomesCsv())) continue;
+            result.add(new NpcAdminEntry(false, profile.id, profile.definitionId, profile.id + " — " + name,
+                    profile.source, dimension, x, y, z, SimpleServerUtilities.NPC_SPAWNS.liveCount(profile.id),
+                    profile.enabled && definition != null && definition.enabled, false));
         }
         result.sort(Comparator.comparing(NpcAdminEntry::name, String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(NpcAdminEntry::id));
@@ -177,7 +242,7 @@ public final class NpcAdminService {
         instance.dimension = player.level().dimension().identifier().toString();
         instance.x = player.getX(); instance.y = player.getY(); instance.z = player.getZ();
         instance.yaw = player.getYRot(); instance.pitch = 0.0F;
-        if (!SimpleServerUtilities.NPCS.saveInstance(instance)) return Result.fail("The NPC could not be moved.");
+        if (!SimpleServerUtilities.NPCS.saveInstance(instance, true)) return Result.fail("The NPC could not be moved.");
         return Result.ok("Moved NPC '" + displayName(instance) + "' to you.");
     }
 

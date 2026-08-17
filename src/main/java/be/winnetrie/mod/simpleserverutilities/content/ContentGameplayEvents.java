@@ -113,7 +113,8 @@ public final class ContentGameplayEvents {
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || !active()) return;
         MOVEMENT.put(player.getUUID(), MovementState.capture(player));
-        publish(player, ContentEventTypes.PLAYER_LOGIN, "*", 1L, commonMetadata(player, Map.of()));
+        // Canonical login/logout events are published by ContentCoreEvents.
+        // This adapter owns movement/exploration state only, avoiding double-counted sessions.
         publish(player, ContentEventTypes.DIMENSION_VISITED, dimension(player), 1L,
                 commonMetadata(player, Map.of("unique_key", dimension(player))));
         publishBiomeVisit(player, true);
@@ -131,7 +132,6 @@ public final class ContentGameplayEvents {
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            if (active()) publish(player, ContentEventTypes.PLAYER_LOGOUT, "*", 1L, commonMetadata(player, Map.of()));
             MOVEMENT.remove(player.getUUID());
         }
     }

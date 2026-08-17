@@ -392,7 +392,7 @@ public final class AuctionHouseScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         Layout l = layout();
-        g.fill(0, 0, width, height, 0xA9000000);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(l.left(), l.top(), l.right(), l.bottom(), PANEL);
         g.outline(l.left(), l.top(), l.width(), l.height(), BORDER);
         String title = isBlacklistMode() ? "Auction House — Blacklist"
@@ -511,7 +511,7 @@ public final class AuctionHouseScreen extends Screen {
         int dialogHeight = 150;
         int x = (width - dialogWidth) / 2;
         int y = (height - dialogHeight) / 2;
-        g.fill(0, 0, width, height, 0x99000000);
+        SsuGuiScale.fullscreenDim(g, this, 0x99000000);
         g.fill(x, y, x + dialogWidth, y + dialogHeight, PANEL);
         g.outline(x, y, dialogWidth, dialogHeight, BORDER);
         String title = "seize".equals(adminDialogAction) ? "Seize auction items" : "Cancel auction as administrator";
@@ -565,7 +565,7 @@ public final class AuctionHouseScreen extends Screen {
         int w = 260;
         int x = (width - w) / 2;
         int y = (height - 126) / 2;
-        g.fill(0, 0, width, height, 0x88000000);
+        SsuGuiScale.fullscreenDim(g, this, 0x88000000);
         g.fill(x, y, x + w, y + 126, PANEL);
         g.outline(x, y, w, 126, BORDER);
         g.text(font, "Buy " + trim(entry.name(), 27), x + 18, y + 15, TEXT, false);
@@ -645,6 +645,10 @@ public final class AuctionHouseScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        double rawMouseX = mouseX;
+        double rawMouseY = mouseY;
+        mouseX = SsuGuiScale.logicalX(this, mouseX);
+        mouseY = SsuGuiScale.logicalY(this, mouseY);
         if (!buyDialog && scrollY != 0.0D) {
             Layout l = layout();
             if (mouseX >= l.contentLeft() && mouseX < l.contentRight()
@@ -656,7 +660,7 @@ public final class AuctionHouseScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return super.mouseScrolled(rawMouseX, rawMouseY, scrollX, scrollY);
     }
 
     @Override

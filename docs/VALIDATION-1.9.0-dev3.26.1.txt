@@ -1,0 +1,12 @@
+SSU 1.9.0-dev3.26.1 validation
+
+- mod_version = 1.9.0-dev3.26.1
+- Network protocol unchanged: 107
+- NPC dialogue schema unchanged: 2
+- NPC definition schema unchanged: 10
+- NPC placement schema unchanged: 4
+- Direct condition-type cycling skips `not` when selected condition child count != 1.
+- Existing Wrap NOT control remains present.
+- Source simulation confirms `any` with zero children advances past invalid `not` and can reach quest_available / quest_active / quest_ready.
+- ZIP integrity checked after packaging.
+- Full NeoForge/Gradle compilation was not run in this environment.

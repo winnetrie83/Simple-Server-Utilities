@@ -78,6 +78,7 @@ public final class ClaimTaxDeleteScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        SsuGuiScale.fullscreenDimWhenScaled(graphics, this, 0xA5000000);
         graphics.fill(left, top, left + panelWidth, top + panelHeight, PANEL);
         graphics.outline(left, top, panelWidth, panelHeight, FRAME);
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);

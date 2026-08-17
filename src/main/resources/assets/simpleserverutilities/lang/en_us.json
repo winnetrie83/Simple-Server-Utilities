@@ -32,5 +32,6 @@
   "key.simpleserverutilities.toggle_minigame_hud": "Cycle minigame scoreboard view",
   "key.simpleserverutilities.minigame_spectate_previous": "Spectate previous minigame player",
   "key.simpleserverutilities.minigame_spectate_next": "Spectate next minigame player",
-  "key.simpleserverutilities.world_edit_compact": "World Edit: compact tools"
+  "key.simpleserverutilities.world_edit_compact": "World Edit: compact tools",
+  "entity.simpleserverutilities.player_npc": "Player NPC"
 }

@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SSU Web API Tester</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0f1218;
+    --panel: #181d27;
+    --panel2: #202735;
+    --border: #303a4d;
+    --text: #eef3fb;
+    --muted: #9da9bb;
+    --good: #67d391;
+    --bad: #ff7474;
+    --warn: #ffc95c;
+    --accent: #7aa2ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .wrap { max-width: 1050px; margin: 0 auto; padding: 28px 20px 50px; }
+  h1 { margin: 0 0 4px; font-size: 28px; }
+  h2 { font-size: 18px; margin: 0 0 12px; }
+  p { color: var(--muted); line-height: 1.5; }
+  code {
+    background: #111722;
+    border: 1px solid #283246;
+    border-radius: 6px;
+    padding: 2px 6px;
+    color: #dce8ff;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-top: 16px;
+  }
+  .setup {
+    border-left: 4px solid var(--warn);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .card {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    min-height: 96px;
+  }
+  .label { color: var(--muted); font-size: 13px; }
+  .value { margin-top: 7px; font-size: 24px; font-weight: 700; }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  label {
+    display: block;
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  input {
+    width: 100%;
+    padding: 10px 11px;
+    background: #101620;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  .buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  button {
+    border: 1px solid #41506b;
+    background: #29354a;
+    color: white;
+    border-radius: 8px;
+    padding: 9px 13px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  button:hover { background: #33425b; }
+  button.primary { background: #355fc4; border-color: #537bea; }
+  button.primary:hover { background: #406bd0; }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+  }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #667085;
+  }
+  .ok .dot { background: var(--good); }
+  .error .dot { background: var(--bad); }
+  .warn .dot { background: var(--warn); }
+  .ok { color: var(--good); }
+  .error { color: var(--bad); }
+  .warn { color: var(--warn); }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-size: 13px; font-weight: 600; }
+  td { font-size: 14px; }
+  pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: #0e141d;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    max-height: 360px;
+    overflow: auto;
+    color: #d9e5f7;
+  }
+  .small { font-size: 12px; color: var(--muted); }
+  .hidden { display: none; }
+  @media (max-width: 760px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+    .row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SSU Web API Tester</h1>
+  <p>Lokale testpagina voor de read-only Web API van Simple Server Utilities.</p>
+
+  <div class="panel setup">
+    <h2>Eerst éénmalig instellen</h2>
+    <p>
+      Omdat dit bestand rechtstreeks vanaf je pc opent, zet je voor deze test in de SSU-config:
+      <code>enableWebApi = true</code>,
+      <code>webApiBindAddress = "127.0.0.1"</code> en
+      <code>webApiAllowedOrigin = "null"</code>.
+      Gebruik een token van minstens 16 tekens en herstart daarna de Minecraft-server.
+    </p>
+    <p class="small">
+      Laat de bind address op 127.0.0.1 staan. De waarde <code>null</code> voor Allowed Origin is alleen bedoeld
+      voor deze lokale testpagina die via file:// wordt geopend.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h2>Verbinding</h2>
+    <div class="row">
+      <div>
+        <label for="apiUrl">API-adres</label>
+        <input id="apiUrl" value="http://127.0.0.1:8765" autocomplete="off">
+      </div>
+      <div>
+        <label for="token">Bearer token</label>
+        <input id="token" type="password" placeholder="minstens 16 tekens" autocomplete="off">
+      </div>
+    </div>
+    <div class="buttons">
+      <button class="primary" id="testBtn">Test verbinding</button>
+      <button id="statusBtn">Server Status</button>
+      <button id="playersBtn">Players</button>
+      <button id="capsBtn">Capabilities</button>
+      <button id="statsBtn">Community stats</button>
+      <button id="leaderBtn">Leaderboard</button>
+      <button id="refreshBtn">Alles vernieuwen</button>
+    </div>
+    <p id="connectionState" class="status warn"><span class="dot"></span><span>Nog niet getest</span></p>
+    <p id="errorText" class="error hidden"></p>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="label">Server</div>
+      <div class="value" id="serverState">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Online spelers</div>
+      <div class="value" id="onlinePlayers">—</div>
+    </div>
+    <div class="card">
+      <div class="label">NPC definitions</div>
+      <div class="value" id="npcDefinitions">—</div>
+    </div>
+    <div class="card">
+      <div class="label">NPC placements</div>
+      <div class="value" id="npcPlacements">—</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Online spelers</h2>
+    <div id="playersEmpty" class="small">Nog geen gegevens geladen.</div>
+    <table id="playersTable" class="hidden">
+      <thead>
+        <tr>
+          <th>Naam</th>
+          <th>UUID</th>
+          <th>Dimensie</th>
+        </tr>
+      </thead>
+      <tbody id="playersBody"></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>API capabilities</h2>
+    <div id="capsView" class="small">Nog geen gegevens geladen.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Community stats (dev3.37+)</h2>
+    <div class="row">
+      <div>
+        <label for="statsPeriod">Periode</label>
+        <input id="statsPeriod" value="week" autocomplete="off">
+      </div>
+      <div>
+        <label for="statsMetric">Leaderboard metric</label>
+        <input id="statsMetric" value="play_time_seconds" autocomplete="off">
+      </div>
+    </div>
+    <div id="statsSummary" class="small" style="margin-top:12px">Nog geen community stats geladen.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Laatste API-response</h2>
+    <pre id="rawOutput">Nog niets opgevraagd.</pre>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function baseUrl() {
+  return $("apiUrl").value.trim().replace(/\/+$/, "");
+}
+
+function token() {
+  return $("token").value.trim();
+}
+
+function showConnection(type, text) {
+  const el = $("connectionState");
+  el.className = "status " + type;
+  el.innerHTML = '<span class="dot"></span><span></span>';
+  el.querySelector("span:last-child").textContent = text;
+}
+
+function showError(text) {
+  const el = $("errorText");
+  if (!text) {
+    el.classList.add("hidden");
+    el.textContent = "";
+  } else {
+    el.classList.remove("hidden");
+    el.textContent = text;
+  }
+}
+
+async function api(path) {
+  showError("");
+  if (!token()) throw new Error("Vul eerst je Bearer token in.");
+  const response = await fetch(baseUrl() + path, {
+    method: "GET",
+    headers: {
+      "Authorization": "Bearer " + token(),
+      "Accept": "application/json"
+    },
+    cache: "no-store"
+  });
+
+  let data;
+  try { data = await response.json(); }
+  catch { data = { error: "Response was geen geldige JSON", httpStatus: response.status }; }
+
+  $("rawOutput").textContent = JSON.stringify(data, null, 2);
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("401 Unauthorized — controleer je token.");
+    if (response.status === 404) throw new Error("404 Not Found — controleer API-adres en SSU-versie.");
+    throw new Error("HTTP " + response.status + " — " + (data.error || response.statusText));
+  }
+  return data;
+}
+
+function renderStatus(data) {
+  $("serverState").textContent = data.running ? "Online" : "Offline";
+  $("onlinePlayers").textContent = data.onlinePlayers ?? "—";
+  $("npcDefinitions").textContent = data.npcs?.definitions ?? "—";
+  $("npcPlacements").textContent = data.npcs?.placements ?? "—";
+  if (Array.isArray(data.players)) renderPlayers(data.players);
+  if (data.capabilities) renderCapabilities(data.capabilities);
+}
+
+function renderPlayers(players) {
+  const body = $("playersBody");
+  body.innerHTML = "";
+  if (!players || players.length === 0) {
+    $("playersTable").classList.add("hidden");
+    $("playersEmpty").classList.remove("hidden");
+    $("playersEmpty").textContent = "Geen spelers online.";
+    return;
+  }
+
+  for (const player of players) {
+    const tr = document.createElement("tr");
+    for (const value of [player.name, player.uuid, player.dimension]) {
+      const td = document.createElement("td");
+      td.textContent = value ?? "";
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  }
+  $("playersEmpty").classList.add("hidden");
+  $("playersTable").classList.remove("hidden");
+}
+
+function renderCapabilities(data) {
+  $("capsView").innerHTML = "";
+  const lines = [
+    ["Status API", data.status],
+    ["Players API", data.players],
+    ["Community statistics", data.statistics],
+    ["Remote actions", data.remoteActions]
+  ];
+  for (const [label, enabled] of lines) {
+    const div = document.createElement("div");
+    div.style.margin = "6px 0";
+    const mark = enabled ? "✓" : "✗";
+    div.textContent = mark + " " + label + ": " + (enabled ? "beschikbaar" : "niet beschikbaar");
+    $("capsView").appendChild(div);
+  }
+}
+
+async function testConnection() {
+  try {
+    const data = await api("/api/v1/health");
+    showConnection(data.ok ? "ok" : "warn", data.ok ? "API bereikbaar" : "API antwoordt, server niet running");
+  } catch (err) {
+    showConnection("error", "Geen verbinding");
+    showError(formatFetchError(err));
+  }
+}
+
+async function loadStatus() {
+  try {
+    const data = await api("/api/v1/status");
+    renderStatus(data);
+    showConnection("ok", "API bereikbaar");
+  } catch (err) {
+    showConnection("error", "Status ophalen mislukt");
+    showError(formatFetchError(err));
+  }
+}
+
+async function loadPlayers() {
+  try {
+    const data = await api("/api/v1/players");
+    $("onlinePlayers").textContent = data.online ?? "—";
+    renderPlayers(data.players || []);
+    showConnection("ok", "API bereikbaar");
+  } catch (err) {
+    showConnection("error", "Players ophalen mislukt");
+    showError(formatFetchError(err));
+  }
+}
+
+async function loadCapabilities() {
+  try {
+    const data = await api("/api/v1/capabilities");
+    renderCapabilities(data);
+    showConnection("ok", "API bereikbaar");
+  } catch (err) {
+    showConnection("error", "Capabilities ophalen mislukt");
+    showError(formatFetchError(err));
+  }
+}
+
+async function loadCommunityStats() {
+  try {
+    const data = await api("/api/v1/stats/server");
+    const period = $("statsPeriod").value.trim() || "week";
+    const view = data.server?.periods?.[period];
+    const values = view?.stats?.values || {};
+    const top = Object.entries(values).sort((a,b) => b[1]-a[1]).slice(0, 12);
+    $("statsSummary").innerHTML = "";
+    const title = document.createElement("div");
+    title.textContent = `Periode: ${period} (${view?.key || "-"})`;
+    title.style.marginBottom = "8px";
+    $("statsSummary").appendChild(title);
+    for (const [key,value] of top) {
+      const div = document.createElement("div");
+      div.textContent = `${key}: ${value}`;
+      div.style.margin = "4px 0";
+      $("statsSummary").appendChild(div);
+    }
+    if (!top.length) $("statsSummary").append("Nog geen waarden in deze periode.");
+    showConnection("ok", "Community stats geladen");
+  } catch (err) {
+    showConnection("error", "Community stats ophalen mislukt");
+    showError(formatFetchError(err));
+  }
+}
+
+async function loadLeaderboard() {
+  try {
+    const period = encodeURIComponent($("statsPeriod").value.trim() || "week");
+    const metric = encodeURIComponent($("statsMetric").value.trim() || "play_time_seconds");
+    const data = await api(`/api/v1/stats/leaderboard?metric=${metric}&period=${period}&limit=10`);
+    $("statsSummary").innerHTML = "";
+    const title = document.createElement("div");
+    title.textContent = `${data.metric?.displayName || metric} — ${data.period}`;
+    title.style.marginBottom = "8px";
+    $("statsSummary").appendChild(title);
+    for (const row of (data.entries || [])) {
+      const div = document.createElement("div");
+      div.textContent = `#${row.rank} ${row.name}: ${row.value}`;
+      div.style.margin = "4px 0";
+      $("statsSummary").appendChild(div);
+    }
+    if (!(data.entries || []).length) $("statsSummary").append("Nog geen leaderboarddata.");
+    showConnection("ok", "Leaderboard geladen");
+  } catch (err) {
+    showConnection("error", "Leaderboard ophalen mislukt");
+    showError(formatFetchError(err));
+  }
+}
+
+async function refreshAll() {
+  try {
+    const [status, players, caps] = await Promise.all([
+      api("/api/v1/status"),
+      api("/api/v1/players"),
+      api("/api/v1/capabilities")
+    ]);
+    renderStatus(status);
+    renderPlayers(players.players || []);
+    renderCapabilities(caps);
+    showConnection("ok", "Alles bijgewerkt");
+  } catch (err) {
+    showConnection("error", "Vernieuwen mislukt");
+    showError(formatFetchError(err));
+  }
+}
+
+function formatFetchError(err) {
+  const msg = String(err?.message || err);
+  if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("Load failed")) {
+    return "Browser kon de API niet bereiken. Controleer: SSU API staat aan, server is herstart, adres/poort klopt, " +
+           'webApiAllowedOrigin = "null" en webApiBindAddress = "127.0.0.1".';
+  }
+  return msg;
+}
+
+$("testBtn").addEventListener("click", testConnection);
+$("statusBtn").addEventListener("click", loadStatus);
+$("playersBtn").addEventListener("click", loadPlayers);
+$("capsBtn").addEventListener("click", loadCapabilities);
+$("statsBtn").addEventListener("click", loadCommunityStats);
+$("leaderBtn").addEventListener("click", loadLeaderboard);
+$("refreshBtn").addEventListener("click", refreshAll);
+</script>
+</body>
+</html>

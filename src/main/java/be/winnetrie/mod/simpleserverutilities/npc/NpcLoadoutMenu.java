@@ -14,7 +14,7 @@ import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
-/** Server-synchronised ghost inventory for visual equipment and the nine-slot NPC loot table. */
+/** Server-synchronised ghost inventory for combat equipment and the nine-slot NPC loot table. */
 public final class NpcLoadoutMenu extends AbstractContainerMenu {
     public static final int MODE_EQUIPMENT = 0;
     public static final int MODE_LOOT = 1;

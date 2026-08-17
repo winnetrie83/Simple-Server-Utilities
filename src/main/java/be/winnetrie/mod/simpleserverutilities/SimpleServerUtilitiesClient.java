@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.google.common.reflect.TypeToken;
 import be.winnetrie.mod.simpleserverutilities.client.identity.DamageIndicatorClientState;
 import be.winnetrie.mod.simpleserverutilities.client.identity.DamageIndicatorRenderer;
 import be.winnetrie.mod.simpleserverutilities.client.identity.IdentityClientEvents;
@@ -14,6 +15,7 @@ import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramClientStat
 import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramRenderer;
 import be.winnetrie.mod.simpleserverutilities.client.npc.NpcLabelClientState;
 import be.winnetrie.mod.simpleserverutilities.client.npc.NpcCustomTextureClientState;
+import be.winnetrie.mod.simpleserverutilities.client.npc.NpcTextureRenderState;
 import be.winnetrie.mod.simpleserverutilities.client.npc.NpcLabelRenderer;
 import be.winnetrie.mod.simpleserverutilities.client.gui.ManagedDimensionScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.ClaimMapScreen;
@@ -38,13 +40,17 @@ import be.winnetrie.mod.simpleserverutilities.client.gui.AuctionHouseScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.AuctionSellScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.HologramEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.NpcEditorScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcQuestWorkflowScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.NpcLoadoutScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.NpcAdminScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcSpawnProfileEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.NpcDialogueScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.NpcDialogueEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.NpcFunctionMenuScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.NpcShopScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.NpcShopAdminScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcAbilityLibraryScreen;
+import be.winnetrie.mod.simpleserverutilities.client.gui.NpcAbilityWorkshopScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.NpcShopEditorScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.NpcItemPriceCatalogScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.QuestBookScreen;
@@ -99,8 +105,11 @@ import be.winnetrie.mod.simpleserverutilities.network.NpcEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcLabelSyncPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcTextureSyncPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcEditorResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcQuestWorkflowOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcLoadoutResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcAdminListPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcSpawnProfileEditorOpenPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcSpawnProfileEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueViewPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueEditorResultPayload;
@@ -109,6 +118,9 @@ import be.winnetrie.mod.simpleserverutilities.network.NpcShopDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcShopAdminDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcShopEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcShopEditorResultPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcAbilityLibraryDataPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcAbilityEditorOpenPayload;
+import be.winnetrie.mod.simpleserverutilities.network.NpcAbilityEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcItemPriceCatalogDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.QuestBookDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.QuestEditorOpenPayload;
@@ -173,21 +185,26 @@ import be.winnetrie.mod.simpleserverutilities.network.UtilityMiningPreviewPayloa
 import be.winnetrie.mod.simpleserverutilities.network.UtilityMiningPreviewRequestPayload;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterDebugRenderersEvent;
 import net.neoforged.neoforge.client.event.AddClientReloadListenersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+import net.neoforged.neoforge.client.renderstate.RegisterRenderStateModifiersEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
@@ -198,6 +215,9 @@ import org.lwjgl.glfw.GLFW;
 import be.winnetrie.mod.simpleserverutilities.mail.ModMailMenus;
 import be.winnetrie.mod.simpleserverutilities.auction.ModAuctionMenus;
 import be.winnetrie.mod.simpleserverutilities.npc.ModNpcMenus;
+import be.winnetrie.mod.simpleserverutilities.npc.ModNpcEntities;
+import be.winnetrie.mod.simpleserverutilities.client.npc.SsuPlayerNpcModel;
+import be.winnetrie.mod.simpleserverutilities.client.npc.SsuPlayerNpcRenderer;
 
 @Mod(value = SimpleServerUtilities.MODID, dist = Dist.CLIENT)
 @EventBusSubscriber(modid = SimpleServerUtilities.MODID, value = Dist.CLIENT)
@@ -268,6 +288,27 @@ public class SimpleServerUtilitiesClient {
         NeoForge.EVENT_BUS.register(IdentityClientEvents.class);
         NeoForge.EVENT_BUS.register(EntityInsightClientEvents.class);
         NeoForge.EVENT_BUS.addListener(RegionSnapshotPreviewRenderer::onSubmitCustomGeometry);
+    }
+
+    @SubscribeEvent
+    static void onRegisterNpcLayerDefinitions(EntityRenderersEvent.RegisterLayerDefinitions event) {
+        event.registerLayerDefinition(SsuPlayerNpcModel.LAYER, SsuPlayerNpcModel::createBodyLayer);
+    }
+
+    @SubscribeEvent
+    static void onRegisterNpcEntityRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        event.registerEntityRenderer(ModNpcEntities.PLAYER_NPC.get(), SsuPlayerNpcRenderer::new);
+    }
+
+    @SubscribeEvent
+    static void onRegisterRenderStateModifiers(RegisterRenderStateModifiersEvent event) {
+        event.registerEntityModifier(
+                new TypeToken<LivingEntityRenderer<LivingEntity, LivingEntityRenderState, ?>>() {},
+                (entity, state) -> state.setRenderData(
+                        NpcTextureRenderState.CUSTOM_TEXTURE,
+                        NpcCustomTextureClientState.textureForEntity(entity.getId())
+                )
+        );
     }
 
     @SubscribeEvent
@@ -580,6 +621,14 @@ public class SimpleServerUtilitiesClient {
                 })
         );
 
+        event.register(NpcQuestWorkflowOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcQuestWorkflowScreen screen) screen.accept(payload);
+                    else minecraft.setScreenAndShow(new NpcQuestWorkflowScreen(payload, minecraft.gui.screen()));
+                })
+        );
+
         event.register(NpcLoadoutResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
@@ -590,8 +639,31 @@ public class SimpleServerUtilitiesClient {
         event.register(NpcAdminListPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcAdminScreen screen) screen.accept(payload);
-                    else minecraft.setScreenAndShow(new NpcAdminScreen(payload, minecraft.gui.screen()));
+                    if (minecraft.gui.screen() instanceof NpcAdminScreen screen) {
+                        // Duplicate/out-of-order list responses update the one manager that is
+                        // already visible; never create a second manager layer.
+                        screen.accept(payload);
+                    } else {
+                        // This is a top-level world screen, not a child overlay. In 26.2 the active
+                        // screen lives on Gui and Gui#setScreen clears NeoForge background layers.
+                        // Using the replacement path here prevents a stale manager from remaining
+                        // underneath the newly opened manager when the NPC tool is used in the air.
+                        minecraft.gui.setScreen(new NpcAdminScreen(payload));
+                    }
+                })
+        );
+
+        event.register(NpcSpawnProfileEditorOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.setScreenAndShow(new NpcSpawnProfileEditorScreen(payload, minecraft.gui.screen()));
+                })
+        );
+
+        event.register(NpcSpawnProfileEditorResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcSpawnProfileEditorScreen screen) screen.acceptResult(payload);
                 })
         );
 
@@ -646,6 +718,29 @@ public class SimpleServerUtilitiesClient {
                     } else if (minecraft.gui.screen() instanceof NpcShopAdminScreen screen) {
                         screen.acceptEditorResult(payload);
                     }
+                })
+        );
+
+        event.register(NpcAbilityLibraryDataPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcAbilityLibraryScreen screen) screen.accept(payload);
+                    else minecraft.setScreenAndShow(new NpcAbilityLibraryScreen(payload, minecraft.gui.screen()));
+                })
+        );
+
+        event.register(NpcAbilityEditorOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.setScreenAndShow(new NpcAbilityWorkshopScreen(payload, minecraft.gui.screen()));
+                })
+        );
+
+        event.register(NpcAbilityEditorResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.gui.screen() instanceof NpcAbilityWorkshopScreen screen) screen.acceptResult(payload);
+                    else if (minecraft.gui.screen() instanceof NpcAbilityLibraryScreen screen) screen.acceptEditorResult(payload);
                 })
         );
 
