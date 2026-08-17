@@ -1,5 +1,8 @@
 package be.winnetrie.mod.simpleserverutilities.client.npc;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.renderer.MultiBufferSource;
+import be.winnetrie.mod.simpleserverutilities.client.render.SsuDebugGizmos;
 import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.network.NpcLabelSyncPayload;
@@ -7,9 +10,6 @@ import be.winnetrie.mod.simpleserverutilities.npc.NpcAttitude;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.gizmos.Gizmos;
-import net.minecraft.gizmos.TextGizmo;
-import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -37,8 +37,11 @@ public final class NpcLabelRenderer implements net.minecraft.client.renderer.deb
     public NpcLabelRenderer(Minecraft minecraft) { this.minecraft = minecraft; }
 
     @Override
-    public void emitGizmos(double camX, double camY, double camZ, DebugValueAccess debugValues,
-                           Frustum frustum, float partialTicks) {
+    public void render(PoseStack poseStack, MultiBufferSource bufferSource,
+                       double camX, double camY, double camZ) {
+        SsuDebugGizmos.begin(minecraft, poseStack, bufferSource, camX, camY, camZ);
+        Frustum frustum = null; // 1.21.1 DebugRenderer does not pass its render frustum to child renderers.
+        float partialTicks = minecraft.getTimer().getGameTimeDeltaPartialTick(true);
         if (minecraft.player == null || minecraft.level == null) return;
         Vec3 playerPosition = minecraft.player.position();
         for (NpcLabelSyncPayload.Entry entry : NpcLabelClientState.entries()) {
@@ -95,6 +98,6 @@ public final class NpcLabelRenderer implements net.minecraft.client.renderer.deb
 
     private static void text(String value, Vec3 position, int color, float scale) {
         if (value == null || value.isBlank()) return;
-        Gizmos.billboardText(value, position, TextGizmo.Style.forColorAndCentered(color).withScale(scale));
+        SsuDebugGizmos.billboardText(value, position, SsuDebugGizmos.TextStyle.forColorAndCentered(color).withScale(scale));
     }
 }

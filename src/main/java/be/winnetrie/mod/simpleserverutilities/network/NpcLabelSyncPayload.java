@@ -8,14 +8,14 @@ import be.winnetrie.mod.simpleserverutilities.npc.NpcAttitude;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Lightweight client snapshot for the SSU NPC overhead identity/quest label. */
 public record NpcLabelSyncPayload(List<Entry> entries) implements CustomPacketPayload {
     private static final int MAX_ENTRIES = 2_048;
 
     public static final Type<NpcLabelSyncPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_label_sync"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_label_sync"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcLabelSyncPayload> STREAM_CODEC =
             StreamCodec.of(NpcLabelSyncPayload::encode, NpcLabelSyncPayload::decode);
 

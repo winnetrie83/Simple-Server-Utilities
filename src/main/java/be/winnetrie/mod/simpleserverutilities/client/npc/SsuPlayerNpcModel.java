@@ -1,7 +1,9 @@
 package be.winnetrie.mod.simpleserverutilities.client.npc;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.npc.entity.SsuPlayerNpcEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.ArmedModel;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.HumanoidModel;
@@ -13,14 +15,18 @@ import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
-import net.minecraft.resources.Identifier;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.item.CrossbowItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ProjectileWeaponItem;
 
 /** Dependency-free 64x64 Steve/Alex model used by the native SSU player NPC runtime. */
-public final class SsuPlayerNpcModel extends EntityModel<SsuPlayerNpcRenderState> implements ArmedModel<SsuPlayerNpcRenderState> {
+public final class SsuPlayerNpcModel extends EntityModel<SsuPlayerNpcEntity> implements ArmedModel {
     public static final ModelLayerLocation LAYER = new ModelLayerLocation(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "player_npc"), "main");
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "player_npc"), "main");
 
     private static final String HEAD = "head";
     private static final String BODY = "body";
@@ -39,9 +45,9 @@ public final class SsuPlayerNpcModel extends EntityModel<SsuPlayerNpcRenderState
     private final ModelPart leftArmSlim;
     private final ModelPart rightLeg;
     private final ModelPart leftLeg;
+    private boolean slim;
 
     public SsuPlayerNpcModel(ModelPart root) {
-        super(root);
         this.head = root.getChild(HEAD);
         this.body = root.getChild(BODY);
         this.rightArm = root.getChild(RIGHT_ARM);
@@ -117,45 +123,45 @@ public final class SsuPlayerNpcModel extends EntityModel<SsuPlayerNpcRenderState
     }
 
     @Override
-    public void setupAnim(SsuPlayerNpcRenderState state) {
-        super.setupAnim(state);
+    public void setupAnim(SsuPlayerNpcEntity entity, float limbSwing, float limbSwingAmount,
+            float ageInTicks, float netHeadYaw, float headPitch) {
+        this.slim = NpcCustomTextureClientState.isSlimModelForEntity(entity.getId());
+        rightArm.visible = !slim;
+        leftArm.visible = !slim;
+        rightArmSlim.visible = slim;
+        leftArmSlim.visible = slim;
 
-        rightArm.visible = !state.slim;
-        leftArm.visible = !state.slim;
-        rightArmSlim.visible = state.slim;
-        leftArmSlim.visible = state.slim;
+        float headPitchRad = headPitch * ((float) Math.PI / 180.0F);
+        float headYawRad = netHeadYaw * ((float) Math.PI / 180.0F);
+        head.xRot = headPitchRad;
+        head.yRot = headYawRad;
 
-        head.xRot = state.headPitch;
-        head.yRot = state.headYaw;
-
-        float walk = state.walkAnimationPos * 0.6662F;
-        float amount = Math.min(1.0F, state.walkAnimationSpeed);
-        float rightLegRot = Mth.cos(walk) * 1.4F * amount;
-        float leftLegRot = Mth.cos(walk + (float) Math.PI) * 1.4F * amount;
+        float walk = limbSwing * 0.6662F;
+        float amount = Math.min(1.0F, limbSwingAmount);
+        rightLeg.xRot = Mth.cos(walk) * 1.4F * amount;
+        leftLeg.xRot = Mth.cos(walk + (float) Math.PI) * 1.4F * amount;
         float rightArmRot = Mth.cos(walk + (float) Math.PI) * 1.2F * amount;
         float leftArmRot = Mth.cos(walk) * 1.2F * amount;
-
-        rightLeg.xRot = rightLegRot;
-        leftLeg.xRot = leftLegRot;
-        rightArm.xRot = rightArmRot;
-        leftArm.xRot = leftArmRot;
-        rightArmSlim.xRot = rightArmRot;
-        leftArmSlim.xRot = leftArmRot;
+        resetArm(rightArm, rightArmRot);
+        resetArm(rightArmSlim, rightArmRot);
+        resetArm(leftArm, leftArmRot);
+        resetArm(leftArmSlim, leftArmRot);
         body.xRot = 0.0F;
 
-        // SSU combat already publishes the normal LivingEntity swing via ArmedEntityRenderState.
-        if (state.attackTime > 0.0F) {
-            float attackSwing = Mth.sin(state.attackTime * (float) Math.PI) * 1.35F;
-            ModelPart attackArm = state.attackArm == HumanoidArm.LEFT ? leftArm : rightArm;
-            ModelPart attackArmSlim = state.attackArm == HumanoidArm.LEFT ? leftArmSlim : rightArmSlim;
-            attackArm.xRot -= attackSwing;
-            attackArmSlim.xRot -= attackSwing;
+        if (this.attackTime > 0.0F) {
+            float attackSwing = Mth.sin(this.attackTime * (float) Math.PI) * 1.35F;
+            HumanoidArm attackArm = entity.getMainArm();
+            ModelPart wide = attackArm == HumanoidArm.LEFT ? leftArm : rightArm;
+            ModelPart slimPart = attackArm == HumanoidArm.LEFT ? leftArmSlim : rightArmSlim;
+            wide.xRot -= attackSwing;
+            slimPart.xRot -= attackSwing;
         }
 
-        applyHeldItemPose(state, HumanoidArm.RIGHT, rightArm, rightArmSlim);
-        applyHeldItemPose(state, HumanoidArm.LEFT, leftArm, leftArmSlim);
+        HumanoidArm mainArm = entity.getMainArm();
+        applyHeldItemPose(mainArm, true, poseFor(entity.getMainHandItem(), entity.isAggressive()), headYawRad, headPitchRad);
+        applyHeldItemPose(mainArm, false, poseFor(entity.getOffhandItem(), entity.isAggressive()), headYawRad, headPitchRad);
 
-        if (state.crouching) {
+        if (entity.isCrouching()) {
             body.xRot = 0.5F;
             rightArm.xRot += 0.4F;
             leftArm.xRot += 0.4F;
@@ -163,10 +169,19 @@ public final class SsuPlayerNpcModel extends EntityModel<SsuPlayerNpcRenderState
             leftArmSlim.xRot += 0.4F;
         }
     }
-    private static void applyHeldItemPose(SsuPlayerNpcRenderState state, HumanoidArm arm, ModelPart wide, ModelPart slim) {
-        HumanoidModel.ArmPose pose = arm == HumanoidArm.RIGHT ? state.rightArmPose : state.leftArmPose;
-        float side = arm == HumanoidArm.RIGHT ? 1.0F : -1.0F;
-        if (pose == null) return;
+
+    private static void resetArm(ModelPart part, float xRot) {
+        part.xRot = xRot;
+        part.yRot = 0.0F;
+        part.zRot = 0.0F;
+    }
+
+    private void applyHeldItemPose(HumanoidArm mainArm, boolean mainHand, HumanoidModel.ArmPose pose,
+            float headYaw, float headPitch) {
+        HumanoidArm physicalArm = mainHand ? mainArm : opposite(mainArm);
+        ModelPart wide = physicalArm == HumanoidArm.RIGHT ? rightArm : leftArm;
+        ModelPart slimPart = physicalArm == HumanoidArm.RIGHT ? rightArmSlim : leftArmSlim;
+        float side = physicalArm == HumanoidArm.RIGHT ? 1.0F : -1.0F;
 
         switch (pose) {
             case BLOCK -> {
@@ -174,32 +189,60 @@ public final class SsuPlayerNpcModel extends EntityModel<SsuPlayerNpcRenderState
                 wide.yRot = -0.5235988F * side;
             }
             case BOW_AND_ARROW -> {
-                wide.yRot = -0.1F * side + state.headYaw;
-                wide.xRot = -1.5707964F + state.headPitch;
+                wide.yRot = -0.1F * side + headYaw;
+                wide.xRot = -1.5707964F + headPitch;
             }
             case CROSSBOW_HOLD -> {
-                wide.yRot = -0.3F * side + state.headYaw;
-                wide.xRot = -1.35F + state.headPitch;
+                wide.yRot = -0.3F * side + headYaw;
+                wide.xRot = -1.35F + headPitch;
             }
             case ITEM -> wide.xRot = wide.xRot * 0.5F - 0.31415927F;
             default -> { }
         }
-
-        slim.xRot = wide.xRot;
-        slim.yRot = wide.yRot;
-        slim.zRot = wide.zRot;
+        slimPart.xRot = wide.xRot;
+        slimPart.yRot = wide.yRot;
+        slimPart.zRot = wide.zRot;
     }
 
-    /**
-     * Attachment hook used by vanilla ItemInHandLayer. This deliberately keeps the proven
-     * dev3.40.4.1 player model instead of turning the entire NPC model into HumanoidModel.
-     */
+    private static HumanoidModel.ArmPose poseFor(ItemStack stack, boolean fighting) {
+        if (stack == null || stack.isEmpty()) return HumanoidModel.ArmPose.EMPTY;
+        if (fighting) {
+            if (stack.getItem() instanceof CrossbowItem || itemIdContains(stack, "crossbow")) {
+                return HumanoidModel.ArmPose.CROSSBOW_HOLD;
+            }
+            if (stack.getItem() instanceof ProjectileWeaponItem || itemIdContains(stack, "bow")) {
+                return HumanoidModel.ArmPose.BOW_AND_ARROW;
+            }
+            if (itemIdContains(stack, "shield")) return HumanoidModel.ArmPose.BLOCK;
+        }
+        return HumanoidModel.ArmPose.ITEM;
+    }
+
+    private static boolean itemIdContains(ItemStack stack, String needle) {
+        return BuiltInRegistries.ITEM.getKey(stack.getItem()).toString().contains(needle);
+    }
+
+    private static HumanoidArm opposite(HumanoidArm arm) {
+        return arm == HumanoidArm.RIGHT ? HumanoidArm.LEFT : HumanoidArm.RIGHT;
+    }
+
     @Override
-    public void translateToHand(SsuPlayerNpcRenderState state, HumanoidArm arm, PoseStack poseStack) {
-        ModelPart part;
-        if (arm == HumanoidArm.RIGHT) part = state.slim ? rightArmSlim : rightArm;
-        else part = state.slim ? leftArmSlim : leftArm;
+    public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLight, int packedOverlay, int color) {
+        head.render(poseStack, vertexConsumer, packedLight, packedOverlay, color);
+        body.render(poseStack, vertexConsumer, packedLight, packedOverlay, color);
+        rightArm.render(poseStack, vertexConsumer, packedLight, packedOverlay, color);
+        leftArm.render(poseStack, vertexConsumer, packedLight, packedOverlay, color);
+        rightArmSlim.render(poseStack, vertexConsumer, packedLight, packedOverlay, color);
+        leftArmSlim.render(poseStack, vertexConsumer, packedLight, packedOverlay, color);
+        rightLeg.render(poseStack, vertexConsumer, packedLight, packedOverlay, color);
+        leftLeg.render(poseStack, vertexConsumer, packedLight, packedOverlay, color);
+    }
+
+    @Override
+    public void translateToHand(HumanoidArm arm, PoseStack poseStack) {
+        ModelPart part = arm == HumanoidArm.RIGHT
+                ? (slim ? rightArmSlim : rightArm)
+                : (slim ? leftArmSlim : leftArm);
         part.translateAndRotate(poseStack);
     }
-
 }

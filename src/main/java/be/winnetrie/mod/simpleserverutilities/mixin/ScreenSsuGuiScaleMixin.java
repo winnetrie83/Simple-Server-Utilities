@@ -1,7 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.mixin;
 
 import be.winnetrie.mod.simpleserverutilities.client.gui.SsuGuiScale;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -10,15 +10,39 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Applies one centered transform around the complete Screen extraction pass.
- * This deliberately lives above individual SSU screens so their layouts do not
- * need scale-aware coordinates and future screens inherit scaling automatically.
+ * 1.21.1 rendering bridge for SSU's per-screen GUI scale.
+ *
+ * <p>Minecraft 1.21.1 still renders screens immediately through
+ * {@code Screen#renderWithTooltip} and exposes a PoseStack from GuiGraphics.
+ * The 26.2 build uses the later render-state extraction / Matrix3x2 stack,
+ * so the same centered SSU transform is applied at this older lifecycle
+ * boundary instead.</p>
  */
 @Mixin(Screen.class)
 public abstract class ScreenSsuGuiScaleMixin {
-    @Inject(method = "extractRenderStateWithTooltipAndSubtitles", at = @At("HEAD"))
+    /**
+     * SSU screens paint their own backdrop/panel. Minecraft 1.21.1's vanilla
+     * Screen#renderBackground applies a world blur/menu background on every
+     * normal Screen#render call, which otherwise gets layered on top of the
+     * already-rendered SSU backdrop (and is especially obvious under the
+     * centered SSU scale transform). Suppress only the vanilla background
+     * path for SSU screens; each SSU screen keeps its own flat dim/panel.
+     */
+    @Inject(method = "renderBackground", at = @At("HEAD"), cancellable = true)
+    private void ssu$suppressVanillaBackground(
+            GuiGraphics graphics,
+            int mouseX,
+            int mouseY,
+            float partialTick,
+            CallbackInfo callback
+    ) {
+        Screen screen = (Screen) (Object) this;
+        if (SsuGuiScale.appliesTo(screen)) callback.cancel();
+    }
+
+    @Inject(method = "renderWithTooltip", at = @At("HEAD"))
     private void ssu$beginScaledScreen(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             int mouseX,
             int mouseY,
             float partialTick,
@@ -30,14 +54,14 @@ public abstract class ScreenSsuGuiScaleMixin {
 
         float centerX = screen.width * 0.5F;
         float centerY = screen.height * 0.5F;
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(centerX, centerY);
-        graphics.pose().scale(scale, scale);
-        graphics.pose().translate(-centerX, -centerY);
+        graphics.pose().pushPose();
+        graphics.pose().translate(centerX, centerY, 0.0F);
+        graphics.pose().scale(scale, scale, 1.0F);
+        graphics.pose().translate(-centerX, -centerY, 0.0F);
     }
 
     @ModifyVariable(
-            method = "extractRenderStateWithTooltipAndSubtitles",
+            method = "renderWithTooltip",
             at = @At("HEAD"),
             argsOnly = true,
             index = 2
@@ -48,7 +72,7 @@ public abstract class ScreenSsuGuiScaleMixin {
     }
 
     @ModifyVariable(
-            method = "extractRenderStateWithTooltipAndSubtitles",
+            method = "renderWithTooltip",
             at = @At("HEAD"),
             argsOnly = true,
             index = 3
@@ -58,54 +82,15 @@ public abstract class ScreenSsuGuiScaleMixin {
         return SsuGuiScale.logicalY(screen, mouseY);
     }
 
-    @Inject(method = "extractRenderStateWithTooltipAndSubtitles", at = @At("RETURN"))
+    @Inject(method = "renderWithTooltip", at = @At("RETURN"))
     private void ssu$endScaledScreen(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             int mouseX,
             int mouseY,
             float partialTick,
             CallbackInfo callback
     ) {
         Screen screen = (Screen) (Object) this;
-        if (SsuGuiScale.isScaled(screen)) graphics.pose().popMatrix();
+        if (SsuGuiScale.isScaled(screen)) graphics.pose().popPose();
     }
-
-    /**
-     * Never let Minecraft's own fullscreen background be extracted inside the
-     * reduced SSU transform. Screen background extraction happens before the
-     * concrete SSU screen emits its own backdrop, so waiting for a per-frame
-     * "backdrop already drawn" flag is too late and leaves a scaled dark
-     * rectangle around the panel.
-     *
-     * At reduced SSU scale we therefore suppress the vanilla background for all
-     * SSU screens up front. Normal SSU menu screens draw an explicit managed
-     * fullscreen dim; the few screens that used to rely on vanilla background
-     * receive a scaled-only fallback in their own render path. Overlay/preview
-     * screens intentionally remain transparent. 100% behaviour is untouched.
-     */
-    @Inject(method = "extractTransparentBackground", at = @At("HEAD"), cancellable = true, require = 0)
-    private void ssu$skipScaledVanillaTransparentBackground(CallbackInfo callback) {
-        Screen screen = (Screen) (Object) this;
-        if (SsuGuiScale.isScaled(screen)) callback.cancel();
-    }
-
-    /** Same safeguard for screens/code paths that request the menu background directly. */
-    @Inject(method = "extractMenuBackground", at = @At("HEAD"), cancellable = true, require = 0)
-    private void ssu$skipScaledVanillaMenuBackground(CallbackInfo callback) {
-        Screen screen = (Screen) (Object) this;
-        if (SsuGuiScale.isScaled(screen)) callback.cancel();
-    }
-
-    @ModifyVariable(method = "mouseScrolled", at = @At("HEAD"), argsOnly = true, index = 1, require = 0)
-    private double ssu$logicalScrollMouseX(double mouseX) {
-        Screen screen = (Screen) (Object) this;
-        return SsuGuiScale.logicalX(screen, mouseX);
-    }
-
-    @ModifyVariable(method = "mouseScrolled", at = @At("HEAD"), argsOnly = true, index = 3, require = 0)
-    private double ssu$logicalScrollMouseY(double mouseY) {
-        Screen screen = (Screen) (Object) this;
-        return SsuGuiScale.logicalY(screen, mouseY);
-    }
-
 }

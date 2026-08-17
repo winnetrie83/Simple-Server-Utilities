@@ -13,13 +13,14 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
-import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 
 /** Executes validated multi-block mining and tracks player-placed tree materials. */
 public final class UtilityMiningEvents {
@@ -41,7 +42,7 @@ public final class UtilityMiningEvents {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onBlockBreak(BreakBlockEvent event) {
+    public static void onBlockBreak(BlockEvent.BreakEvent event) {
         if (!SsuModuleAccess.active("utility_mining")) return;
         if (!Config.ENABLE_TREECAPITATOR.get() && !Config.ENABLE_VEINMINER.get()) return;
         if (event.isCanceled() || !(event.getPlayer() instanceof ServerPlayer player)
@@ -159,7 +160,7 @@ public final class UtilityMiningEvents {
         }
 
         if (destroyed && !player.getAbilities().instabuild && originalTool.isDamageableItem()) {
-            originalTool.hurtAndBreak(1, player, InteractionHand.MAIN_HAND);
+            originalTool.hurtAndBreak(1, player, EquipmentSlot.MAINHAND);
         }
         return destroyed;
     }

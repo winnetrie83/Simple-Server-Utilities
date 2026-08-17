@@ -4,11 +4,11 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record SsuDimensionManagerRequestPayload(String selectedId, long requestId) implements CustomPacketPayload {
     public static final Type<SsuDimensionManagerRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "dimension_manager_request"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "dimension_manager_request"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuDimensionManagerRequestPayload> STREAM_CODEC =
             StreamCodec.of(SsuDimensionManagerRequestPayload::encode, SsuDimensionManagerRequestPayload::decode);
 

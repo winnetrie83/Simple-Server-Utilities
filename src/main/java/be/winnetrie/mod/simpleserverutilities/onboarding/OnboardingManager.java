@@ -30,7 +30,7 @@ import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -165,7 +165,7 @@ public final class OnboardingManager {
             Anchor anchor = anchors.computeIfAbsent(player.getUUID(), ignored -> Anchor.capture(player));
             if (!anchor.matches(player)) {
                 ServerLevel level = server.getLevel(anchor.dimension);
-                if (level != null) player.teleportTo(level, anchor.x, anchor.y, anchor.z, java.util.Set.of(), anchor.yaw, anchor.pitch, true);
+                if (level != null) player.teleportTo(level, anchor.x, anchor.y, anchor.z, java.util.Set.of(), anchor.yaw, anchor.pitch);
             }
             player.setDeltaMovement(0.0D, 0.0D, 0.0D);
             if (player.containerMenu != player.inventoryMenu) player.closeContainer();
@@ -244,11 +244,11 @@ public final class OnboardingManager {
         ServerSpawn lobby = SimpleServerUtilities.SERVER_SPAWN.getLobby();
         if (SpawnEvents.teleport(player, lobby)) return;
         ServerLevel level = player.level().getServer().overworld();
-        BlockPos pos = level.getWorldBorderAdjustedRespawnData(level.getRespawnData()).pos();
+        BlockPos pos = level.getSharedSpawnPos();
         var safe = TeleportSafety.findSafeDestination(level, pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D, 24);
         if (safe.isPresent()) {
             var destination = safe.get();
-            player.teleportTo(level, destination.x(), destination.y(), destination.z(), java.util.Set.of(), player.getYRot(), player.getXRot(), true);
+            player.teleportTo(level, destination.x(), destination.y(), destination.z(), java.util.Set.of(), player.getYRot(), player.getXRot());
         }
     }
 
@@ -259,7 +259,7 @@ public final class OnboardingManager {
         player.connection.send(new ClientboundSetSubtitleTextPacket(Component.literal(copy.welcomeSubtitle)));
         if (copy.welcomeFireworks && player.level() instanceof ServerLevel level) {
             level.sendParticles(ParticleTypes.FIREWORK, player.getX(), player.getY() + 1.2D, player.getZ(), 40, 1.0D, 1.4D, 1.0D, 0.08D);
-            SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(Identifier.parse("minecraft:entity.firework_rocket.blast")).orElse(null);
+            SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(ResourceLocation.parse("minecraft:entity.firework_rocket.blast")).orElse(null);
             if (sound != null) player.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound), SoundSource.PLAYERS, player.getX(), player.getY(), player.getZ(), 1.0F, 1.0F, player.level().getServer().getTickCount() ^ player.getUUID().getLeastSignificantBits()));
         }
     }

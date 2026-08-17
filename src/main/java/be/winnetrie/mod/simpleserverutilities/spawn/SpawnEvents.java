@@ -12,7 +12,7 @@ import java.util.UUID;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -75,11 +75,10 @@ public final class SpawnEvents {
     public static boolean teleport(ServerPlayer player, ServerSpawn destination) {
         if (player == null || destination == null || player.level().getServer() == null) return false;
         try {
-            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, Identifier.parse(destination.getDimension()));
+            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(destination.getDimension()));
             ServerLevel level = player.level().getServer().getLevel(key);
             if (level == null) return false;
-            player.teleportTo(level, destination.getX(), destination.getY(), destination.getZ(), Set.of(),
-                    destination.getYaw(), destination.getPitch(), true);
+            player.teleportTo(level, destination.getX(), destination.getY(), destination.getZ(), Set.of(), destination.getYaw(), destination.getPitch());
             return true;
         } catch (RuntimeException ignored) {
             return false;
@@ -89,7 +88,7 @@ public final class SpawnEvents {
 
     private static boolean atVanillaFallback(ServerPlayer player) {
         if (player == null || player.level().getServer() == null || player.level() != player.level().getServer().overworld()) return false;
-        var spawn = player.level().getServer().overworld().getWorldBorderAdjustedRespawnData(player.level().getServer().overworld().getRespawnData()).pos();
+        var spawn = player.level().getServer().overworld().getSharedSpawnPos();
         return player.distanceToSqr(spawn.getX() + 0.5D, spawn.getY(), spawn.getZ() + 0.5D) <= 16.0D;
     }
 
@@ -99,7 +98,7 @@ public final class SpawnEvents {
         if (teleport(player, SimpleServerUtilities.SERVER_SPAWN.get())) return true;
         ServerLevel level = player.level().getServer().overworld();
         if (level == null) return false;
-        var spawn = level.getWorldBorderAdjustedRespawnData(level.getRespawnData()).pos();
+        var spawn = level.getSharedSpawnPos();
         Optional<TeleportDestination> safe = TeleportSafety.findSafeDestination(level, spawn.getX()+0.5D, spawn.getY(), spawn.getZ()+0.5D, 12);
         double x = spawn.getX() + 0.5D;
         double y = spawn.getY();
@@ -107,7 +106,7 @@ public final class SpawnEvents {
         if (safe.isPresent()) {
             x = safe.get().x(); y = safe.get().y(); z = safe.get().z();
         }
-        player.teleportTo(level, x, y, z, Set.of(), player.getYRot(), player.getXRot(), true);
+        player.teleportTo(level, x, y, z, Set.of(), player.getYRot(), player.getXRot());
         return true;
     }
 

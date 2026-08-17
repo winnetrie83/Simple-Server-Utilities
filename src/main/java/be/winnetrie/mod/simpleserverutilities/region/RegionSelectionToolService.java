@@ -45,7 +45,7 @@ public final class RegionSelectionToolService {
         }
         boolean canEditBlocks = canEdit(player);
         PacketDistributor.sendToPlayer(player, new RegionSelectionToolOpenPayload(
-                selection.getDimension().identifier().toString(),
+                selection.getDimension().location().toString(),
                 selection.getPoint1().asLong(),
                 selection.getPoint2().asLong(),
                 bounds.volume(),

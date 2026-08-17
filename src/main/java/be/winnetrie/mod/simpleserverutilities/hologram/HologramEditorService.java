@@ -12,7 +12,7 @@ import be.winnetrie.mod.simpleserverutilities.network.HologramEditorSubmitPayloa
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -178,7 +178,7 @@ public final class HologramEditorService {
             return Config.ALLOW_REMOTE_HOLOGRAM_IMAGES.get() && validWebsite(value);
         }
         try {
-            Identifier identifier = Identifier.parse(value);
+            ResourceLocation identifier = ResourceLocation.parse(value);
             String path = identifier.getPath().toLowerCase(java.util.Locale.ROOT);
             return path.endsWith(".png") || path.endsWith(".gif")
                     || path.endsWith(".jpg") || path.endsWith(".jpeg");

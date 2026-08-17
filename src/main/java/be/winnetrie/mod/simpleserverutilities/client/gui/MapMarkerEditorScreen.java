@@ -5,13 +5,13 @@ import java.util.UUID;
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerSyncPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Compact create/edit form for one personal map marker. */
 public final class MapMarkerEditorScreen extends Screen {
@@ -137,31 +137,31 @@ public final class MapMarkerEditorScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         int panelWidth = Math.min(420, width - 28);
         int left = (width - panelWidth) / 2;
         int top = Math.max(28, (height - 250) / 2);
         graphics.fill(left, top, left + panelWidth, top + 230, 0xE5121720);
-        graphics.outline(left, top, panelWidth, 230, 0xFF64778D);
-        graphics.centeredText(font, title, left + panelWidth / 2, top + 12, 0xFFFFD66B);
-        graphics.text(font, "Name", left + 18, top + 44, 0xFFE6EAF0);
-        graphics.text(font, "Coordinates", left + 18, top + 80, 0xFFE6EAF0);
-        graphics.text(font, "X", xBox.getX() + 3, top + 65, 0xFF9FB0C3);
-        graphics.text(font, "Y", yBox.getX() + 3, top + 65, 0xFF9FB0C3);
-        graphics.text(font, "Z", zBox.getX() + 3, top + 65, 0xFF9FB0C3);
-        graphics.text(font, "Color", left + 18, top + 118, 0xFFE6EAF0);
+        graphics.renderOutline(left, top, panelWidth, 230, 0xFF64778D);
+        graphics.drawCenteredString(font, title, left + panelWidth / 2, top + 12, 0xFFFFD66B);
+        graphics.drawString(font, "Name", left + 18, top + 44, 0xFFE6EAF0);
+        graphics.drawString(font, "Coordinates", left + 18, top + 80, 0xFFE6EAF0);
+        graphics.drawString(font, "X", xBox.getX() + 3, top + 65, 0xFF9FB0C3);
+        graphics.drawString(font, "Y", yBox.getX() + 3, top + 65, 0xFF9FB0C3);
+        graphics.drawString(font, "Z", zBox.getX() + 3, top + 65, 0xFF9FB0C3);
+        graphics.drawString(font, "Color", left + 18, top + 118, 0xFFE6EAF0);
         graphics.fill(left + 78, top + 115, left + 96, top + 133, selectedColor);
-        graphics.outline(left + 78, top + 115, 18, 18, 0xFFFFFFFF);
-        graphics.text(font, "Dimension: " + dimension, left + 18, top + 170, 0xFF9FB0C3);
+        graphics.renderOutline(left + 78, top + 115, 18, 18, 0xFFFFFFFF);
+        graphics.drawString(font, "Dimension: " + dimension, left + 18, top + 170, 0xFF9FB0C3);
         if (resolveSurfaceHeight) {
-            graphics.text(font, "Y will be verified as one block above the clicked surface.",
+            graphics.drawString(font, "Y will be verified as one block above the clicked surface.",
                     left + 18, top + 184, 0xFF7EDB9B);
         }
         if (!status.isBlank()) {
-            graphics.text(font, status, left + 18, top + 216, statusError ? 0xFFFF6B6B : 0xFF6BFF88);
+            graphics.drawString(font, status, left + 18, top + 216, statusError ? 0xFFFF6B6B : 0xFF6BFF88);
         }
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     public void acceptResult(MapMarkerActionResultPayload result) {
@@ -176,7 +176,7 @@ public final class MapMarkerEditorScreen extends Screen {
         Integer z = parse(zBox.getValue());
         if (x == null || y == null || z == null || nameBox.getValue().trim().isBlank()) return;
         boolean create = markerId.getMostSignificantBits() == 0L && markerId.getLeastSignificantBits() == 0L;
-        ClientPacketDistributor.sendToServer(new MapMarkerActionPayload(
+        PacketDistributor.sendToServer(new MapMarkerActionPayload(
                 create ? "create" : "update", markerId, nameBox.getValue().trim(), dimension,
                 x, y, z, selectedColor, resolveSurfaceHeight));
         status = "Saving…";
@@ -198,7 +198,7 @@ public final class MapMarkerEditorScreen extends Screen {
     }
 
     private void closeToParent() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
 
@@ -224,13 +224,13 @@ public final class MapMarkerEditorScreen extends Screen {
         }
 
         @Override
-        protected void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-            extractDefaultSprite(graphics);
+        public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+            super.renderWidget(graphics, mouseX, mouseY, partialTick);
             graphics.fill(getX() + 3, getY() + 3, getRight() - 3, getBottom() - 3, color);
             int outline = selected.getAsBoolean()
                     ? 0xFFFFFFFF
                     : (isHoveredOrFocused() ? 0xFFBFD7F0 : 0xFF20242B);
-            graphics.outline(getX() + 2, getY() + 2, getWidth() - 4, getHeight() - 4, outline);
+            graphics.renderOutline(getX() + 2, getY() + 2, getWidth() - 4, getHeight() - 4, outline);
         }
     }
 

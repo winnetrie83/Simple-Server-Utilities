@@ -8,7 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapOperation;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record ClaimMapActionPayload(
         ClaimMapOperation operation,
@@ -22,7 +22,7 @@ public record ClaimMapActionPayload(
     private static final int MAX_SELECTION_SIZE = 256;
 
     public static final Type<ClaimMapActionPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "claim_map_action")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "claim_map_action")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ClaimMapActionPayload> STREAM_CODEC =

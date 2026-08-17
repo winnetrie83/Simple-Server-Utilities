@@ -1,13 +1,12 @@
 package be.winnetrie.mod.simpleserverutilities.client.minigame;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.renderer.MultiBufferSource;
+import be.winnetrie.mod.simpleserverutilities.client.render.SsuDebugGizmos;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameDominationVisualPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.debug.DebugRenderer;
-import net.minecraft.gizmos.GizmoStyle;
-import net.minecraft.gizmos.Gizmos;
-import net.minecraft.gizmos.TextGizmo;
-import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.world.phys.Vec3;
 
 /** Renders large, centered Domination node names above the physical banner. */
@@ -25,14 +24,17 @@ public final class DominationRenderer implements DebugRenderer.SimpleDebugRender
     }
 
     @Override
-    public void emitGizmos(double camX, double camY, double camZ, DebugValueAccess debugValues,
-                           Frustum frustum, float partialTicks) {
+    public void render(PoseStack poseStack, MultiBufferSource bufferSource,
+                       double camX, double camY, double camZ) {
+        SsuDebugGizmos.begin(minecraft, poseStack, bufferSource, camX, camY, camZ);
+        Frustum frustum = null; // 1.21.1 DebugRenderer does not pass its render frustum to child renderers.
+        float partialTicks = minecraft.getTimer().getGameTimeDeltaPartialTick(true);
         if (minecraft.level == null) return;
-        String dimension = minecraft.level.dimension().identifier().toString();
-        var camera = minecraft.gameRenderer.mainCamera();
-        var forwardVector = camera.forwardVector();
-        var leftVector = camera.leftVector();
-        var upVector = camera.upVector();
+        String dimension = minecraft.level.dimension().location().toString();
+        var camera = minecraft.gameRenderer.getMainCamera();
+        var forwardVector = camera.getLookVector();
+        var leftVector = camera.getLeftVector();
+        var upVector = camera.getUpVector();
         Vec3 cameraForward = new Vec3(forwardVector.x(), forwardVector.y(), forwardVector.z()).normalize();
         Vec3 cameraHorizontal = new Vec3(leftVector.x(), leftVector.y(), leftVector.z()).normalize();
         Vec3 cameraUp = new Vec3(upVector.x(), upVector.y(), upVector.z()).normalize();
@@ -56,14 +58,14 @@ public final class DominationRenderer implements DebugRenderer.SimpleDebugRender
         Vec3 horizontal = cameraHorizontal.scale(halfWidth);
         Vec3 vertical = cameraUp.scale(LABEL_HALF_HEIGHT);
 
-        Gizmos.rect(
+        SsuDebugGizmos.rect(
                 backgroundCenter.subtract(horizontal).add(vertical),
                 backgroundCenter.add(horizontal).add(vertical),
                 backgroundCenter.add(horizontal).subtract(vertical),
                 backgroundCenter.subtract(horizontal).subtract(vertical),
-                GizmoStyle.fill(BACKGROUND_COLOR))
+                SsuDebugGizmos.FillStyle.fill(BACKGROUND_COLOR))
                 .setAlwaysOnTop();
-        Gizmos.billboardText(entry.label(), center,
-                TextGizmo.Style.forColorAndCentered(color).withScale(LABEL_SCALE)).setAlwaysOnTop();
+        SsuDebugGizmos.billboardText(entry.label(), center,
+                SsuDebugGizmos.TextStyle.forColorAndCentered(color).withScale(LABEL_SCALE)).setAlwaysOnTop();
     }
 }

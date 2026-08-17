@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Bounded post-game result table and cosmetic progression summary. */
 public record MinigameResultsPayload(
@@ -28,7 +28,7 @@ public record MinigameResultsPayload(
     public static final int MAX_ROWS = 128;
     public static final int MAX_BADGES = 8;
     public static final Type<MinigameResultsPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_results"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_results"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameResultsPayload> STREAM_CODEC =
             StreamCodec.of(MinigameResultsPayload::encode, MinigameResultsPayload::decode);
 

@@ -71,9 +71,9 @@ public final class JailDefinition {
     }
 
     public boolean contains(String dim,double x,double y,double z){return boundsSet&&dimension.equals(dim)&&x>=minX&&x<maxX+1D&&y>=minY&&y<maxY+1D&&z>=minZ&&z<maxZ+1D;}
-    public boolean contains(ResourceKey<Level> dim,BlockPos pos){return dim!=null&&contains(dim.identifier().toString(),pos.getX(),pos.getY(),pos.getZ());}
+    public boolean contains(ResourceKey<Level> dim,BlockPos pos){return dim!=null&&contains(dim.location().toString(),pos.getX(),pos.getY(),pos.getZ());}
     public boolean workContains(String dim,BlockPos pos){if(!workBoundsSet||pos==null||!dimension.equals(dim))return false;return pos.getX()>=workMinX&&pos.getX()<=workMaxX&&pos.getY()>=workMinY&&pos.getY()<=workMaxY&&pos.getZ()>=workMinZ&&pos.getZ()<=workMaxZ;}
-    public boolean fullyInside(Region region){return region!=null&&boundsSet&&region.getDimension().identifier().toString().equals(dimension)&&minX>=region.getMinX()&&maxX<=region.getMaxX()&&minY>=region.getMinY()&&maxY<=region.getMaxY()&&minZ>=region.getMinZ()&&maxZ<=region.getMaxZ();}
+    public boolean fullyInside(Region region){return region!=null&&boundsSet&&region.getDimension().location().toString().equals(dimension)&&minX>=region.getMinX()&&maxX<=region.getMaxX()&&minY>=region.getMinY()&&maxY<=region.getMaxY()&&minZ>=region.getMinZ()&&maxZ<=region.getMaxZ();}
     public boolean workInsideJail(){return !workBoundsSet||(boundsSet&&workMinX>=minX&&workMaxX<=maxX&&workMinY>=minY&&workMaxY<=maxY&&workMinZ>=minZ&&workMaxZ<=maxZ);}
     public long volume(){if(!boundsSet)return 0L;return ((long)maxX-minX+1L)*((long)maxY-minY+1L)*((long)maxZ-minZ+1L);}
     public JailDefinition copy(){JailDefinition c=new JailDefinition();c.schemaVersion=schemaVersion;c.id=id;c.displayName=displayName;c.parentRegion=parentRegion;c.enabled=enabled;c.dimension=dimension;c.minX=minX;c.minY=minY;c.minZ=minZ;c.maxX=maxX;c.maxY=maxY;c.maxZ=maxZ;c.boundsSet=boundsSet;c.workMinX=workMinX;c.workMinY=workMinY;c.workMinZ=workMinZ;c.workMaxX=workMaxX;c.workMaxY=workMaxY;c.workMaxZ=workMaxZ;c.workBoundsSet=workBoundsSet;c.intake=intake.copy();c.taskSpawn=taskSpawn.copy();c.releaseExit=releaseExit.copy();c.cells=new ArrayList<>();for(Point point:cells)c.cells.add(point.copy());return c;}

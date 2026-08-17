@@ -4,13 +4,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Client-only progress bar for interruptible minigame actions. */
 public record MinigameCastBarPayload(boolean visible, String label, String instruction, float progress, int color)
         implements CustomPacketPayload {
     public static final Type<MinigameCastBarPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_cast_bar"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_cast_bar"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameCastBarPayload> STREAM_CODEC =
             StreamCodec.of(MinigameCastBarPayload::encode, MinigameCastBarPayload::decode);
 

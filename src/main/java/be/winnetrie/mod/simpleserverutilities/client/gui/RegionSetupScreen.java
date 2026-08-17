@@ -11,7 +11,7 @@ import be.winnetrie.mod.simpleserverutilities.network.RegionSetupOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSetupRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSetupSavePayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPermissionEditorRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -20,7 +20,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Central GUI-first region administration, selection editing and snapshot placement tool. */
 public final class RegionSetupScreen extends Screen {
@@ -545,7 +545,7 @@ public final class RegionSetupScreen extends Screen {
         List<Integer> slots = new ArrayList<>();
         List<Integer> percentages = new ArrayList<>();
         for (MixEntry entry : resetMix) { slots.add(entry.slot); percentages.add(entry.percentage); }
-        ClientPacketDistributor.sendToServer(new RegionSetupSavePayload(data.mode(), regionName, data.dimension(),
+        PacketDistributor.sendToServer(new RegionSetupSavePayload(data.mode(), regionName, data.dimension(),
                 data.point1(), data.point2(), parsedPriority, borderVisible, allowBreak, allowPlace, allowInteract,
                 allowPvp, allowExplosions, allowPistons, allowWater, allowLava, allowRedstone, allowHoppers,
                 allowFireSpread, welcome, leave, rentable, rentPrice, days, resetOnExpire, resetOnUnrent,
@@ -561,7 +561,7 @@ public final class RegionSetupScreen extends Screen {
         List<Integer> slots = new ArrayList<>();
         List<Integer> percentages = new ArrayList<>();
         for (MixEntry entry : selectionMix) { slots.add(entry.slot); percentages.add(entry.percentage); }
-        ClientPacketDistributor.sendToServer(new RegionSelectionActionPayload("fill", "", slots, percentages, nextRequestId++));
+        PacketDistributor.sendToServer(new RegionSelectionActionPayload("fill", "", slots, percentages, nextRequestId++));
         setNotice("Selection fill request sent…", false);
     }
 
@@ -570,24 +570,24 @@ public final class RegionSetupScreen extends Screen {
     }
 
     private void actionForRegion(String operation, String targetRegion, String value) {
-        ClientPacketDistributor.sendToServer(new RegionSetupActionPayload(operation, targetRegion, value, nextRequestId++));
+        PacketDistributor.sendToServer(new RegionSetupActionPayload(operation, targetRegion, value, nextRequestId++));
         setNotice("Processing…", false);
     }
 
     private void requestRegion(String name) {
         openEditorAfterResponse = true;
-        ClientPacketDistributor.sendToServer(new RegionSetupRequestPayload("edit", name, nextRequestId++));
+        PacketDistributor.sendToServer(new RegionSetupRequestPayload("edit", name, nextRequestId++));
         setNotice("Loading region…", false);
     }
 
     private void requestCreate() {
         openEditorAfterResponse = true;
-        ClientPacketDistributor.sendToServer(new RegionSetupRequestPayload("create", "", nextRequestId++));
+        PacketDistributor.sendToServer(new RegionSetupRequestPayload("create", "", nextRequestId++));
         setNotice("Opening create-region settings…", false);
     }
 
     private void requestSelectionContext() {
-        ClientPacketDistributor.sendToServer(new RegionSetupRequestPayload("selection", "", nextRequestId++));
+        PacketDistributor.sendToServer(new RegionSetupRequestPayload("selection", "", nextRequestId++));
         setNotice("Refreshing selection…", false);
     }
 
@@ -599,16 +599,16 @@ public final class RegionSetupScreen extends Screen {
     }
 
     private void openPermissions() {
-        ClientPacketDistributor.sendToServer(new SsuPermissionEditorRequestPayload("region", data.regionName(),
+        PacketDistributor.sendToServer(new SsuPermissionEditorRequestPayload("region", data.regionName(),
                 "", "", "", 0, 8, nextRequestId++));
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-        if (event.buttonInfo().button() == 0) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0) {
             boolean inventoryPage = page == PAGE_RESET || (page == PAGE_SELECTION && selectionSection == 0);
             if (inventoryPage) {
-                int slot = inventorySlotAt((int) event.x(), (int) event.y());
+                int slot = inventorySlotAt((int) mouseX, (int) mouseY);
                 if (slot >= 0) {
                     ItemStack stack = inventoryItem(slot);
                     if (stack.isEmpty()) setNotice("That inventory slot is empty.", true);
@@ -621,7 +621,7 @@ public final class RegionSetupScreen extends Screen {
                 }
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private void addMix(List<MixEntry> target, int slot) {
@@ -642,14 +642,14 @@ public final class RegionSetupScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int x = left();
         int y = top();
         SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
-        graphics.outline(x, y, W, H, BORDER);
-        graphics.text(font, "Region Setup Tool", x + 16, y + 12, TEXT, true);
-        graphics.text(font, trim(headerStatus(), 88), x + 16, y + 27, MUTED, false);
+        graphics.renderOutline(x, y, W, H, BORDER);
+        graphics.drawString(font, "Region Setup Tool", x + 16, y + 12, TEXT, true);
+        graphics.drawString(font, trim(headerStatus(), 88), x + 16, y + 27, MUTED, false);
 
         switch (page) {
             case PAGE_GENERAL -> renderGeneral(graphics, x, y);
@@ -660,8 +660,8 @@ public final class RegionSetupScreen extends Screen {
             case PAGE_REGIONS -> renderRegions(graphics, x, y);
             default -> { }
         }
-        if (!notice.isBlank()) graphics.text(font, trim(notice, 82), x + 16, y + H - 41, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) graphics.drawString(font, trim(notice, 82), x + 16, y + H - 41, noticeError ? ERROR : GOOD, false);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     private String headerStatus() {
@@ -671,114 +671,114 @@ public final class RegionSetupScreen extends Screen {
         return "Mode: SELECT · " + local + " · mark two corners with the Region Tool or choose Browse";
     }
 
-    private void renderGeneral(GuiGraphicsExtractor graphics, int x, int y) {
+    private void renderGeneral(GuiGraphics graphics, int x, int y) {
         if ("SELECT".equals(data.mode())) { renderUnavailable(graphics, x, y); return; }
-        graphics.text(font, "Region identity, messages, spawn and bounds. Save applies changed fields.", x + 22, y + 73, MUTED, false);
-        if ("CREATE".equals(data.mode())) graphics.text(font, "Unique region name", x + 22, y + 84, MUTED, false);
-        graphics.text(font, "Priority", x + 238, y + 84, MUTED, false);
-        graphics.text(font, "Welcome message", x + 22, y + 133, MUTED, false);
-        graphics.text(font, "Leave message", x + 22, y + 180, MUTED, false);
+        graphics.drawString(font, "Region identity, messages, spawn and bounds. Save applies changed fields.", x + 22, y + 73, MUTED, false);
+        if ("CREATE".equals(data.mode())) graphics.drawString(font, "Unique region name", x + 22, y + 84, MUTED, false);
+        graphics.drawString(font, "Priority", x + 238, y + 84, MUTED, false);
+        graphics.drawString(font, "Welcome message", x + 22, y + 133, MUTED, false);
+        graphics.drawString(font, "Leave message", x + 22, y + 180, MUTED, false);
         if ("EDIT".equals(data.mode())) {
-            graphics.text(font, "Select region bounds copies this region into the world-edit selection; redefine uses that selection.", x + 22, y + 294, MUTED, false);
-            graphics.text(font, "Bounds: " + compact(BlockPos.of(data.point1())) + " → " + compact(BlockPos.of(data.point2())), x + 22, y + 311, TEXT, false);
-            graphics.text(font, "Spawn: " + (data.hasSpawn() ? compact(BlockPos.of(data.spawnPos())) : "none"), x + 22, y + 327, MUTED, false);
+            graphics.drawString(font, "Select region bounds copies this region into the world-edit selection; redefine uses that selection.", x + 22, y + 294, MUTED, false);
+            graphics.drawString(font, "Bounds: " + compact(BlockPos.of(data.point1())) + " → " + compact(BlockPos.of(data.point2())), x + 22, y + 311, TEXT, false);
+            graphics.drawString(font, "Spawn: " + (data.hasSpawn() ? compact(BlockPos.of(data.spawnPos())) : "none"), x + 22, y + 327, MUTED, false);
         }
     }
 
-    private void renderProtection(GuiGraphicsExtractor graphics, int x, int y) {
+    private void renderProtection(GuiGraphics graphics, int x, int y) {
         if ("SELECT".equals(data.mode())) { renderUnavailable(graphics, x, y); return; }
-        graphics.text(font, "Default protection flags for players inside this region.", x + 22, y + 73, MUTED, false);
-        graphics.text(font, "Context permission overrides refine these rules per permission key.", x + 22, y + 279, MUTED, false);
+        graphics.drawString(font, "Default protection flags for players inside this region.", x + 22, y + 73, MUTED, false);
+        graphics.drawString(font, "Context permission overrides refine these rules per permission key.", x + 22, y + 279, MUTED, false);
     }
 
-    private void renderRent(GuiGraphicsExtractor graphics, int x, int y) {
+    private void renderRent(GuiGraphics graphics, int x, int y) {
         if ("SELECT".equals(data.mode())) { renderUnavailable(graphics, x, y); return; }
-        graphics.text(font, "Who may manage/use this region and how renting behaves.", x + 22, y + 73, MUTED, false);
+        graphics.drawString(font, "Who may manage/use this region and how renting behaves.", x + 22, y + 73, MUTED, false);
         if ("EDIT".equals(data.mode())) {
-            graphics.text(font, "Managers: " + data.managerCount() + " · Members: " + data.memberCount(), x + 22, y + 281, TEXT, false);
-            graphics.text(font, "Access changes currently resolve exact online player names.", x + 22, y + 297, MUTED, false);
+            graphics.drawString(font, "Managers: " + data.managerCount() + " · Members: " + data.memberCount(), x + 22, y + 281, TEXT, false);
+            graphics.drawString(font, "Access changes currently resolve exact online player names.", x + 22, y + 297, MUTED, false);
         }
     }
 
-    private void renderReset(GuiGraphicsExtractor graphics, int x, int y, int mouseX, int mouseY) {
+    private void renderReset(GuiGraphics graphics, int x, int y, int mouseX, int mouseY) {
         if ("SELECT".equals(data.mode())) { renderUnavailable(graphics, x, y); return; }
-        graphics.text(font, "Automatic/manual reset of this region. This reset snapshot is separate from portable Selection snapshots.", x + 20, y + 71, MUTED, false);
-        graphics.text(font, "Snapshot: " + (data.snapshotAvailable() ? "available" : "not captured") + " · Next: " + formatTime(data.nextResetAt()) + " · Last: " + formatTime(data.lastResetAt()), x + 20, y + 148, data.snapshotAvailable() ? GOOD : WARNING, false);
-        graphics.text(font, "Preset: " + trim(data.presetSummary(), 70), x + 20, y + 163, MUTED, false);
-        graphics.text(font, "New reset preset", x + 20, y + 173, TEXT, true);
+        graphics.drawString(font, "Automatic/manual reset of this region. This reset snapshot is separate from portable Selection snapshots.", x + 20, y + 71, MUTED, false);
+        graphics.drawString(font, "Snapshot: " + (data.snapshotAvailable() ? "available" : "not captured") + " · Next: " + formatTime(data.nextResetAt()) + " · Last: " + formatTime(data.lastResetAt()), x + 20, y + 148, data.snapshotAvailable() ? GOOD : WARNING, false);
+        graphics.drawString(font, "Preset: " + trim(data.presetSummary(), 70), x + 20, y + 163, MUTED, false);
+        graphics.drawString(font, "New reset preset", x + 20, y + 173, TEXT, true);
         renderMixGrid(graphics, resetMix, x + 20, y + 181);
-        graphics.text(font, "Inventory blocks / fluid buckets", x + 490, y + 173, TEXT, true);
+        graphics.drawString(font, "Inventory blocks / fluid buckets", x + 490, y + 173, TEXT, true);
         renderInventory(graphics, x + 500, y + 190, mouseX, mouseY);
         int total = resetMix.stream().mapToInt(entry -> entry.percentage).sum();
-        graphics.text(font, "Mix: " + total + "% · Air: " + Math.max(0, 100 - total) + "%", x + 222, y + 290, total <= 100 ? GOOD : ERROR, false);
+        graphics.drawString(font, "Mix: " + total + "% · Air: " + Math.max(0, 100 - total) + "%", x + 222, y + 290, total <= 100 ? GOOD : ERROR, false);
     }
 
-    private void renderSelection(GuiGraphicsExtractor graphics, int x, int y, int mouseX, int mouseY) {
-        graphics.text(font, "Point 1: " + (data.selectionHasPoint1() ? compact(BlockPos.of(data.selectionPoint1())) : "not set")
+    private void renderSelection(GuiGraphics graphics, int x, int y, int mouseX, int mouseY) {
+        graphics.drawString(font, "Point 1: " + (data.selectionHasPoint1() ? compact(BlockPos.of(data.selectionPoint1())) : "not set")
                 + "   Point 2: " + (data.selectionHasPoint2() ? compact(BlockPos.of(data.selectionPoint2())) : "not set")
                 + "   Dimension: " + shortDim(data.selectionDimension())
                 + "   Volume: " + (data.selectionHasPoint1() && data.selectionHasPoint2() ? data.selectionVolume() + " blocks" : "incomplete"),
                 x + 18, y + 99, data.selectionHasPoint1() && data.selectionHasPoint2() ? GOOD : WARNING, false);
-        graphics.text(font, "Select two corners in the world with the Region Tool. Then choose a build action below.", x + 18, y + 114, MUTED, false);
+        graphics.drawString(font, "Select two corners in the world with the Region Tool. Then choose a build action below.", x + 18, y + 114, MUTED, false);
         if (selectionSection == 0) {
-            graphics.text(font, "Selection actions", x + 18, y + 123, TEXT, true);
-            graphics.text(font, "Inventory block mix", x + 18, y + 200, TEXT, true);
+            graphics.drawString(font, "Selection actions", x + 18, y + 123, TEXT, true);
+            graphics.drawString(font, "Inventory block mix", x + 18, y + 200, TEXT, true);
             renderMixGrid(graphics, selectionMix, x + 18, y + 211);
-            graphics.text(font, "Inventory — click blocks to add", x + 492, y + 200, TEXT, true);
+            graphics.drawString(font, "Inventory — click blocks to add", x + 492, y + 200, TEXT, true);
             renderInventory(graphics, x + 500, y + 210, mouseX, mouseY);
             int total = selectionMix.stream().mapToInt(entry -> entry.percentage).sum();
-            graphics.text(font, "Mix: " + total + "% · Air: " + Math.max(0, 100 - total) + "%", x + 365, y + 320, total <= 100 ? GOOD : ERROR, false);
+            graphics.drawString(font, "Mix: " + total + "% · Air: " + Math.max(0, 100 - total) + "%", x + 365, y + 320, total <= 100 ? GOOD : ERROR, false);
         } else {
-            graphics.text(font, "Portable snapshots copy the selected build (blocks, inventories and structural entities) for preview/placement.",
+            graphics.drawString(font, "Portable snapshots copy the selected build (blocks, inventories and structural entities) for preview/placement.",
                     x + 18, y + 123, MUTED, false);
             String nameStatus = validSnapshotName(selectionSnapshotName)
                     ? "Snapshot name is valid."
                     : snapshotNameError(selectionSnapshotName);
-            graphics.text(font, nameStatus, x + 18, y + 164,
+            graphics.drawString(font, nameStatus, x + 18, y + 164,
                     validSnapshotName(selectionSnapshotName) ? GOOD : WARNING, false);
-            graphics.text(font, "Preview opens separate controls.",
+            graphics.drawString(font, "Preview opens separate controls.",
                     x + 438, y + 139, MUTED, false);
-            graphics.text(font, "No world change before Confirm.",
+            graphics.drawString(font, "No world change before Confirm.",
                     x + 438, y + 155, MUTED, false);
-            graphics.text(font, "Saved snapshots", x + 18, y + 186, TEXT, true);
+            graphics.drawString(font, "Saved snapshots", x + 18, y + 186, TEXT, true);
             int perPage = 5;
             int start = snapshotPage * perPage;
             for (int i = 0; i < perPage && start + i < data.selectionSnapshots().size(); i++) {
                 String name = data.selectionSnapshots().get(start + i);
                 int ry = y + 205 + i * 27;
                 graphics.fill(x + 18, ry, x + 242, ry + 20, SUB);
-                graphics.outline(x + 18, ry, 224, 20, BORDER);
-                graphics.text(font, trim(name, 28), x + 26, ry + 6, TEXT, false);
+                graphics.renderOutline(x + 18, ry, 224, 20, BORDER);
+                graphics.drawString(font, trim(name, 28), x + 26, ry + 6, TEXT, false);
             }
-            graphics.text(font, "Snapshot page " + (snapshotPage + 1) + " · " + data.selectionSnapshots().size() + " saved",
+            graphics.drawString(font, "Snapshot page " + (snapshotPage + 1) + " · " + data.selectionSnapshots().size() + " saved",
                     x + 92, y + 346, MUTED, false);
         }
     }
 
-    private void renderRegions(GuiGraphicsExtractor graphics, int x, int y) {
-        graphics.text(font, data.localRegionName().isBlank() ? "You are not standing in a region." : "Detected here: " + data.localRegionName(), x + 18, y + 74, data.localRegionName().isBlank() ? MUTED : GOOD, false);
-        graphics.text(font, "Edit opens a region remotely; Teleport moves you there. HERE marks the region under your feet.", x + 18, y + 91, MUTED, false);
+    private void renderRegions(GuiGraphics graphics, int x, int y) {
+        graphics.drawString(font, data.localRegionName().isBlank() ? "You are not standing in a region." : "Detected here: " + data.localRegionName(), x + 18, y + 74, data.localRegionName().isBlank() ? MUTED : GOOD, false);
+        graphics.drawString(font, "Edit opens a region remotely; Teleport moves you there. HERE marks the region under your feet.", x + 18, y + 91, MUTED, false);
         int perPage = 6;
         int start = regionPage * perPage;
         for (int i = 0; i < perPage && start + i < data.regions().size(); i++) {
             RegionSetupOpenPayload.RegionEntry entry = data.regions().get(start + i);
             int ry = y + 111 + i * 34;
             graphics.fill(x + 18, ry, x + 518, ry + 20, SUB);
-            graphics.outline(x + 18, ry, 500, 20, BORDER);
+            graphics.renderOutline(x + 18, ry, 500, 20, BORDER);
             String localMark = entry.name().equals(data.localRegionName()) ? " · HERE" : "";
-            graphics.text(font, trim(entry.name(), 28) + localMark, x + 26, ry + 6, entry.name().equals(data.localRegionName()) ? GOOD : TEXT, false);
-            graphics.text(font, shortDim(entry.dimension()) + " · " + entry.volume() + " blocks · priority " + entry.priority()
+            graphics.drawString(font, trim(entry.name(), 28) + localMark, x + 26, ry + 6, entry.name().equals(data.localRegionName()) ? GOOD : TEXT, false);
+            graphics.drawString(font, shortDim(entry.dimension()) + " · " + entry.volume() + " blocks · priority " + entry.priority()
                     + (entry.hasSpawn() ? " · spawn" : ""), x + 232, ry + 6, MUTED, false);
         }
         int pages = Math.max(1, (data.regions().size() + perPage - 1) / perPage);
-        graphics.text(font, "Page " + (regionPage + 1) + "/" + pages + " · " + data.regions().size() + " region(s)", x + 198, y + 333, MUTED, false);
+        graphics.drawString(font, "Page " + (regionPage + 1) + "/" + pages + " · " + data.regions().size() + " region(s)", x + 198, y + 333, MUTED, false);
     }
 
-    private void renderUnavailable(GuiGraphicsExtractor graphics, int x, int y) {
-        graphics.text(font, "Choose a region in Browse, or use Selection to create one from two selected corners.", x + 22, y + 92, WARNING, false);
+    private void renderUnavailable(GuiGraphics graphics, int x, int y) {
+        graphics.drawString(font, "Choose a region in Browse, or use Selection to create one from two selected corners.", x + 22, y + 92, WARNING, false);
     }
 
-    private void renderMixGrid(GuiGraphicsExtractor graphics, List<MixEntry> target, int startX, int startY) {
+    private void renderMixGrid(GuiGraphics graphics, List<MixEntry> target, int startX, int startY) {
         for (int i = 0; i < target.size(); i++) {
             MixEntry entry = target.get(i);
             int column = i / 3;
@@ -787,16 +787,16 @@ public final class RegionSetupScreen extends Screen {
             int y = startY + row * 31;
             ItemStack stack = inventoryItem(entry.slot);
             graphics.fill(x, y, x + 139, y + 20, SUB);
-            graphics.outline(x, y, 139, 20, BORDER);
+            graphics.renderOutline(x, y, 139, 20, BORDER);
             if (!stack.isEmpty()) {
-                graphics.item(stack, x + 2, y + 2);
-                graphics.itemDecorations(font, stack, x + 2, y + 2);
-                graphics.text(font, trim(stack.getHoverName().getString(), 14), x + 22, y + 6, TEXT, false);
+                graphics.renderItem(stack, x + 2, y + 2);
+                graphics.renderItemDecorations(font, stack, x + 2, y + 2);
+                graphics.drawString(font, trim(stack.getHoverName().getString(), 14), x + 22, y + 6, TEXT, false);
             }
         }
     }
 
-    private void renderInventory(GuiGraphicsExtractor graphics, int startX, int startY, int mouseX, int mouseY) {
+    private void renderInventory(GuiGraphics graphics, int startX, int startY, int mouseX, int mouseY) {
         for (int row = 0; row < 3; row++) for (int column = 0; column < 9; column++) {
             drawSlot(graphics, 9 + row * 9 + column, startX + column * 18, startY + row * 18, mouseX, mouseY);
         }
@@ -804,15 +804,15 @@ public final class RegionSetupScreen extends Screen {
         for (int column = 0; column < 9; column++) drawSlot(graphics, column, startX + column * 18, hotbarY, mouseX, mouseY);
     }
 
-    private void drawSlot(GuiGraphicsExtractor graphics, int slot, int x, int y, int mouseX, int mouseY) {
+    private void drawSlot(GuiGraphics graphics, int slot, int x, int y, int mouseX, int mouseY) {
         boolean hovered = inside(mouseX, mouseY, x, y, 18, 18);
         graphics.fill(x, y, x + 18, y + 18, hovered ? 0xD0344C40 : 0xD00B1015);
-        graphics.outline(x, y, 18, 18, hovered ? GOOD : BORDER);
+        graphics.renderOutline(x, y, 18, 18, hovered ? GOOD : BORDER);
         ItemStack stack = inventoryItem(slot);
         if (!stack.isEmpty()) {
-            graphics.item(stack, x + 1, y + 1);
-            graphics.itemDecorations(font, stack, x + 1, y + 1);
-            if (hovered) graphics.setTooltipForNextFrame(font, stack, mouseX, mouseY);
+            graphics.renderItem(stack, x + 1, y + 1);
+            graphics.renderItemDecorations(font, stack, x + 1, y + 1);
+            if (hovered) graphics.renderTooltip(font, stack, mouseX, mouseY);
         }
     }
 
@@ -841,7 +841,7 @@ public final class RegionSetupScreen extends Screen {
     @Override
     public void onClose() {
         if (data.previewActive()) {
-            ClientPacketDistributor.sendToServer(new RegionSetupActionPayload("preview_close", data.regionName(), "", nextRequestId++));
+            PacketDistributor.sendToServer(new RegionSetupActionPayload("preview_close", data.regionName(), "", nextRequestId++));
         }
         super.onClose();
     }

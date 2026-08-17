@@ -77,7 +77,7 @@ import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -92,7 +92,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
@@ -112,7 +112,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.scores.Scoreboard;
-import net.minecraft.world.scores.TeamColor;
+import net.minecraft.ChatFormatting;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
@@ -592,52 +592,52 @@ public final class MinigameManager {
             throw new IllegalArgumentException("Minigame exceeds the serialized size limit.");
         }
         if (gameType == MinigameGameType.SPLEEF) {
-            Identifier toolId = Identifier.parse(definition.spleef.toolItem);
+            ResourceLocation toolId = ResourceLocation.parse(definition.spleef.toolItem);
             if (BuiltInRegistries.ITEM.getOptional(toolId).isEmpty()) {
                 throw new IllegalArgumentException("Unknown Spleef tool item: " + definition.spleef.toolItem);
             }
             for (String blockId : definition.spleef.breakableBlocks) {
-                Identifier parsed = Identifier.parse(blockId);
+                ResourceLocation parsed = ResourceLocation.parse(blockId);
                 if (BuiltInRegistries.BLOCK.getOptional(parsed).isEmpty()) {
                     throw new IllegalArgumentException("Unknown Spleef breakable block: " + blockId);
                 }
             }
         }
         if (gameType == MinigameGameType.CAPTURE_THE_FLAG) {
-            Identifier weapon = Identifier.parse(definition.captureTheFlag.weaponItem);
+            ResourceLocation weapon = ResourceLocation.parse(definition.captureTheFlag.weaponItem);
             if (BuiltInRegistries.ITEM.getOptional(weapon).isEmpty()) {
                 throw new IllegalArgumentException("Unknown Capture the Flag weapon item: " + definition.captureTheFlag.weaponItem);
             }
             for (int team = 1; team <= 2; team++) {
                 String blockId = definition.captureTheFlag.flagBlock(team);
-                Identifier parsed = Identifier.parse(blockId);
+                ResourceLocation parsed = ResourceLocation.parse(blockId);
                 if (BuiltInRegistries.BLOCK.getOptional(parsed).isEmpty() || !blockId.endsWith("_banner")) {
                     throw new IllegalArgumentException("Capture the Flag team " + team + " needs a standing banner block ID.");
                 }
             }
         }
         if (gameType == MinigameGameType.DOMINATION) {
-            Identifier weapon = Identifier.parse(definition.domination.weaponItem);
+            ResourceLocation weapon = ResourceLocation.parse(definition.domination.weaponItem);
             if (BuiltInRegistries.ITEM.getOptional(weapon).isEmpty()) {
                 throw new IllegalArgumentException("Unknown Domination weapon item: " + definition.domination.weaponItem);
             }
             for (String blockId : List.of(definition.domination.neutralBannerBlock,
                     definition.domination.team1BannerBlock, definition.domination.team2BannerBlock)) {
-                Identifier parsed = Identifier.parse(blockId);
+                ResourceLocation parsed = ResourceLocation.parse(blockId);
                 if (BuiltInRegistries.BLOCK.getOptional(parsed).isEmpty() || !blockId.endsWith("_banner")) {
                     throw new IllegalArgumentException("Domination node markers must use standing banner block IDs.");
                 }
             }
         }
         if (gameType == MinigameGameType.KING_OF_THE_HILL) {
-            Identifier weapon = Identifier.parse(definition.kingOfTheHill.weaponItem);
+            ResourceLocation weapon = ResourceLocation.parse(definition.kingOfTheHill.weaponItem);
             if (BuiltInRegistries.ITEM.getOptional(weapon).isEmpty()) {
                 throw new IllegalArgumentException("Unknown King of the Hill weapon item: " + definition.kingOfTheHill.weaponItem);
             }
         }
         if (gameType == MinigameGameType.BLOCK_PARTY) {
             for (String blockId : definition.blockParty.paletteBlocks) {
-                Identifier parsed = Identifier.parse(blockId);
+                ResourceLocation parsed = ResourceLocation.parse(blockId);
                 if (BuiltInRegistries.BLOCK.getOptional(parsed).isEmpty()) {
                     throw new IllegalArgumentException("Unknown Block Party palette block: " + blockId);
                 }
@@ -655,7 +655,7 @@ public final class MinigameManager {
                 throw new IllegalArgumentException("Role maxima cannot hold the configured maximum team size of "
                         + largestTeamAtMaximum + ".");
             }
-            Identifier effectId = Identifier.parse(roleRules.dpsArrowEffect);
+            ResourceLocation effectId = ResourceLocation.parse(roleRules.dpsArrowEffect);
             if (BuiltInRegistries.MOB_EFFECT.getOptional(effectId).isEmpty()) {
                 throw new IllegalArgumentException("Unknown DPS arrow effect: " + roleRules.dpsArrowEffect);
             }
@@ -671,13 +671,13 @@ public final class MinigameManager {
             validateLocation(arena.lobby, "Arena lobby");
             validateLocation(arena.spectator, "Arena spectator spawn");
             if (arena.spectatorBounds != null && arena.spectatorBounds.configured()) {
-                try { Identifier.parse(arena.spectatorBounds.dimension); }
+                try { ResourceLocation.parse(arena.spectatorBounds.dimension); }
                 catch (RuntimeException exception) { throw new IllegalArgumentException("Arena spectator bounds use an invalid dimension."); }
             }
             if (arena.playFloor != null && arena.playFloor.configured()) {
                 if (gameType != MinigameGameType.SPLEEF && gameType != MinigameGameType.BLOCK_PARTY)
                     throw new IllegalArgumentException("Only Spleef and Block Party arenas may define a playfloor.");
-                try { Identifier.parse(arena.playFloor.dimension); }
+                try { ResourceLocation.parse(arena.playFloor.dimension); }
                 catch (RuntimeException exception) { throw new IllegalArgumentException("The playfloor uses an invalid dimension."); }
                 if (gameType == MinigameGameType.BLOCK_PARTY && arena.playFloor.volume() > 32_768L) {
                     throw new IllegalArgumentException("Block Party playfloor is too large; maximum volume is 32768 blocks.");
@@ -838,7 +838,7 @@ public final class MinigameManager {
                     }
                 }
                 if (gameType == MinigameGameType.SPLEEF) {
-                    String regionDimension = region.getDimension().identifier().toString();
+                    String regionDimension = region.getDimension().location().toString();
                     if (!locationNearRegion(arena.spectator, region, 24.0D, 32.0D)) {
                         throw new IllegalArgumentException("The spectator point for arena '" + arena.id
                                 + "' must stay close to the arena region.");
@@ -855,7 +855,7 @@ public final class MinigameManager {
                     }
                 }
                 if (gameType == MinigameGameType.CAPTURE_THE_FLAG) {
-                    String regionDimension = region.getDimension().identifier().toString();
+                    String regionDimension = region.getDimension().location().toString();
                     if (!locationNearRegion(arena.spectator, region, 24.0D, 32.0D)) {
                         throw new IllegalArgumentException("The spectator point for arena '" + arena.id
                                 + "' must stay close to the arena region.");
@@ -874,7 +874,7 @@ public final class MinigameManager {
                     }
                 }
                 if (gameType == MinigameGameType.DOMINATION) {
-                    String regionDimension = region.getDimension().identifier().toString();
+                    String regionDimension = region.getDimension().location().toString();
                     if (!locationNearRegion(arena.spectator, region, 24.0D, 32.0D)) {
                         throw new IllegalArgumentException("The spectator point for arena '" + arena.id
                                 + "' must stay close to the arena region.");
@@ -955,7 +955,7 @@ public final class MinigameManager {
                     String rawItem = action.parameter("item");
                     ItemStack template;
                     try {
-                        template = BuiltInRegistries.ITEM.getOptional(Identifier.parse(rawItem))
+                        template = BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(rawItem))
                                 .map(item -> new ItemStack(item)).orElse(ItemStack.EMPTY);
                     } catch (RuntimeException exception) {
                         throw new IllegalArgumentException(label + " contains an invalid legacy item: " + rawItem);
@@ -987,7 +987,7 @@ public final class MinigameManager {
     private static void validateLocation(MinigameLocation location, String label) {
         if (location == null) throw new IllegalArgumentException(label + " is missing.");
         location.normalize();
-        try { Identifier.parse(location.dimension); }
+        try { ResourceLocation.parse(location.dimension); }
         catch (RuntimeException exception) { throw new IllegalArgumentException(label + " has an invalid dimension: " + location.dimension); }
     }
 
@@ -2142,7 +2142,7 @@ public final class MinigameManager {
     private void showPreparationCountdown(MinigameMatch match, long seconds) {
         if (match == null || seconds < 1L || seconds > 10L) return;
         SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(
-                Identifier.parse("minecraft:block.note_block.hat")).orElse(null);
+                ResourceLocation.parse("minecraft:block.note_block.hat")).orElse(null);
         for (UUID playerId : match.teams.keySet()) {
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
             if (player == null) continue;
@@ -2162,7 +2162,7 @@ public final class MinigameManager {
     private void showMatchStart(MinigameMatch match, MinigameDefinition definition) {
         if (match == null) return;
         SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(
-                Identifier.parse("minecraft:entity.player.levelup")).orElse(null);
+                ResourceLocation.parse("minecraft:entity.player.levelup")).orElse(null);
         for (UUID playerId : match.teams.keySet()) {
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
             if (player == null) continue;
@@ -2221,7 +2221,7 @@ public final class MinigameManager {
     }
 
     private boolean isInsideKingOfTheHill(ServerPlayer player, MinigameLocation hill, double radius) {
-        if (player == null || hill == null || !player.level().dimension().identifier().toString().equals(hill.dimension)) return false;
+        if (player == null || hill == null || !player.level().dimension().location().toString().equals(hill.dimension)) return false;
         double dx = player.getX() - hill.x, dz = player.getZ() - hill.z;
         double dy = player.getY() - hill.y;
         return dx * dx + dz * dz <= radius * radius && dy >= -1.5D && dy <= Math.max(3.0D, radius);
@@ -2331,7 +2331,7 @@ public final class MinigameManager {
         match.blockPartySafeBlock = rules.paletteBlocks.get(paletteIndex);
         List<Block> palette = new ArrayList<>();
         for (String id : rules.paletteBlocks) {
-            Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(id)).orElse(null);
+            Block block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(id)).orElse(null);
             if (block == null) return false;
             palette.add(block);
         }
@@ -2392,7 +2392,7 @@ public final class MinigameManager {
             for (UUID playerId : match.teams.keySet()) {
                 if (!match.active(playerId)) continue;
                 ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-                if (player == null || !player.level().dimension().identifier().toString().equals(arena.playFloor.dimension)) {
+                if (player == null || !player.level().dimension().location().toString().equals(arena.playFloor.dimension)) {
                     wrong.add(playerId);
                     continue;
                 }
@@ -2401,7 +2401,7 @@ public final class MinigameManager {
                     wrong.add(playerId);
                     continue;
                 }
-                Identifier standing = BuiltInRegistries.BLOCK.getKey(level.getBlockState(below).getBlock());
+                ResourceLocation standing = BuiltInRegistries.BLOCK.getKey(level.getBlockState(below).getBlock());
                 if (!match.blockPartySafeBlock.equals(standing.toString())) wrong.add(playerId);
             }
             for (UUID playerId : wrong) eliminate(playerId, "Wrong block! You were eliminated.");
@@ -2409,7 +2409,7 @@ public final class MinigameManager {
                 for (int x = arena.playFloor.minX; x <= arena.playFloor.maxX; x++) {
                     for (int z = arena.playFloor.minZ; z <= arena.playFloor.maxZ; z++) {
                         BlockPos pos = new BlockPos(x, y, z);
-                        Identifier id = BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock());
+                        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock());
                         if (!match.blockPartySafeBlock.equals(id.toString())) {
                             level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
                         }
@@ -2421,7 +2421,7 @@ public final class MinigameManager {
             for (UUID playerId : match.teams.keySet()) if (match.active(playerId)) {
                 match.scores.merge(playerId, 1L, MinigameManager::safeAdd);
             }
-            Block remainingBlock = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(match.blockPartySafeBlock))
+            Block remainingBlock = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(match.blockPartySafeBlock))
                     .orElse(Blocks.AIR);
             announce(match, "Only " + Component.translatable(remainingBlock.getDescriptionId()).getString() + " remains!");
         } else if ("drop".equals(match.blockPartyPhase)) {
@@ -2463,7 +2463,7 @@ public final class MinigameManager {
             double dy = player.getY() - cast.startY();
             double dz = player.getZ() - cast.startZ();
             boolean moved = dx * dx + dy * dy + dz * dz > 0.01D;
-            boolean wrongDimension = !point.location.dimension.equals(player.level().dimension().identifier().toString());
+            boolean wrongDimension = !point.location.dimension.equals(player.level().dimension().location().toString());
             boolean tooFar = player.distanceToSqr(point.location.x, point.location.y, point.location.z) > 16.0D;
             if (moved || wrongDimension || tooFar) {
                 interruptDominationCast(match, playerId, moved ? "Capture interrupted because you moved."
@@ -2536,7 +2536,7 @@ public final class MinigameManager {
             double dy = player.getY() - cast.startY();
             double dz = player.getZ() - cast.startZ();
             boolean moved = dx * dx + dy * dy + dz * dz > 0.01D;
-            boolean wrongDimension = !point.location.dimension.equals(player.level().dimension().identifier().toString());
+            boolean wrongDimension = !point.location.dimension.equals(player.level().dimension().location().toString());
             boolean tooFar = player.distanceToSqr(point.location.x, point.location.y, point.location.z) > 16.0D;
             if (moved || wrongDimension || tooFar) {
                 interruptCtfCast(match, playerId, moved ? "Flag capture interrupted because you moved."
@@ -3677,7 +3677,7 @@ public final class MinigameManager {
                 winner.getUUID(), winner.getName().getString());
         if ("spark".equals(progress.selectedVictoryEffect)
                 && progress.unlockedCosmetics.contains("victory:spark")) {
-            level.sendParticles(new DustParticleOptions(color & 0x00FFFFFF, 1.5F),
+            level.sendParticles(new DustParticleOptions(Vec3.fromRGB24(color & 0x00FFFFFF).toVector3f(), 1.5F),
                     winner.getX(), winner.getY() + 1.0D, winner.getZ(),
                     42, 0.65D, 0.9D, 0.65D, 0.06D);
         } else if ("star".equals(progress.selectedVictoryEffect)
@@ -3859,7 +3859,7 @@ public final class MinigameManager {
         int count = (int) Math.min(64_000L, positiveLong(action.parameter("count"), "count"));
         ItemStack template;
         try {
-            template = BuiltInRegistries.ITEM.getOptional(Identifier.parse(rawItem))
+            template = BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(rawItem))
                     .map(item -> new ItemStack(item)).orElse(ItemStack.EMPTY);
         } catch (RuntimeException exception) {
             throw new IllegalArgumentException("Invalid legacy minigame reward item: " + rawItem);
@@ -4265,7 +4265,7 @@ public final class MinigameManager {
     }
 
     private static void giveRegistryItem(ServerPlayer player, String itemId) {
-        ItemStack tool = BuiltInRegistries.ITEM.getOptional(Identifier.parse(itemId))
+        ItemStack tool = BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(itemId))
                 .map(item -> new ItemStack(item)).orElse(ItemStack.EMPTY);
         if (!tool.isEmpty()) player.getInventory().add(tool);
     }
@@ -4340,7 +4340,7 @@ public final class MinigameManager {
 
     private static ItemStack cosmeticLeather(net.minecraft.world.item.Item item, int color, String name) {
         ItemStack stack = namedMatchItem(item, 1, name);
-        stack.set(DataComponents.DYED_COLOR, new DyedItemColor(color & 0x00FFFFFF));
+        stack.set(DataComponents.DYED_COLOR, new DyedItemColor(color & 0x00FFFFFF, false));
         stack.set(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY);
         stack.remove(DataComponents.MAX_DAMAGE);
         stack.remove(DataComponents.DAMAGE);
@@ -4369,7 +4369,7 @@ public final class MinigameManager {
             case DOMINATION -> definition.domination.bannerBlock(team);
             default -> "minecraft:white_banner";
         };
-        Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(blockId)).orElse(null);
+        Block block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(blockId)).orElse(null);
         return block instanceof AbstractBannerBlock banner ? banner.getColor() : DyeColor.WHITE;
     }
 
@@ -4484,7 +4484,7 @@ public final class MinigameManager {
 
     private static boolean areaInsideRegion(MinigameAreaBounds bounds, Region region, int margin) {
         if (bounds == null || !bounds.configured() || region == null) return true;
-        return bounds.dimension.equals(region.getDimension().identifier().toString())
+        return bounds.dimension.equals(region.getDimension().location().toString())
                 && bounds.minX >= region.getMinX() - margin && bounds.maxX <= region.getMaxX() + margin
                 && bounds.minY >= region.getMinY() - margin && bounds.maxY <= region.getMaxY() + margin
                 && bounds.minZ >= region.getMinZ() - margin && bounds.maxZ <= region.getMaxZ() + margin;
@@ -4493,7 +4493,7 @@ public final class MinigameManager {
     private static boolean locationNearRegion(MinigameLocation location, Region region,
                                               double horizontalMargin, double verticalMargin) {
         if (location == null || region == null) return false;
-        if (!region.getDimension().identifier().toString().equals(location.dimension)) return false;
+        if (!region.getDimension().location().toString().equals(location.dimension)) return false;
         return location.x >= region.getMinX() - horizontalMargin
                 && location.x < region.getMaxX() + 1.0D + horizontalMargin
                 && location.z >= region.getMinZ() - horizontalMargin
@@ -4504,7 +4504,7 @@ public final class MinigameManager {
 
     private static boolean locationInsideRegion(MinigameLocation location, Region region, double verticalMargin) {
         if (location == null || region == null) return false;
-        if (!region.getDimension().identifier().toString().equals(location.dimension)) return false;
+        if (!region.getDimension().location().toString().equals(location.dimension)) return false;
         return location.x >= region.getMinX() && location.x < region.getMaxX() + 1.0D
                 && location.z >= region.getMinZ() && location.z < region.getMaxZ() + 1.0D
                 && location.y >= region.getMinY() - verticalMargin
@@ -4598,7 +4598,7 @@ public final class MinigameManager {
 
     private static Block dominationBannerBlock(MinigameDefinition definition, int owner) {
         String blockId = definition.domination.bannerBlock(owner);
-        return BuiltInRegistries.BLOCK.getOptional(Identifier.parse(blockId)).orElse(null);
+        return BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(blockId)).orElse(null);
     }
 
     private void tickObjectiveTime(MinigameMatch match, MinigameDefinition definition,
@@ -4738,7 +4738,7 @@ public final class MinigameManager {
         if (point == null) return false;
         ServerLevel level = resolveLevel(point.location.dimension);
         if (level == null) return false;
-        Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(definition.captureTheFlag.flagBlock(team)))
+        Block block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(definition.captureTheFlag.flagBlock(team)))
                 .orElse(null);
         if (block == null) return false;
         level.setBlockAndUpdate(blockPos(point.location), block.defaultBlockState());
@@ -4780,7 +4780,7 @@ public final class MinigameManager {
         synchronized (this) {
             for (Map.Entry<Integer, MinigameLocation> entry : match.ctfDroppedFlags.entrySet()) {
                 MinigameLocation location = entry.getValue();
-                if (location != null && location.dimension.equals(player.level().dimension().identifier().toString())
+                if (location != null && location.dimension.equals(player.level().dimension().location().toString())
                         && blockPos(location).equals(pos)) {
                     droppedFlagTeam = entry.getKey();
                     break;
@@ -4793,7 +4793,7 @@ public final class MinigameManager {
         int flagTeam = 0;
         for (int team = 1; team <= 2; team++) {
             MinigameFlagPoint point = arena.flagForTeam(team);
-            if (point != null && point.location.dimension.equals(player.level().dimension().identifier().toString())
+            if (point != null && point.location.dimension.equals(player.level().dimension().location().toString())
                     && blockPos(point.location).equals(pos)) {
                 flagTeam = team;
                 break;
@@ -4884,7 +4884,7 @@ public final class MinigameManager {
                                                 MinigameDefinition definition, MinigameArenaDefinition arena) {
         MinigameControlPoint clicked = null;
         for (MinigameControlPoint point : arena.controlPoints) {
-            if (point.location.dimension.equals(player.level().dimension().identifier().toString())
+            if (point.location.dimension.equals(player.level().dimension().location().toString())
                     && blockPos(point.location).equals(pos)) {
                 clicked = point;
                 break;
@@ -4980,7 +4980,7 @@ public final class MinigameManager {
             boolean ownFlagAtBase = !match.flagCarriers.containsKey(carrierTeam)
                     && !match.ctfDroppedFlags.containsKey(carrierTeam);
             if (ownBase == null || !ownFlagAtBase || !ownBase.location.dimension.equals(
-                    carrier.level().dimension().identifier().toString())) continue;
+                    carrier.level().dimension().location().toString())) continue;
             double radius = definition.captureTheFlag.captureRadius;
             double dx = carrier.getX() - ownBase.location.x;
             double dy = carrier.getY() - ownBase.location.y;
@@ -5048,7 +5048,7 @@ public final class MinigameManager {
         ServerLevel level = resolveLevel(requestedLocation.dimension);
         if (level == null) return null;
         Block block = BuiltInRegistries.BLOCK.getOptional(
-                Identifier.parse(definition.captureTheFlag.flagBlock(flagTeam))).orElse(null);
+                ResourceLocation.parse(definition.captureTheFlag.flagBlock(flagTeam))).orElse(null);
         if (block == null) return null;
         BlockPos origin = blockPos(requestedLocation);
         BlockPos selected = null;
@@ -5074,7 +5074,7 @@ public final class MinigameManager {
         ServerLevel level = resolveLevel(location.dimension);
         if (level == null) return;
         Block expected = BuiltInRegistries.BLOCK.getOptional(
-                Identifier.parse(definition.captureTheFlag.flagBlock(flagTeam))).orElse(null);
+                ResourceLocation.parse(definition.captureTheFlag.flagBlock(flagTeam))).orElse(null);
         BlockPos pos = blockPos(location);
         if (expected != null && level.getBlockState(pos).getBlock() == expected) {
             level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
@@ -5265,9 +5265,9 @@ public final class MinigameManager {
 
     private void playCtfHorns(MinigameMatch match, int carrierTeam) {
         SoundEvent sing = BuiltInRegistries.SOUND_EVENT.getOptional(
-                Identifier.parse("minecraft:item.goat_horn.sound.1")).orElse(null);
+                ResourceLocation.parse("minecraft:item.goat_horn.sound.1")).orElse(null);
         SoundEvent seek = BuiltInRegistries.SOUND_EVENT.getOptional(
-                Identifier.parse("minecraft:item.goat_horn.sound.2")).orElse(null);
+                ResourceLocation.parse("minecraft:item.goat_horn.sound.2")).orElse(null);
         if (sing == null || seek == null) return;
         for (Map.Entry<UUID, Integer> entry : match.teams.entrySet()) {
             ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
@@ -5329,7 +5329,7 @@ public final class MinigameManager {
         if (match == null || definition == null || carrier == null) return;
         removeCtfCarrierVisual(match, carrier.getUUID());
         Block banner = BuiltInRegistries.BLOCK.getOptional(
-                Identifier.parse(definition.captureTheFlag.flagBlock(flagTeam))).orElse(null);
+                ResourceLocation.parse(definition.captureTheFlag.flagBlock(flagTeam))).orElse(null);
         if (banner == null || banner.asItem() == Items.AIR) return;
 
         // Vanilla pillager captains render their ominous banner by equipping the
@@ -5357,7 +5357,7 @@ public final class MinigameManager {
                 if (carrierId.equals(entry.getValue())) { flagTeam = entry.getKey(); break; }
             }
             Block banner = BuiltInRegistries.BLOCK.getOptional(
-                    Identifier.parse(definition.captureTheFlag.flagBlock(flagTeam))).orElse(null);
+                    ResourceLocation.parse(definition.captureTheFlag.flagBlock(flagTeam))).orElse(null);
             if (banner == null || banner.asItem() == Items.AIR) continue;
             if (!match.ctfPreviousHeadItems.containsKey(carrierId)) {
                 attachCtfCarrierVisual(match, definition, carrier, flagTeam);
@@ -5411,20 +5411,22 @@ public final class MinigameManager {
         match.ctfGlowTeams.put(playerId, teamName);
         PlayerTeam glowTeam = scoreboard.getPlayerTeam(teamName);
         if (glowTeam == null) glowTeam = scoreboard.addPlayerTeam(teamName);
-        TeamColor fallback = flagTeam == 1 ? TeamColor.RED : TeamColor.BLUE;
-        glowTeam.setColor(Optional.of(nearestTeamColor(rgb, fallback)));
+        ChatFormatting fallback = flagTeam == 1 ? ChatFormatting.RED : ChatFormatting.BLUE;
+        glowTeam.setColor(nearestTeamColor(rgb, fallback));
         scoreboard.addPlayerToTeam(playerName, glowTeam);
         player.setGlowingTag(true);
     }
 
-    private static TeamColor nearestTeamColor(int rgb, TeamColor fallback) {
-        TeamColor nearest = fallback;
+    private static ChatFormatting nearestTeamColor(int rgb, ChatFormatting fallback) {
+        ChatFormatting nearest = fallback;
         long nearestDistance = Long.MAX_VALUE;
         int targetR = rgb >> 16 & 0xFF;
         int targetG = rgb >> 8 & 0xFF;
         int targetB = rgb & 0xFF;
-        for (TeamColor teamColor : TeamColor.values()) {
-            int color = teamColor.rgb();
+        for (ChatFormatting teamColor : ChatFormatting.values()) {
+            Integer colorValue = teamColor.getColor();
+            if (colorValue == null) continue;
+            int color = colorValue;
             int r = color >> 16 & 0xFF;
             int g = color >> 8 & 0xFF;
             int b = color & 0xFF;
@@ -5461,9 +5463,9 @@ public final class MinigameManager {
 
     private void playDominationHorns(MinigameMatch match, MinigameDefinition definition, int claimingTeam) {
         SoundEvent sing = BuiltInRegistries.SOUND_EVENT.getOptional(
-                Identifier.parse("minecraft:item.goat_horn.sound.1")).orElse(null);
+                ResourceLocation.parse("minecraft:item.goat_horn.sound.1")).orElse(null);
         SoundEvent seek = BuiltInRegistries.SOUND_EVENT.getOptional(
-                Identifier.parse("minecraft:item.goat_horn.sound.2")).orElse(null);
+                ResourceLocation.parse("minecraft:item.goat_horn.sound.2")).orElse(null);
         if (sing == null || seek == null) return;
         for (Map.Entry<UUID, Integer> entry : match.teams.entrySet()) {
             ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
@@ -5486,9 +5488,9 @@ public final class MinigameManager {
     private void playObjectiveCaptureResultSounds(MinigameMatch match, int capturingTeam) {
         if (match == null || capturingTeam <= 0) return;
         SoundEvent ponder = BuiltInRegistries.SOUND_EVENT.getOptional(
-                Identifier.parse("minecraft:item.goat_horn.sound.0")).orElse(null);
+                ResourceLocation.parse("minecraft:item.goat_horn.sound.0")).orElse(null);
         SoundEvent lost = BuiltInRegistries.SOUND_EVENT.getOptional(
-                Identifier.parse("minecraft:block.beacon.deactivate")).orElse(null);
+                ResourceLocation.parse("minecraft:block.beacon.deactivate")).orElse(null);
         if (ponder == null && lost == null) return;
         for (Map.Entry<UUID, Integer> entry : match.teams.entrySet()) {
             ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
@@ -5806,7 +5808,7 @@ public final class MinigameManager {
             if (!level.getBlockState(feet).getFluidState().isEmpty()
                     || !level.getBlockState(feet.above()).getFluidState().isEmpty()
                     || !ground.isFaceSturdy(level, feet.below(), Direction.UP)) continue;
-            return new MinigameLocation(region.getDimension().identifier().toString(),
+            return new MinigameLocation(region.getDimension().location().toString(),
                     x + 0.5D, y + 0.15D, z + 0.5D, 0.0F, 0.0F);
         }
         return null;
@@ -5882,7 +5884,7 @@ public final class MinigameManager {
     }
 
     private void spawnBoostVisual(ServerLevel level, MinigameMatch.ActiveBoost boost) {
-        ItemStack icon = BuiltInRegistries.ITEM.getOptional(Identifier.parse(boost.type.itemId()))
+        ItemStack icon = BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(boost.type.itemId()))
                 .map(ItemStack::new).orElse(ItemStack.EMPTY);
         if (icon.isEmpty()) return;
         icon.set(DataComponents.CUSTOM_NAME, Component.literal(boost.type.label() + " Boost"));
@@ -5898,7 +5900,7 @@ public final class MinigameManager {
     }
 
     private static void emitBoostMist(ServerLevel level, MinigameMatch.ActiveBoost boost, int color) {
-        DustParticleOptions dust = new DustParticleOptions(color & 0x00FFFFFF, 1.15F);
+        DustParticleOptions dust = new DustParticleOptions(Vec3.fromRGB24(color & 0x00FFFFFF).toVector3f(), 1.15F);
         level.sendParticles(dust, boost.location.x, boost.location.y + 0.55D, boost.location.z,
                 5, 0.36D, 0.22D, 0.36D, 0.0D);
     }
@@ -5909,7 +5911,7 @@ public final class MinigameManager {
         for (UUID playerId : match.teams.keySet()) {
             if (!match.active(playerId)) continue;
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
-            if (player == null || !player.level().dimension().identifier().toString().equals(boost.location.dimension)) continue;
+            if (player == null || !player.level().dimension().location().toString().equals(boost.location.dimension)) continue;
             double dx = player.getX() - boost.location.x;
             double dy = player.getY() + 0.5D - boost.location.y;
             double dz = player.getZ() - boost.location.z;
@@ -5947,7 +5949,7 @@ public final class MinigameManager {
                                       MinigameBoostType type) {
         if (match == null || collector == null || type == null) return;
         SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(
-                Identifier.parse(type.soundId())).orElse(null);
+                ResourceLocation.parse(type.soundId())).orElse(null);
         if (sound == null) return;
         for (UUID playerId : match.teams.keySet()) {
             if (!match.active(playerId)) continue;
@@ -5984,7 +5986,7 @@ public final class MinigameManager {
             case JUMP -> "minecraft:jump_boost";
             case ARMOR -> "";
         };
-        MobEffect effect = BuiltInRegistries.MOB_EFFECT.getOptional(Identifier.parse(effectId)).orElse(null);
+        MobEffect effect = BuiltInRegistries.MOB_EFFECT.getOptional(ResourceLocation.parse(effectId)).orElse(null);
         if (effect == null) return;
         int amplifier = type == MinigameBoostType.REGENERATION ? 0 : 1;
         player.addEffect(new MobEffectInstance(BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect),
@@ -6390,7 +6392,7 @@ public final class MinigameManager {
                 .getOrDefault(ability, 0L);
         if (serverTicks >= available) return true;
         int remaining = (int) Math.max(1L, Math.min(Integer.MAX_VALUE, available - serverTicks));
-        player.getCooldowns().addCooldown(held, remaining);
+        player.getCooldowns().addCooldown(held.getItem(), remaining);
         player.sendSystemMessage(Component.literal("Ability cooldown: "
                 + String.format(Locale.ROOT, "%.1f", remaining / 20.0D) + "s"), true);
         return false;
@@ -6401,7 +6403,7 @@ public final class MinigameManager {
         int ticks = Math.max(1, seconds * 20);
         match.roleCooldowns.computeIfAbsent(player.getUUID(), ignored -> new LinkedHashMap<>())
                 .put(ability, safeAdd(serverTicks, ticks));
-        player.getCooldowns().addCooldown(held, ticks);
+        player.getCooldowns().addCooldown(held.getItem(), ticks);
     }
 
     private boolean useTankSlow(MinigameMatch match, MinigameRoleRules rules, ServerPlayer tank) {
@@ -6416,7 +6418,7 @@ public final class MinigameManager {
                     || candidate.distanceToSqr(tank) > radiusSqr) continue;
             targets.add(candidate);
         }
-        MobEffect slow = BuiltInRegistries.MOB_EFFECT.getOptional(Identifier.parse("minecraft:slowness")).orElse(null);
+        MobEffect slow = BuiltInRegistries.MOB_EFFECT.getOptional(ResourceLocation.parse("minecraft:slowness")).orElse(null);
         for (ServerPlayer target : targets) {
             if (slow != null) {
                 target.addEffect(new MobEffectInstance(BuiltInRegistries.MOB_EFFECT.wrapAsHolder(slow),
@@ -6559,8 +6561,8 @@ public final class MinigameManager {
         Vec3 start = source.getEyePosition();
         Vec3 delta = end.subtract(start);
         int steps = Math.max(4, (int) Math.ceil(delta.length() * 7.0D));
-        DustParticleOptions core = new DustParticleOptions(color & 0x00FFFFFF, 1.15F);
-        DustParticleOptions glow = new DustParticleOptions(0xE8FFF0, 0.65F);
+        DustParticleOptions core = new DustParticleOptions(Vec3.fromRGB24(color & 0x00FFFFFF).toVector3f(), 1.15F);
+        DustParticleOptions glow = new DustParticleOptions(Vec3.fromRGB24(0xE8FFF0).toVector3f(), 0.65F);
         for (int step = 0; step <= steps; step++) {
             Vec3 point = start.add(delta.scale(step / (double) steps));
             level.sendParticles(core, point.x, point.y, point.z, 1, 0.008D, 0.008D, 0.008D, 0.0D);
@@ -6571,13 +6573,13 @@ public final class MinigameManager {
 
     private static void roleImpact(ServerPlayer source, Vec3 point, int color) {
         if (!(source.level() instanceof ServerLevel level) || point == null) return;
-        DustParticleOptions dust = new DustParticleOptions(color & 0x00FFFFFF, 1.0F);
+        DustParticleOptions dust = new DustParticleOptions(Vec3.fromRGB24(color & 0x00FFFFFF).toVector3f(), 1.0F);
         level.sendParticles(dust, point.x, point.y, point.z, 18, 0.22D, 0.22D, 0.22D, 0.01D);
     }
 
     private static void roleBurst(ServerPlayer source, int color, double radius) {
         if (!(source.level() instanceof ServerLevel level)) return;
-        DustParticleOptions dust = new DustParticleOptions(color & 0x00FFFFFF, 1.15F);
+        DustParticleOptions dust = new DustParticleOptions(Vec3.fromRGB24(color & 0x00FFFFFF).toVector3f(), 1.15F);
         int particles = Math.max(32, (int) Math.ceil(radius * 18.0D));
         for (int index = 0; index < particles; index++) {
             double angle = Math.PI * 2.0D * index / particles;
@@ -6589,7 +6591,7 @@ public final class MinigameManager {
 
     private static void roleVerticalBurst(ServerPlayer source, int color, double radius) {
         if (!(source.level() instanceof ServerLevel level)) return;
-        DustParticleOptions dust = new DustParticleOptions(color & 0x00FFFFFF, 0.85F);
+        DustParticleOptions dust = new DustParticleOptions(Vec3.fromRGB24(color & 0x00FFFFFF).toVector3f(), 0.85F);
         int columns = 12;
         for (int index = 0; index < columns; index++) {
             double angle = Math.PI * 2.0D * index / columns;
@@ -6603,7 +6605,7 @@ public final class MinigameManager {
 
     private void playRoleSound(MinigameMatch match, ServerPlayer source, String soundId,
                                float volume, float pitch) {
-        SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(Identifier.parse(soundId)).orElse(null);
+        SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(ResourceLocation.parse(soundId)).orElse(null);
         if (sound == null) return;
         for (UUID playerId : match.teams.keySet()) {
             ServerPlayer listener = server.getPlayerList().getPlayer(playerId);
@@ -6634,7 +6636,7 @@ public final class MinigameManager {
                 || !match.active(attacker.getUUID()) || !match.active(victim.getUUID())
                 || match.team(attacker.getUUID()) == match.team(victim.getUUID())) return;
         MobEffect effect = BuiltInRegistries.MOB_EFFECT.getOptional(
-                Identifier.parse(rules.dpsArrowEffect)).orElse(null);
+                ResourceLocation.parse(rules.dpsArrowEffect)).orElse(null);
         if (effect == null) return;
         victim.addEffect(new MobEffectInstance(BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect),
                 rules.dpsArrowEffectDurationSeconds * 20, rules.dpsArrowEffectAmplifier,
@@ -6815,9 +6817,9 @@ public final class MinigameManager {
         if (isNamedMatchItem(held, Items.SNOWBALL, "Infinite Spleef Projectile")
                 && definition.spleef.standardProjectileEnabled && match.spleefStandardProjectileUnlocked) {
             long availableTick = match.spleefStandardProjectileCooldowns.getOrDefault(player.getUUID(), 0L);
-            if (serverTicks < availableTick || player.getCooldowns().isOnCooldown(held)) {
+            if (serverTicks < availableTick || player.getCooldowns().isOnCooldown(held.getItem())) {
                 int remainingTicks = (int) Math.max(1L, Math.min(Integer.MAX_VALUE, availableTick - serverTicks));
-                if (remainingTicks > 0) player.getCooldowns().addCooldown(held, remainingTicks);
+                if (remainingTicks > 0) player.getCooldowns().addCooldown(held.getItem(), remainingTicks);
                 long tenths = Math.max(1L, (Math.max(1L, availableTick - serverTicks) + 1L) / 2L);
                 player.sendSystemMessage(Component.literal("Projectile cooldown: " + (tenths / 10.0D) + "s"), true);
                 syncInventory(player);
@@ -6883,7 +6885,7 @@ public final class MinigameManager {
             ItemStack cooldownStack = findNamedMatchItem(player, Items.SNOWBALL, "Infinite Spleef Projectile");
             if (!cooldownStack.isEmpty()) {
                 int cooldownTicks = Math.max(1, definition.spleef.standardProjectileCooldownSeconds * 20);
-                player.getCooldowns().addCooldown(cooldownStack, cooldownTicks);
+                player.getCooldowns().addCooldown(cooldownStack.getItem(), cooldownTicks);
                 syncInventory(player);
             }
         }
@@ -7029,7 +7031,7 @@ public final class MinigameManager {
         if (!current.equals(expectedState)) return;
         level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
         ItemStack held = player.getMainHandItem();
-        if (!held.isEmpty()) held.hurtAndBreak(1, player, InteractionHand.MAIN_HAND);
+        if (!held.isEmpty()) held.hurtAndBreak(1, player, EquipmentSlot.MAINHAND);
     }
 
     public boolean shouldCancelItemPickup(ServerPlayer player, BlockPos pos) {
@@ -7138,11 +7140,11 @@ public final class MinigameManager {
                 && preferences.isMinigameGameBorderVisible();
         boolean showSpectator = match != null && arena != null && arena.spectatorBounds.configured()
                 && preferences.isMinigameSpectatorBorderVisible();
-        String playerDimension = player.level().dimension().identifier().toString();
+        String playerDimension = player.level().dimension().location().toString();
         RuntimeBorderSyncState next = new RuntimeBorderSyncState(
                 match == null ? null : match.id, playerDimension, showGame, showSpectator,
                 SimpleServerUtilities.BORDER_SETTINGS.revision(),
-                showGame ? gameRegion.getDimension().identifier().toString() : "",
+                showGame ? gameRegion.getDimension().location().toString() : "",
                 showSpectator ? arena.spectatorBounds.dimension : ""
         );
         RuntimeBorderSyncState previous;
@@ -7164,7 +7166,7 @@ public final class MinigameManager {
                     List.of()
             );
             PacketDistributor.sendToPlayer(player, new BorderVisualizationPayload(
-                    BorderLayer.MINIGAME_GAME, true, gameRegion.getDimension().identifier().toString(),
+                    BorderLayer.MINIGAME_GAME, true, gameRegion.getDimension().location().toString(),
                     settings.getClaimVerticalRange(), settings.getRegionRenderDistanceBlocks(), List.of(entry)
             ));
         } else {
@@ -7682,14 +7684,14 @@ public final class MinigameManager {
         if (player == null || location == null) return false;
         ServerLevel level = resolveLevel(location.dimension);
         if (level == null) return false;
-        player.teleportTo(level, location.x, location.y, location.z, Set.of(), location.yaw, location.pitch, true);
+        player.teleportTo(level, location.x, location.y, location.z, Set.of(), location.yaw, location.pitch);
         return true;
     }
 
     private ServerLevel resolveLevel(String rawDimension) {
         if (server == null) return null;
         try {
-            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, Identifier.parse(rawDimension));
+            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(rawDimension));
             return server.getLevel(key);
         } catch (RuntimeException exception) {
             return null;

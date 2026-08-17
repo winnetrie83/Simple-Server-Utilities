@@ -1,13 +1,13 @@
 package be.winnetrie.mod.simpleserverutilities.client.identity;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.renderer.MultiBufferSource;
+import be.winnetrie.mod.simpleserverutilities.client.render.SsuDebugGizmos;
 import java.util.Locale;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.debug.DebugRenderer;
-import net.minecraft.gizmos.Gizmos;
-import net.minecraft.gizmos.TextGizmo;
-import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.world.phys.Vec3;
 
 /** Six selectable damage/healing presentations: Floating, Hearts, Compact, Pop, Burst and Drop. */
@@ -17,8 +17,11 @@ public final class DamageIndicatorRenderer implements DebugRenderer.SimpleDebugR
     public DamageIndicatorRenderer(Minecraft minecraft) { this.minecraft = minecraft; }
 
     @Override
-    public void emitGizmos(double camX, double camY, double camZ, DebugValueAccess debugValues,
-                           Frustum frustum, float partialTicks) {
+    public void render(PoseStack poseStack, MultiBufferSource bufferSource,
+                       double camX, double camY, double camZ) {
+        SsuDebugGizmos.begin(minecraft, poseStack, bufferSource, camX, camY, camZ);
+        Frustum frustum = null; // 1.21.1 DebugRenderer does not pass its render frustum to child renderers.
+        float partialTicks = minecraft.getTimer().getGameTimeDeltaPartialTick(true);
         long now = System.currentTimeMillis();
         for (var entry : DamageIndicatorClientState.snapshot()) {
             double age = Math.max(0.0D, Math.min(1.0D,
@@ -56,8 +59,8 @@ public final class DamageIndicatorRenderer implements DebugRenderer.SimpleDebugR
                 case "DROP" -> (float) (0.38D + 0.22D * Math.sin(Math.PI * Math.min(1.0D, age / 0.28D)));
                 default -> 0.40F;
             };
-            Gizmos.billboardText(label, position,
-                    TextGizmo.Style.forColorAndCentered((alpha << 24) | rgb).withScale(scale)).setAlwaysOnTop();
+            SsuDebugGizmos.billboardText(label, position,
+                    SsuDebugGizmos.TextStyle.forColorAndCentered((alpha << 24) | rgb).withScale(scale)).setAlwaysOnTop();
         }
     }
 

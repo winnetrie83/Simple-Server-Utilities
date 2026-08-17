@@ -2,7 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.minigame;
 
 import java.util.Locale;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Optional tactical role composition and ability tuning for two-team modes. */
 public final class MinigameRoleRules {
@@ -58,7 +58,7 @@ public final class MinigameRoleRules {
         String effect = dpsArrowEffect == null || dpsArrowEffect.isBlank()
                 ? "minecraft:poison" : dpsArrowEffect.trim().toLowerCase(Locale.ROOT);
         try {
-            Identifier.parse(effect);
+            ResourceLocation.parse(effect);
         } catch (RuntimeException ignored) {
             effect = "minecraft:poison";
         }

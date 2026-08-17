@@ -2,11 +2,11 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 
 import be.winnetrie.mod.simpleserverutilities.network.MinigameDiagnosticsPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Scrollable Admin Center health report with safe integrity and orphan-cleanup actions. */
 public final class MinigameDiagnosticsScreen extends Screen {
@@ -59,25 +59,25 @@ public final class MinigameDiagnosticsScreen extends Screen {
     private void request(String action) {
         if (awaiting) return;
         awaiting = true;
-        ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, "", requestId++));
+        PacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, "", requestId++));
         rebuildWidgets();
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, data.title().isBlank() ? "Minigame System Health" : data.title(), x + 14, y + 14, TEXT, true);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, data.title().isBlank() ? "Minigame System Health" : data.title(), x + 14, y + 14, TEXT, true);
         String notice = awaiting ? "Processing…" : data.notice();
-        if (!notice.isBlank()) g.text(font, trim(notice, 88), x + 14, y + 31, data.error() ? ERROR : GOOD, false);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 88), x + 14, y + 31, data.error() ? ERROR : GOOD, false);
         int boxY = y + 50, boxH = H - 90;
         g.fill(x + 12, boxY, x + W - 12, boxY + boxH, 0xB010151C);
-        g.outline(x + 12, boxY, W - 24, boxH, BORDER);
+        g.renderOutline(x + 12, boxY, W - 24, boxH, BORDER);
         int end = Math.min(data.lines().size(), scroll + ROWS);
         for (int index = scroll; index < end; index++) {
             MinigameDiagnosticsPayload.Line line = data.lines().get(index);
@@ -90,10 +90,10 @@ public final class MinigameDiagnosticsScreen extends Screen {
                 case "ok" -> GOOD;
                 default -> MUTED;
             };
-            g.text(font, trim(line.label(), 34), x + 20, ry, color, false);
-            g.text(font, trim(line.value(), 62), x + 250, ry, TEXT, false);
+            g.drawString(font, trim(line.label(), 34), x + 20, ry, color, false);
+            g.drawString(font, trim(line.value(), 62), x + 250, ry, TEXT, false);
         }
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private int left() { return (width - W) / 2; }

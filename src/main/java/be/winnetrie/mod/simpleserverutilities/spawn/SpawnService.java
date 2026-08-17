@@ -8,7 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportPolicy;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -64,7 +64,7 @@ public final class SpawnService {
 
     private static ServerLevel level(ServerPlayer player, String rawDimension) {
         try {
-            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, Identifier.parse(rawDimension));
+            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(rawDimension));
             return player.level().getServer().getLevel(key);
         } catch (Exception exception) {
             return null;

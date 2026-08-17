@@ -13,12 +13,12 @@ import be.winnetrie.mod.simpleserverutilities.mail.MailRichText;
 import be.winnetrie.mod.simpleserverutilities.network.MailActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Standalone mailbox browser. All mail state and actions remain server-authoritative.
@@ -145,41 +145,41 @@ public final class MailScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         Layout l = layout();
         SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(l.left(), l.top(), l.right(), l.bottom(), PANEL);
-        g.outline(l.left(), l.top(), l.width(), l.height(), BORDER);
-        g.text(font, "Mailbox", l.left() + 10, l.top() + 10, TEXT, false);
+        g.renderOutline(l.left(), l.top(), l.width(), l.height(), BORDER);
+        g.drawString(font, "Mailbox", l.left() + 10, l.top() + 10, TEXT, false);
         String summary = "sent".equals(data.mode())
                 ? "Saved sent mail " + data.totalEntries() + "/" + data.sentLimit()
                 : "Visible " + data.visibleCount() + "/" + data.inboxSoftCap()
                         + "  •  Unread " + data.unreadCount() + "  •  Waiting " + data.queuedCount();
-        g.text(font, summary, l.left() + 78, l.top() + 10, MUTED, false);
+        g.drawString(font, summary, l.left() + 78, l.top() + 10, MUTED, false);
 
         if (!data.accessAllowed()) {
-            g.text(font, data.notice().isBlank() ? "Mailbox access is locked." : data.notice(),
+            g.drawString(font, data.notice().isBlank() ? "Mailbox access is locked." : data.notice(),
                     l.left() + 20, l.top() + 85, ERROR, false);
-            super.extractRenderState(g, mouseX, mouseY, partialTick);
+            super.render(g, mouseX, mouseY, partialTick);
             return;
         }
 
         if (data.queuedCount() > 0) {
             g.fill(l.left() + 8, l.top() + 59, l.right() - 8, l.top() + 79, 0x803E311E);
-            g.outline(l.left() + 8, l.top() + 59, l.width() - 16, 20, WARNING);
-            g.text(font, "Mailbox full: " + data.queuedCount()
+            g.renderOutline(l.left() + 8, l.top() + 59, l.width() - 16, 20, WARNING);
+            g.drawString(font, "Mailbox full: " + data.queuedCount()
                     + " mail(s) are stored safely and will appear when space becomes available.",
                     l.left() + 14, l.top() + 65, WARNING, false);
         } else {
-            g.text(font, "Visible mail expires after " + data.retentionDays()
+            g.drawString(font, "Visible mail expires after " + data.retentionDays()
                     + " days. Queued mail does not expire before it becomes visible.",
                     l.left() + 10, l.top() + 65, MUTED, false);
         }
 
         g.fill(l.left() + 6, l.listTop() - 3, l.left() + l.listWidth() - 3, l.listBottom(), 0x5011181E);
-        g.outline(l.left() + 6, l.listTop() - 3, l.listWidth() - 9, l.listBottom() - l.listTop() + 3, BORDER);
+        g.renderOutline(l.left() + 6, l.listTop() - 3, l.listWidth() - 9, l.listBottom() - l.listTop() + 3, BORDER);
         if (data.entries().isEmpty()) {
-            g.text(font, "No " + ("sent".equals(data.mode()) ? "sent mail" : "visible mail") + ".",
+            g.drawString(font, "No " + ("sent".equals(data.mode()) ? "sent mail" : "visible mail") + ".",
                     l.left() + 18, l.listTop() + 12, MUTED, false);
         }
         for (RowBounds row : rows) {
@@ -188,8 +188,8 @@ public final class MailScreen extends Screen {
                     row.index() == selectedIndex ? ROW_SELECTED : ROW);
             int color = !entry.read() && "inbox".equals(data.mode()) ? GOOD : TEXT;
             String prefix = !entry.read() && "inbox".equals(data.mode()) ? "● " : "";
-            g.text(font, trim(prefix + entry.subject(), 34), row.x() + 6, row.y() + 5, color, false);
-            g.text(font, trim(("sent".equals(data.mode()) ? "To: " : "From: ") + entry.otherParty(), 29),
+            g.drawString(font, trim(prefix + entry.subject(), 34), row.x() + 6, row.y() + 5, color, false);
+            g.drawString(font, trim(("sent".equals(data.mode()) ? "To: " : "From: ") + entry.otherParty(), 29),
                     row.x() + 6, row.y() + 17, MUTED, false);
             String flags;
             if ("sent".equals(data.mode())) {
@@ -200,13 +200,13 @@ public final class MailScreen extends Screen {
                 flags = (entry.unclaimedItemCount() > 0 ? "Items " + entry.unclaimedItemCount() + "  " : "")
                         + (entry.moneyUnclaimed() ? entry.formattedMoney() : "");
             }
-            if (!flags.isBlank()) g.text(font, trim(flags, 34), row.x() + 6, row.y() + 29,
+            if (!flags.isBlank()) g.drawString(font, trim(flags, 34), row.x() + 6, row.y() + 29,
                     "sent".equals(data.mode()) && entry.openedAt() > 0L ? GOOD : WARNING, false);
         }
 
         drawDetail(g, l);
         int pageX = Math.min(l.left() + 304, l.right() - 84);
-        g.text(font, "Page " + (data.pageIndex() + 1) + "/" + pageCount(), pageX, l.bottom() - 21, MUTED, false);
+        g.drawString(font, "Page " + (data.pageIndex() + 1) + "/" + pageCount(), pageX, l.bottom() - 21, MUTED, false);
         if (!data.notice().isBlank()) {
             int noticeX = Math.max(l.left() + 304, l.detailLeft() + 8);
             int noticeWidth = Math.max(120, l.right() - noticeX - 10);
@@ -214,25 +214,25 @@ public final class MailScreen extends Screen {
             int shown = Math.min(2, noticeLines.size());
             int noticeY = l.bottom() - 35;
             for (int line = 0; line < shown; line++) {
-                g.text(font, noticeLines.get(line), noticeX, noticeY + line * 11, data.error() ? ERROR : GOOD, false);
+                g.drawString(font, noticeLines.get(line), noticeX, noticeY + line * 11, data.error() ? ERROR : GOOD, false);
             }
         }
 
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void drawDetail(GuiGraphicsExtractor g, Layout l) {
+    private void drawDetail(GuiGraphics g, Layout l) {
         g.fill(l.detailLeft(), l.listTop() - 3, l.detailRight(), l.detailBottom(), 0x5011181E);
-        g.outline(l.detailLeft(), l.listTop() - 3, l.detailRight() - l.detailLeft(), l.detailBottom() - l.listTop() + 3, BORDER);
+        g.renderOutline(l.detailLeft(), l.listTop() - 3, l.detailRight() - l.detailLeft(), l.detailBottom() - l.listTop() + 3, BORDER);
         MailDataPayload.Entry entry = selected();
         if (entry == null) {
-            g.text(font, "Select a mail to read it.", l.detailLeft() + 12, l.listTop() + 12, MUTED, false);
+            g.drawString(font, "Select a mail to read it.", l.detailLeft() + 12, l.listTop() + 12, MUTED, false);
             return;
         }
         int x = l.detailLeft() + 10;
         int y = l.listTop() + 5;
-        g.text(font, trim(entry.subject(), 56), x, y, TEXT, false);
-        g.text(font, ("sent".equals(data.mode()) ? "To " : "From ") + entry.otherParty()
+        g.drawString(font, trim(entry.subject(), 56), x, y, TEXT, false);
+        g.drawString(font, ("sent".equals(data.mode()) ? "To " : "From ") + entry.otherParty()
                 + " • " + formatDate(entry.createdAt()), x, y + 14, MUTED, false);
         int bodyY = y + 34;
         String encodedBody = entry.body();
@@ -250,27 +250,27 @@ public final class MailScreen extends Screen {
                 Math.max(120, l.detailRight() - x - 12));
         int maxBodyLines = Math.max(2, (l.detailBottom() - bodyY - 108) / 10);
         for (int i = 0; i < Math.min(bodyLines.size(), maxBodyLines); i++) {
-            g.text(font, bodyLines.get(i), x, bodyY + i * 10, TEXT, false);
+            g.drawString(font, bodyLines.get(i), x, bodyY + i * 10, TEXT, false);
         }
         int attachmentsY = l.detailBottom() - 100;
         if ("sent".equals(data.mode())) {
-            g.text(font, "Opened: " + statusDate(entry.openedAt(), "No"), x, attachmentsY - 34,
+            g.drawString(font, "Opened: " + statusDate(entry.openedAt(), "No"), x, attachmentsY - 34,
                     entry.openedAt() > 0L ? GOOD : WARNING, false);
             if (entry.itemStackCount() > 0) {
-                g.text(font, "Items claimed: " + statusDate(entry.itemsClaimedAt(), "No"), x, attachmentsY - 22,
+                g.drawString(font, "Items claimed: " + statusDate(entry.itemsClaimedAt(), "No"), x, attachmentsY - 22,
                         entry.itemsClaimedAt() > 0L ? GOOD : WARNING, false);
             }
             if (entry.moneyMinor() > 0L) {
-                g.text(font, "Money claimed: " + statusDate(entry.moneyClaimedAt(), "No"), x, attachmentsY - 10,
+                g.drawString(font, "Money claimed: " + statusDate(entry.moneyClaimedAt(), "No"), x, attachmentsY - 10,
                         entry.moneyClaimedAt() > 0L ? GOOD : WARNING, false);
             }
         }
         if (entry.itemStackCount() > 0) {
-            g.text(font, trim("Items: " + entry.itemSummary(), 67), x, attachmentsY,
+            g.drawString(font, trim("Items: " + entry.itemSummary(), 67), x, attachmentsY,
                     entry.unclaimedItemCount() > 0 ? WARNING : MUTED, false);
         }
         if (entry.moneyMinor() > 0L) {
-            g.text(font, "Money: " + entry.formattedMoney()
+            g.drawString(font, "Money: " + entry.formattedMoney()
                     + (entry.moneyUnclaimed() ? " (unclaimed)" : " (claimed)"),
                     x, attachmentsY + 12, entry.moneyUnclaimed() ? WARNING : MUTED, false);
         }
@@ -285,15 +285,15 @@ public final class MailScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         for (RowBounds row : rows) {
-            if (row.contains((int) event.x(), (int) event.y())) {
+            if (row.contains((int) mouseX, (int) mouseY)) {
                 selectedIndex = row.index();
                 rebuildWidgets();
                 return true;
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private boolean isClearArmed() {
@@ -315,12 +315,12 @@ public final class MailScreen extends Screen {
 
     private void request(String mode, int page) {
         long id = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new MailRequestPayload(mode, Math.max(0, page), PAGE_SIZE, id));
+        PacketDistributor.sendToServer(new MailRequestPayload(mode, Math.max(0, page), PAGE_SIZE, id));
     }
 
     private void action(String action, String mailId) {
         long id = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new MailActionPayload(action, mailId, data.mode(), data.pageIndex(), id));
+        PacketDistributor.sendToServer(new MailActionPayload(action, mailId, data.mode(), data.pageIndex(), id));
     }
 
     private MailDataPayload.Entry selected() {

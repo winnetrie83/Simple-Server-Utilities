@@ -8,7 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Viewer-personalized, bounded living-entity set used by Entity Insight. */
 public record EntityInsightPayload(
@@ -21,7 +21,7 @@ public record EntityInsightPayload(
     private static final int HARD_MAX_ENTRIES = 50;
 
     public static final Type<EntityInsightPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "entity_insight")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "entity_insight")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, EntityInsightPayload> STREAM_CODEC =
             StreamCodec.of(EntityInsightPayload::encode, EntityInsightPayload::decode);

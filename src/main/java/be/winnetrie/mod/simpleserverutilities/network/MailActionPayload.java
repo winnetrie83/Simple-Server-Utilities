@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record MailActionPayload(String action, String mailId, String mode, int pageIndex, long requestId)
         implements CustomPacketPayload {
     public static final Type<MailActionPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "mail_action")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "mail_action")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, MailActionPayload> STREAM_CODEC =
             StreamCodec.of(MailActionPayload::encode, MailActionPayload::decode);

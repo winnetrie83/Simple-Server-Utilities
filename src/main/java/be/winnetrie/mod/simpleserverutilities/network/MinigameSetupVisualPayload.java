@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Administrator-only in-world previews for minigame setup locations and configured play areas. */
 public record MinigameSetupVisualPayload(boolean visible, List<Entry> markers, List<Bounds> bounds)
@@ -15,7 +15,7 @@ public record MinigameSetupVisualPayload(boolean visible, List<Entry> markers, L
     public static final int MAX_MARKERS = 192;
     public static final int MAX_BOUNDS = 3;
     public static final Type<MinigameSetupVisualPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_setup_visual"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_setup_visual"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameSetupVisualPayload> STREAM_CODEC =
             StreamCodec.of(MinigameSetupVisualPayload::encode, MinigameSetupVisualPayload::decode);
 

@@ -1,5 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.client.minimap;
 
+import com.mojang.math.Axis;
+
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.client.map.AerialMapAtlas;
 import be.winnetrie.mod.simpleserverutilities.client.mapmarker.MapMarkerClientState;
@@ -10,10 +12,9 @@ import be.winnetrie.mod.simpleserverutilities.network.SsuMenuSnapshotPayload;
 import be.winnetrie.mod.simpleserverutilities.time.GameCalendar;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Client lifecycle, polling and HUD rendering for the SSU minimap. */
 public final class MinimapClientState {
@@ -28,11 +29,11 @@ public final class MinimapClientState {
     private static final int RECT_FRAME_INSET_TOP = 32;
     private static final int RECT_FRAME_INSET_RIGHT = 33;
     private static final int RECT_FRAME_INSET_BOTTOM = 34;
-    private static final Identifier FRAME_RECTANGLE = Identifier.fromNamespaceAndPath(
+    private static final ResourceLocation FRAME_RECTANGLE = ResourceLocation.fromNamespaceAndPath(
             SimpleServerUtilities.MODID, "textures/gui/minimap/frame_rectangle.png");
-    private static final Identifier FRAME_CIRCLE = Identifier.fromNamespaceAndPath(
+    private static final ResourceLocation FRAME_CIRCLE = ResourceLocation.fromNamespaceAndPath(
             SimpleServerUtilities.MODID, "textures/gui/minimap/frame_circle.png");
-    private static final Identifier PLAYER_ARROW = Identifier.fromNamespaceAndPath(
+    private static final ResourceLocation PLAYER_ARROW = ResourceLocation.fromNamespaceAndPath(
             SimpleServerUtilities.MODID, "textures/gui/minimap/arrow.png");
 
     private static final MinimapTerrainMap TERRAIN = new MinimapTerrainMap();
@@ -88,7 +89,7 @@ public final class MinimapClientState {
             return;
         }
 
-        String dimension = minecraft.level.dimension().identifier().toString();
+        String dimension = minecraft.level.dimension().location().toString();
         if (!dimension.equals(lastDimension)) {
             lastDimension = dimension;
             requestCountdown = 0;
@@ -104,7 +105,7 @@ public final class MinimapClientState {
         }
 
         if (requestCountdown-- <= 0) {
-            ClientPacketDistributor.sendToServer(new MinimapRequestPayload());
+            PacketDistributor.sendToServer(new MinimapRequestPayload());
             requestCountdown = data.enabled() ? ENABLED_REFRESH_TICKS : DISABLED_REFRESH_TICKS;
         }
 
@@ -113,15 +114,15 @@ public final class MinimapClientState {
         }
     }
 
-    public static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
+    public static void render(GuiGraphics graphics, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
         if (!data.allowed() || !data.enabled() || minecraft.player == null || minecraft.level == null) {
             return;
         }
-        if (minecraft.gui.screen() != null) {
+        if (minecraft.screen != null) {
             return;
         }
-        String dimension = minecraft.level.dimension().identifier().toString();
+        String dimension = minecraft.level.dimension().location().toString();
         if (!dimension.equals(data.dimension())) {
             return;
         }
@@ -142,7 +143,7 @@ public final class MinimapClientState {
         if (!data.texturedFrame() && !circle) {
             // Preserve the original SSU minimap border when the player chooses Classic.
             graphics.fill(x - PANEL, y - PANEL, x + size + PANEL, y + size + PANEL, 0xB5101318);
-            graphics.outline(x - 1, y - 1, size + 2, size + 2, 0xFFE2C675);
+            graphics.renderOutline(x - 1, y - 1, size + 2, size + 2, 0xFFE2C675);
         }
 
         if (circle && data.texturedFrame()) {
@@ -166,7 +167,7 @@ public final class MinimapClientState {
         drawPlayerMarker(graphics, mapArea.x() + mapArea.size() / 2, mapArea.y() + mapArea.size() / 2,
                 data.northUp() ? minecraft.player.getYRot() : 0.0F);
         if (data.northUp()) {
-            graphics.centeredText(minecraft.font, "N", x + size / 2, y + 3, 0xFFFFFFFF);
+            graphics.drawCenteredString(minecraft.font, "N", x + size / 2, y + 3, 0xFFFFFFFF);
         }
 
         String coordinates = (int) Math.floor(minecraft.player.getX())
@@ -174,13 +175,13 @@ public final class MinimapClientState {
         int labelY = position.bottom() && !showCalendar ? y - 11 : y + size + 4;
         drawCenteredHudLabel(graphics, minecraft, coordinates, x + size / 2, labelY);
         if (showCalendar) {
-            String calendar = GameCalendar.fromClockTime(minecraft.level.getDefaultClockTime()).displayText();
+            String calendar = GameCalendar.fromClockTime(minecraft.level.getDayTime()).displayText();
             drawCenteredHudLabel(graphics, minecraft, calendar, x + size / 2, labelY + 12);
         }
     }
 
     private static void renderTerrain(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             Minecraft minecraft,
             int x,
             int y,
@@ -196,21 +197,21 @@ public final class MinimapClientState {
         int drawY = y + (size - drawSize) / 2;
         float centerX = x + size / 2.0F;
         float centerY = y + size / 2.0F;
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(centerX, centerY);
-        graphics.pose().rotate((float) Math.toRadians(-(180.0F + minecraft.player.getYRot())));
-        graphics.pose().translate(-centerX, -centerY);
+        graphics.pose().pushPose();
+        graphics.pose().translate(centerX, centerY, 0.0F);
+        graphics.pose().mulPose(Axis.ZP.rotationDegrees(-(180.0F + minecraft.player.getYRot())));
+        graphics.pose().translate(-centerX, -centerY, 0.0F);
         TERRAIN.render(graphics, drawX, drawY, drawSize);
-        graphics.pose().popMatrix();
+        graphics.pose().popPose();
     }
 
     /**
-     * GuiGraphicsExtractor only exposes rectangular scissors. A small bounded set of
+     * GuiGraphics only exposes rectangular scissors. A small bounded set of
      * horizontal strips approximates a circular stencil without introducing a custom
      * render pipeline; 32 terrain blits is trivial at the minimap's maximum 256 px size.
      */
     private static void renderCircularTerrain(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             Minecraft minecraft,
             int x,
             int y,
@@ -235,23 +236,23 @@ public final class MinimapClientState {
     }
 
     private static void drawTexturedFrame(
-            GuiGraphicsExtractor graphics, int x, int y, int size, boolean circle
+            GuiGraphics graphics, int x, int y, int size, boolean circle
     ) {
-        Identifier texture = circle ? FRAME_CIRCLE : FRAME_RECTANGLE;
+        ResourceLocation texture = circle ? FRAME_CIRCLE : FRAME_RECTANGLE;
         float scale = size / (float) FRAME_TEXTURE_SIZE;
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(x, y);
-        graphics.pose().scale(scale, scale);
-        graphics.blit(RenderPipelines.GUI_TEXTURED, texture,
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0.0F);
+        graphics.pose().scale(scale, scale, 1.0F);
+        graphics.blit(texture,
                 0, 0, 0, 0, FRAME_TEXTURE_SIZE, FRAME_TEXTURE_SIZE,
                 FRAME_TEXTURE_SIZE, FRAME_TEXTURE_SIZE);
-        graphics.pose().popMatrix();
+        graphics.pose().popPose();
     }
 
 
 
     private static void drawMarkers(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             Minecraft minecraft,
             int left,
             int top,
@@ -259,7 +260,7 @@ public final class MinimapClientState {
             boolean circle
     ) {
         if (!MapMarkerClientState.showOnMinimap() || minecraft.player == null || minecraft.level == null) return;
-        String dimension = minecraft.level.dimension().identifier().toString();
+        String dimension = minecraft.level.dimension().location().toString();
         double playerX = minecraft.player.getX();
         double playerZ = minecraft.player.getZ();
         double scale = size / (double) MinimapTerrainMap.VISIBLE_BLOCKS;
@@ -283,7 +284,7 @@ public final class MinimapClientState {
         }
     }
 
-    private static void drawMarkerIcon(GuiGraphicsExtractor graphics, int x, int y, int color) {
+    private static void drawMarkerIcon(GuiGraphics graphics, int x, int y, int color) {
         graphics.fill(x - 1, y - 3, x + 2, y + 4, 0xE6111111);
         graphics.fill(x - 3, y - 1, x + 4, y + 2, 0xE6111111);
         graphics.fill(x - 2, y - 2, x + 3, y + 3, 0xE6111111);
@@ -292,12 +293,12 @@ public final class MinimapClientState {
         graphics.fill(x, y, x + 1, y + 1, 0xFFFFFFFF);
     }
 
-    private static void drawCenteredHudLabel(GuiGraphicsExtractor graphics, Minecraft minecraft,
+    private static void drawCenteredHudLabel(GuiGraphics graphics, Minecraft minecraft,
                                                  String text, int centerX, int y) {
         int textWidth = minecraft.font.width(text);
         graphics.fill(centerX - textWidth / 2 - 3, y - 2,
                 centerX + textWidth / 2 + 3, y + 10, 0xA0000000);
-        graphics.centeredText(minecraft.font, text, centerX, y, 0xFFF2F2F2);
+        graphics.drawCenteredString(minecraft.font, text, centerX, y, 0xFFF2F2F2);
     }
 
     public static void clear() {
@@ -321,17 +322,17 @@ public final class MinimapClientState {
         return new Rect(centeredLeft, centeredTop, inner);
     }
 
-    private static void drawPlayerMarker(GuiGraphicsExtractor graphics, int centerX, int centerY, float yaw) {
+    private static void drawPlayerMarker(GuiGraphics graphics, int centerX, int centerY, float yaw) {
         int markerSize = 16;
         int markerX = centerX - markerSize / 2;
         int markerY = centerY - markerSize / 2;
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(centerX, centerY);
-        graphics.pose().rotate((float) Math.toRadians(180.0F + yaw));
-        graphics.pose().translate(-centerX, -centerY);
-        graphics.blit(RenderPipelines.GUI_TEXTURED, PLAYER_ARROW, markerX, markerY,
+        graphics.pose().pushPose();
+        graphics.pose().translate(centerX, centerY, 0.0F);
+        graphics.pose().mulPose(Axis.ZP.rotationDegrees(180.0F + yaw));
+        graphics.pose().translate(-centerX, -centerY, 0.0F);
+        graphics.blit(PLAYER_ARROW, markerX, markerY,
                 0, 0, markerSize, markerSize, markerSize, markerSize);
-        graphics.pose().popMatrix();
+        graphics.pose().popPose();
     }
 
     private static Position position(int guiWidth, int guiHeight, int size, String rawPosition, int footerHeight) {

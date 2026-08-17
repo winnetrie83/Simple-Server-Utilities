@@ -1,4 +1,26 @@
-## Current development build: 1.9.0-dev3.41.3
+## Current development build: 1.9.0-dev3.41.3-mc1.21.1-dev6
+
+
+### Minecraft 1.21.1 backport - compiler pass 5
+
+- Processed the fourth local compiler batch (468 IDE errors reported before this pass).
+- Backported 1.21.1 day-time, world-height, camera, damage, teleport, item-stack stream-codec, entity-tag and DynamicTexture APIs across the remaining shared call sites exposed by the batch.
+- Restored 1.21.1 container-screen background requirements and fixed reward-slot mouse coordinate conversions in the minigame editors.
+- Restored registry tag lookup/enumeration semantics used by Content Core and NPC Shops.
+- Added a 1.21.1 scroll accessor for the rich-text multiline renderer and preserved NPC Shop row double-click editing without the newer mouse event wrapper.
+- Added Gradle source exclusions for known removed 26.2-only files so stale overlay extractions cannot re-enter `compileJava`.
+- Persistence schemas remain unchanged; network protocol remains `119`.
+
+### Minecraft 1.21.1 backport - compiler pass 4
+
+- This branch targets Minecraft 1.21.1 / NeoForge 21.1.244 / Java 21 and starts from the tested dev3.41.3 architecture freeze.
+- Processed the third local compiler batch and removed another broad layer of post-1.21.1 GUI API usage.
+- Screen switching now uses the 1.21.1 `Minecraft#setScreen` path throughout the client UI.
+- Multiline editors, custom button rendering, container-screen sizing/background hooks, registry tag enumeration and several Block Information compatibility calls are back on 1.21.1 signatures.
+- Test this archive from a genuinely clean source tree; deleted 26.2 files must not remain beside the new sources.
+- See `BACKPORT-1.21.1-STATUS.md` for the exact completed and pending categories.
+
+## 26.2 architecture-freeze baseline: 1.9.0-dev3.41.3
 
 ### Backport-preparation architecture freeze
 

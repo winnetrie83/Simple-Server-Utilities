@@ -1,5 +1,8 @@
 package be.winnetrie.mod.simpleserverutilities.client.minigame;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.renderer.MultiBufferSource;
+import be.winnetrie.mod.simpleserverutilities.client.render.SsuDebugGizmos;
 import be.winnetrie.mod.simpleserverutilities.client.visualization.ClaimRegionBorderRenderer;
 import be.winnetrie.mod.simpleserverutilities.network.BorderVisualizationPayload;
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderCategory;
@@ -7,10 +10,6 @@ import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupVisualPayload
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.debug.DebugRenderer;
-import net.minecraft.gizmos.GizmoStyle;
-import net.minecraft.gizmos.Gizmos;
-import net.minecraft.gizmos.TextGizmo;
-import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -32,15 +31,18 @@ public final class MinigameSetupVisualRenderer implements DebugRenderer.SimpleDe
     }
 
     @Override
-    public void emitGizmos(double camX, double camY, double camZ, DebugValueAccess debugValues,
-                           Frustum frustum, float partialTicks) {
+    public void render(PoseStack poseStack, MultiBufferSource bufferSource,
+                       double camX, double camY, double camZ) {
+        SsuDebugGizmos.begin(minecraft, poseStack, bufferSource, camX, camY, camZ);
+        Frustum frustum = null; // 1.21.1 DebugRenderer does not pass its render frustum to child renderers.
+        float partialTicks = minecraft.getTimer().getGameTimeDeltaPartialTick(true);
         if (minecraft.level == null || minecraft.player == null) return;
         if (!TOOL_NAME.equals(minecraft.player.getMainHandItem().getHoverName().getString())) return;
-        String dimension = minecraft.level.dimension().identifier().toString();
-        var camera = minecraft.gameRenderer.mainCamera();
-        var forwardVector = camera.forwardVector();
-        var leftVector = camera.leftVector();
-        var upVector = camera.upVector();
+        String dimension = minecraft.level.dimension().location().toString();
+        var camera = minecraft.gameRenderer.getMainCamera();
+        var forwardVector = camera.getLookVector();
+        var leftVector = camera.getLeftVector();
+        var upVector = camera.getUpVector();
         Vec3 cameraForward = new Vec3(forwardVector.x(), forwardVector.y(), forwardVector.z()).normalize();
         Vec3 cameraHorizontal = new Vec3(leftVector.x(), leftVector.y(), leftVector.z()).normalize();
         Vec3 cameraUp = new Vec3(upVector.x(), upVector.y(), upVector.z()).normalize();
@@ -62,7 +64,7 @@ public final class MinigameSetupVisualRenderer implements DebugRenderer.SimpleDe
         AABB box = new AABB(entry.minX() - BOUNDS_EPSILON, entry.minY() - BOUNDS_EPSILON,
                 entry.minZ() - BOUNDS_EPSILON, entry.maxX() + 1.0D + BOUNDS_EPSILON,
                 entry.maxY() + 1.0D + BOUNDS_EPSILON, entry.maxZ() + 1.0D + BOUNDS_EPSILON);
-        if (!frustum.isVisible(box)) return;
+        if (frustum != null && !frustum.isVisible(box)) return;
 
         int rgb = entry.color() & 0x00FFFFFF;
         int strokeColor = 0xFF000000 | rgb;
@@ -81,7 +83,7 @@ public final class MinigameSetupVisualRenderer implements DebugRenderer.SimpleDe
                     regionEntry, camX, camY, camZ, frustum, 128.0D);
         } else {
             int fillColor = 0x2A000000 | rgb;
-            Gizmos.cuboid(box, GizmoStyle.fill(fillColor)).setAlwaysOnTop();
+            SsuDebugGizmos.cuboid(box, SsuDebugGizmos.FillStyle.fill(fillColor)).setAlwaysOnTop();
             float width = 0.060F;
             Vec3 p000 = new Vec3(box.minX, box.minY, box.minZ);
             Vec3 p001 = new Vec3(box.minX, box.minY, box.maxZ);
@@ -106,7 +108,7 @@ public final class MinigameSetupVisualRenderer implements DebugRenderer.SimpleDe
     }
 
     private static void line(Vec3 start, Vec3 end, int color, float width, boolean alwaysOnTop) {
-        var line = Gizmos.line(start, end, color, width);
+        var line = SsuDebugGizmos.line(start, end, color, width);
         if (alwaysOnTop) line.setAlwaysOnTop();
     }
 
@@ -118,15 +120,15 @@ public final class MinigameSetupVisualRenderer implements DebugRenderer.SimpleDe
         Vec3 horizontal = cameraHorizontal.scale(halfWidth);
         Vec3 vertical = cameraUp.scale(LABEL_HALF_HEIGHT);
 
-        Gizmos.rect(
+        SsuDebugGizmos.rect(
                 backgroundCenter.subtract(horizontal).add(vertical),
                 backgroundCenter.add(horizontal).add(vertical),
                 backgroundCenter.add(horizontal).subtract(vertical),
                 backgroundCenter.subtract(horizontal).subtract(vertical),
-                GizmoStyle.fill(BACKGROUND_COLOR))
+                SsuDebugGizmos.FillStyle.fill(BACKGROUND_COLOR))
                 .setAlwaysOnTop();
-        Gizmos.billboardText(label, textCenter,
-                TextGizmo.Style.forColorAndCentered(color).withScale(LABEL_SCALE))
+        SsuDebugGizmos.billboardText(label, textCenter,
+                SsuDebugGizmos.TextStyle.forColorAndCentered(color).withScale(LABEL_SCALE))
                 .setAlwaysOnTop();
     }
 }

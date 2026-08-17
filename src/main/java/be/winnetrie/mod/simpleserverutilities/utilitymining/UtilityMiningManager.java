@@ -84,7 +84,7 @@ public final class UtilityMiningManager {
 
         PacketDistributor.sendToPlayer(player, UtilityMiningPreviewPayload.of(
                 target.type(),
-                player.level().dimension().identifier().toString(),
+                player.level().dimension().location().toString(),
                 color,
                 brightness,
                 showInfo,

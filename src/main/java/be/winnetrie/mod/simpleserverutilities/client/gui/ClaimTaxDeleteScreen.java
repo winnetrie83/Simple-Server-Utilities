@@ -6,12 +6,12 @@ import java.time.format.DateTimeFormatter;
 
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimTaxDeleteActionPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Explicit two-step settlement choice shown before a taxed player claim is deleted. */
 public final class ClaimTaxDeleteScreen extends Screen {
@@ -61,7 +61,7 @@ public final class ClaimTaxDeleteScreen extends Screen {
         forfeit.setTooltip(Tooltip.create(Component.literal("Delete the claim without payment and permanently confiscate its taxable peak.")));
         addRenderableWidget(forfeit);
 
-        addRenderableWidget(Button.builder(Component.literal("Cancel"), ignored -> minecraft.setScreenAndShow(parent))
+        addRenderableWidget(Button.builder(Component.literal("Cancel"), ignored -> minecraft.setScreen(parent))
                 .bounds(left + panelWidth / 2 - 70, buttonY + 30, 140, 20).build());
     }
 
@@ -71,37 +71,37 @@ public final class ClaimTaxDeleteScreen extends Screen {
             rebuildWidgets();
             return;
         }
-        ClientPacketDistributor.sendToServer(new ClaimTaxDeleteActionPayload(
+        PacketDistributor.sendToServer(new ClaimTaxDeleteActionPayload(
                 payload.selectedClaimGroup(), mode, payload.centerChunkX(), payload.centerChunkZ(), payload.radius()));
-        minecraft.setScreenAndShow(parent);
+        minecraft.setScreen(parent);
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         SsuGuiScale.fullscreenDimWhenScaled(graphics, this, 0xA5000000);
         graphics.fill(left, top, left + panelWidth, top + panelHeight, PANEL);
-        graphics.outline(left, top, panelWidth, panelHeight, FRAME);
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        graphics.renderOutline(left, top, panelWidth, panelHeight, FRAME);
+        super.render(graphics, mouseX, mouseY, partialTick);
 
         int x = left + 16;
         int y = top + 15;
-        graphics.centeredText(font, "DELETE TAXED CLAIM", left + panelWidth / 2, y, ACCENT); y += 30;
-        graphics.text(font, "Claim: " + payload.selectedClaimGroup(), x, y, 0xFFFFFFFF); y += 18;
-        graphics.text(font, "Current chunks: " + payload.selectedClaimChunks(), x, y, MUTED); y += 15;
-        graphics.text(font, "Taxable cycle peak: " + payload.selectedClaimTaxPeakChunks(), x, y, 0xFFFFFFFF); y += 15;
-        graphics.text(font, "Current full-cycle tax: " + payload.selectedClaimTaxEstimate(), x, y, 0xFFFFFFFF); y += 15;
+        graphics.drawCenteredString(font, "DELETE TAXED CLAIM", left + panelWidth / 2, y, ACCENT); y += 30;
+        graphics.drawString(font, "Claim: " + payload.selectedClaimGroup(), x, y, 0xFFFFFFFF); y += 18;
+        graphics.drawString(font, "Current chunks: " + payload.selectedClaimChunks(), x, y, MUTED); y += 15;
+        graphics.drawString(font, "Taxable cycle peak: " + payload.selectedClaimTaxPeakChunks(), x, y, 0xFFFFFFFF); y += 15;
+        graphics.drawString(font, "Current full-cycle tax: " + payload.selectedClaimTaxEstimate(), x, y, 0xFFFFFFFF); y += 15;
         if (payload.selectedClaimTaxDueAt() > 0L) {
-            graphics.text(font, "Scheduled payment: " + DATE.format(Instant.ofEpochMilli(payload.selectedClaimTaxDueAt())), x, y, MUTED); y += 18;
+            graphics.drawString(font, "Scheduled payment: " + DATE.format(Instant.ofEpochMilli(payload.selectedClaimTaxDueAt())), x, y, MUTED); y += 18;
         }
-        graphics.text(font, "Pay: the tax is debited first; the claim and linked homes are then deleted.", x, y, MUTED); y += 15;
-        graphics.text(font, "Forfeit: no money is charged, but " + payload.selectedClaimTaxPeakChunks()
+        graphics.drawString(font, "Pay: the tax is debited first; the claim and linked homes are then deleted.", x, y, MUTED); y += 15;
+        graphics.drawString(font, "Forfeit: no money is charged, but " + payload.selectedClaimTaxPeakChunks()
                 + " claim chunk(s) are permanently removed", x, y, DANGER); y += 13;
-        graphics.text(font, "from your capacity. Existing confiscation: " + payload.confiscatedChunks() + " chunk(s).", x, y, DANGER); y += 19;
-        graphics.text(font, pendingMode == null
+        graphics.drawString(font, "from your capacity. Existing confiscation: " + payload.confiscatedChunks() + " chunk(s).", x, y, DANGER); y += 19;
+        graphics.drawString(font, pendingMode == null
                 ? "Choose an option. You must click the same option a second time to confirm."
                 : "Click the selected option again to confirm this irreversible action.", x, y, ACCENT);
     }
 
     @Override
-    public void onClose() { minecraft.setScreenAndShow(parent); }
+    public void onClose() { minecraft.setScreen(parent); }
 }

@@ -1,5 +1,8 @@
 package be.winnetrie.mod.simpleserverutilities.client.hologram;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.renderer.MultiBufferSource;
+import be.winnetrie.mod.simpleserverutilities.client.render.SsuDebugGizmos;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,12 +17,8 @@ import be.winnetrie.mod.simpleserverutilities.hologram.HologramType;
 import be.winnetrie.mod.simpleserverutilities.network.HologramSyncPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.gizmos.GizmoStyle;
-import net.minecraft.gizmos.Gizmos;
-import net.minecraft.gizmos.TextGizmo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.world.phys.Vec3;
 
 /** Client renderer for synchronized floating text, links, scoreboards and image billboards. */
@@ -49,15 +48,18 @@ public final class HologramRenderer implements net.minecraft.client.renderer.deb
     }
 
     @Override
-    public void emitGizmos(double camX, double camY, double camZ, DebugValueAccess debugValues,
-                           Frustum frustum, float partialTicks) {
+    public void render(PoseStack poseStack, MultiBufferSource bufferSource,
+                       double camX, double camY, double camZ) {
+        SsuDebugGizmos.begin(minecraft, poseStack, bufferSource, camX, camY, camZ);
+        Frustum frustum = null; // 1.21.1 DebugRenderer does not pass its render frustum to child renderers.
+        float partialTicks = minecraft.getTimer().getGameTimeDeltaPartialTick(true);
         if (minecraft.player == null || minecraft.level == null) return;
-        String dimension = minecraft.level.dimension().identifier().toString();
+        String dimension = minecraft.level.dimension().location().toString();
         Vec3 player = minecraft.player.position();
-        var camera = minecraft.gameRenderer.mainCamera();
-        var forwardVector = camera.forwardVector();
-        var leftVector = camera.leftVector();
-        var upVector = camera.upVector();
+        var camera = minecraft.gameRenderer.getMainCamera();
+        var forwardVector = camera.getLookVector();
+        var leftVector = camera.getLeftVector();
+        var upVector = camera.getUpVector();
         Vec3 cameraForward = new Vec3(forwardVector.x(), forwardVector.y(), forwardVector.z()).normalize();
         Vec3 cameraHorizontal = new Vec3(leftVector.x(), leftVector.y(), leftVector.z()).normalize();
         Vec3 cameraUp = new Vec3(upVector.x(), upVector.y(), upVector.z()).normalize();
@@ -90,8 +92,8 @@ public final class HologramRenderer implements net.minecraft.client.renderer.deb
             String label = view.status() == HologramImageCache.Status.ERROR
                     ? "[Image unavailable: " + view.message() + "]"
                     : "[Loading image...]";
-            var placeholder = Gizmos.billboardText(label, position,
-                    TextGizmo.Style.forColorAndCentered(color)
+            var placeholder = SsuDebugGizmos.billboardText(label, position,
+                    SsuDebugGizmos.TextStyle.forColorAndCentered(color)
                             .withScale(Math.max(0.12F, TEXT_SCALE_PER_UNIT * entry.scale() * 0.65F)));
             if (entry.seeThrough()) placeholder.setAlwaysOnTop();
             return 0;
@@ -100,8 +102,8 @@ public final class HologramRenderer implements net.minecraft.client.renderer.deb
         RenderFrame frame = view.asset().frame(System.nanoTime(), view.animationEpochNanos());
         if (frame == null) return 0;
         if (rectangleBudget <= 0 || frame.rectangles().size() > rectangleBudget) {
-            var limited = Gizmos.billboardText("[Image render limit reached]", position,
-                    TextGizmo.Style.forColorAndCentered(0xFFFFAA00)
+            var limited = SsuDebugGizmos.billboardText("[Image render limit reached]", position,
+                    SsuDebugGizmos.TextStyle.forColorAndCentered(0xFFFFAA00)
                             .withScale(Math.max(0.12F, TEXT_SCALE_PER_UNIT * entry.scale() * 0.65F)));
             if (entry.seeThrough()) limited.setAlwaysOnTop();
             return Math.max(0, rectangleBudget);
@@ -126,12 +128,12 @@ public final class HologramRenderer implements net.minecraft.client.renderer.deb
                     .add(cameraUp.scale(verticalOffset));
             Vec3 horizontal = cameraHorizontal.scale(halfWidth);
             Vec3 vertical = cameraUp.scale(halfHeight);
-            var pixel = Gizmos.rect(
+            var pixel = SsuDebugGizmos.rect(
                     center.subtract(horizontal).add(vertical),
                     center.add(horizontal).add(vertical),
                     center.add(horizontal).subtract(vertical),
                     center.subtract(horizontal).subtract(vertical),
-                    GizmoStyle.fill(rectangle.argb()));
+                    SsuDebugGizmos.FillStyle.fill(rectangle.argb()));
             if (entry.seeThrough()) pixel.setAlwaysOnTop();
             emitted++;
         }
@@ -172,8 +174,8 @@ public final class HologramRenderer implements net.minecraft.client.renderer.deb
         HologramRichTextDocument document = new HologramRichTextDocument(encodedLine);
         List<Segment> segments = document.segments(0, document.plainText().length());
         if (segments.isEmpty()) {
-            var empty = Gizmos.billboardText("", lineCenter,
-                    TextGizmo.Style.forColorAndCentered(normalizeColor(entry.color())).withScale(textScale));
+            var empty = SsuDebugGizmos.billboardText("", lineCenter,
+                    SsuDebugGizmos.TextStyle.forColorAndCentered(normalizeColor(entry.color())).withScale(textScale));
             if (entry.seeThrough()) empty.setAlwaysOnTop();
             return;
         }
@@ -217,8 +219,8 @@ public final class HologramRenderer implements net.minecraft.client.renderer.deb
             int color,
             boolean bold
     ) {
-        var primary = Gizmos.billboardText(value, center,
-                TextGizmo.Style.forColorAndCentered(color).withScale(scale));
+        var primary = SsuDebugGizmos.billboardText(value, center,
+                SsuDebugGizmos.TextStyle.forColorAndCentered(color).withScale(scale));
         if (entry.seeThrough()) primary.setAlwaysOnTop();
 
         if (bold) {
@@ -226,8 +228,8 @@ public final class HologramRenderer implements net.minecraft.client.renderer.deb
             // Minecraft's bold overdraw without storing or exposing formatting codes.
             Vec3 duplicateCenter = center.subtract(cameraHorizontal.scale(
                     BOLD_OFFSET_PIXELS * TEXT_WIDTH_PER_FONT_PIXEL * 2.0D * entry.scale()));
-            var duplicate = Gizmos.billboardText(value, duplicateCenter,
-                    TextGizmo.Style.forColorAndCentered(color).withScale(scale));
+            var duplicate = SsuDebugGizmos.billboardText(value, duplicateCenter,
+                    SsuDebugGizmos.TextStyle.forColorAndCentered(color).withScale(scale));
             if (entry.seeThrough()) duplicate.setAlwaysOnTop();
         }
     }
@@ -272,12 +274,12 @@ public final class HologramRenderer implements net.minecraft.client.renderer.deb
                 .subtract(cameraForward.scale(DECORATION_DEPTH_OFFSET_PER_SCALE * unitScale));
         Vec3 horizontal = cameraHorizontal.scale(halfWidth);
         Vec3 vertical = cameraUp.scale(halfThickness);
-        var decoration = Gizmos.rect(
+        var decoration = SsuDebugGizmos.rect(
                 center.subtract(horizontal).add(vertical),
                 center.add(horizontal).add(vertical),
                 center.add(horizontal).subtract(vertical),
                 center.subtract(horizontal).subtract(vertical),
-                GizmoStyle.fill(color));
+                SsuDebugGizmos.FillStyle.fill(color));
         if (entry.seeThrough()) decoration.setAlwaysOnTop();
     }
 
@@ -322,12 +324,12 @@ public final class HologramRenderer implements net.minecraft.client.renderer.deb
         Vec3 center = blockCenter.add(cameraForward.scale(BACKGROUND_DEPTH_OFFSET_PER_SCALE * unitScale));
         Vec3 horizontal = cameraHorizontal.scale(halfWidth);
         Vec3 vertical = cameraUp.scale(halfHeight);
-        var background = Gizmos.rect(
+        var background = SsuDebugGizmos.rect(
                 center.subtract(horizontal).add(vertical),
                 center.add(horizontal).add(vertical),
                 center.add(horizontal).subtract(vertical),
                 center.subtract(horizontal).subtract(vertical),
-                GizmoStyle.fill(entry.backgroundColor()));
+                SsuDebugGizmos.FillStyle.fill(entry.backgroundColor()));
         if (entry.seeThrough()) background.setAlwaysOnTop();
     }
 

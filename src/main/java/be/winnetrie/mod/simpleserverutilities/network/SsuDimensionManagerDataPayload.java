@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record SsuDimensionManagerDataPayload(
         long requestId,
@@ -20,7 +20,7 @@ public record SsuDimensionManagerDataPayload(
 ) implements CustomPacketPayload {
     private static final int MAX_DIMENSIONS = 256;
     public static final Type<SsuDimensionManagerDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "dimension_manager_data"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "dimension_manager_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuDimensionManagerDataPayload> STREAM_CODEC =
             StreamCodec.of(SsuDimensionManagerDataPayload::encode, SsuDimensionManagerDataPayload::decode);
 

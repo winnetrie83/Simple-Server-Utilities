@@ -38,15 +38,15 @@ public final class WorldMapService {
         ChunkPos playerChunk = player.chunkPosition();
         int centerChunkX = clamp(
                 payload.centerChunkX(),
-                playerChunk.x() - MAX_CENTER_DISTANCE,
-                playerChunk.x() + MAX_CENTER_DISTANCE
+                playerChunk.x - MAX_CENTER_DISTANCE,
+                playerChunk.x + MAX_CENTER_DISTANCE
         );
         int centerChunkZ = clamp(
                 payload.centerChunkZ(),
-                playerChunk.z() - MAX_CENTER_DISTANCE,
-                playerChunk.z() + MAX_CENTER_DISTANCE
+                playerChunk.z - MAX_CENTER_DISTANCE,
+                playerChunk.z + MAX_CENTER_DISTANCE
         );
-        String dimension = player.level().dimension().identifier().toString();
+        String dimension = player.level().dimension().location().toString();
 
         List<WorldMapDataPayload.ClaimOverlay> claims = allowed
                 ? collectClaims(player, dimension, centerChunkX, centerChunkZ, radius)
@@ -120,7 +120,7 @@ public final class WorldMapService {
 
         List<WorldMapDataPayload.RegionOverlay> result = new ArrayList<>();
         for (var region : SimpleServerUtilities.REGIONS.getAll()) {
-            if (!dimension.equals(region.getDimension().identifier().toString())) {
+            if (!dimension.equals(region.getDimension().location().toString())) {
                 continue;
             }
             if (region.getMaxX() < minBlockX || region.getMinX() > maxBlockX

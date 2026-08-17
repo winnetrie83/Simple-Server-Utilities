@@ -16,13 +16,13 @@ import be.winnetrie.mod.simpleserverutilities.network.QuestEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.QuestEditorSubmitPayload;
 import be.winnetrie.mod.simpleserverutilities.quest.QuestDefinition;
 import be.winnetrie.mod.simpleserverutilities.quest.QuestObjectiveDefinition;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Compact guided quest editor. The normal path uses labelled buttons/pickers;
@@ -148,12 +148,9 @@ public final class QuestEditorScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("Icon: " + trim(draft.iconItem, 22)), b -> openIconPicker())
                 .bounds(x + 14, y + 108, 185, 18).build());
         descriptionValue = draft.description == null ? "" : draft.description;
-        description = MultiLineEditBox.builder().setX(x + 209).setY(y + 108)
-                .setPlaceholder(Component.literal("Quest description"))
-                .setShowBackground(true).setShowDecorations(true)
-                .build(font, 327, 54, Component.literal("Quest description"));
+        description = new MultiLineEditBox(font, x + 209, y + 108, 327, 54,
+                Component.literal("Quest description"), Component.literal("Quest description"));
         description.setCharacterLimit(8192);
-        description.setLineLimit(24);
         description.setValue(descriptionValue);
         description.setValueListener(v -> descriptionValue = v);
         addRenderableWidget(description);
@@ -275,7 +272,7 @@ public final class QuestEditorScreen extends Screen {
             draft.npcShowReadyMarker = !draft.npcShowReadyMarker; rebuildWidgets();
         }).bounds(x + 334, y + 162, 150, 18).build());
         addRenderableWidget(Button.builder(Component.literal("Edit simple NPC dialogue…"), b -> {
-            savePage(); if (minecraft != null) minecraft.setScreenAndShow(new QuestNpcDialogueTextScreen(this, draft));
+            savePage(); if (minecraft != null) minecraft.setScreen(new QuestNpcDialogueTextScreen(this, draft));
         }).bounds(x + 14, y + 206, 210, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Same NPC for giver + turn-in"), b -> {
             if (!draft.giverNpcInstanceId.isBlank()) draft.turnInNpcInstanceId = draft.giverNpcInstanceId;
@@ -381,7 +378,7 @@ public final class QuestEditorScreen extends Screen {
     private void openEventPicker() {
         savePage();
         String current = objective().eventType;
-        if (minecraft != null) minecraft.setScreenAndShow(new QuestOptionPickerScreen(this, "Choose objective event", EVENT_TYPES, current, value -> {
+        if (minecraft != null) minecraft.setScreen(new QuestOptionPickerScreen(this, "Choose objective event", EVENT_TYPES, current, value -> {
             QuestObjectiveDefinition o = objective();
             o.eventType = value;
             if (eventNeedsNoSubject(value)) o.subject = "*";
@@ -392,7 +389,7 @@ public final class QuestEditorScreen extends Screen {
     private void openConditionPicker() {
         savePage();
         String current = conditionType();
-        if (minecraft != null) minecraft.setScreenAndShow(new QuestOptionPickerScreen(this, "Choose prerequisite", CONDITION_TYPES, current, value -> {
+        if (minecraft != null) minecraft.setScreen(new QuestOptionPickerScreen(this, "Choose prerequisite", CONDITION_TYPES, current, value -> {
             draft.prerequisites = defaultCondition(value);
             rebuildWidgets();
         }));
@@ -401,7 +398,7 @@ public final class QuestEditorScreen extends Screen {
     private void openRewardPicker() {
         savePage();
         String current = reward() == null ? "none" : reward().type();
-        if (minecraft != null) minecraft.setScreenAndShow(new QuestOptionPickerScreen(this, "Choose reward type", REWARD_TYPES, current, value -> {
+        if (minecraft != null) minecraft.setScreen(new QuestOptionPickerScreen(this, "Choose reward type", REWARD_TYPES, current, value -> {
             if ("none".equals(value)) {
                 if (rewardIndex >= 0) {
                     draft.rewards.remove(rewardIndex);
@@ -464,7 +461,7 @@ public final class QuestEditorScreen extends Screen {
 
     private void openIconPicker() {
         savePage();
-        if (minecraft != null) minecraft.setScreenAndShow(new RegistryItemPickerScreen(this, "Choose quest icon", draft.iconItem,
+        if (minecraft != null) minecraft.setScreen(new RegistryItemPickerScreen(this, "Choose quest icon", draft.iconItem,
                 value -> { draft.iconItem = value; rebuildWidgets(); }));
     }
 
@@ -472,7 +469,7 @@ public final class QuestEditorScreen extends Screen {
         savePage();
         ContentAction r = reward(); if (r == null) return;
         String initialItem = r.parameter("item");
-        if (minecraft != null) minecraft.setScreenAndShow(new RegistryItemPickerScreen(this, "Choose reward item", initialItem, value -> {
+        if (minecraft != null) minecraft.setScreen(new RegistryItemPickerScreen(this, "Choose reward item", initialItem, value -> {
             Map<String, String> p = new LinkedHashMap<>(reward().parameters());
             p.put("item", value);
             draft.rewards.set(rewardIndex, new ContentAction("give_item", p));
@@ -483,7 +480,7 @@ public final class QuestEditorScreen extends Screen {
     private void openObjectiveItemPicker() {
         savePage();
         QuestObjectiveDefinition o = objective();
-        if (minecraft != null) minecraft.setScreenAndShow(new RegistryItemPickerScreen(this, "Choose objective target", "*".equals(o.subject) ? "" : o.subject, value -> {
+        if (minecraft != null) minecraft.setScreen(new RegistryItemPickerScreen(this, "Choose objective target", "*".equals(o.subject) ? "" : o.subject, value -> {
             o.subject = value == null || value.isBlank() ? "*" : value;
             rebuildWidgets();
         }));
@@ -491,7 +488,7 @@ public final class QuestEditorScreen extends Screen {
 
     private void openNpcPicker(boolean giver) {
         savePage();
-        if (minecraft != null) minecraft.setScreenAndShow(new QuestNpcPickerScreen(this,
+        if (minecraft != null) minecraft.setScreen(new QuestNpcPickerScreen(this,
                 giver ? "Choose quest giver" : "Choose turn-in NPC", initial.availableNpcs(),
                 giver ? draft.giverNpcInstanceId : draft.turnInNpcInstanceId, value -> {
                     if (giver) draft.giverNpcInstanceId = value; else draft.turnInNpcInstanceId = value;
@@ -503,7 +500,7 @@ public final class QuestEditorScreen extends Screen {
     private void openPrerequisiteQuestPicker() {
         savePage();
         String selected = draft.prerequisites == null ? "" : draft.prerequisites.parameter("quest");
-        if (minecraft != null) minecraft.setScreenAndShow(new QuestDefinitionPickerScreen(this, "Required completed quest",
+        if (minecraft != null) minecraft.setScreen(new QuestDefinitionPickerScreen(this, "Required completed quest",
                 initial.availableQuests(), selected, value -> {
                     draft.prerequisites = value == null || value.isBlank()
                             ? new ContentCondition("always", Map.of(), List.of())
@@ -529,7 +526,7 @@ public final class QuestEditorScreen extends Screen {
             savePage();
             boolean linkedNpc = !draft.giverNpcInstanceId.isBlank() || !draft.turnInNpcInstanceId.isBlank();
             if (linkedNpc && "menu".equalsIgnoreCase(initial.questAccessMode())) {
-                if (minecraft != null) minecraft.setScreenAndShow(new NpcQuestAccessPromptScreen(this,
+                if (minecraft != null) minecraft.setScreen(new NpcQuestAccessPromptScreen(this,
                         () -> submitWithAccess("npc"), () -> submitWithAccess("both")));
                 return;
             }
@@ -541,7 +538,7 @@ public final class QuestEditorScreen extends Screen {
         try {
             String json = GSON.toJson(draft);
             if (json.length() > 65_535) throw new IllegalArgumentException("Quest exceeds the editor size limit.");
-            ClientPacketDistributor.sendToServer(new QuestEditorSubmitPayload(initial.originalQuestId(), json, requestedAccessMode, nextRequestId++));
+            PacketDistributor.sendToServer(new QuestEditorSubmitPayload(initial.originalQuestId(), json, requestedAccessMode, nextRequestId++));
             setNotice("Saving and validating quest…", false);
         } catch (RuntimeException e) { setNotice(message(e, "Invalid quest data."), true); }
     }
@@ -553,32 +550,32 @@ public final class QuestEditorScreen extends Screen {
         if (minecraft != null && minecraft.player != null) minecraft.player.sendSystemMessage(Component.literal(payload.message()));
         if (parent instanceof QuestBookScreen book) book.refreshFromEditor(payload.message());
         if (parent instanceof NpcQuestWorkflowScreen workflow) workflow.refresh();
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     private void setNotice(String text, boolean error) { notice = text == null ? "" : text; noticeError = error; }
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, "Quest Definition Editor", x + 14, y + 14, TEXT, true);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Quest Definition Editor", x + 14, y + 14, TEXT, true);
         switch (page) {
             case GENERAL -> renderGeneralLabels(g, x, y);
             case OBJECTIVES -> renderObjectiveLabels(g, x, y);
             case REWARDS -> renderRewardLabels(g, x, y);
             case NPC -> {
-                g.text(font, "Simple workflow — choose NPCs and SSU handles states, markers and routing.", x + 14, y + 64, MUTED, false);
-                g.text(font, "Advanced branching remains available from the NPC's Advanced Dialogue Editor.", x + 14, y + 240, MUTED, false);
+                g.drawString(font, "Simple workflow — choose NPCs and SSU handles states, markers and routing.", x + 14, y + 64, MUTED, false);
+                g.drawString(font, "Advanced branching remains available from the NPC's Advanced Dialogue Editor.", x + 14, y + 240, MUTED, false);
             }
         }
-        if (!notice.isBlank()) g.text(font, trim(notice, 70), x + 94, y + H - 23, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 70), x + 94, y + H - 23, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void renderGeneralLabels(GuiGraphicsExtractor g, int x, int y) {
+    private void renderGeneralLabels(GuiGraphics g, int x, int y) {
         label(g, "Quest ID", x + 14, y + 65); label(g, "Title", x + 169, y + 65); label(g, "Category", x + 399, y + 65);
         label(g, "Description", x + 209, y + 97); label(g, "Prerequisite", x + 14, y + 207);
         String type = conditionType();
@@ -593,8 +590,8 @@ public final class QuestEditorScreen extends Screen {
         label(g, "Cooldown sec", x + 454, y + 207);
     }
 
-    private void renderObjectiveLabels(GuiGraphicsExtractor g, int x, int y) {
-        g.text(font, "Objective " + (objectiveIndex + 1) + " / " + draft.objectives.size() + "  • ID is automatic", x + 214, y + 81, MUTED, false);
+    private void renderObjectiveLabels(GuiGraphics g, int x, int y) {
+        g.drawString(font, "Objective " + (objectiveIndex + 1) + " / " + draft.objectives.size() + "  • ID is automatic", x + 214, y + 81, MUTED, false);
         label(g, "Player-facing objective text", x + 14, y + 107);
         label(g, "Event", x + 14, y + 149);
         if (!eventNeedsNoSubject(objective().eventType)) label(g, eventUsesRegistryItem(objective().eventType) ? "Target item/block" : "Target / subject", x + 214, y + 149);
@@ -602,10 +599,10 @@ public final class QuestEditorScreen extends Screen {
         if (objectiveMetadata != null) label(g, "Advanced key=value metadata", x + 169, y + 193);
     }
 
-    private void renderRewardLabels(GuiGraphicsExtractor g, int x, int y) {
-        g.text(font, "Reward " + (rewardIndex < 0 ? 0 : rewardIndex + 1) + " / " + draft.rewards.size(), x + 214, y + 81, MUTED, false);
+    private void renderRewardLabels(GuiGraphics g, int x, int y) {
+        g.drawString(font, "Reward " + (rewardIndex < 0 ? 0 : rewardIndex + 1) + " / " + draft.rewards.size(), x + 214, y + 81, MUTED, false);
         ContentAction r = reward();
-        if (r == null) { g.text(font, "No reward. Click Add to create one.", x + 14, y + 158, MUTED, false); return; }
+        if (r == null) { g.drawString(font, "No reward. Click Add to create one.", x + 14, y + 158, MUTED, false); return; }
         switch (r.type()) {
             case "give_item" -> { label(g, "Item", x + 214, y + 111); label(g, "Count", x + 454, y + 111); }
             case "give_money" -> label(g, "Amount (minor currency units)", x + 214, y + 111);
@@ -631,7 +628,7 @@ public final class QuestEditorScreen extends Screen {
                 || "claim_group_created".equals(event) || "claim_chunk_added".equals(event);
     }
 
-    private void label(GuiGraphicsExtractor g, String text, int x, int y) { g.text(font, text, x, y, MUTED, false); }
+    private void label(GuiGraphics g, String text, int x, int y) { g.drawString(font, text, x, y, MUTED, false); }
     private int px() { return Math.max(4, (width - W) / 2); }
     private int py() { return Math.max(4, (height - H) / 2); }
     private static String onOff(boolean v) { return v ? "ON" : "OFF"; }

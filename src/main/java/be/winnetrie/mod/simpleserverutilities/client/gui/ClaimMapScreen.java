@@ -12,14 +12,13 @@ import be.winnetrie.mod.simpleserverutilities.network.ClaimMapRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuActionPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 public final class ClaimMapScreen extends Screen {
 
@@ -64,11 +63,11 @@ public final class ClaimMapScreen extends Screen {
     public boolean openHomesForClaim(String claimName) {
         if (parent instanceof SsuDashboardScreen dashboard) {
             dashboard.openHomesForClaim(claimName);
-            minecraft.setScreenAndShow(dashboard);
+            minecraft.setScreen(dashboard);
             return true;
         }
         SsuDashboardScreen.queueHomesForClaim(claimName);
-        ClientPacketDistributor.sendToServer(new SsuMenuActionPayload(
+        PacketDistributor.sendToServer(new SsuMenuActionPayload(
                 "refresh_shell", "", "", "", nextSettingsRequestId++));
         return true;
     }
@@ -192,36 +191,36 @@ public final class ClaimMapScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         SsuGuiScale.fullscreenDimWhenScaled(graphics, this, 0xA5000000);
         int right = controlLeft + CONTROL_WIDTH;
         graphics.fill(shellLeft, MARGIN, right, height - MARGIN, PANEL);
-        graphics.outline(shellLeft, MARGIN, right - shellLeft, height - MARGIN * 2, FRAME);
+        graphics.renderOutline(shellLeft, MARGIN, right - shellLeft, height - MARGIN * 2, FRAME);
         graphics.fill(shellLeft, MARGIN, right, MARGIN + TOP_BAR - 2, PANEL_ALT);
         graphics.fill(shellLeft + 3, mapTop, mapLeft - 3, mapTop + mapSize, PANEL_ALT);
         graphics.fill(controlLeft, mapTop, right, mapTop + mapSize, PANEL_ALT);
 
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
 
-        graphics.text(font, "CLAIM MAP", shellLeft + 8, MARGIN + 8, ACCENT);
-        graphics.text(font, "Chunk selection & land management", shellLeft + 82, MARGIN + 8, MUTED);
+        graphics.drawString(font, "CLAIM MAP", shellLeft + 8, MARGIN + 8, ACCENT);
+        graphics.drawString(font, "Chunk selection & land management", shellLeft + 82, MARGIN + 8, MUTED);
 
         int x = controlLeft + 8;
-        graphics.text(font, "ACTIVE CLAIM", x, mapTop + 10, ACCENT);
+        graphics.drawString(font, "ACTIVE CLAIM", x, mapTop + 10, ACCENT);
         String selectedClaim = payload.selectedClaimGroup().isBlank() ? "No claim selected" : payload.selectedClaimGroup();
-        graphics.centeredText(font, selectedClaim, controlLeft + CONTROL_WIDTH / 2, mapTop + 44, 0xFFFFFFFF);
-        graphics.text(font, "MODE", x, mapTop + 73, ACCENT);
+        graphics.drawCenteredString(font, selectedClaim, controlLeft + CONTROL_WIDTH / 2, mapTop + 44, 0xFFFFFFFF);
+        graphics.drawString(font, "MODE", x, mapTop + 73, ACCENT);
         int y = mapTop + (operation == ClaimMapOperation.CREATE ? 202 : 174);
 
-        graphics.text(font, "SELECTION", x, y, ACCENT); y += 17;
-        graphics.text(font, selectedChunks.size() + " / " + ClaimMapWidget.MAX_SELECTION_SIZE + " chunks", x, y, 0xFFFFFFFF); y += 14;
-        graphics.text(font, "Total: " + payload.usedChunks() + " / " + payload.maxChunks(), x, y, MUTED); y += 14;
-        graphics.text(font, "Claims: " + payload.usedClaimGroups() + " / " + payload.maxClaimGroups(), x, y, MUTED); y += 14;
+        graphics.drawString(font, "SELECTION", x, y, ACCENT); y += 17;
+        graphics.drawString(font, selectedChunks.size() + " / " + ClaimMapWidget.MAX_SELECTION_SIZE + " chunks", x, y, 0xFFFFFFFF); y += 14;
+        graphics.drawString(font, "Total: " + payload.usedChunks() + " / " + payload.maxChunks(), x, y, MUTED); y += 14;
+        graphics.drawString(font, "Claims: " + payload.usedClaimGroups() + " / " + payload.maxClaimGroups(), x, y, MUTED); y += 14;
         if (!payload.selectedClaimGroup().isBlank()) {
             String limit = payload.maxChunksPerClaim() <= 0 ? "unlimited" : Integer.toString(payload.maxChunksPerClaim());
-            graphics.text(font, "Current: " + payload.selectedClaimChunks() + " / " + limit, x, y, MUTED); y += 14;
+            graphics.drawString(font, "Current: " + payload.selectedClaimChunks() + " / " + limit, x, y, MUTED); y += 14;
             if (payload.selectedClaimTaxSettlementRequired()) {
-                graphics.text(font, "Tax peak: " + payload.selectedClaimTaxPeakChunks(), x, y, 0xFFFFC96B); y += 14;
+                graphics.drawString(font, "Tax peak: " + payload.selectedClaimTaxPeakChunks(), x, y, 0xFFFFC96B); y += 14;
             } else {
                 y += 6;
             }
@@ -229,7 +228,7 @@ public final class ClaimMapScreen extends Screen {
             y += 6;
         }
 
-        graphics.text(font, "LEGEND", x, y, ACCENT); y += 16;
+        graphics.drawString(font, "LEGEND", x, y, ACCENT); y += 16;
         drawLegend(graphics, x, y, payload.ownClaimColor(), "Your claim"); y += 14;
         drawLegend(graphics, x, y, payload.otherClaimColor(), "Other claim"); y += 14;
         drawLegend(graphics, x, y, payload.regionColor(), "Server region"); y += 14;
@@ -248,14 +247,14 @@ public final class ClaimMapScreen extends Screen {
         int bottomX = shellLeft + 16;
         int bottomWidth = Math.max(40, controlLeft + CONTROL_WIDTH - bottomX - 10);
         String visibleBottom = font.plainSubstrByWidth(bottom, bottomWidth);
-        graphics.text(font, visibleBottom, bottomX, height - MARGIN - 17,
+        graphics.drawString(font, visibleBottom, bottomX, height - MARGIN - 17,
                 payload.error() ? 0xFFFF6B6B : 0xFFCED7E2);
     }
 
-    private void drawLegend(GuiGraphicsExtractor graphics, int x, int y, int color, String label) {
+    private void drawLegend(GuiGraphics graphics, int x, int y, int color, String label) {
         graphics.fill(x, y + 2, x + 10, y + 12, withAlpha(color, 0x58));
-        graphics.outline(x, y + 2, 10, 10, color);
-        graphics.text(font, label, x + 15, y + 2, 0xFFCCCCCC);
+        graphics.renderOutline(x, y + 2, 10, 10, color);
+        graphics.drawString(font, label, x + 15, y + 2, 0xFFCCCCCC);
     }
 
     private static int withAlpha(int argb, int alpha) {
@@ -290,7 +289,7 @@ public final class ClaimMapScreen extends Screen {
         if (minecraft.player == null) {
             return;
         }
-        requestMap(minecraft.player.chunkPosition().x(), minecraft.player.chunkPosition().z(),
+        requestMap(minecraft.player.chunkPosition().x, minecraft.player.chunkPosition().z,
                 payload.radius(), payload.selectedClaimGroup());
     }
 
@@ -341,7 +340,7 @@ public final class ClaimMapScreen extends Screen {
                 payload.chunks()
         );
         rebuildWidgets();
-        ClientPacketDistributor.sendToServer(new ClaimMapRequestPayload(
+        PacketDistributor.sendToServer(new ClaimMapRequestPayload(
                 centerX, centerZ, radius, selectedClaim, centerOnSelectedClaim));
     }
 
@@ -354,7 +353,7 @@ public final class ClaimMapScreen extends Screen {
         for (long key : selectedChunks) {
             chunks.add(new ClaimMapActionPayload.ChunkCoordinate(ClaimMapWidget.keyX(key), ClaimMapWidget.keyZ(key)));
         }
-        ClientPacketDistributor.sendToServer(new ClaimMapActionPayload(
+        PacketDistributor.sendToServer(new ClaimMapActionPayload(
                 operation,
                 claimName,
                 payload.centerChunkX(),
@@ -403,7 +402,7 @@ public final class ClaimMapScreen extends Screen {
 
     private void openClaimSettings() {
         if (payload.selectedClaimGroup().isBlank()) return;
-        ClientPacketDistributor.sendToServer(new SsuPropertySettingsRequestPayload(
+        PacketDistributor.sendToServer(new SsuPropertySettingsRequestPayload(
                 "claim", payload.selectedClaimGroup(), nextSettingsRequestId++));
     }
 
@@ -418,15 +417,15 @@ public final class ClaimMapScreen extends Screen {
         pendingDeleteClaim = "";
         selectedChunks.clear();
         if (payload.selectedClaimTaxSettlementRequired()) {
-            minecraft.setScreenAndShow(new ClaimTaxDeleteScreen(this, payload));
+            minecraft.setScreen(new ClaimTaxDeleteScreen(this, payload));
             return;
         }
-        ClientPacketDistributor.sendToServer(new ClaimMapActionPayload(
+        PacketDistributor.sendToServer(new ClaimMapActionPayload(
                 ClaimMapOperation.DELETE, claim, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), List.of()));
     }
 
     private void openWorldMap() {
-        ClientPacketDistributor.sendToServer(new WorldMapRequestPayload(
+        PacketDistributor.sendToServer(new WorldMapRequestPayload(
                 payload.centerChunkX(),
                 payload.centerChunkZ(),
                 Math.max(3, Math.min(32, payload.radius()))
@@ -435,7 +434,7 @@ public final class ClaimMapScreen extends Screen {
 
     private void backToMenu() {
         if (minecraft.player != null) {
-            minecraft.player.connection.sendUnattendedCommand("ssu menu", null);
+            minecraft.player.connection.sendCommand("ssu menu");
         }
     }
 
@@ -462,29 +461,29 @@ public final class ClaimMapScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (event.buttonInfo().button() == 2
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 2
                 && mapWidget != null
-                && mapWidget.beginMiddleDrag(event.x(), event.y())) {
+                && mapWidget.beginMiddleDrag(mouseX, mouseY)) {
             return true;
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
         if (mapWidget != null && mapWidget.isMiddleDragging()) {
-            return mapWidget.updateMiddleDrag(event.x(), event.y());
+            return mapWidget.updateMiddleDrag(mouseX, mouseY);
         }
-        return super.mouseDragged(event, deltaX, deltaY);
+        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
     }
 
     @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
-        if (event.buttonInfo().button() == 2 && mapWidget != null && mapWidget.isMiddleDragging()) {
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 2 && mapWidget != null && mapWidget.isMiddleDragging()) {
             return mapWidget.finishMiddleDrag();
         }
-        return super.mouseReleased(event);
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override

@@ -18,7 +18,7 @@ import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorSubmitPayloa
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Shared lifecycle shell; every concrete minigame mode owns its own tabbed editor. */
 public abstract class MinigameEditorScreen extends Screen {
@@ -85,7 +85,7 @@ public abstract class MinigameEditorScreen extends Screen {
         setNotice(result.message(), !result.successful());
         if (result.successful()) {
             if (minecraft != null) {
-                minecraft.setScreenAndShow(parent);
+                minecraft.setScreen(parent);
                 if (parent instanceof MinigameLobbyScreen lobby) lobby.refreshFromEditor();
                 else if (parent instanceof MinigameAdminScreen admin) admin.refreshFromEditor();
                 else if (parent instanceof MinigameSetupToolScreen setup) setup.refreshFromEditor();
@@ -97,7 +97,7 @@ public abstract class MinigameEditorScreen extends Screen {
         try {
             draft.normalize();
             awaiting = true;
-            ClientPacketDistributor.sendToServer(new MinigameEditorSubmitPayload(
+            PacketDistributor.sendToServer(new MinigameEditorSubmitPayload(
                     initial.originalMinigameId(), GSON.toJson(draft), nextRequestId++));
             setNotice("Saving minigame…", false);
             rebuildWidgets();
@@ -194,6 +194,6 @@ public abstract class MinigameEditorScreen extends Screen {
         return value.length() <= max ? value : value.substring(0, Math.max(0, max - 1)) + "…";
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
 }

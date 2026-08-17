@@ -22,7 +22,7 @@ public final class DamageIndicatorEvents {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onDamage(LivingDamageEvent.Post event) {
         if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("identity")) return;
-        float amount = Math.max(0.0F, event.getInflictedDamage());
+        float amount = Math.max(0.0F, event.getNewDamage());
         if (amount > 0.0001F) send(event.getEntity(), amount, false);
     }
 

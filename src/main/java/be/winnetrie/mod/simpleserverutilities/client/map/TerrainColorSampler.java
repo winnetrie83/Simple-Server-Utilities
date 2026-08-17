@@ -61,8 +61,8 @@ public final class TerrainColorSampler {
         int localX = Math.floorMod(worldX, 16);
         int localZ = Math.floorMod(worldZ, 16);
         int rawSurface = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX, localZ);
-        int minY = level.getMinY();
-        int y = Math.min(rawSurface, level.getMaxY());
+        int minY = level.getMinBuildHeight();
+        int y = Math.min(rawSurface, (level.getMaxBuildHeight() - 1));
         int terrainHeight = Integer.MIN_VALUE;
         int mappedSurfaceHeight = Integer.MIN_VALUE;
         byte mappedSurfaceKind = SURFACE_SOLID;
@@ -236,8 +236,8 @@ public final class TerrainColorSampler {
         int localX = Math.floorMod(worldX, 16);
         int localZ = Math.floorMod(worldZ, 16);
         int raw = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, localX, localZ);
-        int minY = level.getMinY();
-        int y = Math.min(raw, level.getMaxY());
+        int minY = level.getMinBuildHeight();
+        int y = Math.min(raw, (level.getMaxBuildHeight() - 1));
         int terrainHeight = Integer.MIN_VALUE;
         int surfaceHeight = Integer.MIN_VALUE;
         byte surfaceKind = SURFACE_SOLID;

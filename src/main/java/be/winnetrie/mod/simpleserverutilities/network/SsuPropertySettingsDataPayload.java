@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record SsuPropertySettingsDataPayload(
         String kind, String target, String title, long requestId, boolean canEdit,
@@ -16,7 +16,7 @@ public record SsuPropertySettingsDataPayload(
     private static final int MAX_ENTRIES = 40;
     private static final int MAX_OPTIONS = 100;
     public static final Type<SsuPropertySettingsDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "property_settings_data"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "property_settings_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuPropertySettingsDataPayload> STREAM_CODEC =
             StreamCodec.of(SsuPropertySettingsDataPayload::encode, SsuPropertySettingsDataPayload::decode);
 

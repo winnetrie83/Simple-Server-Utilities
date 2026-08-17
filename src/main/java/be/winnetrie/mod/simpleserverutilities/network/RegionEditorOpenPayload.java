@@ -4,13 +4,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Opens the initial region creation/settings editor for the current tool selection. */
 public record RegionEditorOpenPayload(String dimension, long point1, long point2)
         implements CustomPacketPayload {
     public static final Type<RegionEditorOpenPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_editor_open")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_editor_open")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, RegionEditorOpenPayload> STREAM_CODEC =
             StreamCodec.of(RegionEditorOpenPayload::encode, RegionEditorOpenPayload::decode);

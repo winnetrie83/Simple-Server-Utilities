@@ -8,7 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimChunkStatus;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Server-authoritative overlays and viewport metadata for the SSU world map. */
 public record WorldMapDataPayload(
@@ -30,7 +30,7 @@ public record WorldMapDataPayload(
     private static final int MAX_REGIONS = 512;
 
     public static final Type<WorldMapDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "world_map_data")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "world_map_data")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, WorldMapDataPayload> STREAM_CODEC =

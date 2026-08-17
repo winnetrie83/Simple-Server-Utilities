@@ -13,10 +13,11 @@ import be.winnetrie.mod.simpleserverutilities.client.map.AerialMapAtlas;
 import be.winnetrie.mod.simpleserverutilities.client.map.MapLighting;
 import be.winnetrie.mod.simpleserverutilities.network.MinimapDataPayload;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import org.jspecify.annotations.Nullable;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Smooth double-buffered minimap terrain cache.
@@ -45,6 +46,7 @@ final class MinimapTerrainMap implements AutoCloseable {
     private int[] publishedCachePixels;
     private int[] buildingCachePixels;
     private @Nullable DynamicTexture displayTexture;
+    private @Nullable ResourceLocation displayTextureLocation;
 
     private int publishedCenterX = Integer.MIN_VALUE;
     private int publishedCenterZ = Integer.MIN_VALUE;
@@ -74,7 +76,7 @@ final class MinimapTerrainMap implements AutoCloseable {
             return;
         }
 
-        String dimension = level.dimension().identifier().toString();
+        String dimension = level.dimension().location().toString();
         int playerX = (int) Math.floor(minecraft.player.getX());
         int playerZ = (int) Math.floor(minecraft.player.getZ());
         int terrainHash = terrainHash(updated);
@@ -98,22 +100,23 @@ final class MinimapTerrainMap implements AutoCloseable {
         }
     }
 
-    void render(GuiGraphicsExtractor graphics, int left, int top, int size) {
-        if (displayTexture == null) {
+    void render(GuiGraphics graphics, int left, int top, int size) {
+        if (displayTexture == null || displayTextureLocation == null) {
             graphics.fill(left, top, left + size, top + size, UNKNOWN_DARK);
             return;
         }
         graphics.blit(
-                displayTexture.getTextureView(),
-                displayTexture.getSampler(),
+                displayTextureLocation,
                 left,
                 top,
-                left + size,
-                top + size,
+                size,
+                size,
                 0.0F,
-                1.0F,
                 0.0F,
-                1.0F
+                DISPLAY_SIZE,
+                DISPLAY_SIZE,
+                DISPLAY_SIZE,
+                DISPLAY_SIZE
         );
     }
 
@@ -240,7 +243,7 @@ final class MinimapTerrainMap implements AutoCloseable {
             for (int x = 0; x < DISPLAY_SIZE; x++) {
                 int offsetX = x - DISPLAY_SIZE / 2;
                 if (circle && outsideCircle(offsetX, offsetZ)) {
-                    target.setPixel(x, z, 0x00000000);
+                    target.setPixelRGBA(x, z, 0x00000000);
                     continue;
                 }
 
@@ -248,7 +251,7 @@ final class MinimapTerrainMap implements AutoCloseable {
                 if (circle) {
                     color = applyCircleBorder(color, offsetX, offsetZ);
                 }
-                target.setPixel(x, z, color);
+                target.setPixelRGBA(x, z, color);
             }
         }
 
@@ -376,7 +379,9 @@ final class MinimapTerrainMap implements AutoCloseable {
 
     private void ensureDisplayTexture() {
         if (displayTexture == null) {
-            displayTexture = new DynamicTexture("SSU smooth minimap viewport", DISPLAY_SIZE, DISPLAY_SIZE, true);
+            displayTexture = new DynamicTexture(DISPLAY_SIZE, DISPLAY_SIZE, true);
+            displayTextureLocation = Minecraft.getInstance().getTextureManager()
+                    .register("ssu_minimap_viewport", displayTexture);
         }
     }
 
@@ -439,10 +444,11 @@ final class MinimapTerrainMap implements AutoCloseable {
 
     @Override
     public void close() {
-        closeTexture(displayTexture);
+        closeTexture(displayTexture, displayTextureLocation);
         publishedCachePixels = null;
         buildingCachePixels = null;
         displayTexture = null;
+        displayTextureLocation = null;
         publishedCenterX = Integer.MIN_VALUE;
         publishedCenterZ = Integer.MIN_VALUE;
         publishedDimension = "";
@@ -459,8 +465,10 @@ final class MinimapTerrainMap implements AutoCloseable {
         forceRebuild = false;
     }
 
-    private static void closeTexture(@Nullable DynamicTexture texture) {
-        if (texture != null) {
+    private static void closeTexture(@Nullable DynamicTexture texture, @Nullable ResourceLocation location) {
+        if (location != null) {
+            Minecraft.getInstance().getTextureManager().release(location);
+        } else if (texture != null) {
             texture.close();
         }
     }

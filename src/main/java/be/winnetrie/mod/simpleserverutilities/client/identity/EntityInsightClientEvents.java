@@ -5,7 +5,7 @@ import java.util.Locale;
 import be.winnetrie.mod.simpleserverutilities.network.EntityInsightPayload;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
-import net.minecraft.util.TriState;
+import net.neoforged.neoforge.common.util.TriState;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.EventPriority;
@@ -18,12 +18,12 @@ public final class EntityInsightClientEvents {
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
-    public static void onNameTag(RenderNameTagEvent.CanRender event) {
+    public static void onNameTag(RenderNameTagEvent event) {
         if (!(event.getEntity() instanceof LivingEntity living) || living instanceof Player) return;
         // SSU NPCs already have their own multi-line overhead label. Vanilla still reveals a
         // custom-name nameplate while the player targets the entity, which caused the NPC name
         // to be drawn a second time on top of SSU's label. Suppress only that vanilla layer.
-        if (living.entityTags().contains("ssu_npc")) {
+        if (living.getTags().contains("ssu_npc")) {
             event.setCanRender(TriState.FALSE);
             return;
         }

@@ -6,7 +6,7 @@ import be.winnetrie.mod.simpleserverutilities.network.UtilityMiningPreviewPayloa
 import be.winnetrie.mod.simpleserverutilities.utilitymining.UtilityMiningType;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 
 /** Latest validated utility-mining preview received from the server. */
@@ -47,13 +47,13 @@ public final class UtilityMiningClientState {
     }
 
     /** Two-line crosshair HUD using the same RGB value as the active outline. */
-    public static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
+    public static void render(GuiGraphics graphics, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null || minecraft.level == null || minecraft.gui.screen() != null) return;
+        if (minecraft.player == null || minecraft.level == null || minecraft.screen != null) return;
 
         Preview current = snapshot();
         if (!current.isVisible() || !current.showInfo()
-                || !minecraft.level.dimension().identifier().toString().equals(current.dimension())) return;
+                || !minecraft.level.dimension().location().toString().equals(current.dimension())) return;
 
         String title = current.type() == UtilityMiningType.TREECAPITATOR
                 ? "Treecapitator active" : "Veinminer active";
@@ -70,11 +70,11 @@ public final class UtilityMiningClientState {
         int color = 0xFF000000 | (current.color() & 0x00FFFFFF);
 
         graphics.fill(x, y, x + width, y + height, 0xB0000000);
-        graphics.outline(x, y, width, height, 0x78000000 | (current.color() & 0x00FFFFFF));
-        graphics.text(minecraft.font, title,
+        graphics.renderOutline(x, y, width, height, 0x78000000 | (current.color() & 0x00FFFFFF));
+        graphics.drawString(minecraft.font, title,
                 x + (width - minecraft.font.width(title)) / 2,
                 y + paddingY, color, true);
-        graphics.text(minecraft.font, detail,
+        graphics.drawString(minecraft.font, detail,
                 x + (width - minecraft.font.width(detail)) / 2,
                 y + paddingY + lineHeight, color, false);
     }

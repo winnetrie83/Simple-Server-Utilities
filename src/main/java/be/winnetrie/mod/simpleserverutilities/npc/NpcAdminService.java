@@ -13,7 +13,7 @@ import be.winnetrie.mod.simpleserverutilities.network.NpcAdminEntry;
 import be.winnetrie.mod.simpleserverutilities.network.NpcAdminListPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcAdminListRequestPayload;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -229,7 +229,7 @@ public final class NpcAdminService {
         NpcInstance instance = SimpleServerUtilities.NPCS.instance(rawInstanceId);
         if (instance == null) return Result.fail("The NPC placement no longer exists.");
         Entity runtime = SimpleServerUtilities.NPCS.runtimeEntity(instance);
-        String dimension = runtime == null ? instance.dimension : runtime.level().dimension().identifier().toString();
+        String dimension = runtime == null ? instance.dimension : runtime.level().dimension().location().toString();
         ServerLevel level = level(player, dimension);
         if (level == null) return Result.fail("The NPC location is unavailable.");
         double x = runtime == null ? instance.x : runtime.getX();
@@ -237,14 +237,14 @@ public final class NpcAdminService {
         double z = runtime == null ? instance.z : runtime.getZ();
         float yaw = runtime == null ? instance.yaw : runtime.getYRot();
         float pitch = runtime == null ? instance.pitch : runtime.getXRot();
-        player.teleportTo(level, x, y, z, Set.of(), yaw, pitch, true);
+        player.teleportTo(level, x, y, z, Set.of(), yaw, pitch);
         return Result.ok("Teleported to NPC '" + displayName(instance) + "'.");
     }
 
     private static Result bringToPlayer(ServerPlayer player, String rawInstanceId) {
         NpcInstance instance = SimpleServerUtilities.NPCS.instance(rawInstanceId);
         if (instance == null) return Result.fail("The NPC placement no longer exists.");
-        instance.dimension = player.level().dimension().identifier().toString();
+        instance.dimension = player.level().dimension().location().toString();
         instance.x = player.getX(); instance.y = player.getY(); instance.z = player.getZ();
         instance.yaw = player.getYRot(); instance.pitch = 0.0F;
         if (!SimpleServerUtilities.NPCS.saveInstance(instance, true)) return Result.fail("The NPC could not be moved.");
@@ -260,7 +260,7 @@ public final class NpcAdminService {
 
     private static ServerLevel level(ServerPlayer player, String dimension) {
         try {
-            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, Identifier.parse(dimension));
+            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(dimension));
             return player.level().getServer().getLevel(key);
         } catch (RuntimeException exception) {
             return null;

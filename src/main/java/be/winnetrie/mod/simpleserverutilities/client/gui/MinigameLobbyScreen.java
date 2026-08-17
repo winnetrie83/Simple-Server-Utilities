@@ -4,12 +4,12 @@ import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Compact player-only queue browser. Administrative controls live in Admin Center > Minigames. */
 public final class MinigameLobbyScreen extends Screen {
@@ -87,14 +87,14 @@ public final class MinigameLobbyScreen extends Screen {
 
     private void openProfile() {
         MinigameLobbyDataPayload.GameEntry selected = selected();
-        ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload("profile",
+        PacketDistributor.sendToServer(new MinigameLobbyRequestPayload("profile",
                 selected == null ? "" : selected.id(), preferredRole, nextRequestId++));
     }
 
     private void request(String action, String id) {
         if (awaiting) return;
         awaiting = true;
-        ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, id, preferredRole, nextRequestId++));
+        PacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, id, preferredRole, nextRequestId++));
         rebuildWidgets();
     }
 
@@ -114,19 +114,19 @@ public final class MinigameLobbyScreen extends Screen {
 
     public void refreshFromEditor() { request("refresh", ""); }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, "Minigame Lobby", x + 12, y + 14, TEXT, true);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Minigame Lobby", x + 12, y + 14, TEXT, true);
         String state = data.activeMatchId().isBlank()
                 ? data.queuedMinigameId().isBlank() ? "Not queued" : "Queued: " + data.queuedMinigameId()
                 : "Active: " + data.activeMatchId();
-        g.text(font, trim(state, 38), x + 112, y + 15, MUTED, false);
+        g.drawString(font, trim(state, 38), x + 112, y + 15, MUTED, false);
         g.fill(x + LEFT, y + 38, x + LEFT + 1, y + H - 34, BORDER);
 
         for (int i = 0; i < Math.min(ROWS, data.games().size()); i++) {
@@ -135,12 +135,12 @@ public final class MinigameLobbyScreen extends Screen {
             int color = game.activeHere() ? GOOD : game.queuedHere() ? ACCENT
                     : !game.enabled() || !game.requirementsMet() ? MUTED : TEXT;
             String mark = game.activeHere() ? "▶" : game.queuedHere() ? "◆" : game.freeArenas() > 0 ? "•" : "○";
-            g.text(font, mark, x + 16, ry + 6, color, true);
-            g.text(font, game.queuedPlayers() + "q", x + LEFT - 32, ry + 6, MUTED, false);
+            g.drawString(font, mark, x + 16, ry + 6, color, true);
+            g.drawString(font, game.queuedPlayers() + "q", x + LEFT - 32, ry + 6, MUTED, false);
         }
 
         MinigameLobbyDataPayload.GameEntry game = selected();
-        if (game == null) g.text(font, "No minigames configured.", x + LEFT + 12, y + 52, MUTED, false);
+        if (game == null) g.drawString(font, "No minigames configured.", x + LEFT + 12, y + 52, MUTED, false);
         else drawGame(g, game, x + LEFT + 12, y + 46);
 
         String notice = !localNotice.isBlank() ? localNotice : data.notice();
@@ -150,42 +150,42 @@ public final class MinigameLobbyScreen extends Screen {
             List<FormattedCharSequence> noticeLines = font.split(Component.literal(notice), LEFT - 24);
             int color = awaiting && localNotice.isBlank() && data.notice().isBlank() ? MUTED : error ? ERROR : GOOD;
             for (int i = 0; i < Math.min(2, noticeLines.size()); i++) {
-                g.text(font, noticeLines.get(i), x + 12, y + H - 52 + i * 10, color, false);
+                g.drawString(font, noticeLines.get(i), x + 12, y + H - 52 + i * 10, color, false);
             }
         }
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void drawGame(GuiGraphicsExtractor g, MinigameLobbyDataPayload.GameEntry game, int x, int y) {
+    private void drawGame(GuiGraphics g, MinigameLobbyDataPayload.GameEntry game, int x, int y) {
         int width = W - LEFT - 24;
-        g.text(font, trim(game.displayName(), 42), x, y, TEXT, true);
-        g.text(font, trim(game.id() + " • " + modeLabel(game.gameType()), 50), x, y + 14, MUTED, false);
+        g.drawString(font, trim(game.displayName(), 42), x, y, TEXT, true);
+        g.drawString(font, trim(game.id() + " • " + modeLabel(game.gameType()), 50), x, y + 14, MUTED, false);
         List<FormattedCharSequence> lines = font.split(Component.literal(game.description()), width);
-        for (int i = 0; i < Math.min(4, lines.size()); i++) g.text(font, lines.get(i), x, y + 31 + i * 10, TEXT, false);
+        for (int i = 0; i < Math.min(4, lines.size()); i++) g.drawString(font, lines.get(i), x, y + 31 + i * 10, TEXT, false);
 
         int sy = y + 78;
-        g.text(font, "Queue", x, sy, ACCENT, true);
-        g.text(font, game.queuedPlayers() + " waiting • starts at " + game.minPlayers()
+        g.drawString(font, "Queue", x, sy, ACCENT, true);
+        g.drawString(font, game.queuedPlayers() + " waiting • starts at " + game.minPlayers()
                 + " • max " + game.maxPlayers(), x, sy + 14, TEXT, false);
-        g.text(font, game.teamCount() + " team(s) • " + game.runningMatches() + " running", x, sy + 27, TEXT, false);
-        g.text(font, game.freeArenas() + " free arena(s) • " + game.blockedArenas() + " blocked", x, sy + 40,
+        g.drawString(font, game.teamCount() + " team(s) • " + game.runningMatches() + " running", x, sy + 27, TEXT, false);
+        g.drawString(font, game.freeArenas() + " free arena(s) • " + game.blockedArenas() + " blocked", x, sy + 40,
                 game.freeArenas() > 0 ? GOOD : WARN, false);
 
         int ry = sy + 62;
-        g.text(font, "Requirements", x, ry, ACCENT, true);
-        g.text(font, trim(game.requirementsMet() ? "Available" : game.requirementReason(), 48), x, ry + 14,
+        g.drawString(font, "Requirements", x, ry, ACCENT, true);
+        g.drawString(font, trim(game.requirementsMet() ? "Available" : game.requirementReason(), 48), x, ry + 14,
                 game.requirementsMet() ? GOOD : ERROR, false);
         if (game.rolesEnabled() && !game.activeHere()) {
-            g.text(font, game.queuedHere()
+            g.drawString(font, game.queuedHere()
                     ? "Preferred role: " + roleLabel(game.preferredRole()) + " (assignment not guaranteed)"
                     : "Choose a preferred role below; SSU balances the final team composition.",
                     x, ry + 30, game.queuedHere() ? GOOD : MUTED, false);
         }
         if (game.activeHere()) {
             int my = ry + 38;
-            g.text(font, "Your match", x, my, ACCENT, true);
+            g.drawString(font, "Your match", x, my, ACCENT, true);
             String role = game.assignedRole().isBlank() ? "" : " • Role " + roleLabel(game.assignedRole());
-            g.text(font, "State: " + game.matchState().replace('_', ' ') + " • Team " + game.team()
+            g.drawString(font, "State: " + game.matchState().replace('_', ' ') + " • Team " + game.team()
                     + role + " • Score " + game.score(), x, my + 14, GOOD, false);
         }
     }

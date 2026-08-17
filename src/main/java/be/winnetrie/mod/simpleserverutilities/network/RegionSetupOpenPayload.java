@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Full region setup-tool state for selection, creation, local and remote editing. */
 public record RegionSetupOpenPayload(
@@ -39,7 +39,7 @@ public record RegionSetupOpenPayload(
     public static final int MAX_REGIONS = 512;
     public static final int MAX_SNAPSHOTS = 256;
     public static final Type<RegionSetupOpenPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_setup_open"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_setup_open"));
     public static final StreamCodec<RegistryFriendlyByteBuf, RegionSetupOpenPayload> STREAM_CODEC =
             StreamCodec.of(RegionSetupOpenPayload::encode, RegionSetupOpenPayload::decode);
 

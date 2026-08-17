@@ -1,7 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.mixin;
 
 import be.winnetrie.mod.simpleserverutilities.client.gui.RichTextEditBoxRenderer;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MultiLineEditBoxRichTextMixin {
     @Inject(method = "extractContents", at = @At("HEAD"), cancellable = true)
     private void ssu$renderRichText(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             int mouseX,
             int mouseY,
             float partialTick,

@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Bounded page response for the dashboard. Only the list matching {@code page} is populated. */
 public record SsuMenuPageDataPayload(
@@ -31,7 +31,7 @@ public record SsuMenuPageDataPayload(
 
     private static final int MAX_ENTRIES = SsuMenuPageRequestPayload.MAX_PAGE_SIZE;
     public static final Type<SsuMenuPageDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "menu_page_data")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "menu_page_data")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuMenuPageDataPayload> STREAM_CODEC =
             StreamCodec.of(SsuMenuPageDataPayload::encode, SsuMenuPageDataPayload::decode);

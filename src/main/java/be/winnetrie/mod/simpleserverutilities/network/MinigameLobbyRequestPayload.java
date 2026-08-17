@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Bounded player/admin request for the minigame lobby. */
 public record MinigameLobbyRequestPayload(
@@ -15,7 +15,7 @@ public record MinigameLobbyRequestPayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<MinigameLobbyRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_lobby_request"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_lobby_request"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameLobbyRequestPayload> STREAM_CODEC =
             StreamCodec.of(MinigameLobbyRequestPayload::encode, MinigameLobbyRequestPayload::decode);
 

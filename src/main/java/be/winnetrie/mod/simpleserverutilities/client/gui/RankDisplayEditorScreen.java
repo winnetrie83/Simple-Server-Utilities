@@ -6,13 +6,13 @@ import be.winnetrie.mod.simpleserverutilities.mixin.MultiLineEditBoxAccessor;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultilineTextFieldAccessor;
 import be.winnetrie.mod.simpleserverutilities.network.RankDisplayDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RankDisplaySavePayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.components.MultilineTextField;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Rich text editor for the visible prefix of a permission rank. */
 public final class RankDisplayEditorScreen extends Screen {
@@ -51,12 +51,10 @@ public final class RankDisplayEditorScreen extends Screen {
     @Override
     protected void init() {
         int x = left(), y = top();
-        text = MultiLineEditBox.builder().setX(x + 18).setY(y + 64)
-                .setPlaceholder(Component.literal("Example: [Admin] "))
-                .setShowBackground(true).setShowDecorations(true)
-                .build(font, W - 36, 48, Component.literal("Rank prefix"));
+        text = new MultiLineEditBox(font, x + 18, y + 64, W - 36, 48,
+                Component.literal("Example: [Admin] "), Component.literal("Rank prefix"));
         text.setCharacterLimit(96);
-        text.setLineLimit(1);
+        
         text.setValue(document.plainText());
         text.setValueListener(value -> { rememberedStart = rememberedEnd = -1; document.updatePlainText(value.replace('\n', ' ')); });
         addRenderableWidget(text);
@@ -88,7 +86,7 @@ public final class RankDisplayEditorScreen extends Screen {
     }
 
     private void save() {
-        ClientPacketDistributor.sendToServer(new RankDisplaySavePayload(data.rankName(), document.encode()));
+        PacketDistributor.sendToServer(new RankDisplaySavePayload(data.rankName(), document.encode()));
         notice = "Saving…"; noticeError = false;
     }
 
@@ -141,20 +139,20 @@ public final class RankDisplayEditorScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         remember();
         int x = left(), y = top();
-        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
-        g.text(font, "Rank Prefix Editor — " + data.rankName(), x + 18, y + 15, TEXT, true);
-        g.text(font, "The prefix is shown before the normal player name and in chat.", x + 18, y + 31, MUTED, false);
-        g.text(font, "Select text, then apply B / I / U / S or one of the fixed 16 Minecraft colors.", x + 18, y + 48, MUTED, false);
-        if (!notice.isBlank()) g.text(font, trim(notice, 78), x + 100, y + H - 25, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(x, y, x + W, y + H, PANEL); g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Rank Prefix Editor — " + data.rankName(), x + 18, y + 15, TEXT, true);
+        g.drawString(font, "The prefix is shown before the normal player name and in chat.", x + 18, y + 31, MUTED, false);
+        g.drawString(font, "Select text, then apply B / I / U / S or one of the fixed 16 Minecraft colors.", x + 18, y + 48, MUTED, false);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 78), x + 100, y + H - 25, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
 
     @Override public void removed() { RichTextEditBoxRenderer.unregister(text); super.removed(); }
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
     private int left() { return (width - W) / 2; }
     private int top() { return (height - H) / 2; }

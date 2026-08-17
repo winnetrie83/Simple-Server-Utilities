@@ -443,7 +443,7 @@ public final class RegionSetupToolService {
                     int dx = (int)Math.round(-Math.sin(yawRadians) * 5.0D);
                     int dz = (int)Math.round(Math.cos(yawRadians) * 5.0D);
                     BlockPos origin = online.blockPosition().offset(dx, 0, dz);
-                    PreviewSession session = new PreviewSession(name, online.level().dimension().identifier().toString(), origin, template);
+                    PreviewSession session = new PreviewSession(name, online.level().dimension().location().toString(), origin, template);
                     PREVIEWS.put(actor, session);
                     sendPreview(online, session);
                     online.sendSystemMessage(Component.literal("Ghost preview loaded. Use the placement controls or Free mode."), true);
@@ -488,11 +488,11 @@ public final class RegionSetupToolService {
         if (!RegionPolicy.canEditRegion(player)) {
             sendCurrent(player, "Region editing permission is required.", true, requestId); return;
         }
-        if (!player.level().dimension().identifier().toString().equals(session.dimension)) {
+        if (!player.level().dimension().location().toString().equals(session.dimension)) {
             sendCurrent(player, "Travel to the preview dimension before placing the snapshot.", true, requestId); return;
         }
         RegionSelectionSnapshotManager.PasteJob placement;
-        try { placement = RegionSelectionSnapshotManager.createPasteJob(player.level(), session.origin, session.template); }
+        try { placement = RegionSelectionSnapshotManager.createPasteJob(player.serverLevel(), session.origin, session.template); }
         catch (IllegalArgumentException exception) { sendCurrent(player, exception.getMessage(), true, requestId); return; }
         RegionSelectionSnapshotManager.Bounds raw = placement.destination();
         RegionSelectionSchematicManager.Bounds affected = new RegionSelectionSchematicManager.Bounds(
@@ -505,7 +505,7 @@ public final class RegionSetupToolService {
         destinationSelection.setPoint1(player.level().dimension(), new BlockPos(raw.minX(), raw.minY(), raw.minZ()));
         destinationSelection.setPoint2(player.level().dimension(), new BlockPos(raw.maxX(), raw.maxY(), raw.maxZ()));
         RegionSelectionSnapshotManager.CaptureJob undoCapture;
-        try { undoCapture = RegionSelectionSnapshotManager.createCaptureJob(player.level(), destinationSelection); }
+        try { undoCapture = RegionSelectionSnapshotManager.createCaptureJob(player.serverLevel(), destinationSelection); }
         catch (IllegalArgumentException exception) { sendCurrent(player, exception.getMessage(), true, requestId); return; }
         MinecraftServer server = player.level().getServer(); UUID actor = player.getUUID();
         UUID historyJob = SimpleServerUtilities.JOBS.submit(undoCapture, completed -> {
@@ -526,7 +526,7 @@ public final class RegionSetupToolService {
                 SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(online, selections.getSelection(online));
             }
             RegionSelectionSnapshotManager.PasteJob actual = RegionSelectionSnapshotManager.createPasteJob(
-                    online.level(), session.origin, session.template);
+                    (ServerLevel) online.level(), session.origin, session.template);
             scheduleSelectionJob(online, actual, "Snapshot placement", requestId);
         });
         sendCurrent(player, "Snapshot placement safety capture scheduled as job " + historyJob + ".", false, requestId);
@@ -600,7 +600,7 @@ public final class RegionSetupToolService {
         }
         if (destination.isEmpty()) { sendEdit(player, region, "No safe teleport location was found in or directly above the region.", true, requestId); return; }
         TeleportDestination target=destination.get();
-        player.teleportTo(level,target.x(),target.y(),target.z(),Set.of(),yaw,pitch,true);
+        player.teleportTo(level, target.x(), target.y(), target.z(), Set.of(), yaw, pitch);
         sendEdit(player, region, "Teleported to region '"+region.getName()+"'.", false, requestId);
     }
 
@@ -719,7 +719,7 @@ public final class RegionSetupToolService {
                 .sorted(Comparator.comparing(Region::getName, String.CASE_INSENSITIVE_ORDER))
                 .limit(RegionSetupOpenPayload.MAX_REGIONS)
                 .map(region -> new RegionSetupOpenPayload.RegionEntry(region.getName(),
-                        region.getDimension().identifier().toString(), region.getVolume(), region.getPriority(),
+                        region.getDimension().location().toString(), region.getVolume(), region.getPriority(),
                         region.getSpawnPos()!=null, region.getSpawnPos()==null?0L:region.getSpawnPos().asLong()))
                 .toList();
     }
@@ -729,8 +729,8 @@ public final class RegionSetupToolService {
         boolean point1 = selection.getPoint1() != null;
         boolean point2 = selection.getPoint2() != null;
         long selectedVolume = selection.isComplete() ? volume(selection.getPoint1(), selection.getPoint2()) : 0L;
-        String dimension = selection.getDimension() == null ? player.level().dimension().identifier().toString()
-                : selection.getDimension().identifier().toString();
+        String dimension = selection.getDimension() == null ? player.level().dimension().location().toString()
+                : selection.getDimension().location().toString();
         return new SelectionSummary(dimension, point1, point1 ? selection.getPoint1().asLong() : 0L,
                 point2, point2 ? selection.getPoint2().asLong() : 0L, selectedVolume);
     }
@@ -762,13 +762,13 @@ public final class RegionSetupToolService {
         RegionSelection selection = RegionCommands.getSelectionManager().getSelection(player);
         boolean p1 = selection.getPoint1() != null, p2 = selection.getPoint2() != null;
         long volume = selection.isComplete() ? volume(selection.getPoint1(), selection.getPoint2()) : 0L;
-        PacketDistributor.sendToPlayer(player, emptyPayload(player,"SELECT", notice, error, requestId, "", player.level().dimension().identifier().toString(),
+        PacketDistributor.sendToPlayer(player, emptyPayload(player,"SELECT", notice, error, requestId, "", player.level().dimension().location().toString(),
                 p1, p1 ? selection.getPoint1().asLong() : 0L, p2, p2 ? selection.getPoint2().asLong() : 0L, volume,
                 RegionPolicy.canCreateRegion(player), RegionPolicy.canEditRegion(player), RegionPolicy.canDeleteRegion(player)));
     }
 
     private static void sendCreate(ServerPlayer player, RegionSelection selection, String notice, boolean error, long requestId) {
-        PacketDistributor.sendToPlayer(player, emptyPayload(player,"CREATE", notice, error, requestId, "", selection.getDimension().identifier().toString(),
+        PacketDistributor.sendToPlayer(player, emptyPayload(player,"CREATE", notice, error, requestId, "", selection.getDimension().location().toString(),
                 true, selection.getPoint1().asLong(), true, selection.getPoint2().asLong(), volume(selection.getPoint1(), selection.getPoint2()),
                 RegionPolicy.canCreateRegion(player), RegionPolicy.canEditRegion(player), RegionPolicy.canDeleteRegion(player)));
     }
@@ -779,7 +779,7 @@ public final class RegionSetupToolService {
         BlockPos spawn = region.getSpawnPos();
         SelectionSummary selection = selectionSummary(player);
         PacketDistributor.sendToPlayer(player, new RegionSetupOpenPayload(
-                "EDIT", notice, error, requestId, region.getName(), region.getDimension().identifier().toString(),
+                "EDIT", notice, error, requestId, region.getName(), region.getDimension().location().toString(),
                 true, new BlockPos(region.getMinX(), region.getMinY(), region.getMinZ()).asLong(),
                 true, new BlockPos(region.getMaxX(), region.getMaxY(), region.getMaxZ()).asLong(), region.getVolume(),
                 region.getPriority(), region.isBorderVisible(),

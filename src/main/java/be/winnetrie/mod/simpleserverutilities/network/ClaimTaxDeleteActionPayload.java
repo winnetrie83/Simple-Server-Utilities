@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Final, double-confirmed player choice for deleting a taxed claim. */
 public record ClaimTaxDeleteActionPayload(
@@ -18,7 +18,7 @@ public record ClaimTaxDeleteActionPayload(
     public enum Mode { PAY_AND_DELETE, FORFEIT_AND_DELETE }
 
     public static final Type<ClaimTaxDeleteActionPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "claim_tax_delete_action")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "claim_tax_delete_action")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ClaimTaxDeleteActionPayload> STREAM_CODEC =

@@ -66,7 +66,7 @@ import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -266,14 +266,14 @@ public final class ServerOperationsManager {
     public void logBlockBreak(ServerPlayer player, BlockPos pos, BlockState before) {
         if (player == null || pos == null || before == null || !state.activityLoggingEnabled || !state.activityBreaks || transientGameplay(player)) return;
         recordActivity(new ActivityEntry(System.currentTimeMillis(), player.getUUID().toString(), player.getName().getString(),
-                "BREAK", player.level().dimension().identifier().toString(), pos.getX(), pos.getY(), pos.getZ(),
+                "BREAK", player.level().dimension().location().toString(), pos.getX(), pos.getY(), pos.getZ(),
                 blockId(before), "minecraft:air"));
     }
 
     public void logBlockPlace(ServerPlayer player, BlockPos pos, BlockState before, BlockState after) {
         if (player == null || pos == null || before == null || after == null || !state.activityLoggingEnabled || !state.activityPlaces || transientGameplay(player)) return;
         recordActivity(new ActivityEntry(System.currentTimeMillis(), player.getUUID().toString(), player.getName().getString(),
-                "PLACE", player.level().dimension().identifier().toString(), pos.getX(), pos.getY(), pos.getZ(),
+                "PLACE", player.level().dimension().location().toString(), pos.getX(), pos.getY(), pos.getZ(),
                 blockId(before), blockId(after)));
     }
 
@@ -406,7 +406,7 @@ public final class ServerOperationsManager {
         int boundedHours = Math.max(1, Math.min(24 * 90, hours));
         int boundedRadius = Math.max(1, Math.min(256, radius));
         long cutoff = System.currentTimeMillis() - boundedHours * 3_600_000L;
-        String dimension = actor.level().dimension().identifier().toString();
+        String dimension = actor.level().dimension().location().toString();
         BlockPos center = actor.blockPosition();
         ArrayList<ActivityEntry> entries = new ArrayList<>();
         var iterator = activity.descendingIterator();
@@ -433,7 +433,7 @@ public final class ServerOperationsManager {
         MinecraftServer currentServer = server;
         if (job == null || currentServer == null || job.done()) return;
         ResourceKey<Level> key;
-        try { key = ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, Identifier.parse(job.dimension)); }
+        try { key = ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, ResourceLocation.parse(job.dimension)); }
         catch (Exception exception) { job.fail("Invalid rollback dimension."); return; }
         ServerLevel level = currentServer.getLevel(key);
         if (level == null) { job.fail("Rollback dimension is unavailable."); return; }
@@ -446,7 +446,7 @@ public final class ServerOperationsManager {
                 job.skipped++;
                 continue;
             }
-            Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(entry.beforeBlock)).orElse(Blocks.AIR);
+            Block block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(entry.beforeBlock)).orElse(Blocks.AIR);
             if (level.setBlock(pos, block.defaultBlockState(), Block.UPDATE_ALL)) job.restored++;
             else job.skipped++;
         }
@@ -1000,7 +1000,7 @@ public final class ServerOperationsManager {
         int radius = Math.max(1, Math.min(512, radiusChunks));
         int centerChunkX = ((int) Math.floor(level.getWorldBorder().getCenterX())) >> 4;
         int centerChunkZ = ((int) Math.floor(level.getWorldBorder().getCenterZ())) >> 4;
-        pregen = new PregenJob(level.dimension().identifier().toString(), centerChunkX, centerChunkZ, radius,
+        pregen = new PregenJob(level.dimension().location().toString(), centerChunkX, centerChunkZ, radius,
                 state.pregenChunksPerTick, state.pregenPauseAboveMspt);
         audit(actor, "world.pregenerate", dimensionId, "radiusChunks=" + radius + ", total=" + pregen.total);
         return "Chunk pregeneration started for " + pregen.total + " chunk(s).";
@@ -1358,7 +1358,7 @@ public final class ServerOperationsManager {
         if (currentServer == null) return array;
         for (ServerLevel level : currentServer.getAllLevels()) {
             JsonObject value = new JsonObject();
-            value.addProperty("id", level.dimension().identifier().toString());
+            value.addProperty("id", level.dimension().location().toString());
             value.addProperty("borderX", level.getWorldBorder().getCenterX());
             value.addProperty("borderZ", level.getWorldBorder().getCenterZ());
             value.addProperty("borderSize", level.getWorldBorder().getSize());
@@ -1662,7 +1662,7 @@ public final class ServerOperationsManager {
         if (server == null) throw new IllegalArgumentException("Server is unavailable.");
         String id = rawId == null || rawId.isBlank() ? "minecraft:overworld" : rawId.trim();
         try {
-            ResourceKey<Level> key = ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, Identifier.parse(id));
+            ResourceKey<Level> key = ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, ResourceLocation.parse(id));
             ServerLevel level = server.getLevel(key);
             if (level == null) throw new IllegalArgumentException("Dimension is not currently loaded.");
             return level;

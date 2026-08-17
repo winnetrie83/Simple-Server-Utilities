@@ -3,12 +3,12 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 import be.winnetrie.mod.simpleserverutilities.client.region.RegionSnapshotPreviewClientState;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSetupActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSnapshotPreviewPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Small, transparent placement controls for a realistic in-world snapshot preview. */
 public final class RegionSnapshotPreviewScreen extends Screen {
@@ -22,7 +22,7 @@ public final class RegionSnapshotPreviewScreen extends Screen {
 
     public void accept(RegionSnapshotPreviewPayload payload) {
         if (payload == null || !payload.active()) {
-            if (minecraft != null) minecraft.setScreenAndShow(null);
+            if (minecraft != null) minecraft.setScreen(null);
         }
     }
 
@@ -74,7 +74,7 @@ public final class RegionSnapshotPreviewScreen extends Screen {
     private void send(String operation) {
         if (busy) return;
         if ("preview_confirm".equals(operation)) busy = true;
-        ClientPacketDistributor.sendToServer(new RegionSetupActionPayload(operation, "", "", nextRequestId++));
+        PacketDistributor.sendToServer(new RegionSetupActionPayload(operation, "", "", nextRequestId++));
     }
 
     private void cancel() {
@@ -84,14 +84,14 @@ public final class RegionSnapshotPreviewScreen extends Screen {
             rebuildWidgets();
             return;
         }
-        ClientPacketDistributor.sendToServer(new RegionSetupActionPayload("preview_cancel", "", "", nextRequestId++));
+        PacketDistributor.sendToServer(new RegionSetupActionPayload("preview_cancel", "", "", nextRequestId++));
         busy = true;
     }
 
     private void enterFreeMode() {
         if (busy) return;
         RegionSnapshotPreviewClientState.enterFreeMode();
-        if (minecraft != null) minecraft.setScreenAndShow(null);
+        if (minecraft != null) minecraft.setScreen(null);
     }
 
     @Override
@@ -101,29 +101,29 @@ public final class RegionSnapshotPreviewScreen extends Screen {
             rebuildWidgets();
             return;
         }
-        ClientPacketDistributor.sendToServer(new RegionSetupActionPayload("preview_cancel", "", "", nextRequestId++));
+        PacketDistributor.sendToServer(new RegionSetupActionPayload("preview_cancel", "", "", nextRequestId++));
         busy = true;
     }
 
     /** Suppress vanilla's screen blur/dim extraction: preview mode must not put a haze over the world. */
     @Override
-    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
         // Intentionally empty.
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         var data = RegionSnapshotPreviewClientState.snapshot();
         String title = "Preview · " + data.snapshotName() + " · " + data.sizeX() + "×" + data.sizeY() + "×" + data.sizeZ();
         if (!data.complete()) title += " · " + data.receivedBlocks() + "/" + data.totalBlocks();
         int labelY = height - 90;
-        graphics.text(font, title, width - font.width(title) - 10, labelY,
+        graphics.drawString(font, title, width - font.width(title) - 10, labelY,
                 data.complete() ? 0xFF6FE7FF : 0xFFFFD966, true);
         if (confirmCancel) {
             String warning = "Click Confirm cancel again to discard preview";
-            graphics.text(font, warning, width - font.width(warning) - 10, labelY - 12, 0xFFFF8585, true);
+            graphics.drawString(font, warning, width - font.width(warning) - 10, labelY - 12, 0xFFFF8585, true);
         }
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     @Override public boolean isPauseScreen() { return false; }

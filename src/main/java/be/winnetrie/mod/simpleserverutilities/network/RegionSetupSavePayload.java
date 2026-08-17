@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Bounded full save from the Region Setup Tool. */
 public record RegionSetupSavePayload(
@@ -23,7 +23,7 @@ public record RegionSetupSavePayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final int MAX_PRESET = 6;
-    public static final Type<RegionSetupSavePayload> TYPE=new Type<>(Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID,"region_setup_save"));
+    public static final Type<RegionSetupSavePayload> TYPE=new Type<>(ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID,"region_setup_save"));
     public static final StreamCodec<RegistryFriendlyByteBuf,RegionSetupSavePayload> STREAM_CODEC=StreamCodec.of(RegionSetupSavePayload::encode,RegionSetupSavePayload::decode);
     public RegionSetupSavePayload {
         mode=PayloadBounds.string(mode,16); regionName=PayloadBounds.trimmedString(regionName,64); dimension=PayloadBounds.string(dimension,128);

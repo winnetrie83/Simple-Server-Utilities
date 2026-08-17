@@ -9,7 +9,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentEvent;
 import be.winnetrie.mod.simpleserverutilities.content.ContentEventTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
@@ -82,29 +82,32 @@ public final class ContentObjectiveMatcher {
         String tag = stripTagPrefix(normalizeTag(rawTag));
         if (subject.isBlank() || tag.isBlank()) return false;
         try {
-            Identifier subjectId = Identifier.parse(subject);
-            Identifier tagId = Identifier.parse(tag);
+            ResourceLocation subjectId = ResourceLocation.parse(subject);
+            ResourceLocation tagId = ResourceLocation.parse(tag);
 
             if (isBlockEvent(eventType)) {
                 Block block = BuiltInRegistries.BLOCK.getOptional(subjectId).orElse(null);
                 if (block == null) return false;
                 TagKey<Block> key = TagKey.create(Registries.BLOCK, tagId);
-                return BuiltInRegistries.BLOCK.getOrThrow(key)
-                        .contains(BuiltInRegistries.BLOCK.wrapAsHolder(block));
+                return BuiltInRegistries.BLOCK.getTag(key)
+                        .map(values -> values.contains(BuiltInRegistries.BLOCK.wrapAsHolder(block)))
+                        .orElse(false);
             }
             if (isItemEvent(eventType)) {
                 Item item = BuiltInRegistries.ITEM.getOptional(subjectId).orElse(null);
                 if (item == null) return false;
                 TagKey<Item> key = TagKey.create(Registries.ITEM, tagId);
-                return BuiltInRegistries.ITEM.getOrThrow(key)
-                        .contains(BuiltInRegistries.ITEM.wrapAsHolder(item));
+                return BuiltInRegistries.ITEM.getTag(key)
+                        .map(values -> values.contains(BuiltInRegistries.ITEM.wrapAsHolder(item)))
+                        .orElse(false);
             }
             if (isEntityEvent(eventType)) {
                 EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getOptional(subjectId).orElse(null);
                 if (type == null) return false;
                 TagKey<EntityType<?>> key = TagKey.create(Registries.ENTITY_TYPE, tagId);
-                return BuiltInRegistries.ENTITY_TYPE.getOrThrow(key)
-                        .contains(BuiltInRegistries.ENTITY_TYPE.wrapAsHolder(type));
+                return BuiltInRegistries.ENTITY_TYPE.getTag(key)
+                        .map(values -> values.contains(BuiltInRegistries.ENTITY_TYPE.wrapAsHolder(type)))
+                        .orElse(false);
             }
         } catch (RuntimeException ignored) {
             // Invalid/missing tags are a non-match, never a gameplay-event failure.

@@ -18,13 +18,13 @@ import be.winnetrie.mod.simpleserverutilities.network.ServerOperationsRequestPay
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument;
 import be.winnetrie.mod.simpleserverutilities.serverops.SupportRichText;
 import be.winnetrie.mod.simpleserverutilities.serverops.SupportTicketCategory;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Compact GUI-first administration for backups, scheduler, moderation, health and support. */
 public final class ServerOperationsScreen extends Screen {
@@ -289,7 +289,7 @@ public final class ServerOperationsScreen extends Screen {
 
     private void initSupport(int x, int y) {
         addRenderableWidget(Button.builder(Component.literal("Create ticket"), button ->
-                minecraft.setScreenAndShow(new SupportCreateTicketScreen(this, arr(root, "reportTargets"))))
+                minecraft.setScreen(new SupportCreateTicketScreen(this, arr(root, "reportTargets"))))
                 .bounds(x + 16, y + 46, 104, 20).build());
 
         JsonArray tickets = filteredTickets(false);
@@ -314,7 +314,7 @@ public final class ServerOperationsScreen extends Screen {
     }
 
     private void openReplyEditor(long ticketId, boolean staff) {
-        minecraft.setScreenAndShow(new RichTextValueEditorScreen(this, staff ? "Staff reply" : "Ticket reply",
+        minecraft.setScreen(new RichTextValueEditorScreen(this, staff ? "Staff reply" : "Ticket reply",
                 staff ? "Reply to the player. Rich text is supported." : "Reply to staff. Rich text is supported.", "",
                 SupportRichText::normalize, SupportRichText.MAX_VISIBLE_CHARACTERS, SupportRichText.MAX_STORED_CHARACTERS,
                 SupportRichText.MAX_LINES, value -> {
@@ -323,7 +323,7 @@ public final class ServerOperationsScreen extends Screen {
     }
 
     private void openCloseReason(long ticketId, boolean admin) {
-        minecraft.setScreenAndShow(new SupportCloseReasonScreen(this, ticketId,
+        minecraft.setScreen(new SupportCloseReasonScreen(this, ticketId,
                 reason -> action("ticket_close", Long.toString(ticketId), reason, "")));
     }
 
@@ -420,35 +420,35 @@ public final class ServerOperationsScreen extends Screen {
 
     private void addListButtons(int x,int y,JsonArray values,int max,java.util.function.Function<JsonElement,String> label){for(int i=0;i<Math.min(max,values.size());i++){int idx=i;Button button=addRenderableWidget(Button.builder(Component.literal(trim(label.apply(values.get(i)),58)),v->{selected=idx;confirm="";rebuildWidgets();}).bounds(x,y+i*27,350,20).build());button.active=selected!=i;}}
 
-    private void refresh(){if((tab==Tab.SUPPORT||tab==Tab.REPORTS)&&selectedTicketId>0L)action("ticket_view",Long.toString(selectedTicketId),Integer.toString(ticketThreadPage),"");else ClientPacketDistributor.sendToServer(new ServerOperationsRequestPayload(data.admin(),request++));}
-    private void action(String action,String target,String value,String extra){ClientPacketDistributor.sendToServer(new ServerOperationsActionPayload(data.admin(),action,target,value,extra,request++));}
+    private void refresh(){if((tab==Tab.SUPPORT||tab==Tab.REPORTS)&&selectedTicketId>0L)action("ticket_view",Long.toString(selectedTicketId),Integer.toString(ticketThreadPage),"");else PacketDistributor.sendToServer(new ServerOperationsRequestPayload(data.admin(),request++));}
+    private void action(String action,String target,String value,String extra){PacketDistributor.sendToServer(new ServerOperationsActionPayload(data.admin(),action,target,value,extra,request++));}
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float pt){int x=left(),y=top(),pw=panelWidth(),ph=panelHeight();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+pw,y+ph,PANEL);g.outline(x,y,pw,ph,BORDER);g.text(font,data.admin()?"Server Operations":"Support & Reports",x+14,y+16,TEXT,true);if(data.admin())drawAdmin(g,x,y);else drawSupport(g,x,y);if(!data.notice().isBlank()){var lines=font.split(Component.literal(data.notice()),Math.max(120,pw-28));int base=y+ph-18-Math.max(0,lines.size()-1)*10;for(int i=0;i<Math.min(2,lines.size());i++)g.text(font,lines.get(i),x+14,base+i*10,data.error()?ERROR:GOOD,false);}super.extractRenderState(g,mx,my,pt);}
+    @Override public void render(GuiGraphics g,int mx,int my,float pt){int x=left(),y=top(),pw=panelWidth(),ph=panelHeight();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+pw,y+ph,PANEL);g.renderOutline(x,y,pw,ph,BORDER);g.drawString(font,data.admin()?"Server Operations":"Support & Reports",x+14,y+16,TEXT,true);if(data.admin())drawAdmin(g,x,y);else drawSupport(g,x,y);if(!data.notice().isBlank()){var lines=font.split(Component.literal(data.notice()),Math.max(120,pw-28));int base=y+ph-18-Math.max(0,lines.size()-1)*10;for(int i=0;i<Math.min(2,lines.size());i++)g.drawString(font,lines.get(i),x+14,base+i*10,data.error()?ERROR:GOOD,false);}super.render(g,mx,my,pt);}
 
-    private void drawAdmin(GuiGraphicsExtractor g,int x,int y){int cy=y+96;switch(tab){case ACTIVITY->{g.text(font,"Activity logging",x+16,cy+4,MUTED,false);g.text(font,"Retention (days)",x+340,cy+4,MUTED,false);g.text(font,"Rollback player / UUID",x+380,cy+48,MUTED,false);g.text(font,"Hours",x+548,cy+48,MUTED,false);g.text(font,"Radius (blocks)",x+620,cy+48,MUTED,false);g.text(font,"Logs break/place only; rollback restores block type only (no block-entity/NBT).",x+16,cy+48,MUTED,false);g.text(font,"Recent activity",x+380,cy+112,MUTED,false);drawRows(g,x+380,cy+130,arr(root,"activity"),8,e->{JsonObject o=e.getAsJsonObject();return string(o,"player","")+" "+string(o,"action","")+" "+("BREAK".equals(string(o,"action",""))?string(o,"before",""):string(o,"after",""))+" @ "+integer(o,"x",0)+","+integer(o,"y",0)+","+integer(o,"z",0);});JsonObject r=obj("rollback");g.text(font,"Rollback: "+(bool(r,"active",false)?integer(r,"processed",0)+"/"+integer(r,"total",0):"idle")+" • restored "+integer(r,"restored",0)+" • skipped "+integer(r,"skipped",0),x+16,cy+302,MUTED,false);}case BACKUPS->{JsonObject b=obj("backup");g.text(font,"Backup name",x+16,cy+4,MUTED,false);g.text(font,"Automatic backups",x+282,cy+4,MUTED,false);g.text(font,"Every (min)",x+410,cy+4,MUTED,false);g.text(font,"Keep backups",x+508,cy+4,MUTED,false);g.text(font,"Status: "+trim(string(b,"status","Idle"),90),x+16,cy+42,bool(b,"running",false)?WARNING:MUTED,false);g.text(font,"Backups contain the complete world plus world-specific SSU data.",x+396,cy+42,MUTED,false);drawSelectedDetail(g,x+396,cy+64,arr(b,"files"),"name");}case SCHEDULER->{g.text(font,"Task name",x+16,cy+4,MUTED,false);g.text(font,"Action",x+166,cy+4,MUTED,false);g.text(font,"Schedule",x+306,cy+4,MUTED,false);g.text(font,"Optional payload / broadcast message",x+464,cy+4,MUTED,false);g.text(font,"Schedule: interval minutes, daily@HH:mm, or once@yyyy-MM-ddTHH:mm",x+16,cy+42,MUTED,false);g.text(font,"Actions: BACKUP • BROADCAST • MAINTENANCE_ON/OFF • SAVE_SSU • SSU_RELOAD • STOP_SERVER",x+16,cy+306,MUTED,false);g.text(font,"STOP_SERVER is restart-ready: your host/watchdog must start the JVM again.",x+16,cy+322,MUTED,false);drawSelectedDetail(g,x+396,cy+62,arr(root,"tasks"),"result");}case MAINTENANCE->g.text(font,"Maintenance bypass: ssu.maintenance.bypass. Disable when normal players may rejoin.",x+16,cy+82,MUTED,false);case CHAT->{g.text(font,"Slow sec",x+380,cy+4,MUTED,false);g.text(font,"Dup sec",x+442,cy+4,MUTED,false);g.text(font,"Flood sec",x+504,cy+4,MUTED,false);g.text(font,"Max msgs",x+566,cy+4,MUTED,false);g.text(font,"Caps %",x+622,cy+4,MUTED,false);g.text(font,"Min chars",x+678,cy+4,MUTED,false);g.text(font,"Blocked words / phrases",x+16,cy+46,MUTED,false);g.text(font,"Mute player / UUID",x+16,cy+88,MUTED,false);g.text(font,"Duration (minutes; 0 = permanent)",x+174,cy+88,MUTED,false);g.text(font,"Reason",x+256,cy+88,MUTED,false);g.text(font,"Staff chat: prefix # when ssu.chat.staff is allowed. Chat history is memory-only and capped.",x+16,cy+130,MUTED,false);g.text(font,"Active mutes",x+16,cy+152,MUTED,false);drawRows(g,x+16,cy+170,arr(root,"mutes"),6,e->{JsonObject o=e.getAsJsonObject();return string(o,"name","")+" • "+(longValue(o,"expires",0)<=0?"permanent":"temporary")+" • "+string(o,"reason","");});g.text(font,"Recent chat",x+380,cy+152,MUTED,false);drawRows(g,x+380,cy+170,arr(root,"chatHistory"),6,e->{JsonObject o=e.getAsJsonObject();return (bool(o,"staff",false)?"[Staff] ":"")+string(o,"player","")+": "+string(o,"message","");});}case AUDIT->drawRows(g,x+16,cy,arr(root,"audit"),13,e->{JsonObject o=e.getAsJsonObject();return string(o,"actor","")+" • "+string(o,"action","")+" • "+string(o,"target","")+" • "+string(o,"detail","");});case HEALTH->drawHealth(g,x,cy);case REPORTS->{drawTicketPanel(g,x+380,cy,true);int pages=Math.max(1,(filteredTickets(true).size()+ticketPageSize(true)-1)/ticketPageSize(true));g.text(font,"Page "+(ticketListPage+1)+"/"+pages,x+50,cy+252,MUTED,false);}case WORLDS->{JsonObject p=obj("pregen");if(selected>=0){g.text(font,"Center X",x+380,cy+4,MUTED,false);g.text(font,"Center Z",x+470,cy+4,MUTED,false);g.text(font,"Border size",x+560,cy+4,MUTED,false);g.text(font,"Pregeneration radius (chunks)",x+380,cy+48,MUTED,false);}g.text(font,"Chunks/tick",x+380,cy+96,MUTED,false);g.text(font,"Auto-pause MSPT",x+468,cy+96,MUTED,false);g.text(font,"Pregeneration: "+(bool(p,"active",false)?integer(p,"generated",0)+" / "+integer(p,"total",0)+(bool(p,"paused",false)?" • auto-paused for server load":""):"idle"),x+380,cy+142,bool(p,"paused",false)?WARNING:MUTED,false);g.text(font,"Lower speed is safer; auto-pause protects TPS when the server becomes busy.",x+380,cy+160,MUTED,false);}case ECONOMY->drawEconomy(g,x,cy);case PROFILES->g.text(font,"Profiles contain configuration only; player balances, mail, inventories and progression are excluded.",x+16,cy+286,MUTED,false);default->{}}}
+    private void drawAdmin(GuiGraphics g,int x,int y){int cy=y+96;switch(tab){case ACTIVITY->{g.drawString(font,"Activity logging",x+16,cy+4,MUTED,false);g.drawString(font,"Retention (days)",x+340,cy+4,MUTED,false);g.drawString(font,"Rollback player / UUID",x+380,cy+48,MUTED,false);g.drawString(font,"Hours",x+548,cy+48,MUTED,false);g.drawString(font,"Radius (blocks)",x+620,cy+48,MUTED,false);g.drawString(font,"Logs break/place only; rollback restores block type only (no block-entity/NBT).",x+16,cy+48,MUTED,false);g.drawString(font,"Recent activity",x+380,cy+112,MUTED,false);drawRows(g,x+380,cy+130,arr(root,"activity"),8,e->{JsonObject o=e.getAsJsonObject();return string(o,"player","")+" "+string(o,"action","")+" "+("BREAK".equals(string(o,"action",""))?string(o,"before",""):string(o,"after",""))+" @ "+integer(o,"x",0)+","+integer(o,"y",0)+","+integer(o,"z",0);});JsonObject r=obj("rollback");g.drawString(font,"Rollback: "+(bool(r,"active",false)?integer(r,"processed",0)+"/"+integer(r,"total",0):"idle")+" • restored "+integer(r,"restored",0)+" • skipped "+integer(r,"skipped",0),x+16,cy+302,MUTED,false);}case BACKUPS->{JsonObject b=obj("backup");g.drawString(font,"Backup name",x+16,cy+4,MUTED,false);g.drawString(font,"Automatic backups",x+282,cy+4,MUTED,false);g.drawString(font,"Every (min)",x+410,cy+4,MUTED,false);g.drawString(font,"Keep backups",x+508,cy+4,MUTED,false);g.drawString(font,"Status: "+trim(string(b,"status","Idle"),90),x+16,cy+42,bool(b,"running",false)?WARNING:MUTED,false);g.drawString(font,"Backups contain the complete world plus world-specific SSU data.",x+396,cy+42,MUTED,false);drawSelectedDetail(g,x+396,cy+64,arr(b,"files"),"name");}case SCHEDULER->{g.drawString(font,"Task name",x+16,cy+4,MUTED,false);g.drawString(font,"Action",x+166,cy+4,MUTED,false);g.drawString(font,"Schedule",x+306,cy+4,MUTED,false);g.drawString(font,"Optional payload / broadcast message",x+464,cy+4,MUTED,false);g.drawString(font,"Schedule: interval minutes, daily@HH:mm, or once@yyyy-MM-ddTHH:mm",x+16,cy+42,MUTED,false);g.drawString(font,"Actions: BACKUP • BROADCAST • MAINTENANCE_ON/OFF • SAVE_SSU • SSU_RELOAD • STOP_SERVER",x+16,cy+306,MUTED,false);g.drawString(font,"STOP_SERVER is restart-ready: your host/watchdog must start the JVM again.",x+16,cy+322,MUTED,false);drawSelectedDetail(g,x+396,cy+62,arr(root,"tasks"),"result");}case MAINTENANCE->g.drawString(font,"Maintenance bypass: ssu.maintenance.bypass. Disable when normal players may rejoin.",x+16,cy+82,MUTED,false);case CHAT->{g.drawString(font,"Slow sec",x+380,cy+4,MUTED,false);g.drawString(font,"Dup sec",x+442,cy+4,MUTED,false);g.drawString(font,"Flood sec",x+504,cy+4,MUTED,false);g.drawString(font,"Max msgs",x+566,cy+4,MUTED,false);g.drawString(font,"Caps %",x+622,cy+4,MUTED,false);g.drawString(font,"Min chars",x+678,cy+4,MUTED,false);g.drawString(font,"Blocked words / phrases",x+16,cy+46,MUTED,false);g.drawString(font,"Mute player / UUID",x+16,cy+88,MUTED,false);g.drawString(font,"Duration (minutes; 0 = permanent)",x+174,cy+88,MUTED,false);g.drawString(font,"Reason",x+256,cy+88,MUTED,false);g.drawString(font,"Staff chat: prefix # when ssu.chat.staff is allowed. Chat history is memory-only and capped.",x+16,cy+130,MUTED,false);g.drawString(font,"Active mutes",x+16,cy+152,MUTED,false);drawRows(g,x+16,cy+170,arr(root,"mutes"),6,e->{JsonObject o=e.getAsJsonObject();return string(o,"name","")+" • "+(longValue(o,"expires",0)<=0?"permanent":"temporary")+" • "+string(o,"reason","");});g.drawString(font,"Recent chat",x+380,cy+152,MUTED,false);drawRows(g,x+380,cy+170,arr(root,"chatHistory"),6,e->{JsonObject o=e.getAsJsonObject();return (bool(o,"staff",false)?"[Staff] ":"")+string(o,"player","")+": "+string(o,"message","");});}case AUDIT->drawRows(g,x+16,cy,arr(root,"audit"),13,e->{JsonObject o=e.getAsJsonObject();return string(o,"actor","")+" • "+string(o,"action","")+" • "+string(o,"target","")+" • "+string(o,"detail","");});case HEALTH->drawHealth(g,x,cy);case REPORTS->{drawTicketPanel(g,x+380,cy,true);int pages=Math.max(1,(filteredTickets(true).size()+ticketPageSize(true)-1)/ticketPageSize(true));g.drawString(font,"Page "+(ticketListPage+1)+"/"+pages,x+50,cy+252,MUTED,false);}case WORLDS->{JsonObject p=obj("pregen");if(selected>=0){g.drawString(font,"Center X",x+380,cy+4,MUTED,false);g.drawString(font,"Center Z",x+470,cy+4,MUTED,false);g.drawString(font,"Border size",x+560,cy+4,MUTED,false);g.drawString(font,"Pregeneration radius (chunks)",x+380,cy+48,MUTED,false);}g.drawString(font,"Chunks/tick",x+380,cy+96,MUTED,false);g.drawString(font,"Auto-pause MSPT",x+468,cy+96,MUTED,false);g.drawString(font,"Pregeneration: "+(bool(p,"active",false)?integer(p,"generated",0)+" / "+integer(p,"total",0)+(bool(p,"paused",false)?" • auto-paused for server load":""):"idle"),x+380,cy+142,bool(p,"paused",false)?WARNING:MUTED,false);g.drawString(font,"Lower speed is safer; auto-pause protects TPS when the server becomes busy.",x+380,cy+160,MUTED,false);}case ECONOMY->drawEconomy(g,x,cy);case PROFILES->g.drawString(font,"Profiles contain configuration only; player balances, mail, inventories and progression are excluded.",x+16,cy+286,MUTED,false);default->{}}}
 
-    private void drawSupport(GuiGraphicsExtractor g,int x,int y){
-        g.text(font,"Your tickets",x+16,y+70,MUTED,false);
+    private void drawSupport(GuiGraphics g,int x,int y){
+        g.drawString(font,"Your tickets",x+16,y+70,MUTED,false);
         drawTicketPanel(g,x+280,y+78,false);
         int pages=Math.max(1,(filteredTickets(false).size()+ticketPageSize(false)-1)/ticketPageSize(false));
-        g.text(font,"Page "+(ticketListPage+1)+"/"+pages,x+50,y+SUPPORT_H-29,MUTED,false);
+        g.drawString(font,"Page "+(ticketListPage+1)+"/"+pages,x+50,y+SUPPORT_H-29,MUTED,false);
     }
 
-    private void drawTicketPanel(GuiGraphicsExtractor g,int x,int y,boolean admin){
+    private void drawTicketPanel(GuiGraphics g,int x,int y,boolean admin){
         JsonObject detail=selectedTicketDetail();
-        if(detail==null){g.text(font,"Select a ticket to open its conversation.",x,y+8,MUTED,false);return;}
+        if(detail==null){g.drawString(font,"Select a ticket to open its conversation.",x,y+8,MUTED,false);return;}
         long id=longValue(detail,"id",0L);
         String status=string(detail,"status","OPEN");
         String category=string(detail,"categoryLabel",string(detail,"category",""));
-        g.text(font,"#"+id+" • "+category+" • "+status,x,y,TEXT,true);
+        g.drawString(font,"#"+id+" • "+category+" • "+status,x,y,TEXT,true);
         int metaY=y+14;
-        if(admin){g.text(font,"Player: "+string(detail,"player","-"),x,metaY,MUTED,false);metaY+=12;}
+        if(admin){g.drawString(font,"Player: "+string(detail,"player","-"),x,metaY,MUTED,false);metaY+=12;}
         String target=string(detail,"reportTarget","");
-        if(!target.isBlank()){g.text(font,"Reported player: "+target,x,metaY,WARNING,false);metaY+=12;}
+        if(!target.isBlank()){g.drawString(font,"Reported player: "+target,x,metaY,WARNING,false);metaY+=12;}
         String assigned=string(detail,"assigned","");
-        g.text(font,"Assigned: "+(assigned.isBlank()?"-":assigned),x,metaY,MUTED,false);
+        g.drawString(font,"Assigned: "+(assigned.isBlank()?"-":assigned),x,metaY,MUTED,false);
         int page=integer(detail,"messagePage",0),pages=Math.max(1,integer(detail,"messagePages",1));
-        g.text(font,"Conversation • page "+(page+1)+"/"+pages,x+180,metaY,MUTED,false);
+        g.drawString(font,"Conversation • page "+(page+1)+"/"+pages,x+180,metaY,MUTED,false);
         int cursor=metaY+18;
         JsonArray messages=arr(detail,"messages");
         for(JsonElement element:messages){
@@ -458,31 +458,31 @@ public final class ServerOperationsScreen extends Screen {
             String author=string(message,"author",role.equals("STAFF")?"Staff":"Player");
             long time=longValue(message,"time",0L);
             int headerColor=role.equals("STAFF")?GOOD:TEXT;
-            g.text(font,(role.equals("STAFF")?"Staff • ":"")+author+" • "+formatTicketTime(time),x,cursor,headerColor,true);
+            g.drawString(font,(role.equals("STAFF")?"Staff • ":"")+author+" • "+formatTicketTime(time),x,cursor,headerColor,true);
             cursor+=11;
             String body=string(message,"body","");
             HologramRichTextDocument document=new HologramRichTextDocument(body,SupportRichText::normalize,SupportRichText.MAX_STORED_CHARACTERS);
             Component component=RichTextEditBoxRenderer.component(document,0,document.plainText().length(),TEXT);
             var lines=font.split(component,admin?330:255);
             int shown=Math.min(2,lines.size());
-            for(int line=0;line<shown;line++)g.text(font,lines.get(line),x,cursor+line*10,TEXT,false);
-            if(lines.size()>2)g.text(font,"…",x+(admin?318:243),cursor+10,MUTED,false);
+            for(int line=0;line<shown;line++)g.drawString(font,lines.get(line),x,cursor+line*10,TEXT,false);
+            if(lines.size()>2)g.drawString(font,"…",x+(admin?318:243),cursor+10,MUTED,false);
             cursor+=shown*10+7;
             if(cursor>(admin?y+205:y+150))break;
         }
     }
 
-    private void drawHealth(GuiGraphicsExtractor g,int x,int y){
+    private void drawHealth(GuiGraphics g,int x,int y){
         JsonObject h=obj("health");HealthVerdict verdict=healthVerdict(h);
-        g.text(font,"Overall server health",x+16,y,MUTED,false);
-        g.text(font,verdict.label(),x+16,y+18,verdict.color(),true);
-        g.text(font,verdict.summary(),x+116,y+19,verdict.color(),false);
+        g.drawString(font,"Overall server health",x+16,y,MUTED,false);
+        g.drawString(font,verdict.label(),x+16,y+18,verdict.color(),true);
+        g.drawString(font,verdict.summary(),x+116,y+19,verdict.color(),false);
         if(!healthDetails)return;
-        g.text(font,"Technical details",x+16,y+94,MUTED,true);
-        g.text(font,String.format(Locale.ROOT,"TPS %.2f • MSPT %.2f • p95 %.2f",decimal(h,"tps",20),decimal(h,"mspt",0),decimal(h,"p95Mspt",0)),x+16,y+112,TEXT,true);
-        g.text(font,"Players "+integer(h,"players",0)+" • SSU jobs "+integer(h,"jobs",0)+" • Uptime "+longValue(h,"uptimeSeconds",0)+"s",x+16,y+130,MUTED,false);
+        g.drawString(font,"Technical details",x+16,y+94,MUTED,true);
+        g.drawString(font,String.format(Locale.ROOT,"TPS %.2f • MSPT %.2f • p95 %.2f",decimal(h,"tps",20),decimal(h,"mspt",0),decimal(h,"p95Mspt",0)),x+16,y+112,TEXT,true);
+        g.drawString(font,"Players "+integer(h,"players",0)+" • SSU jobs "+integer(h,"jobs",0)+" • Uptime "+longValue(h,"uptimeSeconds",0)+"s",x+16,y+130,MUTED,false);
         long used=longValue(h,"heapUsed",0),max=longValue(h,"heapMax",0);
-        g.text(font,"Heap "+mb(used)+" / "+mb(max)+" MB • Permission cache hit "+String.format(Locale.ROOT,"%.1f%%",decimal(h,"permissionCacheHitRate",0)*100),x+16,y+148,MUTED,false);
+        g.drawString(font,"Heap "+mb(used)+" / "+mb(max)+" MB • Permission cache hit "+String.format(Locale.ROOT,"%.1f%%",decimal(h,"permissionCacheHitRate",0)*100),x+16,y+148,MUTED,false);
         drawRows(g,x+16,y+174,arr(h,"modules"),8,e->{JsonObject o=e.getAsJsonObject();return String.format(Locale.ROOT,"%s • avg %.3f ms • p95 %.3f • max %.3f",string(o,"name","module"),decimal(o,"avg",0),decimal(o,"p95",0),decimal(o,"max",0));});
     }
 
@@ -496,12 +496,12 @@ public final class ServerOperationsScreen extends Screen {
         return new HealthVerdict("GREAT",GREAT,"Everything looks healthy and responsive.");
     }
 
-    private void drawEconomy(GuiGraphicsExtractor g,int x,int y){JsonObject e=obj("economy");g.text(font,"Accounts "+integer(e,"accounts",0)+" • Supply "+longValue(e,"supply",0)+" • Loaded tx "+integer(e,"transactions",0)+" • 24h volume "+longValue(e,"volume24h",0),x+16,y+34,TEXT,false);g.text(font,"Richest players",x+16,y+62,MUTED,false);drawRows(g,x+16,y+80,arr(e,"richest"),7,v->{JsonObject o=v.getAsJsonObject();return string(o,"name","")+" • "+longValue(o,"balance",0);});g.text(font,"Loaded transaction volume by type",x+16,y+220,MUTED,false);drawRows(g,x+16,y+238,arr(e,"types"),5,v->{JsonObject o=v.getAsJsonObject();return string(o,"type","")+" • "+longValue(o,"amount",0);});g.text(font,"Large transaction alerts",x+380,y+62,MUTED,false);drawRows(g,x+380,y+80,arr(e,"alerts"),10,v->{JsonObject o=v.getAsJsonObject();return longValue(o,"amount",0)+" • "+string(o,"type","")+" • "+string(o,"actor","");});}
+    private void drawEconomy(GuiGraphics g,int x,int y){JsonObject e=obj("economy");g.drawString(font,"Accounts "+integer(e,"accounts",0)+" • Supply "+longValue(e,"supply",0)+" • Loaded tx "+integer(e,"transactions",0)+" • 24h volume "+longValue(e,"volume24h",0),x+16,y+34,TEXT,false);g.drawString(font,"Richest players",x+16,y+62,MUTED,false);drawRows(g,x+16,y+80,arr(e,"richest"),7,v->{JsonObject o=v.getAsJsonObject();return string(o,"name","")+" • "+longValue(o,"balance",0);});g.drawString(font,"Loaded transaction volume by type",x+16,y+220,MUTED,false);drawRows(g,x+16,y+238,arr(e,"types"),5,v->{JsonObject o=v.getAsJsonObject();return string(o,"type","")+" • "+longValue(o,"amount",0);});g.drawString(font,"Large transaction alerts",x+380,y+62,MUTED,false);drawRows(g,x+380,y+80,arr(e,"alerts"),10,v->{JsonObject o=v.getAsJsonObject();return longValue(o,"amount",0)+" • "+string(o,"type","")+" • "+string(o,"actor","");});}
 
-    private void drawRows(GuiGraphicsExtractor g,int x,int y,JsonArray a,int max,java.util.function.Function<JsonElement,String> f){if(a.size()==0){g.text(font,"No entries.",x,y,MUTED,false);return;}for(int i=0;i<Math.min(max,a.size());i++)g.text(font,trim(f.apply(a.get(i)),60),x,y+i*18,i%2==0?TEXT:MUTED,false);}
-    private void drawSelectedDetail(GuiGraphicsExtractor g,int x,int y,JsonArray a,String key){if(selected<0||selected>=a.size())return;JsonObject o=a.get(selected).getAsJsonObject();g.text(font,"Selected: "+trim(string(o,key,""),50),x,y,TEXT,true);}
+    private void drawRows(GuiGraphics g,int x,int y,JsonArray a,int max,java.util.function.Function<JsonElement,String> f){if(a.size()==0){g.drawString(font,"No entries.",x,y,MUTED,false);return;}for(int i=0;i<Math.min(max,a.size());i++)g.drawString(font,trim(f.apply(a.get(i)),60),x,y+i*18,i%2==0?TEXT:MUTED,false);}
+    private void drawSelectedDetail(GuiGraphics g,int x,int y,JsonArray a,String key){if(selected<0||selected>=a.size())return;JsonObject o=a.get(selected).getAsJsonObject();g.drawString(font,"Selected: "+trim(string(o,key,""),50),x,y,TEXT,true);}
 
-    @Override public void onClose(){if(minecraft!=null)minecraft.setScreenAndShow(parent);}
+    @Override public void onClose(){if(minecraft!=null)minecraft.setScreen(parent);}
     @Override public boolean isPauseScreen(){return false;}
     private int panelWidth(){return data.admin()?ADMIN_W:SUPPORT_W;}private int panelHeight(){return data.admin()?ADMIN_H:SUPPORT_H;}
     private int left(){return(width-panelWidth())/2;}private int top(){return(height-panelHeight())/2;}

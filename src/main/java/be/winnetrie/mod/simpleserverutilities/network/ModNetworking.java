@@ -17,7 +17,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 ClaimMapDataPayload.TYPE,
-                ClaimMapDataPayload.STREAM_CODEC
+                ClaimMapDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -40,17 +41,20 @@ public class ModNetworking {
 
         registrar.playToClient(
                 BorderVisualizationPayload.TYPE,
-                BorderVisualizationPayload.STREAM_CODEC
+                BorderVisualizationPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 SsuMenuSnapshotPayload.TYPE,
-                SsuMenuSnapshotPayload.STREAM_CODEC
+                SsuMenuSnapshotPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 EntityInsightPayload.TYPE,
-                EntityInsightPayload.STREAM_CODEC
+                EntityInsightPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -61,7 +65,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 SsuMenuPageDataPayload.TYPE,
-                SsuMenuPageDataPayload.STREAM_CODEC
+                SsuMenuPageDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -72,7 +77,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 SsuPermissionEditorDataPayload.TYPE,
-                SsuPermissionEditorDataPayload.STREAM_CODEC
+                SsuPermissionEditorDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -89,7 +95,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 SsuDimensionManagerDataPayload.TYPE,
-                SsuDimensionManagerDataPayload.STREAM_CODEC
+                SsuDimensionManagerDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -100,7 +107,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 SsuPlayerProfileDataPayload.TYPE,
-                SsuPlayerProfileDataPayload.STREAM_CODEC
+                SsuPlayerProfileDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -117,7 +125,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 SsuMenuActionResultPayload.TYPE,
-                SsuMenuActionResultPayload.STREAM_CODEC
+                SsuMenuActionResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -134,7 +143,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 SsuPropertySettingsDataPayload.TYPE,
-                SsuPropertySettingsDataPayload.STREAM_CODEC
+                SsuPropertySettingsDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -157,7 +167,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 SsuTrustedPlayersDataPayload.TYPE,
-                SsuTrustedPlayersDataPayload.STREAM_CODEC
+                SsuTrustedPlayersDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -168,7 +179,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 MinimapDataPayload.TYPE,
-                MinimapDataPayload.STREAM_CODEC
+                MinimapDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -179,12 +191,14 @@ public class ModNetworking {
 
         registrar.playToClient(
                 WorldMapDataPayload.TYPE,
-                WorldMapDataPayload.STREAM_CODEC
+                WorldMapDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MapMarkerSyncPayload.TYPE,
-                MapMarkerSyncPayload.STREAM_CODEC
+                MapMarkerSyncPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -195,17 +209,20 @@ public class ModNetworking {
 
         registrar.playToClient(
                 MapMarkerActionResultPayload.TYPE,
-                MapMarkerActionResultPayload.STREAM_CODEC
+                MapMarkerActionResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 AuctionHouseDataPayload.TYPE,
-                AuctionHouseDataPayload.STREAM_CODEC
+                AuctionHouseDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 AuctionHouseActionResultPayload.TYPE,
-                AuctionHouseActionResultPayload.STREAM_CODEC
+                AuctionHouseActionResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -222,17 +239,20 @@ public class ModNetworking {
 
         registrar.playToClient(
                 MailDataPayload.TYPE,
-                MailDataPayload.STREAM_CODEC
+                MailDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MailComposeResultPayload.TYPE,
-                MailComposeResultPayload.STREAM_CODEC
+                MailComposeResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MailRecipientSuggestionsPayload.TYPE,
-                MailRecipientSuggestionsPayload.STREAM_CODEC
+                MailRecipientSuggestionsPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -273,17 +293,20 @@ public class ModNetworking {
 
         registrar.playToClient(
                 UtilityMiningPreviewPayload.TYPE,
-                UtilityMiningPreviewPayload.STREAM_CODEC
+                UtilityMiningPreviewPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 HologramSyncPayload.TYPE,
-                HologramSyncPayload.STREAM_CODEC
+                HologramSyncPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 HologramEditorOpenPayload.TYPE,
-                HologramEditorOpenPayload.STREAM_CODEC
+                HologramEditorOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -300,22 +323,26 @@ public class ModNetworking {
 
         registrar.playToClient(
                 HologramEditorResultPayload.TYPE,
-                HologramEditorResultPayload.STREAM_CODEC
+                HologramEditorResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 NpcLabelSyncPayload.TYPE,
-                NpcLabelSyncPayload.STREAM_CODEC
+                NpcLabelSyncPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 NpcTextureSyncPayload.TYPE,
-                NpcTextureSyncPayload.STREAM_CODEC
+                NpcTextureSyncPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 NpcEditorOpenPayload.TYPE,
-                NpcEditorOpenPayload.STREAM_CODEC
+                NpcEditorOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -326,7 +353,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcEditorResultPayload.TYPE,
-                NpcEditorResultPayload.STREAM_CODEC
+                NpcEditorResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -343,7 +371,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcLoadoutResultPayload.TYPE,
-                NpcLoadoutResultPayload.STREAM_CODEC
+                NpcLoadoutResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -354,7 +383,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcAdminListPayload.TYPE,
-                NpcAdminListPayload.STREAM_CODEC
+                NpcAdminListPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -365,7 +395,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcSpawnProfileEditorOpenPayload.TYPE,
-                NpcSpawnProfileEditorOpenPayload.STREAM_CODEC
+                NpcSpawnProfileEditorOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -376,13 +407,15 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcSpawnProfileEditorResultPayload.TYPE,
-                NpcSpawnProfileEditorResultPayload.STREAM_CODEC
+                NpcSpawnProfileEditorResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
 
         registrar.playToClient(
                 NpcDialogueViewPayload.TYPE,
-                NpcDialogueViewPayload.STREAM_CODEC
+                NpcDialogueViewPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -393,7 +426,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcFunctionMenuPayload.TYPE,
-                NpcFunctionMenuPayload.STREAM_CODEC
+                NpcFunctionMenuPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -404,7 +438,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcShopDataPayload.TYPE,
-                NpcShopDataPayload.STREAM_CODEC
+                NpcShopDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -427,7 +462,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcShopAdminDataPayload.TYPE,
-                NpcShopAdminDataPayload.STREAM_CODEC
+                NpcShopAdminDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -438,7 +474,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcShopEditorOpenPayload.TYPE,
-                NpcShopEditorOpenPayload.STREAM_CODEC
+                NpcShopEditorOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -449,7 +486,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcShopEditorResultPayload.TYPE,
-                NpcShopEditorResultPayload.STREAM_CODEC
+                NpcShopEditorResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -460,7 +498,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcAbilityLibraryDataPayload.TYPE,
-                NpcAbilityLibraryDataPayload.STREAM_CODEC
+                NpcAbilityLibraryDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -471,7 +510,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcAbilityEditorOpenPayload.TYPE,
-                NpcAbilityEditorOpenPayload.STREAM_CODEC
+                NpcAbilityEditorOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -482,7 +522,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcAbilityEditorResultPayload.TYPE,
-                NpcAbilityEditorResultPayload.STREAM_CODEC
+                NpcAbilityEditorResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -499,7 +540,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcItemPriceCatalogDataPayload.TYPE,
-                NpcItemPriceCatalogDataPayload.STREAM_CODEC
+                NpcItemPriceCatalogDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -510,7 +552,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcDialogueEditorOpenPayload.TYPE,
-                NpcDialogueEditorOpenPayload.STREAM_CODEC
+                NpcDialogueEditorOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -521,7 +564,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcDialogueEditorResultPayload.TYPE,
-                NpcDialogueEditorResultPayload.STREAM_CODEC
+                NpcDialogueEditorResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -532,7 +576,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 NpcQuestWorkflowOpenPayload.TYPE,
-                NpcQuestWorkflowOpenPayload.STREAM_CODEC
+                NpcQuestWorkflowOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -549,7 +594,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 QuestBookDataPayload.TYPE,
-                QuestBookDataPayload.STREAM_CODEC
+                QuestBookDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -560,7 +606,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 QuestEditorOpenPayload.TYPE,
-                QuestEditorOpenPayload.STREAM_CODEC
+                QuestEditorOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -571,7 +618,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 QuestEditorResultPayload.TYPE,
-                QuestEditorResultPayload.STREAM_CODEC
+                QuestEditorResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -582,7 +630,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 MinigameLobbyDataPayload.TYPE,
-                MinigameLobbyDataPayload.STREAM_CODEC
+                MinigameLobbyDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -593,7 +642,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 MinigameMatchOverviewPayload.TYPE,
-                MinigameMatchOverviewPayload.STREAM_CODEC
+                MinigameMatchOverviewPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -610,7 +660,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 MinigameEditorOpenPayload.TYPE,
-                MinigameEditorOpenPayload.STREAM_CODEC
+                MinigameEditorOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -627,32 +678,38 @@ public class ModNetworking {
 
         registrar.playToClient(
                 MinigameEditorResultPayload.TYPE,
-                MinigameEditorResultPayload.STREAM_CODEC
+                MinigameEditorResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MinigameHudPayload.TYPE,
-                MinigameHudPayload.STREAM_CODEC
+                MinigameHudPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MinigameKothVisualPayload.TYPE,
-                MinigameKothVisualPayload.STREAM_CODEC
+                MinigameKothVisualPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MinigameCastBarPayload.TYPE,
-                MinigameCastBarPayload.STREAM_CODEC
+                MinigameCastBarPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MinigameDominationVisualPayload.TYPE,
-                MinigameDominationVisualPayload.STREAM_CODEC
+                MinigameDominationVisualPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MinigameCtfVisualPayload.TYPE,
-                MinigameCtfVisualPayload.STREAM_CODEC
+                MinigameCtfVisualPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -663,7 +720,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 MinigameSelectionCreateResultPayload.TYPE,
-                MinigameSelectionCreateResultPayload.STREAM_CODEC
+                MinigameSelectionCreateResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -674,27 +732,32 @@ public class ModNetworking {
 
         registrar.playToClient(
                 MinigameSetupToolOpenPayload.TYPE,
-                MinigameSetupToolOpenPayload.STREAM_CODEC
+                MinigameSetupToolOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MinigameSetupVisualPayload.TYPE,
-                MinigameSetupVisualPayload.STREAM_CODEC
+                MinigameSetupVisualPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MinigameResultsPayload.TYPE,
-                MinigameResultsPayload.STREAM_CODEC
+                MinigameResultsPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MinigameProfilePayload.TYPE,
-                MinigameProfilePayload.STREAM_CODEC
+                MinigameProfilePayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MinigameKillFeedPayload.TYPE,
-                MinigameKillFeedPayload.STREAM_CODEC
+                MinigameKillFeedPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -705,12 +768,14 @@ public class ModNetworking {
 
         registrar.playToClient(
                 MinigameValidationPayload.TYPE,
-                MinigameValidationPayload.STREAM_CODEC
+                MinigameValidationPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 MinigameDiagnosticsPayload.TYPE,
-                MinigameDiagnosticsPayload.STREAM_CODEC
+                MinigameDiagnosticsPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -721,7 +786,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 DungeonLobbyDataPayload.TYPE,
-                DungeonLobbyDataPayload.STREAM_CODEC
+                DungeonLobbyDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -732,7 +798,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 DungeonEditorOpenPayload.TYPE,
-                DungeonEditorOpenPayload.STREAM_CODEC
+                DungeonEditorOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -743,17 +810,20 @@ public class ModNetworking {
 
         registrar.playToClient(
                 DungeonEditorResultPayload.TYPE,
-                DungeonEditorResultPayload.STREAM_CODEC
+                DungeonEditorResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 RegionSetupOpenPayload.TYPE,
-                RegionSetupOpenPayload.STREAM_CODEC
+                RegionSetupOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 RegionSnapshotPreviewPayload.TYPE,
-                RegionSnapshotPreviewPayload.STREAM_CODEC
+                RegionSnapshotPreviewPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -776,7 +846,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 RegionEditorOpenPayload.TYPE,
-                RegionEditorOpenPayload.STREAM_CODEC
+                RegionEditorOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -787,13 +858,15 @@ public class ModNetworking {
 
         registrar.playToClient(
                 RegionEditorResultPayload.TYPE,
-                RegionEditorResultPayload.STREAM_CODEC
+                RegionEditorResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
 
         registrar.playToClient(
                 RegionSelectionToolOpenPayload.TYPE,
-                RegionSelectionToolOpenPayload.STREAM_CODEC
+                RegionSelectionToolOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -804,12 +877,14 @@ public class ModNetworking {
 
         registrar.playToClient(
                 RegionSelectionActionResultPayload.TYPE,
-                RegionSelectionActionResultPayload.STREAM_CODEC
+                RegionSelectionActionResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 RegionSelectionClientTemplatePayload.TYPE,
-                RegionSelectionClientTemplatePayload.STREAM_CODEC
+                RegionSelectionClientTemplatePayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -820,17 +895,20 @@ public class ModNetworking {
 
         registrar.playToClient(
                 BlockInformationStatePayload.TYPE,
-                BlockInformationStatePayload.STREAM_CODEC
+                BlockInformationStatePayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 BlockInformationContentPayload.TYPE,
-                BlockInformationContentPayload.STREAM_CODEC
+                BlockInformationContentPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 StatisticEditorOpenPayload.TYPE,
-                StatisticEditorOpenPayload.STREAM_CODEC
+                StatisticEditorOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -841,7 +919,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 StatisticEditorResultPayload.TYPE,
-                StatisticEditorResultPayload.STREAM_CODEC
+                StatisticEditorResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -858,7 +937,8 @@ public class ModNetworking {
 
         registrar.playToClient(
                 TitleManagerDataPayload.TYPE,
-                TitleManagerDataPayload.STREAM_CODEC
+                TitleManagerDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToServer(
@@ -875,34 +955,45 @@ public class ModNetworking {
 
         registrar.playToClient(
                 RankDisplayDataPayload.TYPE,
-                RankDisplayDataPayload.STREAM_CODEC
+                RankDisplayDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 PlayerIdentitySyncPayload.TYPE,
-                PlayerIdentitySyncPayload.STREAM_CODEC
+                PlayerIdentitySyncPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
         registrar.playToClient(
                 DamageIndicatorPayload.TYPE,
-                DamageIndicatorPayload.STREAM_CODEC
+                DamageIndicatorPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
         );
 
-        registrar.playToClient(OnboardingStatePayload.TYPE, OnboardingStatePayload.STREAM_CODEC);
+        registrar.playToClient(OnboardingStatePayload.TYPE, OnboardingStatePayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
+        );
         registrar.playToServer(OnboardingActionPayload.TYPE, OnboardingActionPayload.STREAM_CODEC,
                 (p,c) -> { if (c.player() instanceof net.minecraft.server.level.ServerPlayer player) SimpleServerUtilities.ONBOARDING.handleAction(player,p.action(),p.pageIndex(),p.requestId()); });
         registrar.playToServer(OnboardingAdminRequestPayload.TYPE, OnboardingAdminRequestPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.onboarding.OnboardingService::handleRequest);
         registrar.playToServer(OnboardingAdminSavePayload.TYPE, OnboardingAdminSavePayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.onboarding.OnboardingService::handleSave);
-        registrar.playToClient(OnboardingAdminDataPayload.TYPE, OnboardingAdminDataPayload.STREAM_CODEC);
+        registrar.playToClient(OnboardingAdminDataPayload.TYPE, OnboardingAdminDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
+        );
 
         registrar.playToServer(PlayerManagementRequestPayload.TYPE, PlayerManagementRequestPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.moderation.ModerationService::request);
         registrar.playToServer(PlayerManagementActionPayload.TYPE, PlayerManagementActionPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.moderation.ModerationService::action);
-        registrar.playToClient(PlayerManagementDataPayload.TYPE, PlayerManagementDataPayload.STREAM_CODEC);
-        registrar.playToClient(JailDashboardPayload.TYPE, JailDashboardPayload.STREAM_CODEC);
+        registrar.playToClient(PlayerManagementDataPayload.TYPE, PlayerManagementDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
+        );
+        registrar.playToClient(JailDashboardPayload.TYPE, JailDashboardPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
+        );
         registrar.playToServer(JailDashboardActionPayload.TYPE, JailDashboardActionPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.moderation.ModerationService::jailAction);
         registrar.playToServer(PlayerInventoryOpenPayload.TYPE, PlayerInventoryOpenPayload.STREAM_CODEC,
@@ -912,38 +1003,54 @@ public class ModNetworking {
                 be.winnetrie.mod.simpleserverutilities.kits.KitService::request);
         registrar.playToServer(KitActionPayload.TYPE, KitActionPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.kits.KitService::action);
-        registrar.playToClient(KitDataPayload.TYPE, KitDataPayload.STREAM_CODEC);
+        registrar.playToClient(KitDataPayload.TYPE, KitDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
+        );
         registrar.playToServer(KitContentsSavePayload.TYPE, KitContentsSavePayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.kits.KitEditorService::save);
-        registrar.playToClient(KitContentsResultPayload.TYPE, KitContentsResultPayload.STREAM_CODEC);
+        registrar.playToClient(KitContentsResultPayload.TYPE, KitContentsResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
+        );
 
         registrar.playToServer(JailAdminRequestPayload.TYPE, JailAdminRequestPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.jail.JailService::request);
         registrar.playToServer(JailAdminActionPayload.TYPE, JailAdminActionPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.jail.JailService::action);
-        registrar.playToClient(JailAdminDataPayload.TYPE, JailAdminDataPayload.STREAM_CODEC);
+        registrar.playToClient(JailAdminDataPayload.TYPE, JailAdminDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
+        );
 
         registrar.playToServer(MineRequestPayload.TYPE, MineRequestPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.mine.MineService::request);
         registrar.playToServer(MineActionPayload.TYPE, MineActionPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.mine.MineService::action);
-        registrar.playToClient(MineDataPayload.TYPE, MineDataPayload.STREAM_CODEC);
+        registrar.playToClient(MineDataPayload.TYPE, MineDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
+        );
 
         registrar.playToServer(ServerOperationsRequestPayload.TYPE, ServerOperationsRequestPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.serverops.ServerOperationsService::request);
         registrar.playToServer(ServerOperationsActionPayload.TYPE, ServerOperationsActionPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.serverops.ServerOperationsService::action);
-        registrar.playToClient(ServerOperationsDataPayload.TYPE, ServerOperationsDataPayload.STREAM_CODEC);
+        registrar.playToClient(ServerOperationsDataPayload.TYPE, ServerOperationsDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
+        );
 
         registrar.playToServer(AchievementMenuRequestPayload.TYPE, AchievementMenuRequestPayload.STREAM_CODEC,
                 (payload, context) -> SimpleServerUtilities.ACHIEVEMENTS.handleRequest(payload, context));
-        registrar.playToClient(AchievementMenuDataPayload.TYPE, AchievementMenuDataPayload.STREAM_CODEC);
+        registrar.playToClient(AchievementMenuDataPayload.TYPE, AchievementMenuDataPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
+        );
         registrar.playToServer(AchievementEditorRequestPayload.TYPE, AchievementEditorRequestPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.achievement.AchievementEditorService::handleRequest);
-        registrar.playToClient(AchievementEditorOpenPayload.TYPE, AchievementEditorOpenPayload.STREAM_CODEC);
+        registrar.playToClient(AchievementEditorOpenPayload.TYPE, AchievementEditorOpenPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
+        );
         registrar.playToServer(AchievementEditorSubmitPayload.TYPE, AchievementEditorSubmitPayload.STREAM_CODEC,
                 be.winnetrie.mod.simpleserverutilities.achievement.AchievementEditorService::handleSubmit);
-        registrar.playToClient(AchievementEditorResultPayload.TYPE, AchievementEditorResultPayload.STREAM_CODEC);
+        registrar.playToClient(AchievementEditorResultPayload.TYPE, AchievementEditorResultPayload.STREAM_CODEC,
+                ClientPayloadRouter::handle
+        );
 
     }
 }

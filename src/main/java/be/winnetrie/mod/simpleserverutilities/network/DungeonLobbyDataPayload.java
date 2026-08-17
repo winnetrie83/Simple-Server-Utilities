@@ -6,7 +6,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Complete bounded dungeon lobby snapshot for one player. */
 public record DungeonLobbyDataPayload(
@@ -14,7 +14,7 @@ public record DungeonLobbyDataPayload(
         String queuedDungeonId, String activeRunId, List<DungeonEntry> dungeons
 ) implements CustomPacketPayload {
     public static final int MAX_DUNGEONS = 128;
-    public static final Type<DungeonLobbyDataPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "dungeon_lobby_data"));
+    public static final Type<DungeonLobbyDataPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "dungeon_lobby_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf, DungeonLobbyDataPayload> STREAM_CODEC = StreamCodec.of(DungeonLobbyDataPayload::encode, DungeonLobbyDataPayload::decode);
 
     public DungeonLobbyDataPayload {

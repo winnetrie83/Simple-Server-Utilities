@@ -50,7 +50,7 @@ public final class HologramClientState {
 
     private static HologramSyncPayload.Entry targetedEntry(Minecraft minecraft, boolean linksOnly) {
         if (minecraft.player == null || minecraft.level == null) return null;
-        String dimension = minecraft.level.dimension().identifier().toString();
+        String dimension = minecraft.level.dimension().location().toString();
         Vec3 eye = minecraft.player.getEyePosition();
         Vec3 look = minecraft.player.getViewVector(1.0F).normalize();
         Vec3 right = look.cross(new Vec3(0.0D, 1.0D, 0.0D));

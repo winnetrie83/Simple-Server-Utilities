@@ -6,12 +6,12 @@ import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionActionPaylo
 import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionToolOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSetupRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** First, deliberately small action menu opened by right-clicking the region tool. */
 public final class RegionSelectionToolScreen extends Screen {
@@ -39,18 +39,18 @@ public final class RegionSelectionToolScreen extends Screen {
         int buttonX = x + 24;
         int buttonWidth = WIDTH - 48;
         Button create = addRenderableWidget(Button.builder(Component.literal("Create server region"), ignored -> {
-                    ClientPacketDistributor.sendToServer(new RegionSetupRequestPayload("create", "", nextRequestId++));
+                    PacketDistributor.sendToServer(new RegionSetupRequestPayload("create", "", nextRequestId++));
                     notice = "Opening full region setup…";
                     noticeError = false;
                 }).bounds(buttonX, y + 76, buttonWidth, 24).build());
         create.active = selection.canCreateRegion();
         Button edit = addRenderableWidget(Button.builder(Component.literal("Edit selected blocks"), ignored -> {
-                    if (minecraft != null) minecraft.setScreenAndShow(new RegionSelectionEditScreen(selection, this));
+                    if (minecraft != null) minecraft.setScreen(new RegionSelectionEditScreen(selection, this));
                 }).bounds(buttonX, y + 106, buttonWidth, 24).build());
         edit.active = selection.canEditBlocks() && selection.volume() <= selection.maxEditableVolume();
         addRenderableWidget(Button.builder(Component.literal("Clear selection"), ignored -> {
                     long requestId = nextRequestId++;
-                    ClientPacketDistributor.sendToServer(new RegionSelectionActionPayload(
+                    PacketDistributor.sendToServer(new RegionSelectionActionPayload(
                             "clear_selection", "", List.of(), List.of(), requestId));
                     notice = "Clearing selection…";
                     noticeError = false;
@@ -68,20 +68,20 @@ public final class RegionSelectionToolScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left();
         int y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + WIDTH, y + HEIGHT, PANEL);
-        g.outline(x, y, WIDTH, HEIGHT, BORDER);
-        g.text(font, "Region Selection", x + 18, y + 14, TEXT, true);
+        g.renderOutline(x, y, WIDTH, HEIGHT, BORDER);
+        g.drawString(font, "Region Selection", x + 18, y + 14, TEXT, true);
         BlockPos p1 = BlockPos.of(selection.point1());
         BlockPos p2 = BlockPos.of(selection.point2());
-        g.text(font, compact(p1) + " → " + compact(p2), x + 18, y + 34, MUTED, false);
-        g.text(font, selection.volume() + " block(s) · " + shortDimension(selection.dimension()),
+        g.drawString(font, compact(p1) + " → " + compact(p2), x + 18, y + 34, MUTED, false);
+        g.drawString(font, selection.volume() + " block(s) · " + shortDimension(selection.dimension()),
                 x + 18, y + 48, MUTED, false);
-        g.text(font, "Choose what you want to do with the current region selection.", x + 18, y + 62, MUTED, false);
-        g.text(font, "Minigames use the separate Minigame Setup Tool.", x + 18, y + 164, MUTED, false);
+        g.drawString(font, "Choose what you want to do with the current region selection.", x + 18, y + 62, MUTED, false);
+        g.drawString(font, "Minigames use the separate Minigame Setup Tool.", x + 18, y + 164, MUTED, false);
         boolean editTooLarge = selection.volume() > selection.maxEditableVolume();
         if (!selection.canCreateRegion() || !selection.canEditBlocks() || editTooLarge) {
             String access;
@@ -94,10 +94,10 @@ public final class RegionSelectionToolScreen extends Screen {
             } else {
                 access = "Selection block-edit permission is unavailable.";
             }
-            g.text(font, access, x + 18, y + 176, ERROR, false);
+            g.drawString(font, access, x + 18, y + 176, ERROR, false);
         }
-        if (!notice.isBlank()) g.text(font, trim(notice, 58), x + 18, y + 192, noticeError ? ERROR : MUTED, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 58), x + 18, y + 192, noticeError ? ERROR : MUTED, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private int left() { return (width - WIDTH) / 2; }

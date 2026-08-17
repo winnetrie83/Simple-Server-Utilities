@@ -275,7 +275,7 @@ public final class HologramCommands {
         if (player == null) return 0;
         HologramDefinition value = require(source, id);
         if (value == null) return 0;
-        value.dimension = player.level().dimension().identifier().toString();
+        value.dimension = player.level().dimension().location().toString();
         value.x = player.getX();
         value.y = player.getY() + 1.8D;
         value.z = player.getZ();
@@ -359,7 +359,7 @@ public final class HologramCommands {
         HologramDefinition value = new HologramDefinition();
         value.id = id;
         value.type = type;
-        value.dimension = player.level().dimension().identifier().toString();
+        value.dimension = player.level().dimension().location().toString();
         value.x = player.getX();
         value.y = player.getY() + 1.8D;
         value.z = player.getZ();
@@ -420,7 +420,7 @@ public final class HologramCommands {
             return true;
         }
         try {
-            net.minecraft.resources.Identifier identifier = net.minecraft.resources.Identifier.parse(raw);
+            net.minecraft.resources.ResourceLocation identifier = net.minecraft.resources.ResourceLocation.parse(raw);
             String path = identifier.getPath().toLowerCase(java.util.Locale.ROOT);
             if (path.endsWith(".png") || path.endsWith(".gif")
                     || path.endsWith(".jpg") || path.endsWith(".jpeg")) {

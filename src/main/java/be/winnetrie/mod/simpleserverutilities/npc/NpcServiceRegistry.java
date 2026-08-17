@@ -19,7 +19,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.policy.WarpPolicy;
 import be.winnetrie.mod.simpleserverutilities.spawn.SpawnService;
 import be.winnetrie.mod.simpleserverutilities.warp.Warp;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -214,7 +214,7 @@ public final class NpcServiceRegistry {
     private static ServerLevel resolveLevel(ServerPlayer player, Warp warp) {
         if (warp == null) return null;
         try {
-            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, Identifier.parse(warp.getDimension()));
+            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(warp.getDimension()));
             return player.level().getServer().getLevel(key);
         } catch (RuntimeException exception) {
             return null;

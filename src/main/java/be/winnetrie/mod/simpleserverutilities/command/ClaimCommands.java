@@ -35,7 +35,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 
 
@@ -347,7 +347,7 @@ public class ClaimCommands {
         }
 
         if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownClaim(player);
-        player.sendSystemMessage(Component.literal("Chunk " + chunkPos.x() + ", " + chunkPos.z() + " added to claim '" + name + "'."));
+        player.sendSystemMessage(Component.literal("Chunk " + chunkPos.x + ", " + chunkPos.z + " added to claim '" + name + "'."));
         return 1;
     }
 
@@ -371,7 +371,7 @@ public class ClaimCommands {
         }
 
         if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownClaim(player);
-        player.sendSystemMessage(Component.literal("Chunk " + chunkPos.x() + ", " + chunkPos.z() + " unclaimed."));
+        player.sendSystemMessage(Component.literal("Chunk " + chunkPos.x + ", " + chunkPos.z + " unclaimed."));
         return 1;
     }
 
@@ -707,7 +707,7 @@ public class ClaimCommands {
 
     private static ServerLevel getClaimLevel(ServerPlayer player, PlayerClaim claim) {
         try {
-            Identifier dimensionId = Identifier.parse(claim.getDimension());
+            ResourceLocation dimensionId = ResourceLocation.parse(claim.getDimension());
             ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimensionId);
 
             return player.level().getServer().getLevel(dimension);

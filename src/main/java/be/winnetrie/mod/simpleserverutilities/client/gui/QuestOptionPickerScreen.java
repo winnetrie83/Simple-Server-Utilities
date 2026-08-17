@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -85,20 +85,20 @@ public final class QuestOptionPickerScreen extends Screen {
 
     private void choose(String value) {
         callback.accept(value);
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float pt) {
+    @Override public void render(GuiGraphics g, int mx, int my, float pt) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, titleText, x + 14, y + 14, TEXT, true);
-        g.text(font, filtered().size() + " option(s)", x + 92, y + H - 23, MUTED, false);
-        if (!selected.isBlank()) g.text(font, "Current: " + trim(friendly(selected), 28), x + 175, y + H - 23, SELECTED, false);
-        super.extractRenderState(g, mx, my, pt);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, titleText, x + 14, y + 14, TEXT, true);
+        g.drawString(font, filtered().size() + " option(s)", x + 92, y + H - 23, MUTED, false);
+        if (!selected.isBlank()) g.drawString(font, "Current: " + trim(friendly(selected), 28), x + 175, y + H - 23, SELECTED, false);
+        super.render(g, mx, my, pt);
     }
 
     private int left() { return Math.max(4, (width - W) / 2); }

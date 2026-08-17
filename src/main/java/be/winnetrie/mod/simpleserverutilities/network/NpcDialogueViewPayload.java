@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Server-authoritative current dialogue node and already-filtered choices. */
 public record NpcDialogueViewPayload(
@@ -24,7 +24,7 @@ public record NpcDialogueViewPayload(
         List<ChoiceEntry> choices
 ) implements CustomPacketPayload {
     public static final Type<NpcDialogueViewPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_dialogue_view"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_dialogue_view"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcDialogueViewPayload> STREAM_CODEC =
             StreamCodec.of(NpcDialogueViewPayload::encode, NpcDialogueViewPayload::decode);
 

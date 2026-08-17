@@ -4,13 +4,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Lightweight client request for the player's current minimap snapshot. */
 public record MinimapRequestPayload() implements CustomPacketPayload {
 
     public static final Type<MinimapRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minimap_request")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minimap_request")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, MinimapRequestPayload> STREAM_CODEC =

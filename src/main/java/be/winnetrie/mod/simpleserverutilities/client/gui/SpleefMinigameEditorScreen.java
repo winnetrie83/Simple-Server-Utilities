@@ -15,16 +15,15 @@ import be.winnetrie.mod.simpleserverutilities.minigame.MinigameSpawnPoint;
 import be.winnetrie.mod.simpleserverutilities.minigame.SpleefRules;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameRewardCapturePayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Dedicated, compact administrator-facing Spleef editor. */
 final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
@@ -128,11 +127,9 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
         name = field(left + 196, top + 58, 220, 128, "Display name", draft.displayName);
         icon = field(left + 428, top + 58, 203, 128, "Menu icon item", draft.iconItem);
         descriptionValue = draft.description == null ? "" : draft.description;
-        description = MultiLineEditBox.builder().setX(left + 14).setY(top + 116)
-                .setPlaceholder(Component.literal("Player-facing description"))
-                .setShowBackground(true).setShowDecorations(true)
-                .build(font, 617, 54, Component.literal("Description"));
-        description.setCharacterLimit(8_192); description.setLineLimit(24); description.setValue(descriptionValue);
+        description = new MultiLineEditBox(font, left + 14, top + 116, 617, 54,
+                Component.literal("Player-facing description"), Component.literal("Description"));
+        description.setCharacterLimit(8_192); description.setValue(descriptionValue);
         description.setValueListener(value -> descriptionValue = value); addRenderableWidget(description);
         minPlayers = field(left + 14, top + 208, 112, 3, "Minimum players", Integer.toString(draft.minPlayers));
         maxPlayers = field(left + 134, top + 208, 112, 3, "Maximum players", Integer.toString(draft.maxPlayers));
@@ -348,7 +345,7 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
     private void saveAll() { if (saveCurrentPage()) submitDraft(); }
     private void openMatchFlow() {
         if (!saveCurrentPage()) return;
-        if (minecraft != null) minecraft.setScreenAndShow(new MinigameExperienceSettingsScreen(draft, this));
+        if (minecraft != null) minecraft.setScreen(new MinigameExperienceSettingsScreen(draft, this));
     }
 
     private void switchPage(int target) { if (target != page && saveCurrentPage()) { page = target; rebuildWidgets(); } }
@@ -463,18 +460,16 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
             return;
         }
         awaiting = true;
-        ClientPacketDistributor.sendToServer(new MinigameRewardCapturePayload(
+        PacketDistributor.sendToServer(new MinigameRewardCapturePayload(
                 initial.originalMinigameId(), GSON.toJson(draft), winnerRewards ? "winner" : "participation",
                 rewardSlot, carriedInventorySlot, addOne, nextRequestId++));
         setNotice(addOne ? "Adding one item to reward slot…" : "Copying the complete stack to reward slot…", false);
         rebuildWidgets();
     }
 
-    @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    @Override public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (page == 3) {
-            int button = event.buttonInfo().button();
-            int mouseX = (int) event.x(), mouseY = (int) event.y();
-            int rewardSlot = rewardSlotAt(mouseX, mouseY);
+            int rewardSlot = rewardSlotAt((int) mouseX, (int) mouseY);
             if (rewardSlot >= 0 && (button == 0 || button == 1)) {
                 if (carriedInventorySlot >= 0) {
                     placeCarriedStack(rewardSlot, button == 1);
@@ -487,7 +482,7 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
                 }
                 return true;
             }
-            int inventorySlot = inventorySlotAt(mouseX, mouseY);
+            int inventorySlot = inventorySlotAt((int) mouseX, (int) mouseY);
             if (inventorySlot >= 0 && (button == 0 || button == 1)) {
                 ItemStack stack = clientInventoryItem(inventorySlot);
                 if (stack.isEmpty()) {
@@ -505,41 +500,41 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
                 return true;
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int left = left(), top = top();
-        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(left, top, left + W, top + H, PANEL); g.outline(left, top, W, H, BORDER);
-        g.text(font, "Spleef Editor", left + W - 104, top + 17, TEXT, true);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(left, top, left + W, top + H, PANEL); g.renderOutline(left, top, W, H, BORDER);
+        g.drawString(font, "Spleef Editor", left + W - 104, top + 17, TEXT, true);
         if (page == 0) renderGeneral(g, left, top);
         else if (page == 1) renderArena(g, left, top);
         else if (page == 2) renderSpawns(g, left, top);
         else if (page == 3) renderRewards(g, left, top, mouseX, mouseY);
         else if (page == 4) renderRules(g, left, top);
         else renderProjectiles(g, left, top);
-        if (!notice.isBlank()) g.text(font, trim(notice, 68), left + 102, top + H - 24, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 68), left + 102, top + H - 24, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
         if (page == 3 && carriedInventorySlot >= 0) renderGhostCursor(g, mouseX, mouseY);
     }
 
-    private void renderGeneral(GuiGraphicsExtractor g, int left, int top) {
+    private void renderGeneral(GuiGraphics g, int left, int top) {
         fieldInfo(g, left + 14, top + 42, "Internal ID", "Unique storage key; locked after first save.", 170);
         fieldInfo(g, left + 196, top + 42, "Display name", "Name shown to players and in reward mail.", 220);
         fieldInfo(g, left + 428, top + 42, "Menu icon", "Item ID used in the minigame menu.", 203);
-        g.text(font, "Description", left + 14, top + 100, TEXT, true);
-        g.text(font, "Explain the goal and important rules to players.", left + 104, top + 100, MUTED, false);
+        g.drawString(font, "Description", left + 14, top + 100, TEXT, true);
+        g.drawString(font, "Explain the goal and important rules to players.", left + 104, top + 100, MUTED, false);
         fieldInfo(g, left + 14, top + 192, "Minimum players", "Needed before start.", 112);
         fieldInfo(g, left + 134, top + 192, "Maximum players", "Also required spawns.", 112);
         fieldInfo(g, left + 254, top + 192, "Countdown", "Seconds before start.", 112);
         fieldInfo(g, left + 374, top + 192, "Match time", "0 means unlimited.", 112);
         fieldInfo(g, left + 494, top + 192, "Post-game time", "Seconds before return.", 137);
-        g.text(font, "Spleef uses last player standing, individual player slots and no late joining.", left + 14, top + 304, GOOD, false);
+        g.drawString(font, "Spleef uses last player standing, individual player slots and no late joining.", left + 14, top + 304, GOOD, false);
     }
 
-    private void renderArena(GuiGraphicsExtractor g, int left, int top) {
+    private void renderArena(GuiGraphics g, int left, int top) {
         MinigameArenaDefinition arena = arena();
-        g.text(font, "Arena " + (arenaIndex + 1) + " / " + draft.arenas.size(), left + 292, top + 50, MUTED, false);
+        g.drawString(font, "Arena " + (arenaIndex + 1) + " / " + draft.arenas.size(), left + 292, top + 50, MUTED, false);
         fieldInfo(g, left + 14, top + 76, "Arena ID", "Unique key inside this Spleef game.", 150);
         fieldInfo(g, left + 176, top + 76, "Arena name", "Readable name for administrators.", 220);
         fieldInfo(g, left + 408, top + 76, "Arena region", arena.managedRegion
@@ -550,16 +545,16 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
         locationLabels(g, left + 14, top + 242, "Spectator position", "Eliminated players appear here and must remain near the arena.");
     }
 
-    private void locationLabels(GuiGraphicsExtractor g, int x, int y, String title, String help) {
-        g.text(font, title, x, y, TEXT, true); g.text(font, help, x + 118, y, MUTED, false);
-        g.text(font, "Dimension", x, y + 16, MUTED, false); g.text(font, "X", x + 153, y + 16, MUTED, false);
-        g.text(font, "Y", x + 225, y + 16, MUTED, false); g.text(font, "Z", x + 297, y + 16, MUTED, false);
-        g.text(font, "Yaw", x + 369, y + 16, MUTED, false); g.text(font, "Pitch", x + 441, y + 16, MUTED, false);
-        g.text(font, "Yaw = horizontal facing; Pitch = looking up or down.", x, y + 52, MUTED, false);
+    private void locationLabels(GuiGraphics g, int x, int y, String title, String help) {
+        g.drawString(font, title, x, y, TEXT, true); g.drawString(font, help, x + 118, y, MUTED, false);
+        g.drawString(font, "Dimension", x, y + 16, MUTED, false); g.drawString(font, "X", x + 153, y + 16, MUTED, false);
+        g.drawString(font, "Y", x + 225, y + 16, MUTED, false); g.drawString(font, "Z", x + 297, y + 16, MUTED, false);
+        g.drawString(font, "Yaw", x + 369, y + 16, MUTED, false); g.drawString(font, "Pitch", x + 441, y + 16, MUTED, false);
+        g.drawString(font, "Yaw = horizontal facing; Pitch = looking up or down.", x, y + 52, MUTED, false);
     }
 
-    private void renderSpawns(GuiGraphicsExtractor g, int left, int top) {
-        g.text(font, "Player spawn " + (spawnIndex + 1) + " / " + arena().teamSpawns.size(), left + 340, top + 54, TEXT, true);
+    private void renderSpawns(GuiGraphics g, int left, int top) {
+        g.drawString(font, "Player spawn " + (spawnIndex + 1) + " / " + arena().teamSpawns.size(), left + 340, top + 54, TEXT, true);
         wrapped(g, "Each player receives one separate spawn. Technical team numbers are hidden for Spleef.",
                 left + 14, top + 84, 605, GOOD, 2);
         fieldInfo(g, left + 14, top + 116, "Dimension", "World containing this spawn.", 180);
@@ -568,18 +563,18 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
         fieldInfo(g, left + 374, top + 116, "Z", "North/south.", 72);
         fieldInfo(g, left + 458, top + 116, "Yaw", "Facing.", 82);
         fieldInfo(g, left + 552, top + 116, "Pitch", "Look angle.", 79);
-        g.text(font, "Required: " + draft.maxPlayers + " · Configured: " + arena().teamSpawns.size(), left + 14, top + 232,
+        g.drawString(font, "Required: " + draft.maxPlayers + " · Configured: " + arena().teamSpawns.size(), left + 14, top + 232,
                 arena().teamSpawns.size() >= draft.maxPlayers ? GOOD : WARNING, false);
-        g.text(font, "Place every spawn on a different block inside the arena footprint.", left + 14, top + 254, MUTED, false);
+        g.drawString(font, "Place every spawn on a different block inside the arena footprint.", left + 14, top + 254, MUTED, false);
     }
 
-    private void renderRewards(GuiGraphicsExtractor g, int left, int top, int mouseX, int mouseY) {
+    private void renderRewards(GuiGraphics g, int left, int top, int mouseX, int mouseY) {
         fieldInfo(g, left + 216, top + 32, "Money reward", "Delivered through reward mail.", 120);
         wrapped(g, winnerRewards ? "Only the winner receives this package." : "Every restored participant receives this package.",
                 left + 348, top + 54, 283, GOOD, 2);
-        g.text(font, "Mail item slots", left + 14, top + 88, TEXT, true);
+        g.drawString(font, "Mail item slots", left + 14, top + 88, TEXT, true);
         renderRewardSlots(g, left + 14, top + 108, mouseX, mouseY);
-        g.text(font, "Your inventory", left + 128, top + 88, TEXT, true);
+        g.drawString(font, "Your inventory", left + 128, top + 88, TEXT, true);
         renderInventory(g, left + 128, top + 108, mouseX, mouseY);
         wrapped(g, "Click an inventory stack to hold a ghost copy. Then left-click a mail slot to copy the full stack, or right-click to add one item.",
                 left + 322, top + 88, 309, MUTED, 4);
@@ -588,19 +583,19 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
         ItemStack held = heldStack();
         String heldLabel = held.isEmpty() ? "Held copy: none"
                 : "Held copy: " + held.getHoverName().getString() + " ×" + held.getCount();
-        g.text(font, trim(heldLabel, 48), left + 322, top + 182, held.isEmpty() ? MUTED : GOOD, false);
+        g.drawString(font, trim(heldLabel, 48), left + 322, top + 182, held.isEmpty() ? MUTED : GOOD, false);
 
         ContentAction current = action();
         String position = current == null ? "No direct reward selected" : "Direct reward " + (actionIndex() + 1) + " / " + rewards().directActions.size();
-        g.text(font, position, left + 370, top + 224, MUTED, false);
-        g.text(font, "Direct action type", left + 14, top + 250, TEXT, true);
-        g.text(font, "Action parameters", left + 216, top + 250, TEXT, true);
-        g.text(font, "Applied immediately.", left + 14, top + 288, MUTED, false);
-        g.text(font, "Use key=value pairs separated by semicolons.", left + 216, top + 288, MUTED, false);
+        g.drawString(font, position, left + 370, top + 224, MUTED, false);
+        g.drawString(font, "Direct action type", left + 14, top + 250, TEXT, true);
+        g.drawString(font, "Action parameters", left + 216, top + 250, TEXT, true);
+        g.drawString(font, "Applied immediately.", left + 14, top + 288, MUTED, false);
+        g.drawString(font, "Use key=value pairs separated by semicolons.", left + 216, top + 288, MUTED, false);
         wrapped(g, actionHelp(new ContentAction(selectedActionType, Map.of())), left + 14, top + 302, 617, MUTED, 1);
     }
 
-    private void renderRules(GuiGraphicsExtractor g, int left, int top) {
+    private void renderRules(GuiGraphics g, int left, int top) {
         fieldInfo(g, left + 14, top + 60, "Spleef tool", "Exact item temporarily given to players.", 310);
         fieldInfo(g, left + 340, top + 60, "Elimination depth", "Blocks below the region before elimination.", 140);
         fieldInfo(g, left + 14, top + 130, "Breakable floor blocks", "Comma-separated block IDs players may break.", 617);
@@ -610,7 +605,7 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
                 left + 14, top + 286, 617, GOOD, 2);
     }
 
-    private void renderProjectiles(GuiGraphicsExtractor g, int left, int top) {
+    private void renderProjectiles(GuiGraphics g, int left, int top) {
         wrapped(g, "The standard Snowball is infinite: SSU automatically restores one after use, but the server enforces the configured cooldown.",
                 left + 14, top + 78, 617, MUTED, 2);
         fieldInfo(g, left + 14, top + 92, "Standard unlock", "Seconds after match start.", 180);
@@ -625,55 +620,55 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
                 left + 208, top + 268, 423, MUTED, 2);
     }
 
-    private void renderRewardSlots(GuiGraphicsExtractor g, int startX, int startY, int mouseX, int mouseY) {
+    private void renderRewardSlots(GuiGraphics g, int startX, int startY, int mouseX, int mouseY) {
         for (int slot = 0; slot < MinigameRewardSet.MAX_ITEM_STACKS; slot++) {
             int x = startX + (slot % 3) * 34, y = startY + (slot / 3) * 34;
             boolean hovered = SsuGuiGeometry.inside(mouseX, mouseY, x, y, 30, 30);
             g.fill(x, y, x + 30, y + 30, hovered ? 0xE03C5364 : 0xD00B1015);
-            g.outline(x, y, 30, 30, hovered ? GOOD : BORDER);
+            g.renderOutline(x, y, 30, 30, hovered ? GOOD : BORDER);
             ItemStack stack = rewardItem(slot);
             if (!stack.isEmpty()) {
-                g.item(stack, x + 7, y + 7); g.itemDecorations(font, stack, x + 7, y + 7);
-                if (hovered) g.setTooltipForNextFrame(font, stack, mouseX, mouseY);
-            } else g.text(font, Integer.toString(slot + 1), x + 12, y + 11, MUTED, false);
+                g.renderItem(stack, x + 7, y + 7); g.renderItemDecorations(font, stack, x + 7, y + 7);
+                if (hovered) g.renderTooltip(font, stack, mouseX, mouseY);
+            } else g.drawString(font, Integer.toString(slot + 1), x + 12, y + 11, MUTED, false);
         }
     }
 
-    private void renderInventory(GuiGraphicsExtractor g, int startX, int startY, int mouseX, int mouseY) {
+    private void renderInventory(GuiGraphics g, int startX, int startY, int mouseX, int mouseY) {
         for (int row = 0; row < 3; row++) for (int column = 0; column < 9; column++)
             drawInventorySlot(g, 9 + row * 9 + column, startX + column * 20, startY + row * 20, mouseX, mouseY);
         int hotbarY = startY + 66;
         for (int column = 0; column < 9; column++) drawInventorySlot(g, column, startX + column * 20, hotbarY, mouseX, mouseY);
     }
 
-    private void drawInventorySlot(GuiGraphicsExtractor g, int slot, int x, int y, int mouseX, int mouseY) {
+    private void drawInventorySlot(GuiGraphics g, int slot, int x, int y, int mouseX, int mouseY) {
         boolean hovered = SsuGuiGeometry.inside(mouseX, mouseY, x, y, 18, 18);
         boolean carried = slot == carriedInventorySlot;
         g.fill(x, y, x + 18, y + 18, hovered || carried ? 0xE03C5364 : 0xD00B1015);
-        g.outline(x, y, 18, 18, hovered || carried ? GOOD : BORDER);
+        g.renderOutline(x, y, 18, 18, hovered || carried ? GOOD : BORDER);
         ItemStack stack = clientInventoryItem(slot);
         if (!stack.isEmpty()) {
-            g.item(stack, x + 1, y + 1); g.itemDecorations(font, stack, x + 1, y + 1);
-            if (hovered) g.setTooltipForNextFrame(font, stack, mouseX, mouseY);
+            g.renderItem(stack, x + 1, y + 1); g.renderItemDecorations(font, stack, x + 1, y + 1);
+            if (hovered) g.renderTooltip(font, stack, mouseX, mouseY);
         }
     }
 
-    private void renderGhostCursor(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+    private void renderGhostCursor(GuiGraphics g, int mouseX, int mouseY) {
         ItemStack stack = heldStack();
         if (stack.isEmpty()) return;
-        g.item(stack, mouseX - 8, mouseY - 8);
-        g.itemDecorations(font, stack, mouseX - 8, mouseY - 8);
+        g.renderItem(stack, mouseX - 8, mouseY - 8);
+        g.renderItemDecorations(font, stack, mouseX - 8, mouseY - 8);
     }
 
-    private void fieldInfo(GuiGraphicsExtractor g, int x, int y, String title, String help, int width) {
-        g.text(font, title, x, y, TEXT, true);
+    private void fieldInfo(GuiGraphics g, int x, int y, String title, String help, int width) {
+        g.drawString(font, title, x, y, TEXT, true);
         wrapped(g, help, x, y + 38, width, MUTED, 2);
     }
 
-    private void wrapped(GuiGraphicsExtractor g, String text, int x, int y, int width, int color, int maxLines) {
+    private void wrapped(GuiGraphics g, String text, int x, int y, int width, int color, int maxLines) {
         List<FormattedCharSequence> lines = font.split(Component.literal(text == null ? "" : text), Math.max(20, width));
         for (int index = 0; index < Math.min(maxLines, lines.size()); index++) {
-            g.text(font, lines.get(index), x, y + index * 10, color, false);
+            g.drawString(font, lines.get(index), x, y + index * 10, color, false);
         }
     }
 
@@ -707,7 +702,7 @@ final class SpleefMinigameEditorScreen extends MinigameEditorScreen {
 
     private void fillCurrent(EditBox dimension, EditBox x, EditBox y, EditBox z, EditBox yaw, EditBox pitch) {
         if (minecraft == null || minecraft.player == null) return;
-        dimension.setValue(minecraft.player.level().dimension().identifier().toString());
+        dimension.setValue(minecraft.player.level().dimension().location().toString());
         x.setValue(coordinate(minecraft.player.getX())); y.setValue(coordinate(minecraft.player.getY()));
         z.setValue(coordinate(minecraft.player.getZ())); yaw.setValue(angle(minecraft.player.getYRot()));
         pitch.setValue(angle(minecraft.player.getXRot()));

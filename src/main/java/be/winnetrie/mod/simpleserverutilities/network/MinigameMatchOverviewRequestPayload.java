@@ -4,13 +4,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Server-authoritative U-menu request while a player may be in a minigame. */
 public record MinigameMatchOverviewRequestPayload(String action, long requestId)
         implements CustomPacketPayload {
     public static final Type<MinigameMatchOverviewRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_match_overview_request"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_match_overview_request"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameMatchOverviewRequestPayload> STREAM_CODEC =
             StreamCodec.of(MinigameMatchOverviewRequestPayload::encode, MinigameMatchOverviewRequestPayload::decode);
 

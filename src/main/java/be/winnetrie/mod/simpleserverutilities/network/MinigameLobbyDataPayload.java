@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Complete bounded lobby snapshot for one player. */
 public record MinigameLobbyDataPayload(
@@ -22,7 +22,7 @@ public record MinigameLobbyDataPayload(
 ) implements CustomPacketPayload {
     public static final int MAX_GAMES = 128;
     public static final Type<MinigameLobbyDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_lobby_data"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_lobby_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameLobbyDataPayload> STREAM_CODEC =
             StreamCodec.of(MinigameLobbyDataPayload::encode, MinigameLobbyDataPayload::decode);
 

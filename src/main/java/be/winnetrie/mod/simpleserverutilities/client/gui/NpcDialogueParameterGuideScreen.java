@@ -2,7 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 
 import java.util.List;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -42,44 +42,44 @@ public final class NpcDialogueParameterGuideScreen extends Screen {
 
     private void insert(NpcDialogueParameterCatalog.ParameterSpec spec) {
         parent.applyParameterExample(condition, spec.key(), spec.example());
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     private void defaults() {
         parent.applyRecommendedParameters(condition);
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     @Override public void onClose() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
         SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(x, y, x + W, y + H, 0xF0161D25);
-        g.outline(x, y, W, H, 0xFF586978);
-        g.text(font, (condition ? "Condition" : "Action") + " parameters: " + type, x + 12, y + 12, 0xFFF3F5F7, true);
-        g.text(font, trim(info.summary(), 82), x + 12, y + 34, 0xFFAAB5BE, false);
-        g.text(font, "Click Insert example to add or replace that key. You can edit the value afterwards.",
+        g.renderOutline(x, y, W, H, 0xFF586978);
+        g.drawString(font, (condition ? "Condition" : "Action") + " parameters: " + type, x + 12, y + 12, 0xFFF3F5F7, true);
+        g.drawString(font, trim(info.summary(), 82), x + 12, y + 34, 0xFFAAB5BE, false);
+        g.drawString(font, "Click Insert example to add or replace that key. You can edit the value afterwards.",
                 x + 12, y + 50, 0xFFAAB5BE, false);
 
         List<NpcDialogueParameterCatalog.ParameterSpec> specs = info.parameters();
         if (specs.isEmpty()) {
-            g.text(font, "No built-in parameters are required for this type.", x + 12, y + 92, 0xFF83E39A, false);
-            g.text(font, "The free-form parameter field remains available for modded/custom handlers.",
+            g.drawString(font, "No built-in parameters are required for this type.", x + 12, y + 92, 0xFF83E39A, false);
+            g.drawString(font, "The free-form parameter field remains available for modded/custom handlers.",
                     x + 12, y + 110, 0xFFAAB5BE, false);
         } else {
             for (int index = 0; index < Math.min(6, specs.size()); index++) {
                 NpcDialogueParameterCatalog.ParameterSpec spec = specs.get(index);
                 int yy = y + 78 + index * 30;
-                g.text(font, spec.key() + (spec.required() ? "  (required)" : "  (optional)"),
+                g.drawString(font, spec.key() + (spec.required() ? "  (required)" : "  (optional)"),
                         x + 12, yy, spec.required() ? 0xFFFFD36A : 0xFF83E39A, false);
-                g.text(font, trim(spec.description(), 53) + "  Example: " + spec.example(),
+                g.drawString(font, trim(spec.description(), 53) + "  Example: " + spec.example(),
                         x + 12, yy + 12, 0xFFF3F5F7, false);
             }
         }
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private int px() { return (width - W) / 2; }

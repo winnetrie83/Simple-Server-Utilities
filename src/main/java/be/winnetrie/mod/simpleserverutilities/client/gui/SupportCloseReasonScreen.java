@@ -2,7 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 
 import java.util.function.Consumer;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -33,23 +33,23 @@ public final class SupportCloseReasonScreen extends Screen {
                 .bounds(x + 18, y + H - 34, 72, 20).build());
         Button close = addRenderableWidget(Button.builder(Component.literal("Close ticket"), button -> {
             closer.accept(reason.getValue().trim());
-            if (minecraft != null) minecraft.setScreenAndShow(parent);
+            if (minecraft != null) minecraft.setScreen(parent);
         }).bounds(x + W - 112, y + H - 34, 94, 20).build());
         reason.setResponder(value -> close.active = value != null && value.trim().length() >= 3);
         close.active = false;
     }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, "Close ticket #" + ticketId, x + 18, y + 16, TEXT, true);
-        g.text(font, "Give the player/staff a reason. It is stored in the conversation.", x + 18, y + 32, MUTED, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Close ticket #" + ticketId, x + 18, y + 16, TEXT, true);
+        g.drawString(font, "Give the player/staff a reason. It is stored in the conversation.", x + 18, y + 32, MUTED, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
     private int left() { return (width - W) / 2; }
     private int top() { return (height - H) / 2; }

@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 /** Server-authoritative preview of the contents of the block/entity currently inspected by a player. */
@@ -26,7 +26,7 @@ public record BlockInformationContentPayload(
     public static final int MAX_ITEMS = 54;
 
     public static final Type<BlockInformationContentPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "block_information_content"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "block_information_content"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, BlockInformationContentPayload> STREAM_CODEC =
             StreamCodec.of((buffer, payload) -> {

@@ -12,12 +12,12 @@ import be.winnetrie.mod.simpleserverutilities.dimension.ManagedDimensionDefiniti
 import be.winnetrie.mod.simpleserverutilities.network.SsuDimensionManagerDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuDimensionManagerRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuDimensionManagerSubmitPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Admin editor for world-local datapack dimensions managed by SSU. */
 public final class ManagedDimensionScreen extends Screen {
@@ -284,7 +284,7 @@ public final class ManagedDimensionScreen extends Screen {
     private void save() {
         collectDraft();
         long id = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new SsuDimensionManagerSubmitPayload(
+        PacketDistributor.sendToServer(new SsuDimensionManagerSubmitPayload(
                 originalId.isBlank() ? "create" : "save", originalId, GSON.toJson(draft), id));
     }
 
@@ -295,19 +295,19 @@ public final class ManagedDimensionScreen extends Screen {
             rebuildWidgets();
             return;
         }
-        ClientPacketDistributor.sendToServer(new SsuDimensionManagerSubmitPayload(
+        PacketDistributor.sendToServer(new SsuDimensionManagerSubmitPayload(
                 "delete", originalId, "", nextRequestId++));
     }
 
 
     private void teleport() {
         if (data.selectedId().isBlank()) return;
-        ClientPacketDistributor.sendToServer(new SsuDimensionManagerSubmitPayload(
+        PacketDistributor.sendToServer(new SsuDimensionManagerSubmitPayload(
                 "teleport", data.selectedId(), "", nextRequestId++));
     }
 
     private void request(String selectedId) {
-        ClientPacketDistributor.sendToServer(new SsuDimensionManagerRequestPayload(selectedId, nextRequestId++));
+        PacketDistributor.sendToServer(new SsuDimensionManagerRequestPayload(selectedId, nextRequestId++));
     }
 
     private void newDraft() {
@@ -322,7 +322,7 @@ public final class ManagedDimensionScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = panelX();
         int y = panelY();
         int w = panelWidth();
@@ -331,61 +331,61 @@ public final class ManagedDimensionScreen extends Screen {
         int rightX = x + listW + 18;
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + w, y + h, PANEL);
-        g.outline(x, y, w, h, BORDER);
+        g.renderOutline(x, y, w, h, BORDER);
         g.fill(x + 8, y + 64, x + listW + 4, y + h - 36, CARD);
         g.fill(rightX - 6, y + 64, x + w - 8, y + h - 36, CARD);
-        g.text(font, "Dimensions", x + 12, y + 14, TEXT, true);
-        g.text(font, "Create and configure world-local dimensions. Registry changes require a full restart.",
+        g.drawString(font, "Dimensions", x + 12, y + 14, TEXT, true);
+        g.drawString(font, "Create and configure world-local dimensions. Registry changes require a full restart.",
                 x + 96, y + 15, MUTED, false);
 
         if (draft == null) {
             var selected = data.dimensions().stream().filter(entry -> entry.id().equals(data.selectedId())).findFirst().orElse(null);
             if (selected != null) {
-                g.text(font, selected.displayName(), rightX, y + 82, TEXT, true);
-                g.text(font, selected.id(), rightX, y + 101, MUTED, false);
-                g.text(font, selected.vanilla() ? "Vanilla dimension" : "External datapack/mod dimension",
+                g.drawString(font, selected.displayName(), rightX, y + 82, TEXT, true);
+                g.drawString(font, selected.id(), rightX, y + 101, MUTED, false);
+                g.drawString(font, selected.vanilla() ? "Vanilla dimension" : "External datapack/mod dimension",
                         rightX, y + 126, WARNING, false);
-                g.text(font, "It is visible for permissions but cannot be edited or deleted by SSU.",
+                g.drawString(font, "It is visible for permissions but cannot be edited or deleted by SSU.",
                         rightX, y + 144, MUTED, false);
             }
         } else {
             for (FieldLabel label : draftLabels) {
-                g.text(font, label.text(), label.x(), label.y(), MUTED, false);
+                g.drawString(font, label.text(), label.x(), label.y(), MUTED, false);
             }
             drawLabels(g, rightX, y + 70, w - (rightX - x) - 14);
         }
 
         if (data.restartRequired()) {
-            g.text(font, "Restart required to apply dimension registry changes.", x + 86, y + h - 25, WARNING, false);
+            g.drawString(font, "Restart required to apply dimension registry changes.", x + 86, y + h - 25, WARNING, false);
         }
         if (!data.notice().isBlank()) {
-            g.text(font, trim(data.notice(), 76), rightX, y + h - 48, data.error() ? ERROR : GOOD, false);
+            g.drawString(font, trim(data.notice(), 76), rightX, y + h - 48, data.error() ? ERROR : GOOD, false);
         }
         int pages = Math.max(1, (data.dimensions().size() + LIST_ROWS - 1) / LIST_ROWS);
-        g.text(font, "Page " + (listPage + 1) + " / " + pages, x + 78, y + h - 25, MUTED, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        g.drawString(font, "Page " + (listPage + 1) + " / " + pages, x + 78, y + h - 25, MUTED, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void drawLabels(GuiGraphicsExtractor g, int x, int y, int w) {
+    private void drawLabels(GuiGraphics g, int x, int y, int w) {
         switch (tab) {
             case GENERAL -> {
-                g.text(font, "Preset applies safe defaults; all environment values remain editable.", x, y + 146, MUTED, false);
-                g.text(font, originalId.isBlank() ? "IDs use the simpleserverutilities namespace."
+                g.drawString(font, "Preset applies safe defaults; all environment values remain editable.", x, y + 146, MUTED, false);
+                g.drawString(font, originalId.isBlank() ? "IDs use the simpleserverutilities namespace."
                         : "Dimension IDs are permanent after creation.", x, y + 166, MUTED, false);
             }
             case ENVIRONMENT -> {
-                g.text(font, "World behavior", x, y - 12, MUTED, false);
-                g.text(font, "Height values are normalized to valid 16-block boundaries when saved.", x, y + 202, MUTED, false);
+                g.drawString(font, "World behavior", x, y - 12, MUTED, false);
+                g.drawString(font, "Height values are normalized to valid 16-block boundaries when saved.", x, y + 202, MUTED, false);
             }
             case GENERATOR -> {
                 DimensionPreset preset = draft.presetValue();
                 if (preset == DimensionPreset.FLAT || preset == DimensionPreset.EMPTY) {
                     if (preset == DimensionPreset.EMPTY) {
-                        g.text(font, "The 9×9 platform is generated once after the restart loads this dimension.", x, y + 172, MUTED, false);
+                        g.drawString(font, "The 9×9 platform is generated once after the restart loads this dimension.", x, y + 172, MUTED, false);
                     }
                 } else {
-                    g.text(font, preset.label() + " uses Minecraft's vanilla noise generator preset.", x, y + 18, TEXT, false);
-                    g.text(font, "Choose Flat or Empty for editable layer/platform generation.", x, y + 40, MUTED, false);
+                    g.drawString(font, preset.label() + " uses Minecraft's vanilla noise generator preset.", x, y + 18, TEXT, false);
+                    g.drawString(font, "Choose Flat or Empty for editable layer/platform generation.", x, y + 40, MUTED, false);
                 }
             }
         }
@@ -393,7 +393,7 @@ public final class ManagedDimensionScreen extends Screen {
 
     @Override
     public void onClose() {
-        if (minecraft != null && parent != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null && parent != null) minecraft.setScreen(parent);
         else super.onClose();
     }
 

@@ -2,7 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.dimension;
 
 import java.util.Locale;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Persistent, admin-owned definition for one SSU datapack dimension. */
 public final class ManagedDimensionDefinition {
@@ -217,13 +217,13 @@ public final class ManagedDimensionDefinition {
         while (value.startsWith("/")) value = value.substring(1);
         if (value.isBlank()) value = "new_dimension";
         if (value.length() > 64) value = value.substring(0, 64);
-        Identifier.parse("simpleserverutilities:" + value);
+        ResourceLocation.parse("simpleserverutilities:" + value);
         return value;
     }
 
     private static String normalizeIdentifier(String raw, String fallback) {
         try {
-            return Identifier.parse(raw == null ? fallback : raw.trim().toLowerCase(Locale.ROOT)).toString();
+            return ResourceLocation.parse(raw == null ? fallback : raw.trim().toLowerCase(Locale.ROOT)).toString();
         } catch (RuntimeException ignored) {
             return fallback;
         }
@@ -233,7 +233,7 @@ public final class ManagedDimensionDefinition {
         String value = raw == null ? fallback : raw.trim().toLowerCase(Locale.ROOT);
         if (!value.startsWith("#")) value = "#" + value;
         try {
-            Identifier.parse(value.substring(1));
+            ResourceLocation.parse(value.substring(1));
             return value;
         } catch (RuntimeException ignored) {
             return fallback;

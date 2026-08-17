@@ -12,15 +12,14 @@ import be.winnetrie.mod.simpleserverutilities.mixin.MultilineTextFieldAccessor;
 import be.winnetrie.mod.simpleserverutilities.network.HologramEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.HologramEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.HologramEditorSubmitPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.components.MultilineTextField;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Custom creation and rich-text editing GUI for persistent SSU holograms. */
 public final class HologramEditorScreen extends Screen {
@@ -94,16 +93,14 @@ public final class HologramEditorScreen extends Screen {
         coordinateY = field(x + 116, y + 62, 58, "Y", 16, formatDouble(initial.y()));
         coordinateZ = field(x + 204, y + 62, 58, "Z", 16, formatDouble(initial.z()));
 
-        text = MultiLineEditBox.builder().setX(x + 14).setY(y + 100)
-                .setPlaceholder(Component.literal("Visible text / scoreboard title"))
-                .setShowBackground(true).setShowDecorations(true)
-                .build(font, 272, 96, Component.literal("Text"));
+        text = new MultiLineEditBox(font, x + 14, y + 100, 272, 96,
+                Component.literal("Visible text / scoreboard title"), Component.literal("Text"));
         text.setCharacterLimit(HologramRichText.MAX_VISIBLE_CHARACTERS + HologramRichText.MAX_LINES);
         String migratedText = HologramRichText.migrateWholeTextStyles(
                 initial.text(), initial.bold(), initial.italic(), initial.underlined(), initial.strikethrough());
         richDocument = new HologramRichTextDocument(HologramRichText.normalize(migratedText));
         text.setValue(richDocument.plainText());
-        text.setLineLimit(HologramRichText.MAX_LINES);
+        
         text.setValueListener(this::onTextChanged);
         addRenderableWidget(text);
 
@@ -311,7 +308,7 @@ public final class HologramEditorScreen extends Screen {
         paletteTarget = PaletteTarget.NONE;
         if (deleteRequested) {
             long request = nextRequestId++;
-            ClientPacketDistributor.sendToServer(new HologramEditorSubmitPayload(
+            PacketDistributor.sendToServer(new HologramEditorSubmitPayload(
                     initial.originalId(), true, initial.id(), initial.hologramType(),
                     initial.x(), initial.y(), initial.z(), initial.text(), initial.color(),
                     initial.backgroundColor(), initial.scale(), false, false, false, false,
@@ -339,7 +336,7 @@ public final class HologramEditorScreen extends Screen {
             int parsedInterval = Math.max(10, Math.min(72_000,
                     (int) Math.round(parsedRefreshSeconds * 20.0D)));
             long request = nextRequestId++;
-            ClientPacketDistributor.sendToServer(new HologramEditorSubmitPayload(
+            PacketDistributor.sendToServer(new HologramEditorSubmitPayload(
                     initial.originalId(), false, id.getValue(), type, parsedX, parsedY, parsedZ,
                     richDocument.encode(), parsedColor, parsedBackground, parsedScale,
                     false, false, false, false, false, seeThrough, parsedRange, source.getValue(),
@@ -371,13 +368,13 @@ public final class HologramEditorScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (paletteTarget != PaletteTarget.NONE) {
-            if (event.buttonInfo().button() == 0) handlePaletteClick(event.x(), event.y());
+            if (button == 0) handlePaletteClick(mouseX, mouseY);
             else paletteTarget = PaletteTarget.NONE;
             return true;
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private void handlePaletteClick(double mouseX, double mouseY) {
@@ -418,55 +415,55 @@ public final class HologramEditorScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         rememberCurrentSelection();
         int x = panelX();
         int y = panelY();
         int right = x + 304;
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, PANEL);
-        g.outline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
-        g.text(font, initial.editing() ? "Edit Floating Hologram" : "Create Floating Hologram", x + 14, y + 11, TEXT, true);
-        g.text(font, "Dimension: " + shortDimension(initial.dimension()), right, y + 12, MUTED, false);
-        g.text(font, "X:", x + 14, y + 68, MUTED, false);
-        g.text(font, "Y:", x + 102, y + 68, MUTED, false);
-        g.text(font, "Z:", x + 190, y + 68, MUTED, false);
-        g.text(font, "Text / title", x + 14, y + 89, MUTED, false);
-        g.text(font, "Source", x + 14, y + 236, MUTED, false);
-        g.text(font, "Scoreboard objective", x + 14, y + 268, MUTED, false);
-        g.text(font, "{{stat:id}} value • {{rank:id}} rank", x + 14, y + 303, MUTED, false);
-        g.text(font, "Background", right, y + 89, MUTED, false);
-        g.text(font, "Scale / range", right, y + 130, MUTED, false);
-        g.text(font, "Image W/H", right, y + 164, MUTED, false);
+        g.renderOutline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
+        g.drawString(font, initial.editing() ? "Edit Floating Hologram" : "Create Floating Hologram", x + 14, y + 11, TEXT, true);
+        g.drawString(font, "Dimension: " + shortDimension(initial.dimension()), right, y + 12, MUTED, false);
+        g.drawString(font, "X:", x + 14, y + 68, MUTED, false);
+        g.drawString(font, "Y:", x + 102, y + 68, MUTED, false);
+        g.drawString(font, "Z:", x + 190, y + 68, MUTED, false);
+        g.drawString(font, "Text / title", x + 14, y + 89, MUTED, false);
+        g.drawString(font, "Source", x + 14, y + 236, MUTED, false);
+        g.drawString(font, "Scoreboard objective", x + 14, y + 268, MUTED, false);
+        g.drawString(font, "{{stat:id}} value • {{rank:id}} rank", x + 14, y + 303, MUTED, false);
+        g.drawString(font, "Background", right, y + 89, MUTED, false);
+        g.drawString(font, "Scale / range", right, y + 130, MUTED, false);
+        g.drawString(font, "Image W/H", right, y + 164, MUTED, false);
         int scoreboardLabelColor = type == HologramType.SCOREBOARD ? MUTED : 0xFF68737C;
-        g.text(font, "Rows / refresh", right, y + 198, scoreboardLabelColor, false);
-        if (!notice.isBlank()) g.text(font, trim(notice, 66), x + 14, y + 314, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        g.drawString(font, "Rows / refresh", right, y + 198, scoreboardLabelColor, false);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 66), x + 14, y + 314, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
         if (paletteTarget != PaletteTarget.NONE) drawPalette(g, mouseX, mouseY);
     }
 
-    private void drawPalette(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+    private void drawPalette(GuiGraphics g, int mouseX, int mouseY) {
         int x = paletteX();
         int y = paletteY();
         g.fill(x - 6, y - 22, x + 171, y + 70, 0xFC10161D);
-        g.outline(x - 6, y - 22, 177, 92, BORDER);
-        g.text(font, "Background color", x, y - 16, TEXT, true);
+        g.renderOutline(x - 6, y - 22, 177, 92, BORDER);
+        g.drawString(font, "Background color", x, y - 16, TEXT, true);
         int cell = 18, gap = 3;
         for (int index = 0; index < 16; index++) {
             int left = x + (index % 8) * (cell + gap);
             int top = y + (index / 8) * (cell + gap);
             g.fill(left, top, left + cell, top + cell, RichTextPalette.argb(index));
-            g.outline(left, top, cell, cell, 0xFFB6C0C8);
+            g.renderOutline(left, top, cell, cell, 0xFFB6C0C8);
             if (SsuGuiGeometry.inside(mouseX, mouseY, left, top, cell, cell)) {
                 int paletteIndex = index;
-                g.setComponentTooltipForNextFrame(font,
+                g.renderComponentTooltip(font,
                         java.util.List.of(Component.literal(RichTextPalette.name(paletteIndex)).withStyle(style -> style.withColor(RichTextPalette.labelRgb(paletteIndex)))),
                         mouseX, mouseY);
             }
         }
         g.fill(x, y + 46, x + 165, y + 64, 0xFF202A33);
-        g.outline(x, y + 46, 165, 18, 0xFFB6C0C8);
-        g.text(font, "Transparent", x + 52, y + 51, TEXT, false);
+        g.renderOutline(x, y + 46, 165, 18, 0xFFB6C0C8);
+        g.drawString(font, "Transparent", x + 52, y + 51, TEXT, false);
     }
 
     private int currentEditorTextColor() {
@@ -487,7 +484,7 @@ public final class HologramEditorScreen extends Screen {
             paletteTarget = PaletteTarget.NONE;
             return;
         }
-        if (parent != null && minecraft != null) minecraft.setScreenAndShow(parent);
+        if (parent != null && minecraft != null) minecraft.setScreen(parent);
         else super.onClose();
     }
 

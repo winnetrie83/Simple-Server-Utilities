@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record MinigameSelectionCreateResultPayload(boolean successful, String message, long requestId)
         implements CustomPacketPayload {
     public static final Type<MinigameSelectionCreateResultPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_selection_create_result"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_selection_create_result"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameSelectionCreateResultPayload> STREAM_CODEC =
             StreamCodec.of(MinigameSelectionCreateResultPayload::encode, MinigameSelectionCreateResultPayload::decode);
 

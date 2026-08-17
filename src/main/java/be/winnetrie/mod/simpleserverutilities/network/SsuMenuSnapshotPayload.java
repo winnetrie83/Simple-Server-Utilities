@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record SsuMenuSnapshotPayload(
         String playerName,
@@ -41,7 +41,7 @@ public record SsuMenuSnapshotPayload(
     private static final int MAX_LIST_SIZE = 4096;
 
     public static final Type<SsuMenuSnapshotPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "menu_snapshot")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "menu_snapshot")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuMenuSnapshotPayload> STREAM_CODEC =

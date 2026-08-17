@@ -6,13 +6,12 @@ import java.util.List;
 import be.winnetrie.mod.simpleserverutilities.network.NpcShopActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcShopDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcShopRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Click-only NPC shop: shop slots buy, inventory slots sell, and recent sales can be bought back. */
 public final class NpcShopScreen extends Screen {
@@ -108,7 +107,7 @@ public final class NpcShopScreen extends Screen {
         awaiting = true;
         updateButtons();
         long request = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new NpcShopRequestPayload(
+        PacketDistributor.sendToServer(new NpcShopRequestPayload(
                 data.instanceId(), data.shopId(), Math.max(0, page), request));
     }
 
@@ -117,50 +116,50 @@ public final class NpcShopScreen extends Screen {
         awaiting = true;
         updateButtons();
         long request = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new NpcShopActionPayload(action, data.instanceId(), data.shopId(),
+        PacketDistributor.sendToServer(new NpcShopActionPayload(action, data.instanceId(), data.shopId(),
                 entryId, Math.max(0, inventorySlot), data.pageIndex(), request));
     }
 
     @Override public void onClose() {
-        ClientPacketDistributor.sendToServer(new NpcShopActionPayload("close", data.instanceId(), data.shopId(),
+        PacketDistributor.sendToServer(new NpcShopActionPayload("close", data.instanceId(), data.shopId(),
                 "", 0, data.pageIndex(), nextRequestId++));
         super.onClose();
     }
 
     @Override public boolean isPauseScreen() { return false; }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int left = left();
         int top = top();
         SsuGuiScale.fullscreenDim(graphics, this, 0xA9000000);
         graphics.fill(left, top, left + WIDTH, top + HEIGHT, PANEL);
-        graphics.outline(left, top, WIDTH, HEIGHT, BORDER);
-        graphics.text(font, trim(data.shopName().isBlank() ? "NPC Shop" : data.shopName(), 22),
+        graphics.renderOutline(left, top, WIDTH, HEIGHT, BORDER);
+        graphics.drawString(font, trim(data.shopName().isBlank() ? "NPC Shop" : data.shopName(), 22),
                 left + 12, top + 9, TEXT, true);
-        graphics.text(font, trim(data.formattedBalance(), 20), left + 174, top + 10, GOOD, false);
+        graphics.drawString(font, trim(data.formattedBalance(), 20), left + 174, top + 10, GOOD, false);
 
         if (!data.accessAllowed()) {
-            graphics.text(font, trim(data.notice(), 52), left + 18, top + 62, ERROR, false);
-            super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+            graphics.drawString(font, trim(data.notice(), 52), left + 18, top + 62, ERROR, false);
+            super.render(graphics, mouseX, mouseY, partialTick);
             return;
         }
 
         graphics.fill(left + 8, top + 48, left + WIDTH - 8, top + HEIGHT - 6, SUBPANEL);
-        graphics.outline(left + 8, top + 48, WIDTH - 16, HEIGHT - 54, BORDER);
+        graphics.renderOutline(left + 8, top + 48, WIDTH - 16, HEIGHT - 54, BORDER);
         if (tab == Tab.SHOP) renderShop(graphics, mouseX, mouseY);
         else renderBuyback(graphics, mouseX, mouseY);
         renderInventory(graphics, mouseX, mouseY);
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
-    private void renderShop(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+    private void renderShop(GuiGraphics graphics, int mouseX, int mouseY) {
         int left = left();
         int top = top();
         int gridX = left + 18;
         int gridY = top + 65;
-        graphics.text(font, "Shop items", gridX, top + 52, TEXT, false);
+        graphics.drawString(font, "Shop items", gridX, top + 52, TEXT, false);
         int pages = Math.max(1, (data.totalEntries() + data.pageSize() - 1) / data.pageSize());
-        graphics.text(font, "Page " + (data.pageIndex() + 1) + "/" + pages, left + 250, top + 52, MUTED, false);
+        graphics.drawString(font, "Page " + (data.pageIndex() + 1) + "/" + pages, left + 250, top + 52, MUTED, false);
         shopSlots.clear();
         for (int index = 0; index < NpcShopDataPayload.MAX_ENTRIES; index++) {
             int x = gridX + (index % 9) * SLOT;
@@ -177,39 +176,39 @@ public final class NpcShopScreen extends Screen {
         ItemStack hoveredInventoryItem = clientInventoryItem(hoveredInventorySlot);
         if (hovered != null) {
             int offeredCount = Math.max(1, hovered.item().getCount());
-            graphics.text(font, trim(hovered.name(), 30), gridX, top + 104, TEXT, false);
+            graphics.drawString(font, trim(hovered.name(), 30), gridX, top + 104, TEXT, false);
             String stock = hovered.stock() < 0 ? "Infinite stock" : "Stock: " + hovered.stock() + "/" + hovered.maxStock();
-            graphics.text(font, trim(stock, 22), gridX + 196, top + 104, hovered.stock() == 0 ? WARNING : MUTED, false);
+            graphics.drawString(font, trim(stock, 22), gridX + 196, top + 104, hovered.stock() == 0 ? WARNING : MUTED, false);
             long stackPrice = safeMultiply(hovered.buyPriceMinor(), offeredCount);
             boolean canAffordOne = data.balanceMinor() >= hovered.buyPriceMinor();
             boolean canAffordStack = data.balanceMinor() >= stackPrice;
-            graphics.text(font, "Right-click 1: " + hovered.formattedBuyPrice(), gridX, top + 116,
+            graphics.drawString(font, "Right-click 1: " + hovered.formattedBuyPrice(), gridX, top + 116,
                     !hovered.canBuy() ? MUTED : canAffordOne ? GOOD : ERROR, false);
-            graphics.text(font, "Left-click " + offeredCount + ": " + hovered.formattedStackBuyPrice(), gridX, top + 128,
+            graphics.drawString(font, "Left-click " + offeredCount + ": " + hovered.formattedStackBuyPrice(), gridX, top + 128,
                     !hovered.canBuy() ? MUTED : canAffordStack ? GOOD : ERROR, false);
         } else if (!hoveredInventoryItem.isEmpty()) {
-            graphics.text(font, trim(hoveredInventoryItem.getHoverName().getString(), 42), gridX, top + 104, TEXT, false);
+            graphics.drawString(font, trim(hoveredInventoryItem.getHoverName().getString(), 42), gridX, top + 104, TEXT, false);
             if (saleQuote != null && saleQuote.canSell()) {
-                graphics.text(font, "Sell/item: " + saleQuote.formattedUnitPrice(), gridX, top + 116, GOOD, false);
-                graphics.text(font, "Left-click sells the stack; right-click sells one.", gridX, top + 128, MUTED, false);
+                graphics.drawString(font, "Sell/item: " + saleQuote.formattedUnitPrice(), gridX, top + 116, GOOD, false);
+                graphics.drawString(font, "Left-click sells the stack; right-click sells one.", gridX, top + 128, MUTED, false);
             } else {
                 String reason = saleQuote == null ? "Waiting for refreshed shop price data."
                         : saleQuote.reason();
-                graphics.text(font, trim(reason, 52), gridX, top + 116, WARNING, false);
+                graphics.drawString(font, trim(reason, 52), gridX, top + 116, WARNING, false);
             }
         } else {
-            graphics.text(font, "Shop: left-click stack, right-click one item.", gridX, top + 108, MUTED, false);
-            graphics.text(font, "Inventory: left-click stack, right-click one item to sell.", gridX, top + 122, MUTED, false);
+            graphics.drawString(font, "Shop: left-click stack, right-click one item.", gridX, top + 108, MUTED, false);
+            graphics.drawString(font, "Inventory: left-click stack, right-click one item to sell.", gridX, top + 122, MUTED, false);
         }
         renderNotice(graphics, gridX, top + 139);
     }
 
-    private void renderBuyback(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+    private void renderBuyback(GuiGraphics graphics, int mouseX, int mouseY) {
         int left = left();
         int top = top();
         int gridX = left + 18;
         int gridY = top + 65;
-        graphics.text(font, "Recent sales", gridX, top + 52, TEXT, false);
+        graphics.drawString(font, "Recent sales", gridX, top + 52, TEXT, false);
         buybackSlots.clear();
         for (int index = 0; index < NpcShopDataPayload.MAX_BUYBACK_ENTRIES; index++) {
             int x = gridX + index * SLOT;
@@ -221,25 +220,25 @@ public final class NpcShopScreen extends Screen {
         }
         NpcShopDataPayload.BuybackEntry hovered = hoveredBuyback(mouseX, mouseY);
         if (hovered != null) {
-            graphics.text(font, trim(hovered.name(), 42), gridX, top + 88, TEXT, false);
-            graphics.text(font, "Right-click 1: " + hovered.formattedUnitPrice(), gridX, top + 102, GOOD, false);
-            graphics.text(font, "Left-click buys the shown stack • expires in "
+            graphics.drawString(font, trim(hovered.name(), 42), gridX, top + 88, TEXT, false);
+            graphics.drawString(font, "Right-click 1: " + hovered.formattedUnitPrice(), gridX, top + 102, GOOD, false);
+            graphics.drawString(font, "Left-click buys the shown stack • expires in "
                     + timeLeft(hovered.expiresAtEpochMilli()), gridX, top + 116, WARNING, false);
         } else if (data.buybackEntries().isEmpty()) {
-            graphics.text(font, "No recent sales are available for buy-back.", gridX, top + 92, MUTED, false);
+            graphics.drawString(font, "No recent sales are available for buy-back.", gridX, top + 92, MUTED, false);
         } else {
-            graphics.text(font, "Left-click buys back the shown stack; right-click buys back one.",
+            graphics.drawString(font, "Left-click buys back the shown stack; right-click buys back one.",
                     gridX, top + 96, MUTED, false);
         }
         renderNotice(graphics, gridX, top + 139);
     }
 
-    private void renderInventory(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+    private void renderInventory(GuiGraphics graphics, int mouseX, int mouseY) {
         int left = left();
         int top = top();
         int startX = left + 18;
         int startY = top + 164;
-        graphics.text(font, tab == Tab.SHOP ? "Your inventory — click an item to sell" : "Your inventory",
+        graphics.drawString(font, tab == Tab.SHOP ? "Your inventory — click an item to sell" : "Your inventory",
                 startX, top + 151, TEXT, false);
         inventorySlots.clear();
         for (int row = 0; row < 3; row++) {
@@ -263,33 +262,32 @@ public final class NpcShopScreen extends Screen {
         }
     }
 
-    private void drawItemSlot(GuiGraphicsExtractor graphics, SlotBounds bounds, ItemStack stack,
+    private void drawItemSlot(GuiGraphics graphics, SlotBounds bounds, ItemStack stack,
                               int mouseX, int mouseY, boolean enabled) {
         boolean hovered = bounds.contains(mouseX, mouseY);
         graphics.fill(bounds.x, bounds.y, bounds.x + SLOT, bounds.y + SLOT,
                 hovered && enabled ? SLOT_HOVER : SLOT_BACKGROUND);
-        graphics.outline(bounds.x, bounds.y, SLOT, SLOT, enabled ? BORDER : 0xFF39444D);
+        graphics.renderOutline(bounds.x, bounds.y, SLOT, SLOT, enabled ? BORDER : 0xFF39444D);
         if (stack != null && !stack.isEmpty()) {
-            graphics.item(stack, bounds.x + 1, bounds.y + 1);
-            graphics.itemDecorations(font, stack, bounds.x + 1, bounds.y + 1);
-            if (hovered) graphics.setTooltipForNextFrame(font, stack, mouseX, mouseY);
+            graphics.renderItem(stack, bounds.x + 1, bounds.y + 1);
+            graphics.renderItemDecorations(font, stack, bounds.x + 1, bounds.y + 1);
+            if (hovered) graphics.renderTooltip(font, stack, mouseX, mouseY);
         }
     }
 
-    private void renderNotice(GuiGraphicsExtractor graphics, int x, int y) {
-        if (!notice.isBlank()) graphics.text(font, trim(notice, 52), x, y, noticeError ? ERROR : GOOD, false);
-        else if (awaiting) graphics.text(font, "Processing transaction…", x, y, MUTED, false);
+    private void renderNotice(GuiGraphics graphics, int x, int y) {
+        if (!notice.isBlank()) graphics.drawString(font, trim(notice, 52), x, y, noticeError ? ERROR : GOOD, false);
+        else if (awaiting) graphics.drawString(font, "Processing transaction…", x, y, MUTED, false);
     }
 
-    @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (super.mouseClicked(event, doubleClick)) return true;
-        int button = event.buttonInfo().button();
-        if (awaiting || (button != 0 && button != 1)) return false;
-        int mouseX = (int) event.x();
-        int mouseY = (int) event.y();
+    @Override public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (super.mouseClicked(mouseX, mouseY, button)) return true;
+                if (awaiting || (button != 0 && button != 1)) return false;
+        int mouseXi = (int) mouseX;
+        int mouseYi = (int) mouseY;
         if (tab == Tab.SHOP) {
             for (SlotBounds bounds : shopSlots) {
-                if (!bounds.contains(mouseX, mouseY) || bounds.index >= data.entries().size()) continue;
+                if (!bounds.contains(mouseXi, mouseYi) || bounds.index >= data.entries().size()) continue;
                 NpcShopDataPayload.Entry entry = data.entries().get(bounds.index);
                 if (!entry.canBuy()) {
                     notice = "That shop item cannot currently be purchased.";
@@ -300,7 +298,7 @@ public final class NpcShopScreen extends Screen {
                 return true;
             }
             for (SlotBounds bounds : inventorySlots) {
-                if (!bounds.contains(mouseX, mouseY)) continue;
+                if (!bounds.contains(mouseXi, mouseYi)) continue;
                 ItemStack stack = clientInventoryItem(bounds.index);
                 if (stack.isEmpty()) return true;
                 NpcShopDataPayload.InventorySaleQuote quote = saleQuote(bounds.index);
@@ -314,7 +312,7 @@ public final class NpcShopScreen extends Screen {
             }
         } else {
             for (SlotBounds bounds : buybackSlots) {
-                if (!bounds.contains(mouseX, mouseY) || bounds.index >= data.buybackEntries().size()) continue;
+                if (!bounds.contains(mouseXi, mouseYi) || bounds.index >= data.buybackEntries().size()) continue;
                 NpcShopDataPayload.BuybackEntry entry = data.buybackEntries().get(bounds.index);
                 action(button == 0 ? "buyback_stack" : "buyback_one", entry.id(), 0);
                 return true;

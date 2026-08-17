@@ -9,7 +9,7 @@ import be.winnetrie.mod.simpleserverutilities.network.BlockInformationContentPay
 import be.winnetrie.mod.simpleserverutilities.network.BlockInformationStatePayload;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.tags.BlockTags;
@@ -66,10 +66,10 @@ public final class BlockInformationClientState {
         content = BlockInformationContentPayload.clear();
     }
 
-    public static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
+    public static void render(GuiGraphics graphics, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
         if (!allowed || !enabled || minecraft.player == null || minecraft.level == null
-                || minecraft.gui.screen() != null || minecraft.hitResult == null) {
+                || minecraft.screen != null || minecraft.hitResult == null) {
             return;
         }
 
@@ -82,7 +82,7 @@ public final class BlockInformationClientState {
     }
 
     private static void renderBlock(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             Minecraft minecraft,
             BlockHitResult hit,
             ContentPreview preview
@@ -114,7 +114,7 @@ public final class BlockInformationClientState {
     }
 
     private static void renderEntity(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             Minecraft minecraft,
             Entity entity,
             ContentPreview preview
@@ -134,7 +134,7 @@ public final class BlockInformationClientState {
     }
 
     private static void renderCompact(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             Minecraft minecraft,
             String title,
             ItemStack toolIcon,
@@ -161,17 +161,17 @@ public final class BlockInformationClientState {
         int y = 8;
         drawPanel(graphics, x, y, width, height, positive);
         int textY = y + (28 - 9) / 2;
-        graphics.text(minecraft.font, visibleTitle, x + 10, textY, 0xFFF5F7FA, true);
-        if (!toolIcon.isEmpty()) graphics.item(toolIcon, x + width - 20, y + 6);
+        graphics.drawString(minecraft.font, visibleTitle, x + 10, textY, 0xFFF5F7FA, true);
+        if (!toolIcon.isEmpty()) graphics.renderItem(toolIcon, x + width - 20, y + 6);
         for (int i = 0; i < visibleDetails.size(); i++) {
-            graphics.text(minecraft.font, visibleDetails.get(i), x + 10, y + 27 + i * 11,
+            graphics.drawString(minecraft.font, visibleDetails.get(i), x + 10, y + 27 + i * 11,
                     0xFFD4DCE3, false);
         }
         drawContent(graphics, minecraft, x, y + 28 + detailsHeight, width, preview, contentLayout);
     }
 
     private static void renderDebug(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             Minecraft minecraft,
             String title,
             ItemStack toolIcon,
@@ -197,9 +197,9 @@ public final class BlockInformationClientState {
         drawPanel(graphics, x, y, width, height, positive);
         for (int i = 0; i < lines.size(); i++) {
             int color = i == 0 ? 0xFFF5F7FA : 0xFFD4DCE3;
-            graphics.text(minecraft.font, lines.get(i), x + 10, y + 6 + i * lineHeight, color, i == 0);
+            graphics.drawString(minecraft.font, lines.get(i), x + 10, y + 6 + i * lineHeight, color, i == 0);
         }
-        if (!toolIcon.isEmpty()) graphics.item(toolIcon, x + width - 20, y + 3);
+        if (!toolIcon.isEmpty()) graphics.renderItem(toolIcon, x + width - 20, y + 3);
         drawContent(graphics, minecraft, x, y + textHeight, width, preview, contentLayout);
     }
 
@@ -227,7 +227,7 @@ public final class BlockInformationClientState {
         if (!inventoryAllowed || inventoryMaxItems <= 0 || content == null
                 || content.targetType() == BlockInformationContentPayload.TARGET_NONE
                 || minecraft.level == null
-                || !minecraft.level.dimension().identifier().toString().equals(content.dimension())) {
+                || !minecraft.level.dimension().location().toString().equals(content.dimension())) {
             return ContentPreview.NONE;
         }
         if (content.targetType() == BlockInformationContentPayload.TARGET_BLOCK
@@ -243,7 +243,7 @@ public final class BlockInformationClientState {
         return ContentPreview.NONE;
     }
 
-    private static ContentLayout layoutContent(GuiGraphicsExtractor graphics, ContentPreview preview) {
+    private static ContentLayout layoutContent(GuiGraphics graphics, ContentPreview preview) {
         int availableWidth = Math.max(92, graphics.guiWidth() - 24);
         return layoutContent(availableWidth, preview);
     }
@@ -260,7 +260,7 @@ public final class BlockInformationClientState {
     }
 
     private static void drawContent(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             Minecraft minecraft,
             int x,
             int y,
@@ -271,7 +271,7 @@ public final class BlockInformationClientState {
         if (!preview.available()) return;
         graphics.fill(x + 4, y, x + width - 4, y + 1, 0x55697C8C);
         if (preview.items().isEmpty()) {
-            graphics.text(minecraft.font, "Empty", x + 10, y + 6, 0xFFB9C4CC, false);
+            graphics.drawString(minecraft.font, "Empty", x + 10, y + 6, 0xFFB9C4CC, false);
             return;
         }
 
@@ -281,8 +281,8 @@ public final class BlockInformationClientState {
             int itemX = x + 10 + column * 18;
             int itemY = y + 3 + row * 18;
             ItemStack item = preview.items().get(i);
-            graphics.item(item, itemX, itemY, i);
-            graphics.itemDecorations(minecraft.font, item, itemX, itemY);
+            graphics.renderItem(item, itemX, itemY, i);
+            graphics.renderItemDecorations(minecraft.font, item, itemX, itemY);
         }
         if (preview.truncated()) {
             int lastIndex = Math.max(0, preview.items().size() - 1);
@@ -291,13 +291,13 @@ public final class BlockInformationClientState {
             int ellipsisX = columnAfter == 0
                     ? x + width - 16
                     : Math.min(x + width - 16, x + 10 + columnAfter * 18);
-            graphics.text(minecraft.font, "…", ellipsisX, y + 7 + row * 18, 0xFFB9C4CC, false);
+            graphics.drawString(minecraft.font, "…", ellipsisX, y + 7 + row * 18, 0xFFB9C4CC, false);
         }
     }
 
-    private static void drawPanel(GuiGraphicsExtractor graphics, int x, int y, int width, int height, boolean positive) {
+    private static void drawPanel(GuiGraphics graphics, int x, int y, int width, int height, boolean positive) {
         graphics.fill(x, y, x + width, y + height, 0xD5121820);
-        graphics.outline(x, y, width, height, 0xFF697C8C);
+        graphics.renderOutline(x, y, width, height, 0xFF697C8C);
         graphics.fill(x, y, x + 3, y + height, positive ? 0xFF62D97A : 0xFFE06B67);
     }
 
@@ -323,14 +323,8 @@ public final class BlockInformationClientState {
     }
 
     private static ToolKind miningToolKind(BlockState state) {
-        if (state.getBlock() == Blocks.COBWEB
-                || state.is(BlockTags.SHEARS_EXTREME_BREAKING_SPEED)
-                || state.is(BlockTags.SHEARS_MAJOR_BREAKING_SPEED)
-                || state.is(BlockTags.SHEARS_MINOR_BREAKING_SPEED)) {
+        if (state.getBlock() == Blocks.COBWEB) {
             return ToolKind.SHEARS;
-        }
-        if (state.is(BlockTags.SWORD_INSTANTLY_MINES) || state.is(BlockTags.SWORD_EFFICIENT)) {
-            return ToolKind.SWORD;
         }
         return state.is(BlockTags.MINEABLE_WITH_PICKAXE) ? ToolKind.PICKAXE
                 : state.is(BlockTags.MINEABLE_WITH_AXE) ? ToolKind.AXE

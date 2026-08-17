@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record NpcItemPriceCatalogActionPayload(String itemId, long buyPriceMinor, long sellPriceMinor,
         String query, int pageIndex, long requestId) implements CustomPacketPayload {
     public static final Type<NpcItemPriceCatalogActionPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_item_price_catalog_action"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_item_price_catalog_action"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcItemPriceCatalogActionPayload> STREAM_CODEC =
             StreamCodec.of(NpcItemPriceCatalogActionPayload::encode, NpcItemPriceCatalogActionPayload::decode);
 

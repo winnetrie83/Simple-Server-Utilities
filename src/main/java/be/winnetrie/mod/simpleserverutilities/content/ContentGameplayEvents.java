@@ -18,7 +18,7 @@ import net.neoforged.neoforge.event.entity.living.LivingEntityUseItemEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
-import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
@@ -33,7 +33,7 @@ public final class ContentGameplayEvents {
     private ContentGameplayEvents() {}
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onBlockBreak(BreakBlockEvent event) {
+    public static void onBlockBreak(BlockEvent.BreakEvent event) {
         if (!active() || event.isCanceled() || !(event.getPlayer() instanceof ServerPlayer player)) return;
         publish(player, ContentEventTypes.BLOCK_BROKEN,
                 BuiltInRegistries.BLOCK.getKey(event.getState().getBlock()).toString(), 1L,
@@ -65,7 +65,7 @@ public final class ContentGameplayEvents {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onDamage(LivingDamageEvent.Post event) {
         if (!active()) return;
-        long hundredths = Math.max(0L, Math.round(event.getInflictedDamage() * 100.0F));
+        long hundredths = Math.max(0L, Math.round(event.getNewDamage() * 100.0F));
         if (hundredths <= 0L) return;
         Entity responsible = responsibleEntity(event.getSource().getEntity());
         if (responsible instanceof ServerPlayer attacker && attacker != event.getEntity()) {
@@ -73,7 +73,7 @@ public final class ContentGameplayEvents {
             String mainHand = itemId(attacker.getMainHandItem());
             publish(attacker, ContentEventTypes.DAMAGE_DEALT, target, hundredths,
                     commonMetadata(attacker, Map.of("unit", "hundredths", "main_hand", mainHand,
-                            "source", event.getSource().typeHolder().unwrapKey().map(key -> key.identifier().toString()).orElse("unknown"))));
+                            "source", event.getSource().typeHolder().unwrapKey().map(key -> key.location().toString()).orElse("unknown"))));
         }
         if (event.getEntity() instanceof ServerPlayer victim) {
             String source = responsible == null ? "*" : BuiltInRegistries.ENTITY_TYPE.getKey(responsible.getType()).toString();
@@ -179,7 +179,7 @@ public final class ContentGameplayEvents {
     private static void publishBiomeVisit(ServerPlayer player, boolean force) {
         MovementState state = MOVEMENT.computeIfAbsent(player.getUUID(), ignored -> MovementState.capture(player));
         String biome = player.level().getBiome(player.blockPosition()).unwrapKey()
-                .map(key -> key.identifier().toString()).orElse("unknown");
+                .map(key -> key.location().toString()).orElse("unknown");
         if (!force && biome.equals(state.lastBiome)) return;
         state.lastBiome = biome;
         publish(player, ContentEventTypes.BIOME_VISITED, biome, 1L,
@@ -195,7 +195,7 @@ public final class ContentGameplayEvents {
     }
 
     private static String dimension(ServerPlayer player) {
-        return player.level().dimension().identifier().toString();
+        return player.level().dimension().location().toString();
     }
 
     private static String itemId(ItemStack stack) {

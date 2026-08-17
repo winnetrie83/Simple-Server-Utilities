@@ -479,7 +479,7 @@ public class PlayerHomeManager {
     }
 
     private String getDimensionId(ServerPlayer player) {
-        return player.level().dimension().identifier().toString();
+        return player.level().dimension().location().toString();
     }
 
     private String sanitizeName(String name) {

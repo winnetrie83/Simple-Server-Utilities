@@ -7,14 +7,14 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Compact server-authoritative in-match scoreboard overlay. */
 public record MinigameHudPayload(boolean visible, String title, List<String> lines)
         implements CustomPacketPayload {
     public static final int MAX_LINES = 10;
     public static final Type<MinigameHudPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_hud"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_hud"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameHudPayload> STREAM_CODEC =
             StreamCodec.of(MinigameHudPayload::encode, MinigameHudPayload::decode);
 

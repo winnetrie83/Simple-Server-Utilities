@@ -4,11 +4,11 @@ import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameProfilePayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Player-facing cosmetic progression profile; no option on this screen changes combat power. */
 public final class MinigameProfileScreen extends Screen {
@@ -58,48 +58,48 @@ public final class MinigameProfileScreen extends Screen {
     private void select(String action, String value) {
         if (awaiting) return;
         awaiting = true;
-        ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, value,
+        PacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, value,
                 "", data.challengeMinigameId(), requestId++));
         rebuildWidgets();
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, "Minigame Profile", x + 14, y + 14, TEXT, true);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Minigame Profile", x + 14, y + 14, TEXT, true);
         String level = data.experienceForNextLevel() <= 0L
                 ? "Level " + data.level() + "  •  MAX"
                 : "Level " + data.level() + "  •  " + data.experienceIntoLevel() + "/"
                     + data.experienceForNextLevel() + " XP";
-        g.text(font, level, x + W - font.width(level) - 14, y + 15, GOLD, true);
-        g.text(font, "Matches " + data.matchesPlayed() + "  •  Wins " + data.matchesWon(), x + 14, y + 34, MUTED, false);
-        if (!data.badges().isEmpty()) g.text(font, "Badges: " + String.join(", ", data.badges()), x + 210, y + 34, ACCENT, false);
+        g.drawString(font, level, x + W - font.width(level) - 14, y + 15, GOLD, true);
+        g.drawString(font, "Matches " + data.matchesPlayed() + "  •  Wins " + data.matchesWon(), x + 14, y + 34, MUTED, false);
+        if (!data.badges().isEmpty()) g.drawString(font, "Badges: " + String.join(", ", data.badges()), x + 210, y + 34, ACCENT, false);
 
         box(g, x + 12, y + 54, 354, 120, "Victory effects");
-        g.text(font, "Selected: " + capitalize(data.selectedVictoryEffect()), x + 20, y + 78, GOOD, false);
-        g.text(font, "Victory effects are cosmetic and only play when your team wins.", x + 20, y + 133, MUTED, false);
-        g.text(font, "Player titles are now selected from SSU > Profile.", x + 20, y + 149, ACCENT, false);
+        g.drawString(font, "Selected: " + capitalize(data.selectedVictoryEffect()), x + 20, y + 78, GOOD, false);
+        g.drawString(font, "Victory effects are cosmetic and only play when your team wins.", x + 20, y + 133, MUTED, false);
+        g.drawString(font, "Player titles are now selected from SSU > Profile.", x + 20, y + 149, ACCENT, false);
 
         box(g, x + 12, y + 179, 354, 66, "Progression summary");
-        g.text(font, "Minigame XP unlocks global titles, badges and victory effects.", x + 20, y + 205, TEXT, false);
-        g.text(font, "Combat power is never changed by progression.", x + 20, y + 225, WARN, false);
+        g.drawString(font, "Minigame XP unlocks global titles, badges and victory effects.", x + 20, y + 205, TEXT, false);
+        g.drawString(font, "Combat power is never changed by progression.", x + 20, y + 225, WARN, false);
 
         box(g, x + 374, y + 54, 174, 191, "Ratings");
         int ratingY = y + 79;
         List<MinigameProfilePayload.Rating> ratings = data.ratings();
         for (int index = 0; index < Math.min(10, ratings.size()); index++) {
             var rating = ratings.get(index);
-            g.text(font, trim(rating.displayName(), 16), x + 382, ratingY + index * 15, TEXT, false);
+            g.drawString(font, trim(rating.displayName(), 16), x + 382, ratingY + index * 15, TEXT, false);
             String value = Integer.toString(rating.rating());
-            g.text(font, value, x + 538 - font.width(value), ratingY + index * 15, ACCENT, false);
+            g.drawString(font, value, x + 538 - font.width(value), ratingY + index * 15, ACCENT, false);
         }
-        if (ratings.isEmpty()) g.text(font, "Play a rated match", x + 382, ratingY, MUTED, false);
+        if (ratings.isEmpty()) g.drawString(font, "Play a rated match", x + 382, ratingY, MUTED, false);
 
         String weeklyTitle = "Weekly cosmetic challenges";
         if (!data.challengeDisplayName().isBlank()) weeklyTitle += " • " + trim(data.challengeDisplayName(), 24);
@@ -112,26 +112,26 @@ public final class MinigameProfileScreen extends Screen {
             challenge(g, x + 372, y + 276, "Earn " + data.weeklyContributionRequired() + " impact",
                     data.weeklyContribution(), data.weeklyContributionRequired(), data.weeklyContributionExperience());
         } else {
-            g.text(font, "Weekly challenges are disabled for this minigame.", x + 20, y + 281, MUTED, false);
+            g.drawString(font, "Weekly challenges are disabled for this minigame.", x + 20, y + 281, MUTED, false);
         }
-        g.text(font, "All progression rewards are cosmetic-only.", x + 20, y + 304, WARN, false);
+        g.drawString(font, "All progression rewards are cosmetic-only.", x + 20, y + 304, WARN, false);
         String notice = awaiting ? "Updating…" : data.notice();
-        if (!notice.isBlank()) g.text(font, trim(notice, 58), x + 96, y + H - 23,
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 58), x + 96, y + H - 23,
                 data.error() ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void box(GuiGraphicsExtractor g, int x, int y, int width, int height, String title) {
+    private void box(GuiGraphics g, int x, int y, int width, int height, String title) {
         g.fill(x, y, x + width, y + height, SUB);
-        g.outline(x, y, width, height, BORDER);
-        g.text(font, title, x + 8, y + 7, ACCENT, true);
+        g.renderOutline(x, y, width, height, BORDER);
+        g.drawString(font, title, x + 8, y + 7, ACCENT, true);
     }
 
-    private void challenge(GuiGraphicsExtractor g, int x, int y, String label, long value, long maximum, int reward) {
+    private void challenge(GuiGraphics g, int x, int y, String label, long value, long maximum, int reward) {
         long safe = Math.min(maximum, Math.max(0L, value));
         int color = safe >= maximum ? GOOD : TEXT;
-        g.text(font, trim(label, 24), x, y, color, false);
-        g.text(font, safe + "/" + maximum + "  •  +" + reward + " XP", x, y + 14,
+        g.drawString(font, trim(label, 24), x, y, color, false);
+        g.drawString(font, safe + "/" + maximum + "  •  +" + reward + " XP", x, y + 14,
                 safe >= maximum ? GOOD : MUTED, false);
     }
 

@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public final class AuctionHouseSettings {
     public static final int SCHEMA_VERSION = 2;
@@ -79,7 +79,7 @@ public final class AuctionHouseSettings {
     private static String normalizeItemId(String raw) {
         if (raw == null || raw.isBlank()) return "";
         try {
-            return Identifier.parse(raw.trim().toLowerCase(Locale.ROOT)).toString();
+            return ResourceLocation.parse(raw.trim().toLowerCase(Locale.ROOT)).toString();
         } catch (RuntimeException exception) {
             return "";
         }

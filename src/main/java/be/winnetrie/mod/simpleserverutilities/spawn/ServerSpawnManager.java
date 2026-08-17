@@ -100,7 +100,7 @@ public final class ServerSpawnManager {
 
     private static ServerSpawn updated(ServerSpawn existing, ServerPlayer player) {
         ServerSpawn value = existing == null ? new ServerSpawn() : existing;
-        value.update(player.level().dimension().identifier().toString(),
+        value.update(player.level().dimension().location().toString(),
                 player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot(),
                 player.getUUID(), player.getName().getString(), System.currentTimeMillis());
         return value;

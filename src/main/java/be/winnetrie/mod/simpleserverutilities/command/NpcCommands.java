@@ -150,7 +150,7 @@ public final class NpcCommands {
         }
         Vec3 target = player.position().add(player.getViewVector(1.0F).normalize().scale(2.0D));
         NpcInstance pasted = SimpleServerUtilities.NPCS.duplicateLinked(original,
-                player.level().dimension().identifier().toString(), target.x(), target.y(), target.z(),
+                player.level().dimension().location().toString(), target.x(), target.y(), target.z(),
                 player.getYRot(), 0.0F);
         if (pasted == null) {
             source.sendFailure(Component.literal("The NPC could not be pasted."));
@@ -176,7 +176,7 @@ public final class NpcCommands {
         if (player == null) return 0;
         NpcInstance instance = SimpleServerUtilities.NPCS.instance(rawId);
         if (instance == null) { source.sendFailure(Component.literal("Unknown NPC placement: " + rawId)); return 0; }
-        instance.dimension = player.level().dimension().identifier().toString();
+        instance.dimension = player.level().dimension().location().toString();
         instance.x = player.getX(); instance.y = player.getY(); instance.z = player.getZ();
         instance.yaw = player.getYRot(); instance.pitch = 0.0F;
         if (!SimpleServerUtilities.NPCS.saveInstance(instance, true)) { source.sendFailure(Component.literal("NPC could not be moved.")); return 0; }

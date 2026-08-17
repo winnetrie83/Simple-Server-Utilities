@@ -7,14 +7,14 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Arena validator result with optional teleport targets. */
 public record MinigameValidationPayload(String minigameId, String arenaId, List<Issue> issues, long requestId)
         implements CustomPacketPayload {
     public static final int MAX_ISSUES = 128;
     public static final Type<MinigameValidationPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_validation"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_validation"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameValidationPayload> STREAM_CODEC =
             StreamCodec.of(MinigameValidationPayload::encode, MinigameValidationPayload::decode);
 

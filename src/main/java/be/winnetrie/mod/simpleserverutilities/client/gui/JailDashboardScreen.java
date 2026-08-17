@@ -9,11 +9,11 @@ import com.google.gson.reflect.TypeToken;
 import be.winnetrie.mod.simpleserverutilities.identity.RichTextComponents;
 import be.winnetrie.mod.simpleserverutilities.network.JailDashboardActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.JailDashboardPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Prisoner-only dashboard. Pending punishment choices cannot be dismissed. */
 public final class JailDashboardScreen extends Screen {
@@ -43,7 +43,7 @@ public final class JailDashboardScreen extends Screen {
         catch (Exception ignored) { json = new JsonObject(); }
         if (json == null) json = new JsonObject();
         if (json.has("active") && !json.get("active").getAsBoolean()) {
-            if (minecraft != null) minecraft.setScreenAndShow(null);
+            if (minecraft != null) minecraft.setScreen(null);
             return;
         }
         if (minecraft != null && width > 0) rebuildWidgets();
@@ -69,24 +69,24 @@ public final class JailDashboardScreen extends Screen {
     }
 
     private void send(String action) {
-        ClientPacketDistributor.sendToServer(new JailDashboardActionPayload(action, request++));
+        PacketDistributor.sendToServer(new JailDashboardActionPayload(action, request++));
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int x = left();
         int y = top();
         SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
-        graphics.outline(x, y, W, H, BORDER);
-        graphics.text(font, "Jail dashboard", x + 18, y + 15, TEXT, true);
-        graphics.text(font, "Facility: " + string("jailName", string("jailId", "-")), x + 18, y + 34, MUTED, false);
-        graphics.text(font, "Punishment reason", x + 18, y + 55, MUTED, false);
+        graphics.renderOutline(x, y, W, H, BORDER);
+        graphics.drawString(font, "Jail dashboard", x + 18, y + 15, TEXT, true);
+        graphics.drawString(font, "Facility: " + string("jailName", string("jailId", "-")), x + 18, y + 34, MUTED, false);
+        graphics.drawString(font, "Punishment reason", x + 18, y + 55, MUTED, false);
 
         var reason = RichTextComponents.fromEncoded(string("reason", ""));
         var reasonLines = font.split(reason, W - 36);
         for (int i = 0; i < Math.min(3, reasonLines.size()); i++) {
-            graphics.text(font, reasonLines.get(i), x + 18, y + 70 + i * 11, TEXT, false);
+            graphics.drawString(font, reasonLines.get(i), x + 18, y + 70 + i * 11, TEXT, false);
         }
 
         String path = string("selectedPath", "TASK");
@@ -94,8 +94,8 @@ public final class JailDashboardScreen extends Screen {
         int cursor = y + 112;
         if ("PENDING".equals(path)) {
             long remain = secondsUntil(number("choiceExpiresAt"), now);
-            graphics.text(font, "Choose within " + remain + "s", x + 18, cursor, WARNING, true);
-            graphics.text(font,
+            graphics.drawString(font, "Choose within " + remain + "s", x + 18, cursor, WARNING, true);
+            graphics.drawString(font,
                     "Buyout: " + string("buyoutFormatted", Long.toString(number("buyoutMinor")))
                             + "  •  Balance: " + string("balanceFormatted", Long.toString(number("balanceMinor"))),
                     x + 18, cursor + 20, TEXT, false);
@@ -105,8 +105,8 @@ public final class JailDashboardScreen extends Screen {
             drawTask(graphics, x, cursor, now);
         } else if ("TIME".equals(path)) {
             long remain = secondsUntil(number("releaseAt"), now);
-            graphics.text(font, "Solitude sentence", x + 18, cursor, TEXT, true);
-            graphics.text(font, "Time remaining: " + duration(remain) + "  •  Cell: " + (number("assignedCell") + 1L), x + 18, cursor + 22, GOOD, false);
+            graphics.drawString(font, "Solitude sentence", x + 18, cursor, TEXT, true);
+            graphics.drawString(font, "Time remaining: " + duration(remain) + "  •  Cell: " + (number("assignedCell") + 1L), x + 18, cursor + 22, GOOD, false);
             cursor = drawWrapped(graphics,
                     "You may move inside your assigned cell. Commands, items, containers, combat, teleportation and unrelated SSU functions are blocked.",
                     x + 18, cursor + 44, W - 36, MUTED, 2) + 5;
@@ -114,27 +114,27 @@ public final class JailDashboardScreen extends Screen {
                     "Admins may teleport to you, but neither you nor an admin can keep you teleported outside the Jail before release.",
                     x + 18, cursor, W - 36, MUTED, 2);
         } else {
-            graphics.text(font, "Task punishment — locked in", x + 18, cursor, TEXT, true);
+            graphics.drawString(font, "Task punishment — locked in", x + 18, cursor, TEXT, true);
             drawTask(graphics, x, cursor + 22, now);
         }
 
         if (!data.notice().isBlank()) {
             drawWrapped(graphics, data.notice(), x + 18, y + H - 58, W - 36, data.error() ? ERROR : GOOD, 2);
         }
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
-    private void drawTask(GuiGraphicsExtractor graphics, int x, int y, long now) {
+    private void drawTask(GuiGraphics graphics, int x, int y, long now) {
         long deadline = number("taskDeadlineAt");
         long remain = deadline > 0L ? secondsUntil(deadline, now) : 0L;
-        graphics.text(font, "Task deadline: " + (deadline > 0L ? duration(remain) : "No deadline"), x + 18, y, TEXT, false);
+        graphics.drawString(font, "Task deadline: " + (deadline > 0L ? duration(remain) : "No deadline"), x + 18, y, TEXT, false);
         Map<String, Integer> requirements = map("requirements");
         Map<String, Integer> progress = map("progress");
         int i = 0;
         for (var entry : requirements.entrySet()) {
             if (i >= 6) break;
             int current = progress.getOrDefault(entry.getKey(), 0);
-            graphics.text(font,
+            graphics.drawString(font,
                     trim(entry.getKey(), 31) + "  " + current + " / " + entry.getValue(),
                     x + 18 + (i / 3) * 220,
                     y + 21 + (i % 3) * 17,
@@ -143,16 +143,16 @@ public final class JailDashboardScreen extends Screen {
             i++;
         }
         if (requirements.isEmpty()) {
-            graphics.text(font, "No task requirements configured.", x + 18, y + 22, WARNING, false);
+            graphics.drawString(font, "No task requirements configured.", x + 18, y + 22, WARNING, false);
         } else {
-            graphics.text(font, "Completion is automatic when every requirement is finished.", x + 18, y + 78, GOOD, false);
+            graphics.drawString(font, "Completion is automatic when every requirement is finished.", x + 18, y + 78, GOOD, false);
         }
     }
 
-    private int drawWrapped(GuiGraphicsExtractor graphics, String text, int x, int y, int maxWidth, int color, int maxLines) {
+    private int drawWrapped(GuiGraphics graphics, String text, int x, int y, int maxWidth, int color, int maxLines) {
         var lines = font.split(Component.literal(text), maxWidth);
         int count = Math.min(maxLines, lines.size());
-        for (int i = 0; i < count; i++) graphics.text(font, lines.get(i), x, y + i * 11, color, false);
+        for (int i = 0; i < count; i++) graphics.drawString(font, lines.get(i), x, y + i * 11, color, false);
         return y + count * 11;
     }
 
@@ -198,7 +198,7 @@ public final class JailDashboardScreen extends Screen {
 
     @Override
     public void onClose() {
-        if (!"PENDING".equals(string("selectedPath", "TASK")) && minecraft != null) minecraft.setScreenAndShow(null);
+        if (!"PENDING".equals(string("selectedPath", "TASK")) && minecraft != null) minecraft.setScreen(null);
     }
 
     @Override

@@ -7,7 +7,6 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.players.NameAndId;
 
 public class PermissionService {
 
@@ -178,7 +177,7 @@ public class PermissionService {
             return false;
         }
 
-        return server.getPlayerList().isOp(new NameAndId(player.getGameProfile()));
+        return server.getPlayerList().isOp(player.getGameProfile());
     }
 
     private static boolean isJailed(ServerPlayer player) {

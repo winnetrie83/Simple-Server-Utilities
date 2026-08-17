@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Server-authoritative operation requested from the region selection editor. */
 public record RegionSelectionActionPayload(
@@ -19,7 +19,7 @@ public record RegionSelectionActionPayload(
 ) implements CustomPacketPayload {
     public static final int MAX_MIX_ENTRIES = 64;
     public static final Type<RegionSelectionActionPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_selection_action")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_selection_action")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, RegionSelectionActionPayload> STREAM_CODEC =
             StreamCodec.of(RegionSelectionActionPayload::encode, RegionSelectionActionPayload::decode);

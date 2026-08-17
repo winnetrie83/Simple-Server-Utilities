@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Free-for-all Block Party round timing and floor palette. */
 public final class BlockPartyRules {
@@ -30,7 +30,7 @@ public final class BlockPartyRules {
         if (paletteBlocks != null) for (String raw : paletteBlocks) {
             String value = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
             if (value.isBlank()) continue;
-            Identifier.parse(value);
+            ResourceLocation.parse(value);
             palette.add(value);
             if (palette.size() >= MAX_PALETTE) break;
         }

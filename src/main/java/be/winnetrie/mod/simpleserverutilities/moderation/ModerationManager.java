@@ -39,7 +39,7 @@ import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -236,7 +236,7 @@ public final class ModerationManager {
         ServerPlayer target=online(targetId);if(target==null)throw new IllegalArgumentException("That player is not online.");int duration=Math.max(2,Math.min(60,seconds));PlayerModerationRecord record=ensure(targetId,target.getName().getString());
         synchronized(this){addHistory(record,"warning",reason,actorName(actor),actorId(actor),System.currentTimeMillis(),0L,duration+" seconds");saveRecord(targetId,record);}
         Component message=RichTextComponents.fromEncoded(reason);target.connection.send(new ClientboundSetTitlesAnimationPacket(5,duration*20,10));target.connection.send(new ClientboundSetTitleTextPacket(Component.literal("WARNING")));target.connection.send(new ClientboundSetSubtitleTextPacket(message));
-        SoundEvent sound=BuiltInRegistries.SOUND_EVENT.getOptional(Identifier.parse("minecraft:item.goat_horn.sound.5")).orElse(null);if(sound!=null)target.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound),SoundSource.PLAYERS,target.getX(),target.getY(),target.getZ(),1.2F,1.0F,target.level().getServer().getTickCount() ^ target.getUUID().getLeastSignificantBits()));
+        SoundEvent sound=BuiltInRegistries.SOUND_EVENT.getOptional(ResourceLocation.parse("minecraft:item.goat_horn.sound.5")).orElse(null);if(sound!=null)target.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound),SoundSource.PLAYERS,target.getX(),target.getY(),target.getZ(),1.2F,1.0F,target.level().getServer().getTickCount() ^ target.getUUID().getLeastSignificantBits()));
     }
 
     public void kick(ServerPlayer actor,UUID targetId,String reason){reason=requireReason(reason);ServerPlayer target=online(targetId);if(target==null)throw new IllegalArgumentException("That player is not online.");PlayerModerationRecord record=ensure(targetId,target.getName().getString());synchronized(this){addHistory(record,"kick",reason,actorName(actor),actorId(actor),System.currentTimeMillis(),0L,"");saveRecord(targetId,record);}target.connection.disconnect(Component.literal("Kicked: ").append(RichTextComponents.fromEncoded(reason)));}
@@ -253,15 +253,15 @@ public final class ModerationManager {
         Map<String,Integer> safeRequirements=requirements==null?Map.of():requirements;List<String> safeTools=tools==null?List.of():tools;boolean task=!mode.equals("TIME_ONLY");boolean time=mode.equals("TIME_ONLY");
         if(task&&safeRequirements.isEmpty())throw new IllegalArgumentException("Task punishment requires at least one block requirement.");if(time&&durationSeconds<=0L)throw new IllegalArgumentException("Time-only punishment requires a positive sentence duration.");if(mode.equals("CHOICE")&&buyoutMinor<=0L)throw new IllegalArgumentException("Choice punishment requires a buyout amount.");if(task&&taskDeadlineSeconds<=0L)throw new IllegalArgumentException("Task punishment requires a completion deadline.");
         SimpleServerUtilities.JAILS.validateForSentence(jailId,task,time);
-        for(var requirement:safeRequirements.entrySet()){Identifier id;try{id=Identifier.parse(requirement.getKey());}catch(RuntimeException ex){throw new IllegalArgumentException("Invalid task block ID: "+requirement.getKey());}if(BuiltInRegistries.BLOCK.getOptional(id).isEmpty())throw new IllegalArgumentException("Unknown task block: "+requirement.getKey());if(requirement.getValue()==null||requirement.getValue()<=0)throw new IllegalArgumentException("Task block amounts must be positive.");}
-        for(String tool:safeTools){Identifier id;try{id=Identifier.parse(tool);}catch(RuntimeException ex){throw new IllegalArgumentException("Invalid jail tool ID: "+tool);}if(BuiltInRegistries.ITEM.getOptional(id).isEmpty())throw new IllegalArgumentException("Unknown jail tool: "+tool);}
+        for(var requirement:safeRequirements.entrySet()){ResourceLocation id;try{id=ResourceLocation.parse(requirement.getKey());}catch(RuntimeException ex){throw new IllegalArgumentException("Invalid task block ID: "+requirement.getKey());}if(BuiltInRegistries.BLOCK.getOptional(id).isEmpty())throw new IllegalArgumentException("Unknown task block: "+requirement.getKey());if(requirement.getValue()==null||requirement.getValue()<=0)throw new IllegalArgumentException("Task block amounts must be positive.");}
+        for(String tool:safeTools){ResourceLocation id;try{id=ResourceLocation.parse(tool);}catch(RuntimeException ex){throw new IllegalArgumentException("Invalid jail tool ID: "+tool);}if(BuiltInRegistries.ITEM.getOptional(id).isEmpty())throw new IllegalArgumentException("Unknown jail tool: "+tool);}
         ServerPlayer target=online(targetId);if(target!=null)suspendActivities(target);PlayerModerationRecord record;long now=System.currentTimeMillis();JailDefinition facility=SimpleServerUtilities.JAILS.definition(jailId);
         synchronized(this){record=records.computeIfAbsent(targetId,ignored->new PlayerModerationRecord());if(record.jail.active)throw new IllegalArgumentException("That player is already jailed.");if(record.frozen){record.frozen=false;freezeAnchors.remove(targetId);addHistory(record,"unfreeze","Superseded by jail",actorName(actor),actorId(actor),now,0L,"automatic");}JailSentence jail=new JailSentence();jail.active=true;jail.jailId=JailDefinition.normalizeId(jailId);jail.reason=reason;jail.startedAt=now;jail.sentenceMode=mode;jail.selectedPath=mode.equals("CHOICE")?"PENDING":(time?"TIME":"TASK");jail.choiceExpiresAt=mode.equals("CHOICE")?now+30_000L:0L;jail.taskDeadlineAt=task?now+Math.max(1L,taskDeadlineSeconds)*1000L:0L;jail.releaseAt=time?now+Math.max(1L,durationSeconds)*1000L:0L;jail.buyoutMinor=mode.equals("CHOICE")?Math.max(0L,buyoutMinor):0L;jail.requirements.putAll(safeRequirements);jail.toolItems.addAll(safeTools);jail.rewardLookbackDays=lookbackDays;jail.assignedCell=time&&facility!=null&&!facility.cells.isEmpty()?chooseCellIndex(jail.jailId,facility.cells.size()):-1;if(target!=null)jail.inventoryBackup=MinigamePlayerState.capture(target);jail.normalize();record.jail=jail;addHistory(record,"jail",reason,actorName(actor),actorId(actor),now,time?jail.releaseAt:jail.taskDeadlineAt,"jail="+jail.jailId+";mode="+mode);saveRecord(targetId,record);}
         if(target!=null){applyJail(target,record,true);ModerationService.sendJail(target,"You have been jailed. Review your punishment options.",false);}
     }
 
     /** Legacy location setters remain for old saves/fallback only; new punishments use dedicated Jail facilities. */
-    public synchronized void setJailLocation(ServerPlayer actor){settings.jailLocation=new ServerSpawn(actor.level().dimension().identifier().toString(),actor.getX(),actor.getY(),actor.getZ(),actor.getYRot(),actor.getXRot(),actor.getUUID(),actor.getName().getString(),System.currentTimeMillis());saveSettings();}
+    public synchronized void setJailLocation(ServerPlayer actor){settings.jailLocation=new ServerSpawn(actor.level().dimension().location().toString(),actor.getX(),actor.getY(),actor.getZ(),actor.getYRot(),actor.getXRot(),actor.getUUID(),actor.getName().getString(),System.currentTimeMillis());saveSettings();}
     public synchronized void clearJailLocation(){settings.jailLocation=null;saveSettings();}
 
     public void release(UUID targetId,String reason,ServerPlayer actor){PlayerModerationRecord record;ServerPlayer target=online(targetId);JailSentence old;String message=reason==null||reason.isBlank()?"You have been released from jail.":reason;synchronized(this){record=records.get(targetId);if(record==null||!record.jail.active)return;old=record.jail;addHistory(record,"unjail",message,actorName(actor),actorId(actor),System.currentTimeMillis(),0L,"");if(target==null){old.active=false;old.restorePending=true;old.releaseReason=message;record.jail=old;}else record.jail=new JailSentence();saveRecord(targetId,record);}if(target!=null)restoreAndExit(target,old,message);}
@@ -293,20 +293,20 @@ public final class ModerationManager {
         if(nestedMine!=null){
             boolean global=be.winnetrie.mod.simpleserverutilities.permission.PermissionService.getBooleanForJailGameplay(player,be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys.MINES_USE,true);
             boolean specific=nestedMine.permissionKey.isBlank()||be.winnetrie.mod.simpleserverutilities.permission.PermissionService.getBooleanForJailGameplay(player,nestedMine.permissionKey,false);
-            if(!global||!specific){player.sendOverlayMessage(Component.literal("You do not have permission to mine here."));return true;}
+            if(!global||!specific){player.sendSystemMessage(Component.literal("You do not have permission to mine here."), true);return true;}
             // A task prisoner with access to an overlapping Mine may physically mine every block in that Mine.
             // Only configured requirement blocks advance punishment progress; all Mine blocks are still removed
-            // without vanilla drops because the original BreakBlockEvent remains cancelled.
+            // without vanilla drops because the original BlockEvent.BreakEvent remains cancelled.
         }else{
             // Outside a Mine, the dedicated Jail Task Area remains requirement-only.
             if(required<=0)return true;
             synchronized(this){if(jail.progress.getOrDefault(blockId,0)>=required)return true;}
         }
-        // BreakBlockEvent is intentionally cancelled for jailed players so vanilla cannot generate drops or
+        // BlockEvent.BreakEvent is intentionally cancelled for jailed players so vanilla cannot generate drops or
         // execute unrelated block-break behavior. Applying AIR inside that cancelled event is unsafe because
         // vanilla resynchronises the original block after cancellation. Queue the validated removal for the
         // next server tick instead; duplicate attempts against the same block are coalesced.
-        String key=level.dimension().identifier()+"@"+pos.asLong();
+        String key=level.dimension().location()+"@"+pos.asLong();
         synchronized(this){
             pendingJailBreaks.putIfAbsent(key,new PendingJailBreak(level,pos.immutable(),player.getUUID(),blockId,minedState,serverTick(level)+1L));
         }
@@ -347,7 +347,7 @@ public final class ModerationManager {
         if(nestedMine!=null){
             boolean global=be.winnetrie.mod.simpleserverutilities.permission.PermissionService.getBooleanForJailGameplay(player,be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys.MINES_USE,true);
             boolean specific=nestedMine.permissionKey.isBlank()||be.winnetrie.mod.simpleserverutilities.permission.PermissionService.getBooleanForJailGameplay(player,nestedMine.permissionKey,false);
-            if(!global||!specific){player.sendOverlayMessage(Component.literal("You do not have permission to mine here."));return;}
+            if(!global||!specific){player.sendSystemMessage(Component.literal("You do not have permission to mine here."), true);return;}
         }else if(required<=0){
             return;
         }
@@ -375,7 +375,7 @@ public final class ModerationManager {
                 }
             }
         }
-        if(taskAdvanced)player.sendOverlayMessage(Component.literal("Task punishment: "+pending.blockId+" "+progress+"/"+required));
+        if(taskAdvanced)player.sendSystemMessage(Component.literal("Task punishment: "+pending.blockId+" "+progress+"/"+required), true);
         if(taskAdvanced&&jail.taskComplete()){
             player.sendSystemMessage(Component.literal("Task punishment completed."));
             completeTask(player);
@@ -397,7 +397,7 @@ public final class ModerationManager {
     private void applyJail(ServerPlayer player,PlayerModerationRecord record,boolean clear){if(!SsuModuleAccess.active("jails"))return;if(record.jail.inventoryBackup==null)record.jail.inventoryBackup=MinigamePlayerState.capture(player);if(clear){player.getInventory().clearContent();player.getInventory().setChanged();}equipJailTools(player,record.jail);boolean teleported=false;if(record.jail.timeSelected()){JailDefinition.Point cell=SimpleServerUtilities.JAILS.cell(record.jail.jailId,record.jail.assignedCell);teleported=SimpleServerUtilities.JAILS.teleport(player,cell);}else{teleported=SimpleServerUtilities.JAILS.teleport(player,SimpleServerUtilities.JAILS.destination(record.jail.jailId,record.jail.taskSelected()?"task":"intake"));}if(!teleported){ServerSpawn destination; synchronized(this){destination=settings.jailLocation;}if(!SpawnEvents.teleport(player,destination))SpawnEvents.teleportFallback(player);}player.sendSystemMessage(Component.literal("You are jailed. Press U for your Jail dashboard. Commands and non-jail SSU functions are disabled."));saveRecord(player.getUUID(),record);}
     private void enforceJailInventory(ServerPlayer player,JailSentence jail){equipJailTools(player,jail);if(player.containerMenu!=player.inventoryMenu)player.closeContainer();}
     private void equipJailTools(ServerPlayer player,JailSentence jail){int toolCount=jail.taskSelected()?Math.min(9,jail.toolItems.size()):0;for(int slot=0;slot<toolCount;slot++){String id=jail.toolItems.get(slot);ItemStack expected=item(id,1);ItemStack current=player.getInventory().getItem(slot);if(current.isEmpty()||!ItemStack.isSameItemSameComponents(current,expected)){player.getInventory().setItem(slot,expected);}else if(current.isDamageableItem()&&current.getDamageValue()!=0)current.setDamageValue(0);}for(int slot=toolCount;slot<player.getInventory().getContainerSize();slot++)if(!player.getInventory().getItem(slot).isEmpty())player.getInventory().setItem(slot,ItemStack.EMPTY);player.getInventory().setChanged();player.containerMenu.broadcastChanges();}
-    private void enforceJailConfinement(ServerPlayer player,JailSentence jail){if(!SsuModuleAccess.active("jails"))return;JailDefinition d=SimpleServerUtilities.JAILS.definition(jail.jailId);if(d==null||!d.boundsSet)return;if(jail.timeSelected()){JailDefinition.Point cell=SimpleServerUtilities.JAILS.cell(jail.jailId,jail.assignedCell);if(cell==null)return;boolean outsideJail=!d.contains(player.level().dimension().identifier().toString(),player.getX(),player.getY(),player.getZ());if(outsideJail)SimpleServerUtilities.JAILS.teleport(player,cell);return;}if(!d.contains(player.level().dimension().identifier().toString(),player.getX(),player.getY(),player.getZ()))SimpleServerUtilities.JAILS.teleport(player,SimpleServerUtilities.JAILS.destination(jail.jailId,jail.taskSelected()?"task":"intake"));}
+    private void enforceJailConfinement(ServerPlayer player,JailSentence jail){if(!SsuModuleAccess.active("jails"))return;JailDefinition d=SimpleServerUtilities.JAILS.definition(jail.jailId);if(d==null||!d.boundsSet)return;if(jail.timeSelected()){JailDefinition.Point cell=SimpleServerUtilities.JAILS.cell(jail.jailId,jail.assignedCell);if(cell==null)return;boolean outsideJail=!d.contains(player.level().dimension().location().toString(),player.getX(),player.getY(),player.getZ());if(outsideJail)SimpleServerUtilities.JAILS.teleport(player,cell);return;}if(!d.contains(player.level().dimension().location().toString(),player.getX(),player.getY(),player.getZ()))SimpleServerUtilities.JAILS.teleport(player,SimpleServerUtilities.JAILS.destination(jail.jailId,jail.taskSelected()?"task":"intake"));}
     private void suspendActivities(ServerPlayer player) {
         if (SsuModuleAccess.active("teleport")) try { SimpleServerUtilities.TELEPORTS.cancel(player); } catch (Exception ignored) { }
         if (SsuModuleAccess.active("minigames")) try { SimpleServerUtilities.MINIGAMES.leave(player, true); } catch (Exception ignored) { }
@@ -409,7 +409,7 @@ public final class ModerationManager {
 
     private void distributeCommunityContribution(ServerPlayer prisoner,JailSentence jail){
         if (!SsuModuleAccess.active("mail")) {
-            SimpleServerUtilities.LOGGER.warn("Jail community contribution for {} was not distributed because the Mail module is inactive.", prisoner.getGameProfile().name());
+            SimpleServerUtilities.LOGGER.warn("Jail community contribution for {} was not distributed because the Mail module is inactive.", prisoner.getGameProfile().getName());
             return;
         }
         long cutoff=System.currentTimeMillis()-Duration.ofDays(jail.rewardLookbackDays).toMillis();
@@ -460,12 +460,12 @@ public final class ModerationManager {
     private static String requireReason(String value){String normalized=be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText.normalize(value);if(be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText.stripFormatting(normalized).trim().isBlank())throw new IllegalArgumentException("A reason is required.");return normalized;}
     private static String actorName(ServerPlayer actor){return actor==null?"Server":actor.getName().getString();}
     private static String actorId(ServerPlayer actor){return actor==null?"server":actor.getUUID().toString();}
-    private static ItemStack item(String id,int count){try{ItemStack stack=BuiltInRegistries.ITEM.getOptional(Identifier.parse(id)).map(ItemStack::new).orElse(ItemStack.EMPTY);if(!stack.isEmpty())stack.setCount(Math.max(1,Math.min(stack.getMaxStackSize(),count)));return stack;}catch(RuntimeException ignored){return ItemStack.EMPTY;}}
+    private static ItemStack item(String id,int count){try{ItemStack stack=BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(id)).map(ItemStack::new).orElse(ItemStack.EMPTY);if(!stack.isEmpty())stack.setCount(Math.max(1,Math.min(stack.getMaxStackSize(),count)));return stack;}catch(RuntimeException ignored){return ItemStack.EMPTY;}}
     private synchronized void addHistory(PlayerModerationRecord record,String type,String reason,String actorName,String actorId,long created,long expires,String metadata){record.history.add(new ModerationActionRecord(type,reason,actorName,actorId,created,expires,metadata));record.normalize();}
     private synchronized void saveSettings(){if(settingsFile!=null){settings.normalize();settingsStore.queueJson(GSON,settingsFile,settings);}}
     private synchronized void saveRecord(UUID id,PlayerModerationRecord record){if(recordFolder!=null){record.playerId=id.toString();record.normalize();recordStore.queueJson(GSON,StoragePaths.jsonFile(recordFolder,id.toString()),record);}}
 
     private record PendingJailBreak(ServerLevel level,BlockPos pos,UUID playerId,String blockId,BlockState state,long dueTick){}
 
-    private record Anchor(net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension,double x,double y,double z,float yaw,float pitch){static Anchor capture(ServerPlayer p){return new Anchor(p.level().dimension(),p.getX(),p.getY(),p.getZ(),p.getYRot(),p.getXRot());}void hold(ServerPlayer p){ServerLevel l=p.level().getServer().getLevel(dimension);if(l!=null&&(p.level()!=l||p.distanceToSqr(x,y,z)>0.04D))p.teleportTo(l,x,y,z,Set.of(),yaw,pitch,true);p.setDeltaMovement(0,0,0);}}
+    private record Anchor(net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension,double x,double y,double z,float yaw,float pitch){static Anchor capture(ServerPlayer p){return new Anchor(p.level().dimension(),p.getX(),p.getY(),p.getZ(),p.getYRot(),p.getXRot());}void hold(ServerPlayer p){ServerLevel l=p.level().getServer().getLevel(dimension);if(l!=null&&(p.level()!=l||p.distanceToSqr(x,y,z)>0.04D))p.teleportTo(l, x, y, z, Set.of(), yaw, pitch);p.setDeltaMovement(0,0,0);}}
 }

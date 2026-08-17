@@ -5,11 +5,11 @@ import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameResultsPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Post-game scoreboard, progression summary and rematch/next-arena vote. */
 public final class MinigameResultsScreen extends Screen {
@@ -66,7 +66,7 @@ public final class MinigameResultsScreen extends Screen {
 
     private void vote(String action) {
         voted = action;
-        ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, data.matchId(), requestId++));
+        PacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, data.matchId(), requestId++));
         rebuildWidgets();
     }
 
@@ -76,28 +76,28 @@ public final class MinigameResultsScreen extends Screen {
         if (voteTicksRemaining > 0 && --voteTicksRemaining == 0) rebuildWidgets();
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(null); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(null); }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xB5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, data.title(), x + 14, y + 14, GOLD, true);
-        g.text(font, trim(data.reason(), 85), x + 14, y + 31, MUTED, false);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, data.title(), x + 14, y + 14, GOLD, true);
+        g.drawString(font, trim(data.reason(), 85), x + 14, y + 31, MUTED, false);
         String progress = "Level " + data.level() + "  •  +" + data.experienceGained() + " XP";
         if (data.experienceForNextLevel() > 0L) progress += "  •  " + data.experienceIntoLevel() + "/" + data.experienceForNextLevel();
-        g.text(font, progress, x + W - font.width(progress) - 14, y + 15, GOOD, true);
+        g.drawString(font, progress, x + W - font.width(progress) - 14, y + 15, GOOD, true);
         if (!data.badges().isEmpty()) {
             String badges = "Badges: " + String.join(", ", data.badges());
-            g.text(font, trim(badges, 72), x + W - font.width(trim(badges, 72)) - 14, y + 32, ACCENT, false);
+            g.drawString(font, trim(badges, 72), x + W - font.width(trim(badges, 72)) - 14, y + 32, ACCENT, false);
         }
 
         int tableX = x + 14, tableY = y + 58;
         int tableW = W - 28, tableH = 268;
         g.fill(tableX, tableY, tableX + tableW, tableY + tableH, 0xB010151C);
-        g.outline(tableX, tableY, tableW, tableH, BORDER);
+        g.renderOutline(tableX, tableY, tableW, tableH, BORDER);
         // Fixed columns: headers and values share the exact same anchors.
         final int nameX = tableX + 20;
         final int teamX = tableX + 178;
@@ -111,9 +111,9 @@ public final class MinigameResultsScreen extends Screen {
         final int defensesX = tableX + 516;
         final int objectiveX = tableX + 566;
         final int impactX = tableX + 654;
-        g.text(font, "Player", nameX, tableY + 8, ACCENT, true);
+        g.drawString(font, "Player", nameX, tableY + 8, ACCENT, true);
         textCenter(g, "T", teamX, tableY + 8, ACCENT, true);
-        g.text(font, "Role", roleX, tableY + 8, ACCENT, true);
+        g.drawString(font, "Role", roleX, tableY + 8, ACCENT, true);
         textRight(g, "K", killsX, tableY + 8, ACCENT, true);
         textRight(g, "D", deathsX, tableY + 8, ACCENT, true);
         textRight(g, "A", assistsX, tableY + 8, ACCENT, true);
@@ -137,10 +137,10 @@ public final class MinigameResultsScreen extends Screen {
             int lineY = tableY + 31 + (index - scroll) * 19;
             if ((index - scroll) % 2 == 1) g.fill(tableX + 4, lineY - 3, tableX + tableW - 4, lineY + 13, 0x351F2A34);
             int color = row.winner() ? GOOD : TEXT;
-            if (row.winner()) g.text(font, "★", tableX + 8, lineY, GOOD, false);
-            g.text(font, trim(row.name(), 18), nameX, lineY, color, false);
+            if (row.winner()) g.drawString(font, "★", tableX + 8, lineY, GOOD, false);
+            g.drawString(font, trim(row.name(), 18), nameX, lineY, color, false);
             textCenter(g, Integer.toString(row.team()), teamX, lineY, MUTED, false);
-            g.text(font, roleLabel(row.role()), roleX, lineY, MUTED, false);
+            g.drawString(font, roleLabel(row.role()), roleX, lineY, MUTED, false);
             textRight(g, Long.toString(row.kills()), killsX, lineY, TEXT, false);
             textRight(g, Long.toString(row.deaths()), deathsX, lineY, TEXT, false);
             textRight(g, Long.toString(row.assists()), assistsX, lineY, TEXT, false);
@@ -153,22 +153,22 @@ public final class MinigameResultsScreen extends Screen {
         }
         if (voteTicksRemaining > 0) {
             int seconds = Math.max(1, (voteTicksRemaining + 19) / 20);
-            g.text(font, "Voting closes in " + seconds + "s", x + 354, y + H - 25, MUTED, false);
+            g.drawString(font, "Voting closes in " + seconds + "s", x + 354, y + H - 25, MUTED, false);
         }
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private int left() { return (width - W) / 2; }
     private int top() { return (height - H) / 2; }
 
-    private void textRight(GuiGraphicsExtractor graphics, String value, int rightX, int y, int color, boolean shadow) {
+    private void textRight(GuiGraphics graphics, String value, int rightX, int y, int color, boolean shadow) {
         String safe = value == null ? "" : value;
-        graphics.text(font, safe, rightX - font.width(safe), y, color, shadow);
+        graphics.drawString(font, safe, rightX - font.width(safe), y, color, shadow);
     }
 
-    private void textCenter(GuiGraphicsExtractor graphics, String value, int centerX, int y, int color, boolean shadow) {
+    private void textCenter(GuiGraphics graphics, String value, int centerX, int y, int color, boolean shadow) {
         String safe = value == null ? "" : value;
-        graphics.text(font, safe, centerX - font.width(safe) / 2, y, color, shadow);
+        graphics.drawString(font, safe, centerX - font.width(safe) / 2, y, color, shadow);
     }
 
     private static String roleLabel(String role) {

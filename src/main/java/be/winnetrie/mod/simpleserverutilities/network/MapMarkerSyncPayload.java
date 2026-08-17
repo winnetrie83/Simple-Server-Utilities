@@ -8,7 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Personal marker snapshot plus effective display settings. */
 public record MapMarkerSyncPayload(
@@ -22,7 +22,7 @@ public record MapMarkerSyncPayload(
     private static final int MAX_MARKERS = 256;
 
     public static final Type<MapMarkerSyncPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "map_marker_sync"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "map_marker_sync"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MapMarkerSyncPayload> STREAM_CODEC =
             StreamCodec.of(MapMarkerSyncPayload::encode, MapMarkerSyncPayload::decode);
 

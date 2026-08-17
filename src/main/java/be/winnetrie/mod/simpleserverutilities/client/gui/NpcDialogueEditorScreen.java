@@ -19,13 +19,13 @@ import be.winnetrie.mod.simpleserverutilities.npc.NpcDialogueChoice;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcDialogueDefinition;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcDialogueNode;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcDialogueValidation;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Dialogue Editor 2.1: bounded graph, entry actions, all choice actions and server-synchronised catalogues. */
 public final class NpcDialogueEditorScreen extends Screen {
@@ -191,12 +191,9 @@ public final class NpcDialogueEditorScreen extends Screen {
                 .bounds(x + W - 112, y + 172, 100, 18).build());
 
         nodeTextValue = node().text == null ? "" : node().text;
-        nodeText = MultiLineEditBox.builder().setX(x + 12).setY(y + 196)
-                .setPlaceholder(Component.literal("Dialogue text"))
-                .setShowBackground(true).setShowDecorations(true)
-                .build(font, W - 24, 108, Component.literal("Dialogue text"));
+        nodeText = new MultiLineEditBox(font, x + 12, y + 196, W - 24, 108,
+                Component.literal("Dialogue text"), Component.literal("Dialogue text"));
         nodeText.setCharacterLimit(4096);
-        nodeText.setLineLimit(24);
         nodeText.setValue(nodeTextValue);
         nodeText.setValueListener(value -> nodeTextValue = value);
         addRenderableWidget(nodeText);
@@ -399,7 +396,7 @@ public final class NpcDialogueEditorScreen extends Screen {
         saveCurrent();
         if (minecraft == null) return;
         String current = node().text == null ? "" : node().text;
-        minecraft.setScreenAndShow(new RichTextValueEditorScreen(this, "NPC dialogue text",
+        minecraft.setScreen(new RichTextValueEditorScreen(this, "NPC dialogue text",
                 "Use SSU's 16 colours and B/I/U/S formatting for this dialogue line.", current,
                 NpcDialogueEditorScreen::normalizeDialogueText, 4096, 4096, 24, value -> {
                     node().text = value;
@@ -771,18 +768,18 @@ public final class NpcDialogueEditorScreen extends Screen {
 
     private void openValidation() {
         NpcDialogueValidation.Report report = validateDraft();
-        if (minecraft != null) minecraft.setScreenAndShow(new NpcDialogueValidationScreen(this, report));
+        if (minecraft != null) minecraft.setScreen(new NpcDialogueValidationScreen(this, report));
     }
 
     private void openGuide() {
         saveCurrent();
-        if (minecraft != null) minecraft.setScreenAndShow(new NpcDialogueGuideScreen(this));
+        if (minecraft != null) minecraft.setScreen(new NpcDialogueGuideScreen(this));
     }
 
     private void openParameterGuide(boolean condition) {
         saveCurrent();
         String type = condition ? selectedCondition().type() : actionTypeValue;
-        if (minecraft != null) minecraft.setScreenAndShow(new NpcDialogueParameterGuideScreen(this, condition, type));
+        if (minecraft != null) minecraft.setScreen(new NpcDialogueParameterGuideScreen(this, condition, type));
     }
 
     void applyParameterExample(boolean condition, String key, String value) {
@@ -823,7 +820,7 @@ public final class NpcDialogueEditorScreen extends Screen {
         actions.set(index, new ContentAction(current.type(), values));
         actionTypeValue = current.type();
         actionParametersValue = parameters(values);
-        if (minecraft != null && minecraft.gui.screen() == this) rebuildWidgets();
+        if (minecraft != null && minecraft.screen == this) rebuildWidgets();
     }
 
     private static String pageDescription(Page page) {
@@ -840,11 +837,11 @@ public final class NpcDialogueEditorScreen extends Screen {
         NpcDialogueValidation.Report report = validateDraft();
         if (!report.valid()) {
             setNotice("Preview blocked: " + report.summary(), true);
-            if (minecraft != null) minecraft.setScreenAndShow(new NpcDialogueValidationScreen(this, report));
+            if (minecraft != null) minecraft.setScreen(new NpcDialogueValidationScreen(this, report));
             return;
         }
         String previewName = node().speaker == null || node().speaker.isBlank() ? draft.displayName : node().speaker;
-        if (minecraft != null) minecraft.setScreenAndShow(new NpcDialoguePreviewScreen(this, draft, previewName, node().id));
+        if (minecraft != null) minecraft.setScreen(new NpcDialoguePreviewScreen(this, draft, previewName, node().id));
     }
 
     private void submit() {
@@ -853,7 +850,7 @@ public final class NpcDialogueEditorScreen extends Screen {
             if (!report.valid()) throw new IllegalArgumentException("Fix dialogue validation errors before saving: " + report.summary());
             String json = GSON.toJson(draft);
             if (json.length() > 65_535) throw new IllegalArgumentException("Dialogue is too large.");
-            ClientPacketDistributor.sendToServer(new NpcDialogueEditorSubmitPayload(
+            PacketDistributor.sendToServer(new NpcDialogueEditorSubmitPayload(
                     initial.instanceId(), initial.originalDialogueId(), json, nextRequestId++));
             setNotice("Saving…", false);
         } catch (RuntimeException exception) {
@@ -869,7 +866,7 @@ public final class NpcDialogueEditorScreen extends Screen {
         }
         if (parent instanceof NpcEditorScreen editor) editor.acceptDialogueLink(payload.dialogueId(), payload.message());
         if (minecraft != null && minecraft.player != null) minecraft.player.sendSystemMessage(Component.literal(payload.message()));
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     private void setNotice(String value, boolean error) {
@@ -879,17 +876,17 @@ public final class NpcDialogueEditorScreen extends Screen {
 
     @Override
     public void onClose() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
         SsuGuiScale.fullscreenDim(graphics, this, 0xA9000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
-        graphics.outline(x, y, W, H, BORDER);
-        graphics.text(font, "NPC Dialogue Editor 2.1", x + 12, y + 12, TEXT, true);
-        graphics.text(font, pageDescription(page), x + 12, y + 52, MUTED, false);
+        graphics.renderOutline(x, y, W, H, BORDER);
+        graphics.drawString(font, "NPC Dialogue Editor 2.1", x + 12, y + 12, TEXT, true);
+        graphics.drawString(font, pageDescription(page), x + 12, y + 52, MUTED, false);
 
         switch (page) {
             case NODE -> {
@@ -907,11 +904,11 @@ public final class NpcDialogueEditorScreen extends Screen {
                 label(graphics, "Node " + (nodeIndex + 1) + "/" + draft.nodes.size() + ": " + node().id, x + 80, y + 63);
                 label(graphics, actionCountLabel("Entry action", entryActionIndex, node().enterActions.size()), x + 12, y + 107);
                 if (node().enterActions.isEmpty()) {
-                    graphics.text(font, "No entry actions. Add one to execute it when this node opens.", x + 12, y + 166, MUTED, false);
+                    graphics.drawString(font, "No entry actions. Add one to execute it when this node opens.", x + 12, y + 166, MUTED, false);
                 } else {
                     label(graphics, "Action type — runs when this node opens", x + 12, y + 155);
                     label(graphics, "Parameters — use the guide or keep custom key=value entries", x + 12, y + 207);
-                    graphics.text(font, trim(NpcDialogueParameterCatalog.action(actionTypeValue).summary(), 82),
+                    graphics.drawString(font, trim(NpcDialogueParameterCatalog.action(actionTypeValue).summary(), 82),
                             x + 12, y + 250, MUTED, false);
                 }
             }
@@ -923,7 +920,7 @@ public final class NpcDialogueEditorScreen extends Screen {
                 label(graphics, "Next dialogue node", x + 12, y + 155);
                 label(graphics, "Optional server service", x + 240, y + 155);
                 label(graphics, targetHint(serviceValue), x + 12, y + 207);
-                graphics.text(font, conditionNodeCount(choiceCondition()) + " condition node(s); open Conditions to edit the tree.",
+                graphics.drawString(font, conditionNodeCount(choiceCondition()) + " condition node(s); open Conditions to edit the tree.",
                         x + 12, y + 258, MUTED, false);
             }
             case CHOICE_ACTIONS -> {
@@ -931,18 +928,18 @@ public final class NpcDialogueEditorScreen extends Screen {
                         x + 80, y + 63);
                 label(graphics, actionCountLabel("Choice action", choiceActionIndex, choice().actions.size()), x + 12, y + 107);
                 if (choice().actions.isEmpty()) {
-                    graphics.text(font, "No choice actions. Add one to execute it before the next node/service.", x + 12, y + 166, MUTED, false);
+                    graphics.drawString(font, "No choice actions. Add one to execute it before the next node/service.", x + 12, y + 166, MUTED, false);
                 } else {
                     label(graphics, "Action type — runs after this choice is clicked", x + 12, y + 155);
                     label(graphics, "Parameters — use the guide or keep custom key=value entries", x + 12, y + 207);
-                    graphics.text(font, trim(NpcDialogueParameterCatalog.action(actionTypeValue).summary(), 82),
+                    graphics.drawString(font, trim(NpcDialogueParameterCatalog.action(actionTypeValue).summary(), 82),
                             x + 12, y + 250, MUTED, false);
                 }
             }
         }
 
-        if (!notice.isBlank()) graphics.text(font, trim(notice, 38), x + 258, y + H - 20, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) graphics.drawString(font, trim(notice, 38), x + 258, y + H - 20, noticeError ? ERROR : GOOD, false);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     private static String actionCountLabel(String singular, int index, int size) {
@@ -959,8 +956,8 @@ public final class NpcDialogueEditorScreen extends Screen {
         };
     }
 
-    private void label(GuiGraphicsExtractor graphics, String text, int x, int y) {
-        graphics.text(font, text, x, y, MUTED, false);
+    private void label(GuiGraphics graphics, String text, int x, int y) {
+        graphics.drawString(font, text, x, y, MUTED, false);
     }
 
     private int px() { return (width - W) / 2; }
@@ -1142,7 +1139,7 @@ public final class NpcDialogueEditorScreen extends Screen {
         ContentCondition replacement = new ContentCondition(current.type(),
                 defaultConditionParameters(current.type()), current.children());
         setRootCondition(replaceCondition(rootCondition(), conditionPath, 0, replacement));
-        if (minecraft != null && minecraft.gui.screen() == this) rebuildWidgets();
+        if (minecraft != null && minecraft.screen == this) rebuildWidgets();
     }
 
     private static boolean isComposite(String type) {
@@ -1181,7 +1178,7 @@ public final class NpcDialogueEditorScreen extends Screen {
         return summary;
     }
 
-    private void renderConditions(GuiGraphicsExtractor graphics, int x, int y) {
+    private void renderConditions(GuiGraphics graphics, int x, int y) {
         List<ConditionRef> nodes = flattenedConditions();
         int selectedIndex = selectedConditionIndex(nodes);
         ConditionRef selected = nodes.get(selectedIndex);
@@ -1196,7 +1193,7 @@ public final class NpcDialogueEditorScreen extends Screen {
                 : "Condition type — controls whether this player choice is available", x + 12, y + 155);
         label(graphics, "Parameters — use the guide or keep custom key=value entries", x + 12, y + 207);
 
-        graphics.text(font, trim(NpcDialogueParameterCatalog.condition(selected.condition().type()).summary(), 82),
+        graphics.drawString(font, trim(NpcDialogueParameterCatalog.condition(selected.condition().type()).summary(), 82),
                 x + 12, y + 240, MUTED, false);
         int first = Math.max(0, Math.min(selectedIndex - 2, Math.max(0, nodes.size() - 5)));
         for (int index = first; index < Math.min(nodes.size(), first + 4); index++) {
@@ -1207,11 +1204,11 @@ public final class NpcDialogueEditorScreen extends Screen {
             String params = parameters(entry.condition().parameters());
             if (!params.isBlank()) line += "  " + trim(params, 42);
             if (!entry.condition().children().isEmpty()) line += "  (" + entry.condition().children().size() + ")";
-            graphics.text(font, trim(line, 78), x + 12, y + 258 + (index - first) * 14,
+            graphics.drawString(font, trim(line, 78), x + 12, y + 258 + (index - first) * 14,
                     index == selectedIndex ? GOOD : MUTED, false);
         }
         if (!isComposite(selected.condition().type()) && !selected.condition().children().isEmpty()) {
-            graphics.text(font, "Children are stored, but only all/any/not evaluate child nodes.",
+            graphics.drawString(font, "Children are stored, but only all/any/not evaluate child nodes.",
                     x + 12, y + 316, ERROR, false);
         }
     }

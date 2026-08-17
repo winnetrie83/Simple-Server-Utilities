@@ -39,8 +39,8 @@ public final class ClaimMapService {
                     player.getUUID(), payload.selectedClaimGroup());
             ChunkPos center = claimCenter(selected);
             if (center != null) {
-                centerChunkX = center.x();
-                centerChunkZ = center.z();
+                centerChunkX = center.x;
+                centerChunkZ = center.z;
             }
         }
         sendMap(
@@ -65,7 +65,7 @@ public final class ClaimMapService {
 
         if (!isSafeViewport(player, payload.centerChunkX(), payload.centerChunkZ(),
                 payload.claimName(), payload.radius())) {
-            sendMap(player, player.chunkPosition().x(), player.chunkPosition().z(), payload.radius(),
+            sendMap(player, player.chunkPosition().x, player.chunkPosition().z, payload.radius(),
                     payload.claimName(), "Map operation rejected: view is too far from your position.", true);
             return;
         }
@@ -141,7 +141,7 @@ public final class ClaimMapService {
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (!ClaimPolicy.canUseMap(player) || !ClaimPolicy.canDeleteClaim(player)) return;
         if (!isSafeViewport(player, payload.centerChunkX(), payload.centerChunkZ(), payload.claimName(), payload.radius())) {
-            sendMap(player, player.chunkPosition().x(), player.chunkPosition().z(), payload.radius(), payload.claimName(),
+            sendMap(player, player.chunkPosition().x, player.chunkPosition().z, payload.radius(), payload.claimName(),
                     "Tax settlement rejected: view is too far from your claim.", true);
             return;
         }
@@ -166,8 +166,8 @@ public final class ClaimMapService {
     public static void open(ServerPlayer player, String selectedClaimGroup) {
         sendMap(
                 player,
-                player.chunkPosition().x(),
-                player.chunkPosition().z(),
+                player.chunkPosition().x,
+                player.chunkPosition().z,
                 5,
                 selectedClaimGroup,
                 "",
@@ -187,10 +187,10 @@ public final class ClaimMapService {
         boolean ownedClaimViewport = isOwnedClaimViewport(
                 player, centerChunkX, centerChunkZ, selectedClaimGroup, radius);
         ChunkPos playerChunk = player.chunkPosition();
-        int safeCenterX = ownedClaimViewport ? centerChunkX : Math.max(playerChunk.x() - MAX_CENTER_DISTANCE,
-                Math.min(playerChunk.x() + MAX_CENTER_DISTANCE, centerChunkX));
-        int safeCenterZ = ownedClaimViewport ? centerChunkZ : Math.max(playerChunk.z() - MAX_CENTER_DISTANCE,
-                Math.min(playerChunk.z() + MAX_CENTER_DISTANCE, centerChunkZ));
+        int safeCenterX = ownedClaimViewport ? centerChunkX : Math.max(playerChunk.x - MAX_CENTER_DISTANCE,
+                Math.min(playerChunk.x + MAX_CENTER_DISTANCE, centerChunkX));
+        int safeCenterZ = ownedClaimViewport ? centerChunkZ : Math.max(playerChunk.z - MAX_CENTER_DISTANCE,
+                Math.min(playerChunk.z + MAX_CENTER_DISTANCE, centerChunkZ));
 
         ClaimMapData data = SimpleServerUtilities.PLAYER_CLAIMS.getMapData(
                 player,
@@ -208,8 +208,8 @@ public final class ClaimMapService {
     private static boolean isSafeViewport(ServerPlayer player, int centerChunkX, int centerChunkZ,
             String selectedClaimGroup, int radius) {
         ChunkPos playerChunk = player.chunkPosition();
-        return (Math.abs(centerChunkX - playerChunk.x()) <= MAX_CENTER_DISTANCE
-                && Math.abs(centerChunkZ - playerChunk.z()) <= MAX_CENTER_DISTANCE)
+        return (Math.abs(centerChunkX - playerChunk.x) <= MAX_CENTER_DISTANCE
+                && Math.abs(centerChunkZ - playerChunk.z) <= MAX_CENTER_DISTANCE)
                 || isOwnedClaimViewport(player, centerChunkX, centerChunkZ, selectedClaimGroup, radius);
     }
 
@@ -221,7 +221,7 @@ public final class ClaimMapService {
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(
                 player.getUUID(), selectedClaimGroup);
         if (claim == null || claim.getChunks().isEmpty()
-                || !claim.getDimension().equals(player.level().dimension().identifier().toString())) {
+                || !claim.getDimension().equals(player.level().dimension().location().toString())) {
             return false;
         }
         int minX = Integer.MAX_VALUE;

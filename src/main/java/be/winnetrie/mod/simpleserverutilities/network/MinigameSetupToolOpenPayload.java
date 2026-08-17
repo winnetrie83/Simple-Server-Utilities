@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Bounded setup-tool state and the administrator-visible minigame/arena catalogue. */
 public record MinigameSetupToolOpenPayload(
@@ -30,7 +30,7 @@ public record MinigameSetupToolOpenPayload(
 ) implements CustomPacketPayload {
     public static final int MAX_GAMES = 128, MAX_ARENAS = 32;
     public static final Type<MinigameSetupToolOpenPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_setup_open"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_setup_open"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameSetupToolOpenPayload> STREAM_CODEC =
             StreamCodec.of(MinigameSetupToolOpenPayload::encode, MinigameSetupToolOpenPayload::decode);
 

@@ -5,13 +5,13 @@ import be.winnetrie.mod.simpleserverutilities.region.RegionSelectionSchematicMan
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Sends a completed template export to the requesting client for local storage. */
 public record RegionSelectionClientTemplatePayload(String name, byte[] data, long requestId)
         implements CustomPacketPayload {
     public static final Type<RegionSelectionClientTemplatePayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_selection_client_template")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_selection_client_template")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, RegionSelectionClientTemplatePayload> STREAM_CODEC =
             StreamCodec.of(RegionSelectionClientTemplatePayload::encode, RegionSelectionClientTemplatePayload::decode);

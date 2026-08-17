@@ -38,7 +38,7 @@ import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -241,7 +241,7 @@ public final class DungeonManager {
     private static void validateLocation(DungeonLocation location, String label) {
         if (location == null) throw new IllegalArgumentException(label + " is missing.");
         location.normalize();
-        try { Identifier.parse(location.dimension); }
+        try { ResourceLocation.parse(location.dimension); }
         catch (RuntimeException exception) { throw new IllegalArgumentException(label + " has an invalid dimension: " + location.dimension); }
     }
 
@@ -747,17 +747,17 @@ public final class DungeonManager {
         DungeonCheckpointDefinition checkpoint = arena.checkpoint(run.activeCheckpointId); return checkpoint == null ? arena.start : checkpoint.location;
     }
     private boolean atLocation(ServerPlayer player, DungeonLocation location) {
-        if (player == null || location == null || !player.level().dimension().identifier().toString().equals(location.dimension)) return false;
+        if (player == null || location == null || !player.level().dimension().location().toString().equals(location.dimension)) return false;
         double dx = player.getX() - location.x, dy = player.getY() - location.y, dz = player.getZ() - location.z;
         return dx * dx + dy * dy + dz * dz <= CHECKPOINT_RADIUS_SQUARED;
     }
     private boolean teleport(ServerPlayer player, DungeonLocation location) {
         if (player == null || location == null) return false; ServerLevel level = resolveLevel(location.dimension); if (level == null) return false;
-        player.teleportTo(level, location.x, location.y, location.z, Set.of(), location.yaw, location.pitch, true); return true;
+        player.teleportTo(level, location.x, location.y, location.z, Set.of(), location.yaw, location.pitch); return true;
     }
     private ServerLevel resolveLevel(String rawDimension) {
         if (server == null) return null;
-        try { ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, Identifier.parse(rawDimension)); return server.getLevel(key); }
+        try { ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(rawDimension)); return server.getLevel(key); }
         catch (RuntimeException exception) { return null; }
     }
     private static long safeAdd(long left, long right) { try { return Math.addExact(left, right); } catch (ArithmeticException ignored) { return right >= 0 ? Long.MAX_VALUE : Long.MIN_VALUE; } }

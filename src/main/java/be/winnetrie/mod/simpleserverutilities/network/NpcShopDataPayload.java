@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 /** Bounded player-facing snapshot of a click-driven NPC shop. */
@@ -19,7 +19,7 @@ public record NpcShopDataPayload(boolean accessAllowed, String instanceId, Strin
     public static final int MAX_BUYBACK_ENTRIES = 9;
     public static final int MAX_INVENTORY_SALE_QUOTES = 36;
     public static final Type<NpcShopDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_data"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcShopDataPayload> STREAM_CODEC =
             StreamCodec.of(NpcShopDataPayload::encode, NpcShopDataPayload::decode);
 

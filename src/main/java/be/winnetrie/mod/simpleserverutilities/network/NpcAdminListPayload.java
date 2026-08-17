@@ -6,11 +6,11 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record NpcAdminListPayload(String mode,String query,int page,int pageCount,int total,List<NpcAdminEntry> entries,
         String notice,boolean error,long requestId) implements CustomPacketPayload {
-    public static final Type<NpcAdminListPayload> TYPE=new Type<>(Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID,"npc_admin_list"));
+    public static final Type<NpcAdminListPayload> TYPE=new Type<>(ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID,"npc_admin_list"));
     public static final StreamCodec<RegistryFriendlyByteBuf,NpcAdminListPayload> STREAM_CODEC=StreamCodec.of(NpcAdminListPayload::encode,NpcAdminListPayload::decode);
     public NpcAdminListPayload{
         mode="templates".equalsIgnoreCase(mode)?"templates":"spawns".equalsIgnoreCase(mode)?"spawns":"placements";query=query==null?"":query;page=Math.max(0,page);pageCount=Math.max(1,pageCount);total=Math.max(0,total);

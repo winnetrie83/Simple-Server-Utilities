@@ -5,11 +5,11 @@ import java.net.URI;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramToolManager;
 import be.winnetrie.mod.simpleserverutilities.network.HologramEditorRequestPayload;
 import net.minecraft.client.Minecraft;
-import net.minecraft.util.Util;
+import net.minecraft.Util;
 import net.minecraft.world.item.Items;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 public final class HologramClientEvents {
     private HologramClientEvents() {
@@ -19,7 +19,7 @@ public final class HologramClientEvents {
     public static void onInteraction(InputEvent.InteractionKeyMappingTriggered event) {
         if (!event.isUseItem() || event.getHand() != net.minecraft.world.InteractionHand.MAIN_HAND) return;
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.gui.screen() != null || minecraft.player == null) return;
+        if (minecraft.screen != null || minecraft.player == null) return;
 
         boolean hologramTool = minecraft.player.getMainHandItem().is(Items.AMETHYST_SHARD)
                 && HologramToolManager.TOOL_NAME
@@ -27,7 +27,7 @@ public final class HologramClientEvents {
         if (hologramTool) {
             String id = HologramClientState.targetedHologramId(minecraft);
             if (id == null) return; // Let the normal server-side right-click open a creation editor.
-            ClientPacketDistributor.sendToServer(new HologramEditorRequestPayload(id));
+            PacketDistributor.sendToServer(new HologramEditorRequestPayload(id));
             event.setCanceled(true);
             event.setSwingHand(false);
             return;

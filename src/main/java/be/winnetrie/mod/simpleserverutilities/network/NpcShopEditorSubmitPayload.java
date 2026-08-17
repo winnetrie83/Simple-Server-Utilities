@@ -4,13 +4,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Saves a visual shop draft or asks the server to copy one administrator inventory slot into it. */
 public record NpcShopEditorSubmitPayload(String operation, String originalShopId, String definitionJson,
         String selectedEntryId, int inventorySlot, long requestId) implements CustomPacketPayload {
     public static final Type<NpcShopEditorSubmitPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_editor_submit"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_editor_submit"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcShopEditorSubmitPayload> STREAM_CODEC =
             StreamCodec.of(NpcShopEditorSubmitPayload::encode, NpcShopEditorSubmitPayload::decode);
 

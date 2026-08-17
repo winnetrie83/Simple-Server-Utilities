@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Result of a server-validated dialogue editor save. */
 public record NpcDialogueEditorResultPayload(
@@ -14,7 +14,7 @@ public record NpcDialogueEditorResultPayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<NpcDialogueEditorResultPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_dialogue_editor_result"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_dialogue_editor_result"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcDialogueEditorResultPayload> STREAM_CODEC =
             StreamCodec.of(NpcDialogueEditorResultPayload::encode, NpcDialogueEditorResultPayload::decode);
 

@@ -1,16 +1,12 @@
 package be.winnetrie.mod.simpleserverutilities.client.mapmarker;
 
-import be.winnetrie.mod.simpleserverutilities.mixin.LevelRendererAccessor;
+import net.minecraft.client.renderer.MultiBufferSource;
+import be.winnetrie.mod.simpleserverutilities.client.render.SsuDebugGizmos;
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerSyncPayload;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.blockentity.BeaconRenderer;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.debug.DebugRenderer;
-import net.minecraft.gizmos.GizmoStyle;
-import net.minecraft.gizmos.Gizmos;
-import net.minecraft.gizmos.TextGizmo;
-import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.world.phys.Vec3;
 
 /** In-world camera-facing marker icons and distance-limited beacon beams. */
@@ -37,22 +33,19 @@ public final class MapMarkerRenderer implements DebugRenderer.SimpleDebugRendere
     }
 
     @Override
-    public void emitGizmos(
-            double camX,
-            double camY,
-            double camZ,
-            DebugValueAccess debugValues,
-            Frustum frustum,
-            float partialTicks
-    ) {
+    public void render(PoseStack poseStack, MultiBufferSource bufferSource,
+                       double camX, double camY, double camZ) {
+        SsuDebugGizmos.begin(minecraft, poseStack, bufferSource, camX, camY, camZ);
+        Frustum frustum = null; // 1.21.1 DebugRenderer does not pass its render frustum to child renderers.
+        float partialTicks = minecraft.getTimer().getGameTimeDeltaPartialTick(true);
         if (minecraft.level == null || minecraft.player == null) return;
-        String dimension = minecraft.level.dimension().identifier().toString();
+        String dimension = minecraft.level.dimension().location().toString();
         double beamDistanceSquared = square(MapMarkerClientState.beamDistance());
         double iconDistanceSquared = square(MAX_ICON_DISTANCE);
-        var camera = minecraft.gameRenderer.mainCamera();
-        var forwardVector = camera.forwardVector();
-        var leftVector = camera.leftVector();
-        var upVector = camera.upVector();
+        var camera = minecraft.gameRenderer.getMainCamera();
+        var forwardVector = camera.getLookVector();
+        var leftVector = camera.getLeftVector();
+        var upVector = camera.getUpVector();
         Vec3 cameraForward = new Vec3(forwardVector.x(), forwardVector.y(), forwardVector.z()).normalize();
         Vec3 cameraHorizontal = new Vec3(leftVector.x(), leftVector.y(), leftVector.z()).normalize();
         Vec3 cameraUp = new Vec3(upVector.x(), upVector.y(), upVector.z()).normalize();
@@ -152,7 +145,7 @@ public final class MapMarkerRenderer implements DebugRenderer.SimpleDebugRendere
             Vec3 upperRight = center.add(up.scale(upperY)).add(right.scale(upperHalfWidth));
             Vec3 lowerRight = center.add(up.scale(lowerY)).add(right.scale(lowerHalfWidth));
             Vec3 lowerLeft = center.add(up.scale(lowerY)).subtract(right.scale(lowerHalfWidth));
-            Gizmos.rect(upperLeft, upperRight, lowerRight, lowerLeft, GizmoStyle.fill(color))
+            SsuDebugGizmos.rect(upperLeft, upperRight, lowerRight, lowerLeft, SsuDebugGizmos.FillStyle.fill(color))
                     .setAlwaysOnTop();
         }
     }
@@ -178,15 +171,15 @@ public final class MapMarkerRenderer implements DebugRenderer.SimpleDebugRendere
         Vec3 horizontal = cameraHorizontal.scale(halfWidth);
         Vec3 top = cameraUp.scale(LABEL_BACKGROUND_TOP * visualScale);
         Vec3 bottom = cameraUp.scale(LABEL_BACKGROUND_BOTTOM * visualScale);
-        Gizmos.rect(
+        SsuDebugGizmos.rect(
                 backgroundCenter.subtract(horizontal).add(top),
                 backgroundCenter.add(horizontal).add(top),
                 backgroundCenter.add(horizontal).subtract(bottom),
                 backgroundCenter.subtract(horizontal).subtract(bottom),
-                GizmoStyle.fill(0xC010141A))
+                SsuDebugGizmos.FillStyle.fill(0xC010141A))
                 .setAlwaysOnTop();
-        Gizmos.billboardText(label, textCenter,
-                TextGizmo.Style.forColorAndCentered(0xFFFFFFFF).withScale((float) (LABEL_SCALE * visualScale)))
+        SsuDebugGizmos.billboardText(label, textCenter,
+                SsuDebugGizmos.TextStyle.forColorAndCentered(0xFFFFFFFF).withScale((float) (LABEL_SCALE * visualScale)))
                 .setAlwaysOnTop();
     }
 
@@ -205,32 +198,24 @@ public final class MapMarkerRenderer implements DebugRenderer.SimpleDebugRendere
             float partialTicks,
             int color
     ) {
-        if (minecraft.level == null || minecraft.levelRenderer == null) return;
+        if (minecraft.level == null) return;
 
-        int minimumY = minecraft.level.getMinY();
-        int maximumYExclusive = minecraft.level.getMaxY() + 1;
-        int height = maximumYExclusive - minimumY;
-        if (height <= 0) return;
+        int minimumY = minecraft.level.getMinBuildHeight();
+        int maximumYExclusive = minecraft.level.getMaxBuildHeight();
+        if (maximumYExclusive <= minimumY) return;
 
-        PoseStack poseStack = new PoseStack();
-        poseStack.translate(
-                marker.x() - camX,
-                minimumY - camY,
-                marker.z() - camZ);
-
-        float animationTime = (float) (minecraft.level.getGameTime() + partialTicks);
-        int opaqueColor = 0xFF000000 | (color & 0x00FFFFFF);
-        BeaconRenderer.submitBeaconBeam(
-                poseStack,
-                ((LevelRendererAccessor) minecraft.levelRenderer).ssu$getSubmitNodeStorage(),
-                BeaconRenderer.BEAM_LOCATION,
-                1.0F,
-                animationTime,
-                0,
-                height,
-                opaqueColor,
-                BeaconRenderer.SOLID_BEAM_RADIUS,
-                BeaconRenderer.BEAM_GLOW_RADIUS);
+        // 1.21.1 predates the 26.2 submit-node beacon API. Draw a narrow, translucent
+        // full-height marker column through the classic debug-render path instead.
+        // This keeps the marker semantics intact without depending on renderer internals.
+        double centerX = marker.x() + 0.5D;
+        double centerZ = marker.z() + 0.5D;
+        double radius = 0.075D;
+        int beamColor = 0x70000000 | (color & 0x00FFFFFF);
+        SsuDebugGizmos.cuboid(
+                new net.minecraft.world.phys.AABB(
+                        centerX - radius, minimumY, centerZ - radius,
+                        centerX + radius, maximumYExclusive, centerZ + radius),
+                SsuDebugGizmos.FillStyle.fill(beamColor));
     }
 
     private static double visualScale(double distance) {

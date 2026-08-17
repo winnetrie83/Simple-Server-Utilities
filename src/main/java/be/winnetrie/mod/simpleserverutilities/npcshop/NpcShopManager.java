@@ -37,7 +37,7 @@ import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import be.winnetrie.mod.simpleserverutilities.time.GameCalendar;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.server.MinecraftServer;
@@ -124,7 +124,7 @@ public final class NpcShopManager {
     public synchronized List<CatalogItem> catalogItems(String rawQuery) {
         String query = rawQuery == null ? "" : rawQuery.trim().toLowerCase(Locale.ROOT);
         ArrayList<CatalogItem> result = new ArrayList<>();
-        for (Identifier id : BuiltInRegistries.ITEM.keySet()) {
+        for (ResourceLocation id : BuiltInRegistries.ITEM.keySet()) {
             try {
                 Item item = BuiltInRegistries.ITEM.getOptional(id).orElse(null);
                 if (item == null) continue;
@@ -150,8 +150,8 @@ public final class NpcShopManager {
     }
 
     public synchronized boolean setItemPrice(String rawItemId, long buyPriceMinor, long sellPriceMinor) {
-        Identifier id;
-        try { id = Identifier.parse(rawItemId == null ? "" : rawItemId.trim()); }
+        ResourceLocation id;
+        try { id = ResourceLocation.parse(rawItemId == null ? "" : rawItemId.trim()); }
         catch (RuntimeException exception) { return false; }
         if (BuiltInRegistries.ITEM.getOptional(id).isEmpty()) return false;
         itemPrices.set(id.toString(), buyPriceMinor, sellPriceMinor);
@@ -264,7 +264,7 @@ public final class NpcShopManager {
             if (value.isBlank()) continue;
             if (value.length() > 160) throw new IllegalArgumentException("A sale " + label + " entry is too long.");
             String identifier = value.startsWith("#") ? value.substring(1) : value;
-            try { Identifier.parse(identifier); }
+            try { ResourceLocation.parse(identifier); }
             catch (RuntimeException exception) {
                 throw new IllegalArgumentException("Invalid sale " + label + " item ID or tag: " + value);
             }
@@ -458,7 +458,7 @@ public final class NpcShopManager {
             sendPage(player, access.instance, access.definition, access.shop, payload.pageIndex(), payload.requestId(),
                     "You do not have permission to buy from NPC shops.", true); return;
         }
-        GameCalendar.Moment gameMoment = GameCalendar.fromClockTime(player.level().getDefaultClockTime());
+        GameCalendar.Moment gameMoment = GameCalendar.fromClockTime(player.level().getDayTime());
         long unitBuyPrice = entry == null ? 0L : purchasePrice(player, access.definition, access.shop, entry);
         if (entry == null || unitBuyPrice <= 0L || !entry.available(gameMoment)) {
             sendPage(player, access.instance, access.definition, access.shop, payload.pageIndex(), payload.requestId(),
@@ -652,7 +652,7 @@ public final class NpcShopManager {
         boolean changed = expireBuybacks(now);
         changed |= applyRestocks(shop, now);
         if (changed) saveAll();
-        GameCalendar.Moment gameMoment = GameCalendar.fromClockTime(player.level().getDefaultClockTime());
+        GameCalendar.Moment gameMoment = GameCalendar.fromClockTime(player.level().getDayTime());
         List<NpcShopEntry> available = shop.entries.stream()
                 .filter(entry -> entry.configured(server.registryAccess()))
                 .filter(entry -> entry.available(gameMoment))
@@ -743,7 +743,7 @@ public final class NpcShopManager {
         if (player == null || instance == null || definition == null || !SsuModuleAccess.active("npc_shops")
                 || !SsuModuleAccess.active("npcs")
                 || !ContentAccessPolicy.canInteractWithNpc(player) || !definition.enabled || !instance.enabled || instance.dead) return false;
-        if (!instance.dimension.equals(player.level().dimension().identifier().toString())) return false;
+        if (!instance.dimension.equals(player.level().dimension().location().toString())) return false;
         double dx = player.getX() - instance.x, dy = player.getY() - instance.y, dz = player.getZ() - instance.z;
         if (dx * dx + dy * dy + dz * dz > MAX_DISTANCE_SQUARED) return false;
         int reputation = definition.factionId.isBlank() ? 0
@@ -799,7 +799,7 @@ public final class NpcShopManager {
 
     private String itemId(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return "";
-        Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         return id == null ? "" : id.toString();
     }
 
@@ -816,10 +816,10 @@ public final class NpcShopManager {
         if (filter.isBlank()) return false;
         try {
             if (filter.startsWith("#")) {
-                TagKey<Item> tag = TagKey.create(Registries.ITEM, Identifier.parse(filter.substring(1)));
+                TagKey<Item> tag = TagKey.create(Registries.ITEM, ResourceLocation.parse(filter.substring(1)));
                 return stack.is(tag);
             }
-            return itemId(stack).equals(Identifier.parse(filter).toString());
+            return itemId(stack).equals(ResourceLocation.parse(filter).toString());
         } catch (RuntimeException ignored) {
             return false;
         }

@@ -94,7 +94,7 @@ public final class NpcFunctionService {
         if (player == null || instance == null || definition == null
                 || !SsuModuleAccess.active("npcs") || !ContentAccessPolicy.canInteractWithNpc(player)
                 || !definition.enabled || !instance.enabled || instance.dead) return false;
-        if (!instance.dimension.equals(player.level().dimension().identifier().toString())) return false;
+        if (!instance.dimension.equals(player.level().dimension().location().toString())) return false;
         double dx = player.getX() - instance.x, dy = player.getY() - instance.y, dz = player.getZ() - instance.z;
         if (dx * dx + dy * dy + dz * dz > MAX_DISTANCE_SQUARED) return false;
         int reputation = definition.factionId.isBlank() ? 0

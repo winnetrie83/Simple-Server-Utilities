@@ -11,13 +11,13 @@ import be.winnetrie.mod.simpleserverutilities.kits.KitDefinition;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcItemCodec;
 import be.winnetrie.mod.simpleserverutilities.network.KitActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.KitDataPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Compact player kit catalogue and administration editor. */
 public final class KitScreen extends Screen {
@@ -149,41 +149,41 @@ public final class KitScreen extends Screen {
     private EditBox box(int x, int y, int width, String value, int maximum, String hint) {
         EditBox box = new EditBox(font, x, y, width, 20, Component.literal(hint)); box.setHint(Component.literal(hint)); box.setMaxLength(maximum); box.setValue(value == null ? "" : value); addRenderableWidget(box); return box;
     }
-    private void send(String action, String kitId, String json) { ClientPacketDistributor.sendToServer(new KitActionPayload(action, kitId, json, requestId++)); }
+    private void send(String action, String kitId, String json) { PacketDistributor.sendToServer(new KitActionPayload(action, kitId, json, requestId++)); }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top(), w = panelWidth(), h = panelHeight();
-        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(x, y, x + w, y + h, PANEL); g.outline(x, y, w, h, BORDER);
-        g.text(font, data.admin() ? "Kit Administration" : "Available Kits", x + 14, y + 14, TEXT, true);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(x, y, x + w, y + h, PANEL); g.renderOutline(x, y, w, h, BORDER);
+        g.drawString(font, data.admin() ? "Kit Administration" : "Available Kits", x + 14, y + 14, TEXT, true);
         if (!rows.isEmpty() && !creating) {
             Row row = rows.get(selected); KitDefinition d = row.definition; int dx = data.admin() ? x + 174 : x + 174;
             if (data.admin()) {
-                g.text(font, "Kit ID", dx, y + 39, MUTED, false); g.text(font, "Display name", dx + 142, y + 39, MUTED, false);
-                g.text(font, "Description", dx, y + 75, MUTED, false); g.text(font, "Permission", dx, y + 111, MUTED, false);
-                g.text(font, "Price", dx, y + 147, MUTED, false); g.text(font, "Cooldown (sec)", dx + 102, y + 147, MUTED, false);
-                g.text(font, "Contents", dx, y + 250, MUTED, false);
+                g.drawString(font, "Kit ID", dx, y + 39, MUTED, false); g.drawString(font, "Display name", dx + 142, y + 39, MUTED, false);
+                g.drawString(font, "Description", dx, y + 75, MUTED, false); g.drawString(font, "Permission", dx, y + 111, MUTED, false);
+                g.drawString(font, "Price", dx, y + 147, MUTED, false); g.drawString(font, "Cooldown (sec)", dx + 102, y + 147, MUTED, false);
+                g.drawString(font, "Contents", dx, y + 250, MUTED, false);
                 drawItems(g, row, dx, y + 264, mouseX, mouseY);
             } else {
-                g.text(font, d.displayName, dx, y + 52, TEXT, true);
-                if (!strip(d.description).isBlank()) g.text(font, strip(d.description), dx, y + 76, MUTED, false);
-                g.text(font, "Price: " + d.priceMinor + "  •  Cooldown: " + d.cooldownSeconds + "s  •  One-time: " + onOff(d.oneTime), dx, y + 104, MUTED, false);
-                g.text(font, "Contents", dx, y + 138, MUTED, false);
+                g.drawString(font, d.displayName, dx, y + 52, TEXT, true);
+                if (!strip(d.description).isBlank()) g.drawString(font, strip(d.description), dx, y + 76, MUTED, false);
+                g.drawString(font, "Price: " + d.priceMinor + "  •  Cooldown: " + d.cooldownSeconds + "s  •  One-time: " + onOff(d.oneTime), dx, y + 104, MUTED, false);
+                g.drawString(font, "Contents", dx, y + 138, MUTED, false);
                 drawItems(g, row, dx, y + 154, mouseX, mouseY);
             }
         }
-        if (!data.notice().isBlank()) g.text(font, trim(data.notice(), 62), x + 92, y + h - 23, data.error() ? 0xFFFF8585 : 0xFF83E39A, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (!data.notice().isBlank()) g.drawString(font, trim(data.notice(), 62), x + 92, y + h - 23, data.error() ? 0xFFFF8585 : 0xFF83E39A, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void drawItems(GuiGraphicsExtractor g, Row row, int startX, int startY, int mouseX, int mouseY) {
+    private void drawItems(GuiGraphics g, Row row, int startX, int startY, int mouseX, int mouseY) {
         List<ItemStack> items = itemStacks(row.definition);
         for (int i = 0; i < 9; i++) {
             int sx = startX + i * 22, sy = startY;
-            g.fill(sx, sy, sx + 20, sy + 20, 0xFF090D12); g.outline(sx, sy, 20, 20, 0xFF586978);
+            g.fill(sx, sy, sx + 20, sy + 20, 0xFF090D12); g.renderOutline(sx, sy, 20, 20, 0xFF586978);
             ItemStack stack = i < items.size() ? items.get(i) : ItemStack.EMPTY;
             if (!stack.isEmpty()) {
-                g.item(stack, sx + 2, sy + 2); g.itemDecorations(font, stack, sx + 2, sy + 2);
-                if (SsuGuiGeometry.inside(mouseX, mouseY, sx, sy, 20, 20)) g.setTooltipForNextFrame(font, stack, mouseX, mouseY);
+                g.renderItem(stack, sx + 2, sy + 2); g.renderItemDecorations(font, stack, sx + 2, sy + 2);
+                if (SsuGuiGeometry.inside(mouseX, mouseY, sx, sy, 20, 20)) g.renderTooltip(font, stack, mouseX, mouseY);
             }
         }
     }
@@ -195,7 +195,7 @@ public final class KitScreen extends Screen {
         return result;
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
     private int panelWidth() { return data.admin() ? ADMIN_W : PLAYER_W; }
     private int panelHeight() { return data.admin() ? ADMIN_H : PLAYER_H; }

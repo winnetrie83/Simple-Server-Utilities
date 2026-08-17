@@ -2,11 +2,11 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 
 import be.winnetrie.mod.simpleserverutilities.network.NpcFunctionMenuPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcFunctionUsePayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Compact generated menu for an NPC with one or more configured functions. */
 public final class NpcFunctionMenuScreen extends Screen {
@@ -36,21 +36,21 @@ public final class NpcFunctionMenuScreen extends Screen {
 
     private void use(NpcFunctionMenuPayload.Entry entry) {
         if (!entry.available()) return;
-        ClientPacketDistributor.sendToServer(new NpcFunctionUsePayload(data.instanceId(), entry.id()));
+        PacketDistributor.sendToServer(new NpcFunctionUsePayload(data.instanceId(), entry.id()));
         onClose();
     }
 
     @Override public void onClose() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = (width - W) / 2, y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
-        g.fill(x, y, x + W, y + heightBox(), PANEL); g.outline(x, y, W, heightBox(), BORDER);
-        g.text(font, data.npcName(), x + 16, y + 14, TEXT, true);
-        if (!data.roleLabel().isBlank()) g.text(font, data.roleLabel(), x + 16, y + 29, RichTextPalette.argb(data.roleColor()), false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        g.fill(x, y, x + W, y + heightBox(), PANEL); g.renderOutline(x, y, W, heightBox(), BORDER);
+        g.drawString(font, data.npcName(), x + 16, y + 14, TEXT, true);
+        if (!data.roleLabel().isBlank()) g.drawString(font, data.roleLabel(), x + 16, y + 29, RichTextPalette.argb(data.roleColor()), false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private int heightBox() { return 86 + Math.max(1, data.entries().size()) * ROW; }

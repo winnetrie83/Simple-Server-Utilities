@@ -80,7 +80,7 @@ public class TeleportManager {
         }
 
         if (SsuModuleAccess.active("moderation") && SimpleServerUtilities.MODERATION.jailed(player.getUUID())) {
-            player.sendOverlayMessage(Component.literal("Teleport is disabled while jailed."));
+            player.sendSystemMessage(Component.literal("Teleport is disabled while jailed."), true);
             return 0;
         }
 
@@ -162,7 +162,7 @@ public class TeleportManager {
                 options.cooldownSeconds(),
                 options.requireStill(),
                 executeAtTick,
-                player.level().dimension().identifier().toString(),
+                player.level().dimension().location().toString(),
                 player.getX(),
                 player.getY(),
                 player.getZ(),
@@ -261,7 +261,7 @@ public class TeleportManager {
     }
 
     private boolean hasMoved(ServerPlayer player, PendingTeleport pendingTeleport) {
-        String currentDimension = player.level().dimension().identifier().toString();
+        String currentDimension = player.level().dimension().location().toString();
         if (!currentDimension.equals(pendingTeleport.startDimension())) {
             return true;
         }
@@ -283,16 +283,7 @@ public class TeleportManager {
             float yaw,
             float pitch
     ) {
-        player.teleportTo(
-                level,
-                x,
-                y,
-                z,
-                Set.of(),
-                yaw,
-                pitch,
-                true
-        );
+        player.teleportTo(level, x, y, z, Set.of(), yaw, pitch);
     }
 
     private void applyCooldown(

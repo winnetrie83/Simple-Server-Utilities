@@ -4,13 +4,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Bounded player action/request for the server-authoritative, paged questbook. */
 public record QuestBookRequestPayload(String action, String questId, String source, int page, long requestId)
         implements CustomPacketPayload {
     public static final Type<QuestBookRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "quest_book_request"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "quest_book_request"));
     public static final StreamCodec<RegistryFriendlyByteBuf, QuestBookRequestPayload> STREAM_CODEC =
             StreamCodec.of(QuestBookRequestPayload::encode, QuestBookRequestPayload::decode);
 

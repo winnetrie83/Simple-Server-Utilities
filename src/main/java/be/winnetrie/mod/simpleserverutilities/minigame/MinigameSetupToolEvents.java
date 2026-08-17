@@ -10,7 +10,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
-import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 
 /** Click routing and protected build-mode hooks for the Minigame Setup Tool. */
 public final class MinigameSetupToolEvents {
@@ -47,7 +47,7 @@ public final class MinigameSetupToolEvents {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void afterBreak(BreakBlockEvent event) {
+    public static void afterBreak(BlockEvent.BreakEvent event) {
         if (!SsuModuleAccess.active("minigames")) return;
         if (event.isCanceled() || !(event.getPlayer() instanceof ServerPlayer player)) return;
         MinigameSetupToolService.onArenaBlockEdited(player, event.getPos());

@@ -1,7 +1,7 @@
 {
   "required": true,
   "package": "be.winnetrie.mod.simpleserverutilities.mixin",
-  "compatibilityLevel": "JAVA_25",
+  "compatibilityLevel": "JAVA_21",
   "mixins": [
     "BlockEntityComponentInvoker",
     "FlowingFluidMixin",
@@ -17,13 +17,12 @@
     "requireAnnotations": true
   },
   "client": [
+    "AbstractScrollWidgetAccessor",
     "PlayerSkinWidgetAccessor",
     "LivingEntityRendererTextureMixin",
-    "LevelRendererAccessor",
     "MultiLineEditBoxAccessor",
     "MultilineTextFieldAccessor",
     "MultiLineEditBoxRichTextMixin",
-    "ScreenSsuGuiScaleMixin",
-    "MouseButtonEventSsuGuiScaleMixin"
+    "ScreenSsuGuiScaleMixin"
   ]
 }

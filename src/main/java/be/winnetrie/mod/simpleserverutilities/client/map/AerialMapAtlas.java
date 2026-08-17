@@ -15,7 +15,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Shared, resource-pack-aware persistent atlas for every SSU map.
@@ -102,8 +102,8 @@ public final class AerialMapAtlas {
         installCompletedDiskTiles();
 
         String dimension = dimension(level);
-        int centerX = minecraft.player.chunkPosition().x();
-        int centerZ = minecraft.player.chunkPosition().z();
+        int centerX = minecraft.player.chunkPosition().x;
+        int centerZ = minecraft.player.chunkPosition().z;
         if (!dimension.equals(scanDimension)
                 || centerX != scanCenterChunkX
                 || centerZ != scanCenterChunkZ
@@ -820,7 +820,7 @@ public final class AerialMapAtlas {
         }
         return withinRadius(
                 chunkX, chunkZ,
-                minecraft.player.chunkPosition().x(), minecraft.player.chunkPosition().z(),
+                minecraft.player.chunkPosition().x, minecraft.player.chunkPosition().z,
                 liveUpdateRadiusChunks
         );
     }
@@ -844,7 +844,7 @@ public final class AerialMapAtlas {
     }
 
     private static String dimension(ClientLevel level) {
-        return level.dimension().identifier().toString();
+        return level.dimension().location().toString();
     }
 
     private static long key(int x, int z) {

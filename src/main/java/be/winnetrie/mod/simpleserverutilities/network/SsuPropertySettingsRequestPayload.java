@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record SsuPropertySettingsRequestPayload(String kind, String target, long requestId)
         implements CustomPacketPayload {
     public static final Type<SsuPropertySettingsRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "property_settings_request"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "property_settings_request"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuPropertySettingsRequestPayload> STREAM_CODEC =
             StreamCodec.of(SsuPropertySettingsRequestPayload::encode, SsuPropertySettingsRequestPayload::decode);
 

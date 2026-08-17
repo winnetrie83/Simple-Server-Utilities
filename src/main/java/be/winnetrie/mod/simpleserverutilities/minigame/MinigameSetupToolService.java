@@ -33,7 +33,7 @@ import be.winnetrie.mod.simpleserverutilities.visualization.BorderCategory;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -260,12 +260,12 @@ public final class MinigameSetupToolService {
     private static void selectResizeCorner(ServerPlayer player, MinigameSetupToolManager.Session session,
                                            MinigameDefinition definition, MinigameArenaDefinition arena, BlockPos clicked) {
         if (session.firstPoint == null) {
-            session.setFirst(player.level().dimension().identifier().toString(), clicked);
+            session.setFirst(player.level().dimension().location().toString(), clicked);
             player.sendSystemMessage(Component.literal("Resize corner 1 set to " + compact(clicked)
                     + ". Left-click the opposite corner."), true);
             return;
         }
-        if (!session.firstDimension.equals(player.level().dimension().identifier().toString())) {
+        if (!session.firstDimension.equals(player.level().dimension().location().toString())) {
             session.clearPoint();
             throw new IllegalArgumentException("Both arena corners must be in the same dimension.");
         }
@@ -279,11 +279,11 @@ public final class MinigameSetupToolService {
                                          BlockPos clicked, boolean playFloor, String label) {
         String areaLabel = label == null || label.isBlank() ? (playFloor ? "Playfloor" : "Spectator area") : label;
         if (session.firstPoint == null) {
-            session.setFirst(player.level().dimension().identifier().toString(), clicked);
+            session.setFirst(player.level().dimension().location().toString(), clicked);
             player.sendSystemMessage(Component.literal(areaLabel + " corner 1 set. Left-click the opposite corner."), true);
             return;
         }
-        if (!session.firstDimension.equals(player.level().dimension().identifier().toString())) {
+        if (!session.firstDimension.equals(player.level().dimension().location().toString())) {
             session.clearPoint();
             throw new IllegalArgumentException("Both corners must be in the same dimension.");
         }
@@ -661,12 +661,12 @@ public final class MinigameSetupToolService {
         ServerLevel level;
         try {
             level = server.getLevel(net.minecraft.resources.ResourceKey.create(
-                    net.minecraft.core.registries.Registries.DIMENSION, Identifier.parse(location.dimension)));
+                    net.minecraft.core.registries.Registries.DIMENSION, ResourceLocation.parse(location.dimension)));
         } catch (RuntimeException exception) {
             level = null;
         }
         if (level == null) throw new IllegalArgumentException("The issue dimension is unavailable.");
-        player.teleportTo(level, location.x, location.y, location.z, Set.of(), location.yaw, location.pitch, true);
+        player.teleportTo(level, location.x, location.y, location.z, Set.of(), location.yaw, location.pitch);
     }
 
     private static MinigameArenaDefinition cloneArena(MinigameDefinition definition,
@@ -782,7 +782,7 @@ public final class MinigameSetupToolService {
         return new MinigameSetupToolOpenPayload(notice, error, requestId, session.minigameId, session.arenaId,
                 session.action.id(), session.team, session.index, session.firstPoint != null,
                 session.firstPoint == null ? 0L : session.firstPoint.asLong(), complete,
-                complete ? selection.getDimension().identifier().toString() : "",
+                complete ? selection.getDimension().location().toString() : "",
                 complete ? selection.getPoint1().asLong() : 0L, complete ? selection.getPoint2().asLong() : 0L,
                 complete ? RegionSelectionSchematicManager.bounds(selection).volume() : 0L, games);
     }
@@ -838,12 +838,12 @@ public final class MinigameSetupToolService {
     }
 
     private static MinigameLocation location(ServerPlayer player, BlockPos position) {
-        return new MinigameLocation(player.level().dimension().identifier().toString(), position.getX() + 0.5D,
+        return new MinigameLocation(player.level().dimension().location().toString(), position.getX() + 0.5D,
                 position.getY(), position.getZ() + 0.5D, player.getYRot(), player.getXRot());
     }
 
     private static void placeBlock(ServerPlayer player, BlockPos position, String blockId) {
-        Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(blockId))
+        Block block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(blockId))
                 .orElseThrow(() -> new IllegalArgumentException("Unknown marker block: " + blockId));
         if (!(player.level() instanceof ServerLevel level)) throw new IllegalArgumentException("The arena dimension is unavailable.");
         level.setBlockAndUpdate(position, block.defaultBlockState());
@@ -943,7 +943,7 @@ public final class MinigameSetupToolService {
         Region region = SimpleServerUtilities.REGIONS.get(arena.regionId);
         if (region != null && borderPreferences.isMinigameGameBorderVisible()) {
             bounds.add(new MinigameSetupVisualPayload.Bounds(
-                    region.getDimension().identifier().toString(), region.getMinX(), region.getMinY(), region.getMinZ(),
+                    region.getDimension().location().toString(), region.getMinX(), region.getMinY(), region.getMinZ(),
                     region.getMaxX(), region.getMaxY(), region.getMaxZ(), "Game border", gameBorderColor,
                     MinigameSetupVisualPayload.Bounds.GAME));
         }
@@ -1068,7 +1068,7 @@ public final class MinigameSetupToolService {
         if (level == null) return;
         BlockPos pos = blockPos(location);
         if (pos == null || isPhysicalGameMarkerPosition(arena, pos)) return;
-        Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(blockId)).orElse(null);
+        Block block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(blockId)).orElse(null);
         if (!(block instanceof AbstractBannerBlock)) return;
         Block current = level.getBlockState(pos).getBlock();
         if (!level.getBlockState(pos).isAir() && !(current instanceof AbstractBannerBlock)) return;
@@ -1081,7 +1081,7 @@ public final class MinigameSetupToolService {
         ServerLevel level = level(server, location.dimension);
         BlockPos pos = blockPos(location);
         if (level == null || pos == null || isPhysicalGameMarkerPosition(arena, pos)) return;
-        Block marker = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(BOOST_SETUP_BLOCK)).orElse(Blocks.END_ROD);
+        Block marker = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(BOOST_SETUP_BLOCK)).orElse(Blocks.END_ROD);
         Block current = level.getBlockState(pos).getBlock();
         if (!level.getBlockState(pos).isAir() && current != marker) return;
         if (current != marker) level.setBlockAndUpdate(pos, marker.defaultBlockState());
@@ -1131,7 +1131,7 @@ public final class MinigameSetupToolService {
     private static ServerLevel level(MinecraftServer server, String dimension) {
         if (server == null || dimension == null || dimension.isBlank()) return null;
         for (ServerLevel candidate : server.getAllLevels()) {
-            if (candidate.dimension().identifier().toString().equals(dimension)) return candidate;
+            if (candidate.dimension().location().toString().equals(dimension)) return candidate;
         }
         return null;
     }
@@ -1156,14 +1156,14 @@ public final class MinigameSetupToolService {
         ServerLevel level = null;
         if (server != null) {
             for (ServerLevel candidate : server.getAllLevels()) {
-                if (candidate.dimension().identifier().toString().equals(location.dimension)) {
+                if (candidate.dimension().location().toString().equals(location.dimension)) {
                     level = candidate;
                     break;
                 }
             }
         }
         if (level == null) return;
-        Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(blockId)).orElse(null);
+        Block block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(blockId)).orElse(null);
         if (!(block instanceof AbstractBannerBlock)) return;
         BlockPos pos = blockPos(location);
         if (pos != null && level.getBlockState(pos).getBlock() != block) {
@@ -1211,7 +1211,7 @@ public final class MinigameSetupToolService {
         for (MinigameControlPoint point : arena.controlPoints) { clamp(point.location, region, 0); clamp(point.respawn, region, 1); }
         for (MinigameLocation boostSpawn : arena.boostSpawns) clamp(boostSpawn, region, 2);
         if (!near(arena.spectator, region, 24, 32)) {
-            arena.spectator = new MinigameLocation(region.getDimension().identifier().toString(),
+            arena.spectator = new MinigameLocation(region.getDimension().location().toString(),
                     (region.getMinX() + region.getMaxX() + 1.0D) / 2.0D, region.getMaxY() + 2.0D,
                     (region.getMinZ() + region.getMaxZ() + 1.0D) / 2.0D, 0, 0);
         }
@@ -1221,7 +1221,7 @@ public final class MinigameSetupToolService {
 
     private static void clamp(MinigameLocation location, Region region, int topMargin) {
         if (location == null) return;
-        location.dimension = region.getDimension().identifier().toString();
+        location.dimension = region.getDimension().location().toString();
         location.x = Math.max(region.getMinX() + 0.5D, Math.min(region.getMaxX() + 0.5D, location.x));
         location.y = Math.max(region.getMinY(), Math.min(region.getMaxY() + topMargin, location.y));
         location.z = Math.max(region.getMinZ() + 0.5D, Math.min(region.getMaxZ() + 0.5D, location.z));
@@ -1229,7 +1229,7 @@ public final class MinigameSetupToolService {
 
     private static boolean insideRegion(MinigameAreaBounds bounds, Region region, int margin) {
         if (bounds == null || !bounds.configured()) return true;
-        return bounds.dimension.equals(region.getDimension().identifier().toString())
+        return bounds.dimension.equals(region.getDimension().location().toString())
                 && bounds.minX >= region.getMinX() - margin && bounds.maxX <= region.getMaxX() + margin
                 && bounds.minY >= region.getMinY() - margin && bounds.maxY <= region.getMaxY() + margin
                 && bounds.minZ >= region.getMinZ() - margin && bounds.maxZ <= region.getMaxZ() + margin;
@@ -1237,7 +1237,7 @@ public final class MinigameSetupToolService {
 
     private static boolean locationInsideRegion(MinigameLocation location, Region region, double verticalMargin) {
         if (location == null || region == null) return false;
-        if (!region.getDimension().identifier().toString().equals(location.dimension)) return false;
+        if (!region.getDimension().location().toString().equals(location.dimension)) return false;
         return location.x >= region.getMinX() && location.x < region.getMaxX() + 1.0D
                 && location.z >= region.getMinZ() && location.z < region.getMaxZ() + 1.0D
                 && location.y >= region.getMinY() - verticalMargin
@@ -1245,7 +1245,7 @@ public final class MinigameSetupToolService {
     }
 
     private static boolean near(MinigameLocation location, Region region, double horizontal, double vertical) {
-        return location != null && region.getDimension().identifier().toString().equals(location.dimension)
+        return location != null && region.getDimension().location().toString().equals(location.dimension)
                 && location.x >= region.getMinX() - horizontal && location.x <= region.getMaxX() + 1 + horizontal
                 && location.z >= region.getMinZ() - horizontal && location.z <= region.getMaxZ() + 1 + horizontal
                 && location.y >= region.getMinY() - vertical && location.y <= region.getMaxY() + vertical;

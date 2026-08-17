@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Requests the editor for a synchronized hologram selected in the world. */
 public record HologramEditorRequestPayload(String id) implements CustomPacketPayload {
     public static final Type<HologramEditorRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "hologram_editor_request")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "hologram_editor_request")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, HologramEditorRequestPayload> STREAM_CODEC =
             StreamCodec.of(HologramEditorRequestPayload::encode, HologramEditorRequestPayload::decode);

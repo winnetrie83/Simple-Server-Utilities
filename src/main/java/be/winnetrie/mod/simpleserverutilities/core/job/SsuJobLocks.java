@@ -13,7 +13,7 @@ public final class SsuJobLocks {
 
     public static String region(ResourceKey<Level> dimension, String regionName) {
         return "region:"
-                + dimension.identifier()
+                + dimension.location()
                 + ":"
                 + normalize(regionName);
     }
@@ -28,7 +28,7 @@ public final class SsuJobLocks {
             int maxZ
     ) {
         return "cuboid:"
-                + dimension.identifier()
+                + dimension.location()
                 + ":"
                 + minX + "," + minY + "," + minZ
                 + ":"

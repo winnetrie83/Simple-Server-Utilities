@@ -12,7 +12,7 @@ import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
@@ -331,7 +331,7 @@ final class NpcAbilityController {
             if (ability.knockback > 0.0D) pushAway(source, target, ability.knockback,
                     type == NpcAbilityType.THUNDERCLAP ? 0.22D : 0.08D);
             if (ability.stunTicks > 0 && type != NpcAbilityType.CHARGE) applyStun(target, ability.stunTicks);
-            if (ability.slowTicks > 0) target.addEffect(new MobEffectInstance(MobEffects.SLOWNESS,
+            if (ability.slowTicks > 0) target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,
                     ability.slowTicks, ability.slowAmplifier, false, true, true), source);
             applyConfiguredEffect(target, source, ability);
             if (ability.bleedDamage > 0.0D && ability.bleedDurationTicks > 0) {
@@ -388,7 +388,7 @@ final class NpcAbilityController {
         if (target == null || ability == null || ability.debuffEffect == null || ability.debuffEffect.isBlank()
                 || ability.debuffDurationTicks <= 0) return;
         try {
-            var effect = BuiltInRegistries.MOB_EFFECT.getOptional(Identifier.parse(ability.debuffEffect)).orElse(null);
+            var effect = BuiltInRegistries.MOB_EFFECT.getOptional(ResourceLocation.parse(ability.debuffEffect)).orElse(null);
             if (effect != null) {
                 target.addEffect(new MobEffectInstance(BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect),
                         ability.debuffDurationTicks, ability.debuffAmplifier, false, true, true), source);
@@ -440,7 +440,7 @@ final class NpcAbilityController {
     private static void holdStationary(LivingEntity source, LivingEntity target) {
         if (source instanceof Mob mob) {
             mob.getNavigation().stop();
-            mob.getMoveControl().setWait();
+            mob.getMoveControl().setWantedPosition(mob.getX(), mob.getY(), mob.getZ(), 0.0D);
             if (target != null) mob.getLookControl().setLookAt(target, 45.0F, 45.0F);
         }
         Vec3 velocity = source.getDeltaMovement();
@@ -461,7 +461,7 @@ final class NpcAbilityController {
 
     private static void applyStun(LivingEntity target, int ticks) {
         if (target == null || ticks <= 0) return;
-        target.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, ticks, 10, false, true, true));
+        target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, ticks, 10, false, true, true));
         target.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, ticks, 10, false, true, true));
         target.setDeltaMovement(Vec3.ZERO);
         if (target instanceof Mob mob) mob.getNavigation().stop();
@@ -520,11 +520,11 @@ final class NpcAbilityController {
         if (normal.lengthSqr() < 1.0E-6D) normal = new Vec3(0.0D, 1.0D, 0.0D);
         normal = normal.normalize();
 
-        DustParticleOptions beamCore = new DustParticleOptions(0xA95CFF, 1.20F);
-        DustParticleOptions beamGlow = new DustParticleOptions(0xE7C9FF, 0.85F);
-        DustParticleOptions orbCore = new DustParticleOptions(0x7B2CFF, 1.65F);
-        DustParticleOptions orbGlow = new DustParticleOptions(0xF5E9FF, 0.95F);
-        DustParticleOptions impactDust = new DustParticleOptions(0xC78BFF, 1.10F);
+        DustParticleOptions beamCore = new DustParticleOptions(Vec3.fromRGB24(0xA95CFF).toVector3f(), 1.20F);
+        DustParticleOptions beamGlow = new DustParticleOptions(Vec3.fromRGB24(0xE7C9FF).toVector3f(), 0.85F);
+        DustParticleOptions orbCore = new DustParticleOptions(Vec3.fromRGB24(0x7B2CFF).toVector3f(), 1.65F);
+        DustParticleOptions orbGlow = new DustParticleOptions(Vec3.fromRGB24(0xF5E9FF).toVector3f(), 0.95F);
+        DustParticleOptions impactDust = new DustParticleOptions(Vec3.fromRGB24(0xC78BFF).toVector3f(), 1.10F);
 
         int steps = Math.max(20, Math.min(96, (int) Math.ceil(length * 9.0D)));
         double amplitude = Math.min(0.42D, Math.max(0.14D, 0.08D + length * 0.016D));
@@ -601,8 +601,8 @@ final class NpcAbilityController {
         double remaining = Math.max(0.0D, executeTick - serverTick);
         double charge = 1.0D - Math.min(1.0D, remaining / 16.0D);
         double centerY = source.getY() + source.getBbHeight() * (0.58D + charge * 0.08D);
-        DustParticleOptions core = new DustParticleOptions(0x9C4DFF, 1.0F);
-        DustParticleOptions glow = new DustParticleOptions(0xEED8FF, 0.75F);
+        DustParticleOptions core = new DustParticleOptions(Vec3.fromRGB24(0x9C4DFF).toVector3f(), 1.0F);
+        DustParticleOptions glow = new DustParticleOptions(Vec3.fromRGB24(0xEED8FF).toVector3f(), 0.75F);
         double radius = 0.28D + charge * 0.16D;
         int points = 8;
         for (int index = 0; index < points; index++) {
@@ -619,7 +619,7 @@ final class NpcAbilityController {
     }
 
     private static void playSound(ServerLevel level, LivingEntity source, String soundId, float volume, float pitch) {
-        SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(Identifier.parse(soundId)).orElse(null);
+        SoundEvent sound = BuiltInRegistries.SOUND_EVENT.getOptional(ResourceLocation.parse(soundId)).orElse(null);
         if (sound == null) return;
         for (ServerPlayer player : level.players()) {
             if (player.distanceToSqr(source) > 48.0D * 48.0D) continue;

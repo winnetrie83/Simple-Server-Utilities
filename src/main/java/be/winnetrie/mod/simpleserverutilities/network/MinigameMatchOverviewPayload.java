@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Detailed bounded snapshot opened by the SSU menu key while participating in a match. */
 public record MinigameMatchOverviewPayload(
@@ -39,7 +39,7 @@ public record MinigameMatchOverviewPayload(
     public static final int MAX_PLAYERS = 128;
     public static final int MAX_LINES = 32;
     public static final Type<MinigameMatchOverviewPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_match_overview"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_match_overview"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameMatchOverviewPayload> STREAM_CODEC =
             StreamCodec.of(MinigameMatchOverviewPayload::encode, MinigameMatchOverviewPayload::decode);
 

@@ -5,7 +5,7 @@ import be.winnetrie.mod.simpleserverutilities.mail.MailRichText;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record MailComposeSubmitPayload(
         int containerId,
@@ -16,7 +16,7 @@ public record MailComposeSubmitPayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<MailComposeSubmitPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "mail_compose_submit")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "mail_compose_submit")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, MailComposeSubmitPayload> STREAM_CODEC =
             StreamCodec.of(MailComposeSubmitPayload::encode, MailComposeSubmitPayload::decode);

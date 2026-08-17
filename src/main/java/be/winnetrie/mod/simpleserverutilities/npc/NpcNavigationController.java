@@ -203,7 +203,7 @@ final class NpcNavigationController {
             // Specialised flying/swimming MoveControls may keep an old wanted position even after
             // PathNavigation stops. Put the native controller in WAIT as well when SSU deliberately
             // stops at a waypoint/idle state, otherwise a Vex/Ghast-style shell can keep drifting.
-            mob.getMoveControl().setWait();
+            mob.getMoveControl().setWantedPosition(mob.getX(), mob.getY(), mob.getZ(), 0.0D);
         }
         entity.setDeltaMovement(Vec3.ZERO);
     }

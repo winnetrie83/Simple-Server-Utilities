@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Strictly bounded, chunked real-block snapshot preview state for one administrator. */
 public record RegionSnapshotPreviewPayload(
@@ -33,7 +33,7 @@ public record RegionSnapshotPreviewPayload(
     private static final int MAX_STATE_LENGTH = 768;
 
     public static final Type<RegionSnapshotPreviewPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_snapshot_preview"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_snapshot_preview"));
     public static final StreamCodec<RegistryFriendlyByteBuf, RegionSnapshotPreviewPayload> STREAM_CODEC =
             StreamCodec.of(RegionSnapshotPreviewPayload::encode, RegionSnapshotPreviewPayload::decode);
 

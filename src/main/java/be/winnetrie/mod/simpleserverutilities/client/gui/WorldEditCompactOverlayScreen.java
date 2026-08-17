@@ -4,12 +4,12 @@ import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionActionResultPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Transparent, world-visible World Edit controls. It intentionally behaves like a tiny HUD palette
@@ -60,7 +60,7 @@ public final class WorldEditCompactOverlayScreen extends Screen {
     }
 
     private void send(String operation, String value) {
-        ClientPacketDistributor.sendToServer(new RegionSelectionActionPayload(
+        PacketDistributor.sendToServer(new RegionSelectionActionPayload(
                 operation,
                 value == null ? "" : value,
                 List.of(),
@@ -74,28 +74,28 @@ public final class WorldEditCompactOverlayScreen extends Screen {
         nextRequestId = Math.max(nextRequestId, payload.requestId() + 1L);
         notice = payload.message();
         noticeError = !payload.successful();
-        if (payload.selectionCleared() && minecraft != null) minecraft.setScreenAndShow(null);
+        if (payload.selectionCleared() && minecraft != null) minecraft.setScreen(null);
     }
 
     /** No vanilla menu blur/dim layer: the world must remain fully readable behind the controls. */
     @Override
-    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
         // Intentionally empty.
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int labelY = height - 64;
         String title = "World Edit · compact tools";
         int titleX = width - font.width(title) - 10;
-        graphics.text(font, title, titleX, labelY, 0xFF6FE7FF, true);
+        graphics.drawString(font, title, titleX, labelY, 0xFF6FE7FF, true);
         if (!notice.isBlank()) {
             int max = 190;
             String clipped = font.width(notice) <= max ? notice : font.plainSubstrByWidth(notice, max - 8) + "…";
-            graphics.text(font, clipped, width - font.width(clipped) - 10, labelY - 12,
+            graphics.drawString(font, clipped, width - font.width(clipped) - 10, labelY - 12,
                     noticeError ? 0xFFFF8585 : 0xFF7DFF9B, true);
         }
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     @Override

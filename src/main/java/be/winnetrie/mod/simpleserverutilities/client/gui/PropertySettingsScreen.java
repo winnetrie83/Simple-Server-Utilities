@@ -10,13 +10,12 @@ import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsActionP
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPropertySettingsRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuTrustedPlayersRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Paged, server-authoritative editor for claim and server-region settings. */
 public final class PropertySettingsScreen extends Screen {
@@ -207,7 +206,7 @@ public final class PropertySettingsScreen extends Screen {
         expandedOptionKey = "";
         optionScroll = 0;
         long id = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new SsuPropertySettingsActionPayload(
+        PacketDistributor.sendToServer(new SsuPropertySettingsActionPayload(
                 data.kind(), data.target(), key, value, id));
     }
 
@@ -215,7 +214,7 @@ public final class PropertySettingsScreen extends Screen {
         expandedOptionKey = "";
         optionScroll = 0;
         long id = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new SsuPropertySettingsRequestPayload(data.kind(), data.target(), id));
+        PacketDistributor.sendToServer(new SsuPropertySettingsRequestPayload(data.kind(), data.target(), id));
     }
 
     void refreshFromChild() {
@@ -225,14 +224,14 @@ public final class PropertySettingsScreen extends Screen {
     private void openNavigation(String destination) {
         long id = nextRequestId++;
         if ("region_permissions".equals(destination)) {
-            ClientPacketDistributor.sendToServer(new SsuPermissionEditorRequestPayload(
+            PacketDistributor.sendToServer(new SsuPermissionEditorRequestPayload(
                     "region", data.target(), "", "", "", 0, 8, id));
         } else if ("trusted_players".equals(destination) && "claim".equals(data.kind())) {
-            ClientPacketDistributor.sendToServer(new SsuTrustedPlayersRequestPayload(data.target(), "", id));
+            PacketDistributor.sendToServer(new SsuTrustedPlayersRequestPayload(data.target(), "", id));
         } else if ("homes".equals(destination) && "claim".equals(data.kind())) {
             if (parent instanceof SsuDashboardScreen dashboard) {
                 dashboard.openHomesForClaim(data.target());
-                minecraft.setScreenAndShow(dashboard);
+                minecraft.setScreen(dashboard);
             } else if (parent instanceof ClaimMapScreen claimMap) {
                 claimMap.openHomesForClaim(data.target());
             }
@@ -251,10 +250,10 @@ public final class PropertySettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!expandedOptionKey.isBlank()) {
             for (OptionBounds bounds : optionBounds) {
-                if (!bounds.contains(event.x(), event.y())) continue;
+                if (!bounds.contains(mouseX, mouseY)) continue;
                 selectedOptionValues.put(expandedOptionKey, bounds.option().value());
                 Button picker = optionButtons.get(expandedOptionKey);
                 SsuPropertySettingsDataPayload.Entry entry = findEntry(expandedOptionKey);
@@ -266,9 +265,9 @@ public final class PropertySettingsScreen extends Screen {
                 return true;
             }
             Rect dropdown = dropdownBounds();
-            if (dropdown != null && dropdown.contains(event.x(), event.y())) return true;
+            if (dropdown != null && dropdown.contains(mouseX, mouseY)) return true;
             Rect anchor = optionAnchors.get(expandedOptionKey);
-            if (anchor != null && anchor.contains(event.x(), event.y())) {
+            if (anchor != null && anchor.contains(mouseX, mouseY)) {
                 expandedOptionKey = "";
                 optionScroll = 0;
                 return true;
@@ -276,15 +275,11 @@ public final class PropertySettingsScreen extends Screen {
             expandedOptionKey = "";
             optionScroll = 0;
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        double rawMouseX = mouseX;
-        double rawMouseY = mouseY;
-        mouseX = SsuGuiScale.logicalX(this, mouseX);
-        mouseY = SsuGuiScale.logicalY(this, mouseY);
         if (!expandedOptionKey.isBlank()) {
             Rect bounds = dropdownBounds();
             SsuPropertySettingsDataPayload.Entry entry = findEntry(expandedOptionKey);
@@ -295,17 +290,17 @@ public final class PropertySettingsScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseScrolled(rawMouseX, rawMouseY, scrollX, scrollY);
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         Layout layout = layout();
         SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         graphics.fill(layout.left(), layout.top(), layout.right(), layout.bottom(), PANEL);
-        graphics.outline(layout.left(), layout.top(), layout.width(), layout.height(), BORDER);
-        graphics.text(font, data.title(), layout.left() + 10, layout.top() + 10, TEXT, false);
-        graphics.text(font, data.canEdit() ? "Changes are validated and saved by the server." : "Read-only",
+        graphics.renderOutline(layout.left(), layout.top(), layout.width(), layout.height(), BORDER);
+        graphics.drawString(font, data.title(), layout.left() + 10, layout.top() + 10, TEXT, false);
+        graphics.drawString(font, data.canEdit() ? "Changes are validated and saved by the server." : "Read-only",
                 layout.left() + 10, layout.top() + 27, data.canEdit() ? MUTED : ERROR, false);
 
         int from = pageIndex * PAGE_SIZE;
@@ -316,17 +311,17 @@ public final class PropertySettingsScreen extends Screen {
             if (((index - from) & 1) == 0) {
                 graphics.fill(layout.left() + 6, y, layout.right() - 6, y + ROW_HEIGHT - 2, 0x401F2A34);
             }
-            graphics.text(font, entry.label(), layout.left() + 12, y + 8, entry.editable() ? TEXT : MUTED, false);
+            graphics.drawString(font, entry.label(), layout.left() + 12, y + 8, entry.editable() ? TEXT : MUTED, false);
         }
 
-        graphics.text(font, "Page " + (pageIndex + 1) + " / " + pageCount(),
+        graphics.drawString(font, "Page " + (pageIndex + 1) + " / " + pageCount(),
                 layout.left() + 176, layout.bottom() - 22, MUTED, false);
         if (!data.notice().isBlank()) {
-            graphics.text(font, data.notice(), layout.left() + 10, layout.bottom() - 45,
+            graphics.drawString(font, data.notice(), layout.left() + 10, layout.bottom() - 45,
                     data.error() ? ERROR : GOOD, false);
         }
 
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
 
         Rect dropdown = dropdownBounds();
         if (dropdown == null || !dropdown.contains(mouseX, mouseY)) {
@@ -346,7 +341,7 @@ public final class PropertySettingsScreen extends Screen {
                 if (!entry.value().isBlank() && !"player_action".equals(entry.type())) {
                     tooltip.add(Component.literal("Current: " + entry.value()));
                 }
-                graphics.setComponentTooltipForNextFrame(font, tooltip, mouseX, mouseY);
+                graphics.renderComponentTooltip(font, tooltip, mouseX, mouseY);
                 break;
             }
         }
@@ -354,7 +349,7 @@ public final class PropertySettingsScreen extends Screen {
         drawOptionDropdown(graphics, mouseX, mouseY);
     }
 
-    private void drawOptionDropdown(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+    private void drawOptionDropdown(GuiGraphics graphics, int mouseX, int mouseY) {
         optionBounds.clear();
         if (expandedOptionKey.isBlank()) return;
         SsuPropertySettingsDataPayload.Entry entry = findEntry(expandedOptionKey);
@@ -362,7 +357,7 @@ public final class PropertySettingsScreen extends Screen {
         if (entry == null || bounds == null || entry.options().isEmpty()) return;
 
         graphics.fill(bounds.x(), bounds.y(), bounds.right(), bounds.bottom(), 0xFF121922);
-        graphics.outline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), BORDER);
+        graphics.renderOutline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), BORDER);
 
         int maxScroll = Math.max(0, entry.options().size() - DROPDOWN_VISIBLE_ROWS);
         optionScroll = Math.max(0, Math.min(optionScroll, maxScroll));
@@ -374,8 +369,8 @@ public final class PropertySettingsScreen extends Screen {
                     && mouseY >= rowY && mouseY < rowY + 12;
             graphics.fill(bounds.x() + 4, rowY, bounds.right() - 8, rowY + 12,
                     hovered ? DROPDOWN_HOVER : DROPDOWN_ROW);
-            graphics.outline(bounds.x() + 4, rowY, bounds.width() - 12, 12, BORDER);
-            graphics.text(font, trim(option.label(), 22), bounds.x() + 8, rowY + 2, TEXT, false);
+            graphics.renderOutline(bounds.x() + 4, rowY, bounds.width() - 12, 12, BORDER);
+            graphics.drawString(font, trim(option.label(), 22), bounds.x() + 8, rowY + 2, TEXT, false);
             optionBounds.add(new OptionBounds(option, bounds.x() + 4, rowY, bounds.width() - 12, 12));
         }
 
@@ -417,7 +412,7 @@ public final class PropertySettingsScreen extends Screen {
 
     @Override
     public void onClose() {
-        if (parent != null) minecraft.setScreenAndShow(parent);
+        if (parent != null) minecraft.setScreen(parent);
         else super.onClose();
     }
 

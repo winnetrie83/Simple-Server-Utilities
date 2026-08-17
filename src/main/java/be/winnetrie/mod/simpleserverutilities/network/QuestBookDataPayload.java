@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Complete bounded questbook snapshot for one player. */
 public record QuestBookDataPayload(
@@ -24,7 +24,7 @@ public record QuestBookDataPayload(
 ) implements CustomPacketPayload {
     public static final int MAX_QUESTS = 12;
     public static final Type<QuestBookDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "quest_book_data"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "quest_book_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf, QuestBookDataPayload> STREAM_CODEC =
             StreamCodec.of(QuestBookDataPayload::encode, QuestBookDataPayload::decode);
 

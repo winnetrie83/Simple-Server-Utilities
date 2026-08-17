@@ -10,11 +10,11 @@ import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichText;
 import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument;
 import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument.CharacterStyle;
 import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument.Segment;
+import be.winnetrie.mod.simpleserverutilities.mixin.AbstractScrollWidgetAccessor;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultiLineEditBoxAccessor;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultilineTextFieldAccessor;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.AbstractTextAreaWidget;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.components.MultilineTextField;
 import net.minecraft.network.chat.Component;
@@ -69,7 +69,7 @@ public final class RichTextEditBoxRenderer {
     }
 
     /** Called from the client mixin; returns true when vanilla content was replaced. */
-    public static boolean render(MultiLineEditBox box, GuiGraphicsExtractor graphics) {
+    public static boolean render(MultiLineEditBox box, GuiGraphics graphics) {
         Registration registration = REGISTRATIONS.get(box);
         if (registration == null) return false;
 
@@ -87,10 +87,10 @@ public final class RichTextEditBoxRenderer {
         int selectionStart = Math.min(cursor, anchor);
         int selectionEnd = Math.max(cursor, anchor);
 
-        int innerPadding = AbstractTextAreaWidget.DEFAULT_TOTAL_PADDING / 2;
+        int innerPadding = 4;
         int innerLeft = box.getX() + innerPadding;
         int innerTop = box.getY() + innerPadding;
-        int contentTop = innerTop - (int) Math.floor(box.scrollAmount());
+        int contentTop = innerTop - (int) Math.floor(((AbstractScrollWidgetAccessor) (Object) box).ssu$scrollAmount());
         int clipLeft = box.getX() + 3;
         int clipTop = box.getY() + 3;
         int clipRight = box.getRight() - box.scrollbarWidth() - 2;
@@ -99,7 +99,7 @@ public final class RichTextEditBoxRenderer {
 
         graphics.enableScissor(clipLeft, clipTop, clipRight, clipBottom);
         if (value.isEmpty()) {
-            graphics.text(minecraft.font, registration.placeholder().getVisualOrderText(),
+            graphics.drawString(minecraft.font, registration.placeholder().getVisualOrderText(),
                     innerLeft, contentTop, PLACEHOLDER_COLOR, false);
             drawCursorIfNeeded(box, graphics, innerLeft, contentTop, cursor, anchor);
             graphics.disableScissor();
@@ -117,7 +117,7 @@ public final class RichTextEditBoxRenderer {
                         selectionStart, selectionEnd, innerLeft, y, defaultColor, registration.paletteColor());
                 MutableComponent component = component(document, lineStart, lineEnd, defaultColor,
                         registration.paletteColor());
-                graphics.text(minecraft.font, component.getVisualOrderText(), innerLeft, y, defaultColor, false);
+                graphics.drawString(minecraft.font, component.getVisualOrderText(), innerLeft, y, defaultColor, false);
                 if (box.isFocused() && cursor == anchor && cursor >= lineStart && cursor <= lineEnd
                         && cursorVisible()) {
                     int cursorX = innerLeft + minecraft.font.width(
@@ -134,7 +134,7 @@ public final class RichTextEditBoxRenderer {
     }
 
     private static void drawSelection(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             Minecraft minecraft,
             SsuRichTextDocument document,
             int lineStart,
@@ -156,7 +156,7 @@ public final class RichTextEditBoxRenderer {
 
     private static void drawCursorIfNeeded(
             MultiLineEditBox box,
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             int x,
             int y,
             int cursor,

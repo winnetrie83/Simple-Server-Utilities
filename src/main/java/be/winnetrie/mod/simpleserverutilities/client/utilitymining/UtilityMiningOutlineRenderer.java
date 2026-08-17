@@ -1,12 +1,13 @@
 package be.winnetrie.mod.simpleserverutilities.client.utilitymining;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.renderer.MultiBufferSource;
+import be.winnetrie.mod.simpleserverutilities.client.render.SsuDebugGizmos;
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.debug.DebugRenderer;
-import net.minecraft.gizmos.Gizmos;
-import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.world.phys.Vec3;
 
 /** Renders the merged outer silhouette twice to create a readable glow-like holographic outline. */
@@ -22,21 +23,18 @@ public final class UtilityMiningOutlineRenderer implements DebugRenderer.SimpleD
     }
 
     @Override
-    public void emitGizmos(
-            double camX,
-            double camY,
-            double camZ,
-            DebugValueAccess debugValues,
-            Frustum frustum,
-            float partialTicks
-    ) {
+    public void render(PoseStack poseStack, MultiBufferSource bufferSource,
+                       double camX, double camY, double camZ) {
+        SsuDebugGizmos.begin(minecraft, poseStack, bufferSource, camX, camY, camZ);
+        Frustum frustum = null; // 1.21.1 DebugRenderer does not pass its render frustum to child renderers.
+        float partialTicks = minecraft.getTimer().getGameTimeDeltaPartialTick(true);
         if (minecraft.level == null) {
             return;
         }
 
         UtilityMiningClientState.Preview preview = UtilityMiningClientState.snapshot();
         if (!preview.isVisible()
-                || !minecraft.level.dimension().identifier().toString().equals(preview.dimension())) {
+                || !minecraft.level.dimension().location().toString().equals(preview.dimension())) {
             return;
         }
 
@@ -54,8 +52,8 @@ public final class UtilityMiningOutlineRenderer implements DebugRenderer.SimpleD
         for (UtilityMiningOutlineMath.Line line : cachedLines) {
             Vec3 start = offset(line.start());
             Vec3 end = offset(line.end());
-            Gizmos.line(start, end, glowColor, glowWidth).setAlwaysOnTop();
-            Gizmos.line(start, end, coreColor, coreWidth).setAlwaysOnTop();
+            SsuDebugGizmos.line(start, end, glowColor, glowWidth).setAlwaysOnTop();
+            SsuDebugGizmos.line(start, end, coreColor, coreWidth).setAlwaysOnTop();
         }
     }
 

@@ -11,10 +11,11 @@ import be.winnetrie.mod.simpleserverutilities.client.map.MapLighting;
 import be.winnetrie.mod.simpleserverutilities.client.map.TerrainColorSampler;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import org.jspecify.annotations.Nullable;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Double-buffered terrain renderer for the claim map.
@@ -34,6 +35,7 @@ final class ClaimTerrainMap implements AutoCloseable {
     private static final int UNKNOWN_LIGHT = 0xFF292F35;
 
     private @Nullable DynamicTexture publishedTexture;
+    private @Nullable ResourceLocation publishedTextureLocation;
     private int publishedWidth;
     private int publishedHeight;
     private int publishedCenterChunkX = Integer.MIN_VALUE;
@@ -43,6 +45,7 @@ final class ClaimTerrainMap implements AutoCloseable {
     private int publishedNightBucket = -1;
 
     private @Nullable DynamicTexture buildingTexture;
+    private @Nullable ResourceLocation buildingTextureLocation;
     private int buildingWidth;
     private int buildingHeight;
     private int buildingCenterChunkX = Integer.MIN_VALUE;
@@ -56,7 +59,7 @@ final class ClaimTerrainMap implements AutoCloseable {
 
     void ensureView(ClaimMapDataPayload payload) {
         ClientLevel level = Minecraft.getInstance().level;
-        String currentDimension = level == null ? "" : level.dimension().identifier().toString();
+        String currentDimension = level == null ? "" : level.dimension().location().toString();
         int gridSize = payload.radius() * 2 + 1;
         int requiredWidth = gridSize * PIXELS_PER_CHUNK;
         int requiredHeight = requiredWidth;
@@ -110,7 +113,7 @@ final class ClaimTerrainMap implements AutoCloseable {
     }
 
     void render(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             int left,
             int top,
             int size,
@@ -123,7 +126,9 @@ final class ClaimTerrainMap implements AutoCloseable {
                 && publishedDimension.equals(currentDimension())) {
             renderMapped(
                     graphics,
-                    publishedTexture,
+                    publishedTextureLocation,
+                    publishedWidth,
+                    publishedHeight,
                     publishedCenterChunkX,
                     publishedCenterChunkZ,
                     publishedRadius,
@@ -140,24 +145,29 @@ final class ClaimTerrainMap implements AutoCloseable {
                 && buildingCenterChunkX == view.centerChunkX()
                 && buildingCenterChunkZ == view.centerChunkZ()
                 && buildingDimension.equals(currentDimension())) {
-            graphics.blit(
-                    buildingTexture.getTextureView(),
-                    buildingTexture.getSampler(),
-                    left,
-                    top,
-                    left + size,
-                    top + size,
-                    0.0F,
-                    1.0F,
-                    0.0F,
-                    1.0F
-            );
+            if (buildingTextureLocation != null) {
+                graphics.blit(
+                        buildingTextureLocation,
+                        left,
+                        top,
+                        size,
+                        size,
+                        0.0F,
+                        0.0F,
+                        buildingWidth,
+                        buildingHeight,
+                        buildingWidth,
+                        buildingHeight
+                );
+            }
         }
     }
 
     private void renderMapped(
-            GuiGraphicsExtractor graphics,
-            DynamicTexture source,
+            GuiGraphics graphics,
+            @Nullable ResourceLocation sourceLocation,
+            int sourceTextureWidth,
+            int sourceTextureHeight,
             int sourceCenterChunkX,
             int sourceCenterChunkZ,
             int sourceRadius,
@@ -166,6 +176,7 @@ final class ClaimTerrainMap implements AutoCloseable {
             int size,
             ClaimMapDataPayload target
     ) {
+        if (sourceLocation == null) return;
         int targetMinX = (target.centerChunkX() - target.radius()) << 4;
         int targetMinZ = (target.centerChunkZ() - target.radius()) << 4;
         int targetMaxX = (target.centerChunkX() + target.radius() + 1) << 4;
@@ -199,17 +210,22 @@ final class ClaimTerrainMap implements AutoCloseable {
         float u1 = (float) ((intersectionMaxX - sourceMinX) / sourceWidth);
         float v1 = (float) ((intersectionMaxZ - sourceMinZ) / sourceHeight);
 
+        int sourceU = Math.max(0, Math.min(sourceTextureWidth - 1, Math.round(u0 * sourceTextureWidth)));
+        int sourceV = Math.max(0, Math.min(sourceTextureHeight - 1, Math.round(v0 * sourceTextureHeight)));
+        int sourceUWidth = Math.max(1, Math.min(sourceTextureWidth - sourceU, Math.round((u1 - u0) * sourceTextureWidth)));
+        int sourceVHeight = Math.max(1, Math.min(sourceTextureHeight - sourceV, Math.round((v1 - v0) * sourceTextureHeight)));
         graphics.blit(
-                source.getTextureView(),
-                source.getSampler(),
+                sourceLocation,
                 destinationLeft,
                 destinationTop,
-                destinationRight,
-                destinationBottom,
-                u0,
-                u1,
-                v0,
-                v1
+                destinationRight - destinationLeft,
+                destinationBottom - destinationTop,
+                sourceU,
+                sourceV,
+                sourceUWidth,
+                sourceVHeight,
+                sourceTextureWidth,
+                sourceTextureHeight
         );
     }
 
@@ -255,13 +271,10 @@ final class ClaimTerrainMap implements AutoCloseable {
             int requiredHeight,
             int nightBucket
     ) {
-        closeTexture(buildingTexture);
-        buildingTexture = new DynamicTexture(
-                "SSU claim terrain map build",
-                requiredWidth,
-                requiredHeight,
-                true
-        );
+        closeTexture(buildingTexture, buildingTextureLocation);
+        buildingTexture = new DynamicTexture(requiredWidth, requiredHeight, true);
+        buildingTextureLocation = Minecraft.getInstance().getTextureManager()
+                .register("ssu_claim_terrain_build", buildingTexture);
         buildingWidth = requiredWidth;
         buildingHeight = requiredHeight;
         buildingCenterChunkX = payload.centerChunkX();
@@ -286,10 +299,10 @@ final class ClaimTerrainMap implements AutoCloseable {
         }
         int originX = Minecraft.getInstance().player == null
                 ? payload.centerChunkX()
-                : Minecraft.getInstance().player.chunkPosition().x();
+                : Minecraft.getInstance().player.chunkPosition().x;
         int originZ = Minecraft.getInstance().player == null
                 ? payload.centerChunkZ()
-                : Minecraft.getInstance().player.chunkPosition().z();
+                : Minecraft.getInstance().player.chunkPosition().z;
         ordered.sort(Comparator.comparingInt(entry -> distanceSquared(entry.x(), entry.z(), originX, originZ)));
         pendingChunks = List.copyOf(ordered);
         nextPendingChunk = 0;
@@ -317,15 +330,16 @@ final class ClaimTerrainMap implements AutoCloseable {
                 color = color == TerrainColorSampler.VOID_COLOR
                         ? checkerColor(pixelX, pixelZ)
                         : MapLighting.apply(level, worldX, worldZ, color);
-                pixels.setPixel(pixelX, pixelZ, color);
+                pixels.setPixelRGBA(pixelX, pixelZ, color);
             }
         }
         buildingDirty = true;
     }
 
     private void cancelBuild() {
-        closeTexture(buildingTexture);
+        closeTexture(buildingTexture, buildingTextureLocation);
         buildingTexture = null;
+        buildingTextureLocation = null;
         buildingWidth = 0;
         buildingHeight = 0;
         buildingCenterChunkX = Integer.MIN_VALUE;
@@ -342,8 +356,9 @@ final class ClaimTerrainMap implements AutoCloseable {
         if (buildingTexture == null) {
             return;
         }
-        closeTexture(publishedTexture);
+        closeTexture(publishedTexture, publishedTextureLocation);
         publishedTexture = buildingTexture;
+        publishedTextureLocation = buildingTextureLocation;
         publishedWidth = buildingWidth;
         publishedHeight = buildingHeight;
         publishedCenterChunkX = buildingCenterChunkX;
@@ -353,6 +368,7 @@ final class ClaimTerrainMap implements AutoCloseable {
         publishedNightBucket = buildingNightBucket;
 
         buildingTexture = null;
+        buildingTextureLocation = null;
         buildingWidth = 0;
         buildingHeight = 0;
         buildingCenterChunkX = Integer.MIN_VALUE;
@@ -378,28 +394,32 @@ final class ClaimTerrainMap implements AutoCloseable {
     private static void fillUnknown(NativeImage image) {
         for (int y = 0; y < image.getHeight(); y++) {
             for (int x = 0; x < image.getWidth(); x++) {
-                image.setPixel(x, y, checkerColor(x, y));
+                image.setPixelRGBA(x, y, checkerColor(x, y));
             }
         }
     }
 
     private static String currentDimension() {
         ClientLevel level = Minecraft.getInstance().level;
-        return level == null ? "" : level.dimension().identifier().toString();
+        return level == null ? "" : level.dimension().location().toString();
     }
 
-    private static void closeTexture(@Nullable DynamicTexture texture) {
-        if (texture != null) {
+    private static void closeTexture(@Nullable DynamicTexture texture, @Nullable ResourceLocation location) {
+        if (location != null) {
+            Minecraft.getInstance().getTextureManager().release(location);
+        } else if (texture != null) {
             texture.close();
         }
     }
 
     @Override
     public void close() {
-        closeTexture(publishedTexture);
-        closeTexture(buildingTexture);
+        closeTexture(publishedTexture, publishedTextureLocation);
+        closeTexture(buildingTexture, buildingTextureLocation);
         publishedTexture = null;
         buildingTexture = null;
+        publishedTextureLocation = null;
+        buildingTextureLocation = null;
         pendingChunks = List.of();
         nextPendingChunk = 0;
     }

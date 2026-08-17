@@ -21,7 +21,7 @@ import be.winnetrie.mod.simpleserverutilities.region.RegionSelectionSchematicMan
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -211,7 +211,7 @@ public final class MinigameSelectionService {
         arena.managedRegion = true;
         arena.lobby = MinigameLocation.of(player);
         arena.spectator = MinigameLocation.of(player);
-        arena.playFloor = new MinigameAreaBounds(player.level().dimension().identifier().toString(),
+        arena.playFloor = new MinigameAreaBounds(player.level().dimension().location().toString(),
                 new BlockPos(bounds.minX(), bounds.minY(), bounds.minZ()),
                 new BlockPos(bounds.maxX(), bounds.maxY(), bounds.maxZ()));
         arena.teamSpawns.clear();
@@ -226,7 +226,7 @@ public final class MinigameSelectionService {
             double x = bounds.minX() + 0.5D + usableX * (column + 0.5D) / columns;
             double z = bounds.minZ() + 0.5D + usableZ * (row + 0.5D) / rows;
             arena.teamSpawns.add(new MinigameSpawnPoint(index + 1,
-                    new MinigameLocation(player.level().dimension().identifier().toString(), x, spawnY, z, 0.0F, 0.0F)));
+                    new MinigameLocation(player.level().dimension().location().toString(), x, spawnY, z, 0.0F, 0.0F)));
         }
         definition.arenas.add(arena);
         definition.normalize();
@@ -263,7 +263,7 @@ public final class MinigameSelectionService {
         arena.teamSpawns.clear();
         arena.flagPoints.clear();
 
-        String dimension = player.level().dimension().identifier().toString();
+        String dimension = player.level().dimension().location().toString();
         double spawnY = Math.max(bounds.minY() + 1.0D, Math.min(player.getY(), bounds.maxY() + 1.0D));
         int sizeX = bounds.maxX() - bounds.minX() + 1;
         int sizeZ = bounds.maxZ() - bounds.minZ() + 1;
@@ -334,7 +334,7 @@ public final class MinigameSelectionService {
         arena.flagPoints.clear();
         arena.controlPoints.clear();
 
-        String dimension = player.level().dimension().identifier().toString();
+        String dimension = player.level().dimension().location().toString();
         double y = Math.max(bounds.minY() + 1.0D, Math.min(player.getY(), bounds.maxY() + 1.0D));
         int sizeX = bounds.maxX() - bounds.minX() + 1;
         int sizeZ = bounds.maxZ() - bounds.minZ() + 1;
@@ -400,7 +400,7 @@ public final class MinigameSelectionService {
         arena.lobby = MinigameLocation.of(player);
         arena.spectator = MinigameLocation.of(player);
         arena.teamSpawns.clear();
-        String dimension = player.level().dimension().identifier().toString();
+        String dimension = player.level().dimension().location().toString();
         double centerX = (bounds.minX() + bounds.maxX() + 1.0D) / 2.0D;
         double centerZ = (bounds.minZ() + bounds.maxZ() + 1.0D) / 2.0D;
         double y = Math.max(bounds.minY() + 1.0D, Math.min(player.getY(), bounds.maxY() + 1.0D));
@@ -451,7 +451,7 @@ public final class MinigameSelectionService {
         arena.managedRegion = true;
         arena.lobby = MinigameLocation.of(player);
         arena.spectator = MinigameLocation.of(player);
-        String dimension = player.level().dimension().identifier().toString();
+        String dimension = player.level().dimension().location().toString();
         int floorY = bounds.minY();
         arena.playFloor = new MinigameAreaBounds(dimension,
                 new BlockPos(bounds.minX(), floorY, bounds.minZ()),
@@ -482,13 +482,13 @@ public final class MinigameSelectionService {
         if (type == MinigameGameType.CAPTURE_THE_FLAG) {
             for (MinigameFlagPoint point : arena.flagPoints) {
                 Block block = BuiltInRegistries.BLOCK.getOptional(
-                        Identifier.parse(definition.captureTheFlag.flagBlock(point.team))).orElse(null);
+                        ResourceLocation.parse(definition.captureTheFlag.flagBlock(point.team))).orElse(null);
                 if (block != null) level.setBlockAndUpdate(BlockPos.containing(
                         point.location.x, point.location.y, point.location.z), block.defaultBlockState());
             }
         } else if (type == MinigameGameType.DOMINATION) {
             Block neutral = BuiltInRegistries.BLOCK.getOptional(
-                    Identifier.parse(definition.domination.neutralBannerBlock)).orElse(null);
+                    ResourceLocation.parse(definition.domination.neutralBannerBlock)).orElse(null);
             if (neutral == null) return;
             for (MinigameControlPoint point : arena.controlPoints) {
                 level.setBlockAndUpdate(BlockPos.containing(point.location.x, point.location.y, point.location.z),

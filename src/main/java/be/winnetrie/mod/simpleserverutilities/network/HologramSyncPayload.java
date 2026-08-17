@@ -9,14 +9,14 @@ import be.winnetrie.mod.simpleserverutilities.hologram.HologramType;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record HologramSyncPayload(List<Entry> entries) implements CustomPacketPayload {
     private static final int MAX_ENTRIES = 512;
     private static final int MAX_LINES = 64;
 
     public static final Type<HologramSyncPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "hologram_sync")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "hologram_sync")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, HologramSyncPayload> STREAM_CODEC =
             StreamCodec.of(HologramSyncPayload::encode, HologramSyncPayload::decode);

@@ -9,7 +9,7 @@ import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimChunkStatus;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Server-authoritative claim and region overlay data plus validated HUD settings. */
 public record MinimapDataPayload(
@@ -38,7 +38,7 @@ public record MinimapDataPayload(
     private static final int MAX_REGIONS = 256;
 
     public static final Type<MinimapDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minimap_data")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minimap_data")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, MinimapDataPayload> STREAM_CODEC =

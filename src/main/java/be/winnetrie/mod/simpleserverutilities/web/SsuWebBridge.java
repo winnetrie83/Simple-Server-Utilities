@@ -101,7 +101,7 @@ public final class SsuWebBridge {
         List<PlayerRow> players = new ArrayList<>();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             players.add(new PlayerRow(player.getUUID().toString(), player.getName().getString(),
-                    player.level().dimension().identifier().toString()));
+                    player.level().dimension().location().toString()));
         }
         boolean statsEnabled = SimpleServerUtilities.CORE.modules().isActive("community_statistics");
         CommunityStatisticsManager.WebSnapshot stats = statsEnabled

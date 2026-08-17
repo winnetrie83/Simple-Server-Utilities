@@ -7,11 +7,11 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record PlayerIdentitySyncPayload(List<Entry> entries) implements CustomPacketPayload {
     private static final int MAX_PLAYERS = 2048;
-    public static final Type<PlayerIdentitySyncPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "player_identity_sync"));
+    public static final Type<PlayerIdentitySyncPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "player_identity_sync"));
     public static final StreamCodec<RegistryFriendlyByteBuf, PlayerIdentitySyncPayload> STREAM_CODEC = StreamCodec.of(PlayerIdentitySyncPayload::encode, PlayerIdentitySyncPayload::decode);
     public PlayerIdentitySyncPayload { entries = entries == null ? List.of() : List.copyOf(entries); if(entries.size()>MAX_PLAYERS) throw new IllegalArgumentException("Too many identity entries."); }
     private static void encode(RegistryFriendlyByteBuf b, PlayerIdentitySyncPayload p){b.writeVarInt(p.entries.size());for(Entry e:p.entries){b.writeVarInt(e.entityId);b.writeUtf(e.playerName,64);b.writeUtf(e.rankPrefix,256);b.writeBoolean(e.showRank);b.writeUtf(e.title,48);b.writeInt(e.titleColor);b.writeBoolean(e.showTitle);}}

@@ -6,11 +6,11 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record NpcAbilityLibraryDataPayload(String query,int pageIndex,int pageCount,int totalAbilities,List<Entry> entries,String notice,boolean error,long requestId) implements CustomPacketPayload {
     public static final int MAX_ENTRIES=12;
-    public static final Type<NpcAbilityLibraryDataPayload> TYPE=new Type<>(Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID,"npc_ability_library_data"));
+    public static final Type<NpcAbilityLibraryDataPayload> TYPE=new Type<>(ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID,"npc_ability_library_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf,NpcAbilityLibraryDataPayload> STREAM_CODEC=StreamCodec.of(NpcAbilityLibraryDataPayload::encode,NpcAbilityLibraryDataPayload::decode);
     public NpcAbilityLibraryDataPayload{query=PayloadBounds.string(query,64);pageIndex=Math.max(0,pageIndex);pageCount=Math.max(1,pageCount);totalAbilities=Math.max(0,totalAbilities);entries=entries==null?List.of():List.copyOf(entries.subList(0,Math.min(entries.size(),MAX_ENTRIES)));notice=PayloadBounds.string(notice,256);requestId=Math.max(0L,requestId);}
     private static void encode(RegistryFriendlyByteBuf b,NpcAbilityLibraryDataPayload p){b.writeUtf(p.query,64);b.writeVarInt(p.pageIndex);b.writeVarInt(p.pageCount);b.writeVarInt(p.totalAbilities);b.writeVarInt(p.entries.size());for(Entry e:p.entries)e.encode(b);b.writeUtf(p.notice,256);b.writeBoolean(p.error);b.writeVarLong(p.requestId);}

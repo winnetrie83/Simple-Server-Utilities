@@ -64,7 +64,7 @@ public final class NpcToolManager {
         PacketDistributor.sendToPlayer(player, NpcEditorOpenPayload.create(
                 anchor.dimension(), anchor.x(), anchor.y(), anchor.z(), anchor.yaw(), anchor.pitch(),
                 be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities.NPCS
-                        .supportedLivingEntityTypes(player.level()),
+                        .supportedLivingEntityTypes(player.serverLevel()),
                 NpcEditorService.shopChoices(), NpcEditorService.factionChoices(),
                 be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities.NPCS.localTextureNames()));
     }
@@ -77,7 +77,7 @@ public final class NpcToolManager {
     }
 
     public Anchor setAnchor(ServerPlayer player, double x, double y, double z) {
-        Anchor anchor = new Anchor(player.level().dimension().identifier().toString(), x, y, z,
+        Anchor anchor = new Anchor(player.level().dimension().location().toString(), x, y, z,
                 player.getYRot(), 0.0F, player.level().getGameTime());
         anchors.put(player.getUUID(), anchor);
         return anchor;
@@ -123,7 +123,7 @@ public final class NpcToolManager {
     public Anchor validAnchor(ServerPlayer player) {
         Anchor anchor = anchors.get(player.getUUID());
         if (anchor == null
-                || !anchor.dimension().equals(player.level().dimension().identifier().toString())
+                || !anchor.dimension().equals(player.level().dimension().location().toString())
                 || player.level().getGameTime() - anchor.createdAtTick() > ANCHOR_TIMEOUT_TICKS) {
             anchors.remove(player.getUUID());
             return null;
@@ -149,7 +149,7 @@ public final class NpcToolManager {
         if (player == null || !NpcEditorService.canAdmin(player)) return false;
         NpcInstance instance = SimpleServerUtilities.NPCS.instance(rawInstanceId);
         if (instance == null) return false;
-        String dimension = player.level().dimension().identifier().toString();
+        String dimension = player.level().dimension().location().toString();
         if (!dimension.equals(instance.dimension)) {
             player.sendSystemMessage(Component.literal("Teleport to the NPC's dimension before editing its patrol route."), true);
             return false;
@@ -171,7 +171,7 @@ public final class NpcToolManager {
         if (player == null || !NpcEditorService.canAdmin(player)) return false;
         NpcInstance instance = SimpleServerUtilities.NPCS.instance(rawInstanceId);
         if (instance == null) return false;
-        String dimension = player.level().dimension().identifier().toString();
+        String dimension = player.level().dimension().location().toString();
         if (!dimension.equals(instance.dimension)) {
             player.sendSystemMessage(Component.literal("Teleport to the NPC's dimension before editing its schedule route."), true);
             return false;
@@ -202,7 +202,7 @@ public final class NpcToolManager {
         NpcInstance updated = existing.copy();
         NpcScheduleEntry entry = new NpcScheduleEntry();
         entry.minuteOfDay = nextFreeScheduleMinute(existing.schedule,
-                GameCalendar.fromClockTime(player.level().getDefaultClockTime()).minuteOfDay());
+                GameCalendar.fromClockTime(player.level().getDayTime()).minuteOfDay());
         entry.x = x; entry.y = y; entry.z = z; entry.yaw = player.getYRot();
         entry.movement = NpcScheduleEntry.MOVEMENT_WALK;
         entry.activity = NpcScheduleEntry.ACTIVITY_IDLE;
@@ -378,13 +378,13 @@ public final class NpcToolManager {
             ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
             if (player == null || !NpcEditorService.canAdmin(player)) { patrolEditors.remove(entry.getKey()); continue; }
             PatrolEditSession session = entry.getValue();
-            if (!session.dimension().equals(player.level().dimension().identifier().toString())) {
+            if (!session.dimension().equals(player.level().dimension().location().toString())) {
                 cancelPatrolEdit(player, "Patrol route editing stopped because you changed dimension.");
                 continue;
             }
             NpcInstance instance = SimpleServerUtilities.NPCS.instance(session.instanceId());
             if (instance == null) { cancelPatrolEdit(player, "Patrol route editing stopped because the NPC was removed."); continue; }
-            ServerLevel level = player.level();
+            ServerLevel level = (ServerLevel) player.level();
             for (int i = 0; i < instance.patrol.size(); i++) {
                 NpcPatrolPoint point = instance.patrol.get(i);
                 level.sendParticles(ParticleTypes.END_ROD, point.x, point.y + 0.15D, point.z,
@@ -399,13 +399,13 @@ public final class NpcToolManager {
             ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
             if (player == null || !NpcEditorService.canAdmin(player)) { scheduleEditors.remove(entry.getKey()); continue; }
             ScheduleEditSession session = entry.getValue();
-            if (!session.dimension().equals(player.level().dimension().identifier().toString())) {
+            if (!session.dimension().equals(player.level().dimension().location().toString())) {
                 cancelScheduleEdit(player, "Schedule route editing stopped because you changed dimension.");
                 continue;
             }
             NpcInstance instance = SimpleServerUtilities.NPCS.instance(session.instanceId());
             if (instance == null) { cancelScheduleEdit(player, "Schedule route editing stopped because the NPC was removed."); continue; }
-            ServerLevel level = player.level();
+            ServerLevel level = (ServerLevel) player.level();
             for (int i = 0; i < instance.schedule.size(); i++) {
                 NpcScheduleEntry point = instance.schedule.get(i);
                 level.sendParticles(ParticleTypes.END_ROD, point.x, point.y + 0.25D, point.z,
@@ -473,7 +473,7 @@ public final class NpcToolManager {
         if (player == null) return null;
         PatrolEditSession session = patrolEditors.get(player.getUUID());
         if (session == null) return null;
-        if (!session.dimension().equals(player.level().dimension().identifier().toString())) {
+        if (!session.dimension().equals(player.level().dimension().location().toString())) {
             cancelPatrolEdit(player, "Patrol route editing stopped because you changed dimension.");
             return null;
         }
@@ -484,7 +484,7 @@ public final class NpcToolManager {
         if (player == null) return null;
         ScheduleEditSession session = scheduleEditors.get(player.getUUID());
         if (session == null) return null;
-        if (!session.dimension().equals(player.level().dimension().identifier().toString())) {
+        if (!session.dimension().equals(player.level().dimension().location().toString())) {
             cancelScheduleEdit(player, "Schedule route editing stopped because you changed dimension.");
             return null;
         }

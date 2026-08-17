@@ -262,7 +262,7 @@ public final class HologramManager {
         if (previous != null) {
             for (HologramSyncPayload.Entry entry : previous) previousById.put(entry.id(), entry);
         }
-        String dimension = player.level().dimension().identifier().toString();
+        String dimension = player.level().dimension().location().toString();
         List<HologramSyncPayload.Entry> entries = new ArrayList<>();
         for (HologramDefinition definition : nearbyDefinitions(
                 dimension, player.getX(), player.getZ(), globalDistance)) {

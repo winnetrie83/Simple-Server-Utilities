@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Complete server-owned dialogue draft plus registered editor catalogues and safe target browsers. */
 public record NpcDialogueEditorOpenPayload(
@@ -20,7 +20,7 @@ public record NpcDialogueEditorOpenPayload(
         List<TargetEntry> availableTargets)
         implements CustomPacketPayload {
     public static final Type<NpcDialogueEditorOpenPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_dialogue_editor_open"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_dialogue_editor_open"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcDialogueEditorOpenPayload> STREAM_CODEC =
             StreamCodec.of(NpcDialogueEditorOpenPayload::encode, NpcDialogueEditorOpenPayload::decode);
 

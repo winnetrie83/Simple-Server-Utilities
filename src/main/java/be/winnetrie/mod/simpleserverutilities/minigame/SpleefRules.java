@@ -5,7 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Server-validated settings for the first concrete SSU minigame mode. */
 public final class SpleefRules {
@@ -39,7 +39,7 @@ public final class SpleefRules {
             for (String raw : breakableBlocks) {
                 String value = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
                 if (value.isBlank()) continue;
-                Identifier.parse(value);
+                ResourceLocation.parse(value);
                 normalized.add(value);
                 if (normalized.size() >= MAX_BREAKABLE_BLOCKS) break;
             }
@@ -66,7 +66,7 @@ public final class SpleefRules {
 
     private static String normalizeIdentifier(String raw, String fallback) {
         String value = raw == null || raw.isBlank() ? fallback : raw.trim().toLowerCase(Locale.ROOT);
-        Identifier.parse(value);
+        ResourceLocation.parse(value);
         return value;
     }
 }

@@ -15,7 +15,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -139,7 +139,7 @@ public final class UtilityMiningCommands {
     ) {
         final String block;
         try {
-            block = Identifier.parse(rawBlock).toString().toLowerCase(Locale.ROOT);
+            block = ResourceLocation.parse(rawBlock).toString().toLowerCase(Locale.ROOT);
         } catch (Exception e) {
             source.sendFailure(Component.literal("Invalid block identifier: " + rawBlock));
             return 0;

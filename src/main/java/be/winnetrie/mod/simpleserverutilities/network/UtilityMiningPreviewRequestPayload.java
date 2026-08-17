@@ -5,13 +5,13 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Requests a server-authoritative tree/vein preview for the block under the crosshair. */
 public record UtilityMiningPreviewRequestPayload(long packedBlockPos) implements CustomPacketPayload {
 
     public static final Type<UtilityMiningPreviewRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "utility_mining_preview_request")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "utility_mining_preview_request")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, UtilityMiningPreviewRequestPayload> STREAM_CODEC =

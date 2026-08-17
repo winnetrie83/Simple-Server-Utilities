@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Bounded Server Operations action envelope; rich support messages use the larger value allowance. */
 public record ServerOperationsActionPayload(boolean admin, String action, String target, String value, String extra, long requestId)
@@ -15,7 +15,7 @@ public record ServerOperationsActionPayload(boolean admin, String action, String
     private static final int MAX_EXTRA = 4_096;
 
     public static final Type<ServerOperationsActionPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "server_operations_action"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "server_operations_action"));
     public static final StreamCodec<RegistryFriendlyByteBuf, ServerOperationsActionPayload> STREAM_CODEC =
             StreamCodec.of(ServerOperationsActionPayload::encode, ServerOperationsActionPayload::decode);
 

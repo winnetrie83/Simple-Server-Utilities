@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Creates the first arena of a minigame from the administrator's active region selection. */
 public record MinigameSelectionCreatePayload(
@@ -16,7 +16,7 @@ public record MinigameSelectionCreatePayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<MinigameSelectionCreatePayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_selection_create"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_selection_create"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameSelectionCreatePayload> STREAM_CODEC =
             StreamCodec.of(MinigameSelectionCreatePayload::encode, MinigameSelectionCreatePayload::decode);
 

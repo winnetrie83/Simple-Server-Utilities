@@ -9,12 +9,12 @@ import be.winnetrie.mod.simpleserverutilities.network.SsuMenuActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPermissionEditorDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuPermissionEditorRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Searchable, paged editor for contextual permission overrides on one server region. */
 public final class RegionPermissionScreen extends Screen {
@@ -148,20 +148,20 @@ public final class RegionPermissionScreen extends Screen {
     private void set(String key, String value) {
         long id = nextRequestId++;
         latestActionRequest = id;
-        ClientPacketDistributor.sendToServer(new SsuMenuActionPayload(
+        PacketDistributor.sendToServer(new SsuMenuActionPayload(
                 "permission_region_set", data.selectedTarget(), key, value, id));
     }
 
     private void unset(String key) {
         long id = nextRequestId++;
         latestActionRequest = id;
-        ClientPacketDistributor.sendToServer(new SsuMenuActionPayload(
+        PacketDistributor.sendToServer(new SsuMenuActionPayload(
                 "permission_region_unset", data.selectedTarget(), key, "", id));
     }
 
     private void requestPage(int pageIndex) {
         long id = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new SsuPermissionEditorRequestPayload(
+        PacketDistributor.sendToServer(new SsuPermissionEditorRequestPayload(
                 "region", data.selectedTarget(), "", "", query,
                 Math.max(0, pageIndex), PAGE_SIZE, id));
     }
@@ -171,16 +171,16 @@ public final class RegionPermissionScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         Layout l = layout();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(l.left(), l.top(), l.right(), l.bottom(), PANEL);
-        g.outline(l.left(), l.top(), l.width(), l.height(), BORDER);
-        g.text(font, "Region permissions — " + data.selectedLabel(), l.left() + 10, l.top() + 10, TEXT, false);
-        g.text(font, data.targetSummary(), l.left() + 10, l.top() + 25, MUTED, false);
+        g.renderOutline(l.left(), l.top(), l.width(), l.height(), BORDER);
+        g.drawString(font, "Region permissions — " + data.selectedLabel(), l.left() + 10, l.top() + 10, TEXT, false);
+        g.drawString(font, data.targetSummary(), l.left() + 10, l.top() + 25, MUTED, false);
 
         if (data.permissions().isEmpty()) {
-            g.text(font, "No permissions match this search.", l.left() + 12, l.listTop() + 8, MUTED, false);
+            g.drawString(font, "No permissions match this search.", l.left() + 12, l.listTop() + 8, MUTED, false);
         }
         for (int index = 0; index < data.permissions().size(); index++) {
             SsuPermissionEditorDataPayload.PermissionEntry entry = data.permissions().get(index);
@@ -188,17 +188,17 @@ public final class RegionPermissionScreen extends Screen {
             if ((index & 1) == 0) g.fill(l.left() + 6, y, l.right() - 6, y + ROW_HEIGHT - 2, 0x401F2A34);
             int keyColor = entry.directValue().isBlank() ? TEXT
                     : "false".equalsIgnoreCase(entry.directValue()) ? WARNING : GOOD;
-            g.text(font, trim(entry.key(), 46), l.left() + 12, y + 9, keyColor, false);
+            g.drawString(font, trim(entry.key(), 46), l.left() + 12, y + 9, keyColor, false);
         }
 
-        g.text(font, "Page " + (data.pageIndex() + 1) + " / " + pageCount(),
+        g.drawString(font, "Page " + (data.pageIndex() + 1) + " / " + pageCount(),
                 l.left() + 176, l.bottom() - 22, MUTED, false);
         if (!notice.isBlank()) {
-            g.text(font, trim(notice, 88), l.left() + 10, l.bottom() - 45,
+            g.drawString(font, trim(notice, 88), l.left() + 10, l.bottom() - 45,
                     noticeError ? ERROR : GOOD, false);
         }
 
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
 
         for (RowBounds row : rowBounds) {
             if (!row.contains(mouseX, mouseY)) continue;
@@ -213,7 +213,7 @@ public final class RegionPermissionScreen extends Screen {
                     + (entry.directValue().isBlank() ? "Default / none" : entry.directValue())));
             tooltip.add(Component.literal("Fallback preview: " + blank(entry.defaultValue())));
             tooltip.add(Component.literal("Resolved source: " + entry.source()));
-            g.setComponentTooltipForNextFrame(font, tooltip, mouseX, mouseY);
+            g.renderComponentTooltip(font, tooltip, mouseX, mouseY);
             break;
         }
     }
@@ -228,7 +228,7 @@ public final class RegionPermissionScreen extends Screen {
 
     @Override
     public void onClose() {
-        if (parent != null) minecraft.setScreenAndShow(parent);
+        if (parent != null) minecraft.setScreen(parent);
         else super.onClose();
     }
 

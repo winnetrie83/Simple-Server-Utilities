@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Closed, server-validated personal setting update used outside the dashboard shell. */
 public record PlayerUiSettingUpdatePayload(String key, String value) implements CustomPacketPayload {
     public static final Type<PlayerUiSettingUpdatePayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "player_ui_setting_update")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "player_ui_setting_update")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, PlayerUiSettingUpdatePayload> STREAM_CODEC =
             StreamCodec.of(PlayerUiSettingUpdatePayload::encode, PlayerUiSettingUpdatePayload::decode);

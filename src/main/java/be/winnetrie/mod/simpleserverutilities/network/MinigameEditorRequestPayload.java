@@ -4,11 +4,11 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record MinigameEditorRequestPayload(String minigameId, long requestId) implements CustomPacketPayload {
     public static final Type<MinigameEditorRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_editor_request"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_editor_request"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameEditorRequestPayload> STREAM_CODEC =
             StreamCodec.of(MinigameEditorRequestPayload::encode, MinigameEditorRequestPayload::decode);
 

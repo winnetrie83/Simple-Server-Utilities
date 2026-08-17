@@ -861,7 +861,7 @@ public class RegionCommands {
 
         Component confirm = Component.literal("[CONFIRM UNRENT]")
                 .withStyle(style -> style.withColor(ChatFormatting.RED)
-                        .withClickEvent(new ClickEvent.RunCommand("/regions confirmunrent " + region.getName())));
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/regions confirmunrent " + region.getName())));
 
         player.sendSystemMessage(Component.literal("Unrenting may remove your access and may reset the region."));
         player.sendSystemMessage(Component.literal("Click to confirm: ").append(confirm));
@@ -1050,7 +1050,7 @@ public class RegionCommands {
                 + SimpleServerUtilities.ECONOMY.formattedBalance(player)));
         Component accept = Component.literal("[CONFIRM EXTENSION]")
                 .withStyle(style -> style.withColor(ChatFormatting.GREEN)
-                        .withClickEvent(new ClickEvent.RunCommand("/regions extendaccept " + region.getName())));
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/regions extendaccept " + region.getName())));
         player.sendSystemMessage(Component.literal("Click to confirm: ").append(accept));
         return 1;
     }
@@ -2133,11 +2133,11 @@ public class RegionCommands {
 
         Component accept = Component.literal("[ACCEPT]")
                 .withStyle(style -> style.withColor(ChatFormatting.GREEN)
-                        .withClickEvent(new ClickEvent.RunCommand("/regions rentaccept " + region.getName())));
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/regions rentaccept " + region.getName())));
 
         Component decline = Component.literal(" [DECLINE]")
                 .withStyle(style -> style.withColor(ChatFormatting.RED)
-                        .withClickEvent(new ClickEvent.RunCommand("/regions rentdecline " + region.getName())));
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/regions rentdecline " + region.getName())));
 
         player.sendSystemMessage(Component.literal("").append(accept).append(decline));
     }

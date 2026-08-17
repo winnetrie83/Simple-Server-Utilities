@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Complete, bounded state for the dashboard permission editor. */
 public record SsuPermissionEditorDataPayload(
@@ -34,7 +34,7 @@ public record SsuPermissionEditorDataPayload(
     private static final int MAX_PERMISSIONS = SsuPermissionEditorRequestPayload.MAX_PAGE_SIZE;
 
     public static final Type<SsuPermissionEditorDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "permission_editor_data")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "permission_editor_data")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuPermissionEditorDataPayload> STREAM_CODEC =
             StreamCodec.of(SsuPermissionEditorDataPayload::encode, SsuPermissionEditorDataPayload::decode);

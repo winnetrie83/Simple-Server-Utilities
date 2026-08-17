@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record BlockInformationStatePayload(
         boolean allowed,
@@ -15,7 +15,7 @@ public record BlockInformationStatePayload(
         int inventoryMaxItems
 ) implements CustomPacketPayload {
     public static final Type<BlockInformationStatePayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "block_information_state"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "block_information_state"));
     public static final StreamCodec<RegistryFriendlyByteBuf, BlockInformationStatePayload> STREAM_CODEC =
             StreamCodec.of((buffer, payload) -> {
                 buffer.writeBoolean(payload.allowed());

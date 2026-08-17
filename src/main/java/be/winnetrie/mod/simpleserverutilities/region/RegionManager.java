@@ -28,7 +28,7 @@ import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.Level;
@@ -435,7 +435,7 @@ public class RegionManager {
 
     private Region regionFromJson(JsonObject json) {
         String name = json.get("name").getAsString();
-        Identifier dimensionId = Identifier.parse(json.get("dimension").getAsString());
+        ResourceLocation dimensionId = ResourceLocation.parse(json.get("dimension").getAsString());
         ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimensionId);
 
         BlockPos point1 = new BlockPos(
@@ -556,7 +556,7 @@ public class RegionManager {
 
         json.addProperty("schemaVersion", 5);
         json.addProperty("name", region.getName());
-        json.addProperty("dimension", region.getDimension().identifier().toString());
+        json.addProperty("dimension", region.getDimension().location().toString());
         json.addProperty("priority", region.getPriority());
         json.addProperty("borderVisible", region.isBorderVisible());
 
@@ -706,7 +706,7 @@ public class RegionManager {
 
         if (!SsuModuleAccess.active("claims")) return null;
         for (PlayerClaim claim : SimpleServerUtilities.PLAYER_CLAIMS.getClaims()) {
-            if (!claim.getDimension().equals(dimension.identifier().toString())) {
+            if (!claim.getDimension().equals(dimension.location().toString())) {
                 continue;
             }
 

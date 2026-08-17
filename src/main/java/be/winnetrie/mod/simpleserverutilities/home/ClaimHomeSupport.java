@@ -28,7 +28,7 @@ public final class ClaimHomeSupport {
 
     public static boolean contains(PlayerClaim claim, Level level, BlockPos position) {
         if (claim == null || level == null || position == null) return false;
-        String dimension = level.dimension().identifier().toString();
+        String dimension = level.dimension().location().toString();
         return claim.getDimension().equals(dimension)
                 && claim.hasChunk(Math.floorDiv(position.getX(), 16), Math.floorDiv(position.getZ(), 16));
     }

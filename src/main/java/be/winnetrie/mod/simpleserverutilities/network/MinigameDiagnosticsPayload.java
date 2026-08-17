@@ -7,14 +7,14 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Bounded administrator-facing Minigame Framework health and integrity report. */
 public record MinigameDiagnosticsPayload(String title, String notice, boolean error, List<Line> lines,
         long requestId) implements CustomPacketPayload {
     public static final int MAX_LINES = 192;
     public static final Type<MinigameDiagnosticsPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_diagnostics"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_diagnostics"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameDiagnosticsPayload> STREAM_CODEC =
             StreamCodec.of(MinigameDiagnosticsPayload::encode, MinigameDiagnosticsPayload::decode);
 

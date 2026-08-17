@@ -20,7 +20,7 @@ public final class DungeonLocation {
     }
 
     public static DungeonLocation of(ServerPlayer player) {
-        return new DungeonLocation(player.level().dimension().identifier().toString(),
+        return new DungeonLocation(player.level().dimension().location().toString(),
                 player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot());
     }
 

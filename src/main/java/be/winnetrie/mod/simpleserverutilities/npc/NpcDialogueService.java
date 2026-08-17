@@ -421,7 +421,7 @@ public final class NpcDialogueService {
     }
 
     private static boolean near(ServerPlayer player, NpcInstance instance) {
-        return player.level().dimension().identifier().toString().equals(instance.dimension)
+        return player.level().dimension().location().toString().equals(instance.dimension)
                 && player.distanceToSqr(instance.x, instance.y, instance.z) <= MAX_DISTANCE_SQUARED;
     }
 

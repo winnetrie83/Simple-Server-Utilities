@@ -30,7 +30,7 @@ public final class NpcSpawnProfileEditorService {
         if (!NpcEditorService.canAdmin(player)) return;
         NpcSpawnProfile profile = new NpcSpawnProfile();
         profile.id = uniqueId("spawn_profile");
-        profile.dimension = player.level().dimension().identifier().toString();
+        profile.dimension = player.level().dimension().location().toString();
         List<NpcDefinition> definitions = new ArrayList<>(SimpleServerUtilities.NPCS.definitions());
         if (!definitions.isEmpty()) profile.definitionId = definitions.getFirst().id;
         SpawnerAnchor anchor = lookedSpawner(player);
@@ -117,7 +117,7 @@ public final class NpcSpawnProfileEditorService {
         if (!(hit instanceof BlockHitResult blockHit) || hit.getType() != HitResult.Type.BLOCK) return null;
         BlockPos pos = blockHit.getBlockPos();
         if (!player.level().getBlockState(pos).is(Blocks.SPAWNER)) return null;
-        return new SpawnerAnchor(player.level().dimension().identifier().toString(), pos.immutable());
+        return new SpawnerAnchor(player.level().dimension().location().toString(), pos.immutable());
     }
 
     private static boolean validSpawnerAnchor(ServerPlayer player, NpcSpawnProfile profile) {
@@ -131,7 +131,7 @@ public final class NpcSpawnProfileEditorService {
     private static ServerLevel resolveLevel(ServerPlayer player, String rawDimension) {
         if (player == null || rawDimension == null || rawDimension.isBlank()) return null;
         for (ServerLevel level : player.level().getServer().getAllLevels()) {
-            if (rawDimension.equals(level.dimension().identifier().toString())) return level;
+            if (rawDimension.equals(level.dimension().location().toString())) return level;
         }
         return null;
     }

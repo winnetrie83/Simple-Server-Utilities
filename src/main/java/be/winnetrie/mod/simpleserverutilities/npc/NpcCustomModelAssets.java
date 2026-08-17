@@ -1,6 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.npc;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Legacy/future custom-geometry metadata helpers. Custom geometry is inactive in dev3.32. */
 public final class NpcCustomModelAssets {
@@ -40,7 +40,7 @@ public final class NpcCustomModelAssets {
     public static boolean validIdentifier(String raw) {
         if (raw == null || raw.isBlank() || raw.length() > MAX_RESOURCE_LENGTH) return false;
         try {
-            Identifier.parse(raw);
+            ResourceLocation.parse(raw);
             return true;
         } catch (RuntimeException ignored) {
             return false;

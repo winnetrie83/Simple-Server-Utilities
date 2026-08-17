@@ -13,16 +13,16 @@ import com.google.gson.JsonObject;
 import be.winnetrie.mod.simpleserverutilities.mine.MineDefinition;
 import be.winnetrie.mod.simpleserverutilities.network.MineActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MineDataPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Dedicated Mines catalogue/admin workflow, independent from generic Regions. */
 public final class MineScreen extends Screen {
@@ -87,9 +87,9 @@ public final class MineScreen extends Screen {
         Button del=addRenderableWidget(Button.builder(Component.literal("Delete"),v->send("admin_delete",d.id,"{}")).bounds(fx+236,by,64,19).build());del.active=editableExisting();
     }
 
-    private void openPalette(MineDefinition d){if(minecraft!=null)minecraft.setScreenAndShow(new MinePaletteEditorScreen(d.copy(),this));}
-    private void openRules(MineDefinition d){if(minecraft!=null)minecraft.setScreenAndShow(new MineRulesScreen(d.copy(),this));}
-    private void openStats(MineDefinition d){if(minecraft!=null)minecraft.setScreenAndShow(new MineStatisticsScreen(d.copy(),this));}
+    private void openPalette(MineDefinition d){if(minecraft!=null)minecraft.setScreen(new MinePaletteEditorScreen(d.copy(),this));}
+    private void openRules(MineDefinition d){if(minecraft!=null)minecraft.setScreen(new MineRulesScreen(d.copy(),this));}
+    private void openStats(MineDefinition d){if(minecraft!=null)minecraft.setScreen(new MineStatisticsScreen(d.copy(),this));}
 
     private void save(){
         MineDefinition d=current().copy();String originalId=d.id;d.id=idBox==null?d.id:idBox.getValue();d.displayName=nameBox==null?d.displayName:nameBox.getValue();d.permissionKey=permissionBox==null?d.permissionKey:permissionBox.getValue();if((creating||mines.isEmpty())&&(d.permissionKey.isBlank()||d.permissionKey.equals("ssu.mines.use."+MineDefinition.normalizeId(originalId))||d.permissionKey.equals("ssu.mines."+MineDefinition.normalizeId(originalId)+".use")))d.permissionKey="ssu.mines.use."+MineDefinition.normalizeId(d.id);d.resetIntervalSeconds=longValue(intervalBox,d.resetIntervalSeconds);d.resetMinedPercent=intValue(thresholdBox,d.resetMinedPercent);d.warningSeconds=intValue(warningBox,d.warningSeconds);d.enabled=enabled;d.resetOnlyWhenEmpty=onlyEmpty;d.teleportPlayersOnReset=teleportOnReset;d.normalize();send(creating||mines.isEmpty()?"admin_create":"admin_save",d.id,GSON.toJson(d));
@@ -99,29 +99,29 @@ public final class MineScreen extends Screen {
     private MineDefinition fresh(){MineDefinition d=new MineDefinition();d.id="new_mine";d.displayName="New Mine";d.normalize();return d;}
     private boolean editableExisting(){return !creating&&!mines.isEmpty();}
     private EditBox box(int x,int y,int w,String value,int max,String hint){EditBox e=new EditBox(font,x,y,w,19,Component.literal(hint));e.setHint(Component.literal(hint));e.setMaxLength(max);e.setValue(value==null?"":value);addRenderableWidget(e);return e;}
-    private void send(String action,String id,String json){ClientPacketDistributor.sendToServer(new MineActionPayload(action,id,json,request++));}
+    private void send(String action,String id,String json){PacketDistributor.sendToServer(new MineActionPayload(action,id,json,request++));}
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float partialTick){
-        int x=left(),y=top(),w=widthPanel(),h=heightPanel();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+w,y+h,PANEL);g.outline(x,y,w,h,BORDER);g.text(font,data.admin()?"Mine Administration":"Mines",x+14,y+13,TEXT,true);if(mines.size()>rowsPerPage()){int maxPage=(mines.size()-1)/rowsPerPage();g.centeredText(font,"Page "+(page+1)+"/"+(maxPage+1),x+99,y+h-46,MUTED);}
-        if(data.admin())drawAdmin(g,x,y,mouseX,mouseY);else drawPlayer(g,x,y,mouseX,mouseY);if(!data.notice().isBlank()){var lines=font.split(Component.literal(data.notice()),Math.max(120,w-270));for(int i=0;i<Math.min(3,lines.size());i++)g.text(font,lines.get(i),x+170,y+h-66+i*11,data.error()?0xFFFF8585:GOOD,false);}super.extractRenderState(g,mouseX,mouseY,partialTick);
+    @Override public void render(GuiGraphics g,int mouseX,int mouseY,float partialTick){
+        int x=left(),y=top(),w=widthPanel(),h=heightPanel();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+w,y+h,PANEL);g.renderOutline(x,y,w,h,BORDER);g.drawString(font,data.admin()?"Mine Administration":"Mines",x+14,y+13,TEXT,true);if(mines.size()>rowsPerPage()){int maxPage=(mines.size()-1)/rowsPerPage();g.drawCenteredString(font,"Page "+(page+1)+"/"+(maxPage+1),x+99,y+h-46,MUTED);}
+        if(data.admin())drawAdmin(g,x,y,mouseX,mouseY);else drawPlayer(g,x,y,mouseX,mouseY);if(!data.notice().isBlank()){var lines=font.split(Component.literal(data.notice()),Math.max(120,w-270));for(int i=0;i<Math.min(3,lines.size());i++)g.drawString(font,lines.get(i),x+170,y+h-66+i*11,data.error()?0xFFFF8585:GOOD,false);}super.render(g,mouseX,mouseY,partialTick);
     }
 
-    private void drawAdmin(GuiGraphicsExtractor g,int x,int y,int mx,int my){
-        MineDefinition d=current();int fx=x+170;g.text(font,"Mine ID",fx,y+33,MUTED,false);g.text(font,"Display name",fx+124,y+33,MUTED,false);g.text(font,"Permission / rank access key",fx,y+65,MUTED,false);g.text(font,"Reset sec",fx,y+97,MUTED,false);g.text(font,"Mined %",fx+76,y+97,MUTED,false);g.text(font,"Warn",fx+140,y+97,MUTED,false);
-        String bounds=d.boundsSet?d.dimension+"  ["+d.minX+","+d.minY+","+d.minZ+"] → ["+d.maxX+","+d.maxY+","+d.maxZ+"]":"No bounds yet";g.text(font,trim(bounds,58),fx,y+190,d.boundsSet?MUTED:WARNING,false);if(d.boundsSet)g.text(font,"Region: "+(d.parentRegion.isBlank()?"not detected":d.parentRegion),fx+300,y+190,MUTED,false);
-        g.text(font,"Palette",fx,y+204,MUTED,false);for(int i=0;i<Math.min(9,d.palette.size());i++){int sx=fx+48+i*22;drawBlockIcon(g,d.palette.get(i).blockId,sx,y+198,mx,my);}
-        String rule="Drops: "+displayDropMode(d.dropMode)+" • XP x"+String.format(Locale.ROOT,"%.2f",d.experienceMultiplier)+" • Fortune "+on(d.allowFortune)+" • Silk "+on(d.allowSilkTouch);g.text(font,trim(rule,64),fx,y+254,MUTED,false);
-        String status="Current "+d.blocksMined+"/"+d.volume()+" • Lifetime "+d.totalBlocksMined+" • Resets "+d.resetCount+" • Uses "+d.totalUses;g.text(font,trim(status,66),fx,y+270,GOOD,false);
-        String holo=d.statusHologramEnabled?"Status hologram: ON"+(d.hologramSet?" (custom position)":" (auto position)"):"Status hologram: OFF";g.text(font,holo,fx,y+286,d.statusHologramEnabled?GOOD:MUTED,false);
-        if(bool(selection,"complete"))g.text(font,"Setup selection ready",fx+364,y+204,GOOD,false);
+    private void drawAdmin(GuiGraphics g,int x,int y,int mx,int my){
+        MineDefinition d=current();int fx=x+170;g.drawString(font,"Mine ID",fx,y+33,MUTED,false);g.drawString(font,"Display name",fx+124,y+33,MUTED,false);g.drawString(font,"Permission / rank access key",fx,y+65,MUTED,false);g.drawString(font,"Reset sec",fx,y+97,MUTED,false);g.drawString(font,"Mined %",fx+76,y+97,MUTED,false);g.drawString(font,"Warn",fx+140,y+97,MUTED,false);
+        String bounds=d.boundsSet?d.dimension+"  ["+d.minX+","+d.minY+","+d.minZ+"] → ["+d.maxX+","+d.maxY+","+d.maxZ+"]":"No bounds yet";g.drawString(font,trim(bounds,58),fx,y+190,d.boundsSet?MUTED:WARNING,false);if(d.boundsSet)g.drawString(font,"Region: "+(d.parentRegion.isBlank()?"not detected":d.parentRegion),fx+300,y+190,MUTED,false);
+        g.drawString(font,"Palette",fx,y+204,MUTED,false);for(int i=0;i<Math.min(9,d.palette.size());i++){int sx=fx+48+i*22;drawBlockIcon(g,d.palette.get(i).blockId,sx,y+198,mx,my);}
+        String rule="Drops: "+displayDropMode(d.dropMode)+" • XP x"+String.format(Locale.ROOT,"%.2f",d.experienceMultiplier)+" • Fortune "+on(d.allowFortune)+" • Silk "+on(d.allowSilkTouch);g.drawString(font,trim(rule,64),fx,y+254,MUTED,false);
+        String status="Current "+d.blocksMined+"/"+d.volume()+" • Lifetime "+d.totalBlocksMined+" • Resets "+d.resetCount+" • Uses "+d.totalUses;g.drawString(font,trim(status,66),fx,y+270,GOOD,false);
+        String holo=d.statusHologramEnabled?"Status hologram: ON"+(d.hologramSet?" (custom position)":" (auto position)"):"Status hologram: OFF";g.drawString(font,holo,fx,y+286,d.statusHologramEnabled?GOOD:MUTED,false);
+        if(bool(selection,"complete"))g.drawString(font,"Setup selection ready",fx+364,y+204,GOOD,false);
     }
 
-    private void drawPlayer(GuiGraphicsExtractor g,int x,int y,int mx,int my){
-        if(mines.isEmpty()){g.text(font,"No mines are currently available to you.",x+154,y+60,MUTED,false);return;}MineDefinition d=mines.get(selected);int dx=x+154;g.text(font,d.displayName,dx,y+52,TEXT,true);g.text(font,String.format(Locale.ROOT,"Remaining %.1f%% • mined %.1f%%",d.remainingPercent(),d.minedPercent()),dx,y+76,GOOD,false);String reset=d.nextResetAt>0L?"Reset in "+Math.max(0L,(d.nextResetAt-System.currentTimeMillis()+999L)/1000L)+"s":d.resetMinedPercent>0?"Waiting for mined threshold":"Manual reset";g.text(font,reset,dx,y+94,MUTED,false);g.text(font,"Blocks",dx,y+122,MUTED,false);for(int i=0;i<Math.min(9,d.palette.size());i++){int sx=dx+i*24;drawBlockIcon(g,d.palette.get(i).blockId,sx,y+136,mx,my);g.centeredText(font,Integer.toString(d.palette.get(i).weight),sx+9,y+157,MUTED);}String rules="Drops: "+displayDropMode(d.dropMode)+" • XP x"+String.format(Locale.ROOT,"%.2f",d.experienceMultiplier);g.text(font,rules,dx,y+184,MUTED,false);
+    private void drawPlayer(GuiGraphics g,int x,int y,int mx,int my){
+        if(mines.isEmpty()){g.drawString(font,"No mines are currently available to you.",x+154,y+60,MUTED,false);return;}MineDefinition d=mines.get(selected);int dx=x+154;g.drawString(font,d.displayName,dx,y+52,TEXT,true);g.drawString(font,String.format(Locale.ROOT,"Remaining %.1f%% • mined %.1f%%",d.remainingPercent(),d.minedPercent()),dx,y+76,GOOD,false);String reset=d.nextResetAt>0L?"Reset in "+Math.max(0L,(d.nextResetAt-System.currentTimeMillis()+999L)/1000L)+"s":d.resetMinedPercent>0?"Waiting for mined threshold":"Manual reset";g.drawString(font,reset,dx,y+94,MUTED,false);g.drawString(font,"Blocks",dx,y+122,MUTED,false);for(int i=0;i<Math.min(9,d.palette.size());i++){int sx=dx+i*24;drawBlockIcon(g,d.palette.get(i).blockId,sx,y+136,mx,my);g.drawCenteredString(font,Integer.toString(d.palette.get(i).weight),sx+9,y+157,MUTED);}String rules="Drops: "+displayDropMode(d.dropMode)+" • XP x"+String.format(Locale.ROOT,"%.2f",d.experienceMultiplier);g.drawString(font,rules,dx,y+184,MUTED,false);
     }
 
-    private void drawBlockIcon(GuiGraphicsExtractor g,String blockId,int x,int y,int mx,int my){g.fill(x,y,x+20,y+20,0xFF090D12);g.outline(x,y,20,20,BORDER);try{var block=BuiltInRegistries.BLOCK.getOptional(Identifier.parse(blockId)).orElse(Blocks.AIR);ItemStack stack=new ItemStack(block.asItem());if(!stack.isEmpty()){g.item(stack,x+2,y+2);if(SsuGuiGeometry.inside(mx,my,x,y,20,20))g.setTooltipForNextFrame(font,stack,mx,my);}}catch(Exception ignored){}}
-    @Override public void onClose(){if(minecraft!=null)minecraft.setScreenAndShow(parent);}@Override public boolean isPauseScreen(){return false;}
+    private void drawBlockIcon(GuiGraphics g,String blockId,int x,int y,int mx,int my){g.fill(x,y,x+20,y+20,0xFF090D12);g.renderOutline(x,y,20,20,BORDER);try{var block=BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(blockId)).orElse(Blocks.AIR);ItemStack stack=new ItemStack(block.asItem());if(!stack.isEmpty()){g.renderItem(stack,x+2,y+2);if(SsuGuiGeometry.inside(mx,my,x,y,20,20))g.renderTooltip(font,stack,mx,my);}}catch(Exception ignored){}}
+    @Override public void onClose(){if(minecraft!=null)minecraft.setScreen(parent);}@Override public boolean isPauseScreen(){return false;}
     private int widthPanel(){return data.admin()?ADMIN_W:PLAYER_W;}private int heightPanel(){return data.admin()?ADMIN_H:PLAYER_H;}private int rowsPerPage(){return data.admin()?10:8;}private int left(){return(width-widthPanel())/2;}private int top(){return(height-heightPanel())/2;}
     private static boolean bool(JsonObject o,String key){try{return o.has(key)&&o.get(key).getAsBoolean();}catch(Exception ignored){return false;}}
     private static String trim(String s,int max){if(s==null)return"";return s.length()<=max?s:s.substring(0,Math.max(0,max-1))+"…";}private static String on(boolean b){return b?"ON":"OFF";}private static long longValue(EditBox e,long f){try{return Long.parseLong(e.getValue().trim());}catch(Exception ignored){return f;}}private static int intValue(EditBox e,int f){try{return Integer.parseInt(e.getValue().trim());}catch(Exception ignored){return f;}}

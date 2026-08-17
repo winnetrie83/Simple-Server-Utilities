@@ -6,7 +6,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record SsuDimensionManagerSubmitPayload(
         String action,
@@ -16,7 +16,7 @@ public record SsuDimensionManagerSubmitPayload(
 ) implements CustomPacketPayload {
     public static final int MAX_JSON = 32768;
     public static final Type<SsuDimensionManagerSubmitPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "dimension_manager_submit"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "dimension_manager_submit"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuDimensionManagerSubmitPayload> STREAM_CODEC =
             StreamCodec.of(SsuDimensionManagerSubmitPayload::encode, SsuDimensionManagerSubmitPayload::decode);
 

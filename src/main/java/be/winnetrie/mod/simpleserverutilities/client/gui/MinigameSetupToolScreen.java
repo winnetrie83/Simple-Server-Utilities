@@ -7,13 +7,13 @@ import be.winnetrie.mod.simpleserverutilities.minigame.MinigameSetupAction;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupToolConfigurePayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupToolOpenPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Right-click action selector for the dedicated in-world Minigame Setup Tool. */
 public final class MinigameSetupToolScreen extends Screen {
@@ -82,12 +82,12 @@ public final class MinigameSetupToolScreen extends Screen {
         restore.active = targetSelected && !awaiting;
 
         Button create = addRenderableWidget(Button.builder(Component.literal("Create new game"), ignored -> {
-            if (minecraft != null) minecraft.setScreenAndShow(new MinigameSetupCreateScreen(data, this));
+            if (minecraft != null) minecraft.setScreen(new MinigameSetupCreateScreen(data, this));
         }).bounds(x + 18, y + H - 34, 106, 20).build());
         create.active = data.hasSelection() && !awaiting;
 
         Button editor = addRenderableWidget(Button.builder(Component.literal("Open game settings"), ignored -> {
-            if (!data.selectedMinigameId().isBlank()) ClientPacketDistributor.sendToServer(
+            if (!data.selectedMinigameId().isBlank()) PacketDistributor.sendToServer(
                     new MinigameEditorRequestPayload(data.selectedMinigameId(), nextRequestId++));
         }).bounds(x + 130, y + H - 34, 118, 20).build());
         editor.active = !data.selectedMinigameId().isBlank() && !awaiting;
@@ -165,7 +165,7 @@ public final class MinigameSetupToolScreen extends Screen {
     private void send(String operation, String game, String arena, String action, int team, int index) {
         if (awaiting) return;
         awaiting = true;
-        ClientPacketDistributor.sendToServer(new MinigameSetupToolConfigurePayload(operation, game, arena, action,
+        PacketDistributor.sendToServer(new MinigameSetupToolConfigurePayload(operation, game, arena, action,
                 team, index, nextRequestId++));
         rebuildWidgets();
     }
@@ -204,59 +204,59 @@ public final class MinigameSetupToolScreen extends Screen {
         return "Team " + data.team();
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(null); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(null); }
     @Override public boolean isPauseScreen() { return false; }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, "SSU Minigame Setup Tool", x + 18, y + 14, TEXT, true);
-        g.text(font, "Right-click opens this menu. The selected action is performed with left-click in the world.",
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "SSU Minigame Setup Tool", x + 18, y + 14, TEXT, true);
+        g.drawString(font, "Right-click opens this menu. The selected action is performed with left-click in the world.",
                 x + 18, y + 31, MUTED, false);
-        g.text(font, "Game", x + 18, y + 43, MUTED, false);
-        g.text(font, "Arena", x + 18, y + 83, MUTED, false);
-        g.text(font, "Left-click action", x + 18, y + 123, MUTED, false);
+        g.drawString(font, "Game", x + 18, y + 43, MUTED, false);
+        g.drawString(font, "Arena", x + 18, y + 83, MUTED, false);
+        g.drawString(font, "Left-click action", x + 18, y + 123, MUTED, false);
         MinigameSetupAction action = MinigameSetupAction.parse(data.action());
         List<FormattedCharSequence> actionLines = font.split(Component.literal(action.description()), 174);
         for (int i = 0; i < Math.min(5, actionLines.size()); i++)
-            g.text(font, actionLines.get(i), x + 330, y + 54 + i * 11, ACCENT, false);
+            g.drawString(font, actionLines.get(i), x + 330, y + 54 + i * 11, ACCENT, false);
         if (action == MinigameSetupAction.TEAM_SPAWN || action == MinigameSetupAction.CTF_FLAG)
-            g.text(font, "Team", x + 18, y + 163, MUTED, false);
+            g.drawString(font, "Team", x + 18, y + 163, MUTED, false);
         if (action == MinigameSetupAction.TEAM_SPAWN || action == MinigameSetupAction.DOMINATION_NODE
                 || action == MinigameSetupAction.DOMINATION_NODE_SPAWN || action == MinigameSetupAction.BOOST_SPAWN
                 || action == MinigameSetupAction.KOTH_HILL) {
             String indexLabel = action == MinigameSetupAction.BOOST_SPAWN ? "Boost slot"
                     : action == MinigameSetupAction.KOTH_HILL ? "Hill point"
                     : (action == MinigameSetupAction.DOMINATION_NODE || action == MinigameSetupAction.DOMINATION_NODE_SPAWN) ? "Node" : "Spawn slot";
-            g.text(font, indexLabel, x + 174, y + 163, MUTED, false);
+            g.drawString(font, indexLabel, x + 174, y + 163, MUTED, false);
         }
 
         var arena = arena();
         int infoY = y + 216;
         if (arena != null) {
-            g.text(font, "Arena region: " + trim(arena.bounds(), 56), x + 18, infoY, TEXT, false);
-            g.text(font, "Spleef floor: " + trim(arena.playFloor(), 56), x + 18, infoY + 13, MUTED, false);
-            g.text(font, "Spectator bounds: " + trim(arena.spectatorBounds(), 52), x + 18, infoY + 26, MUTED, false);
+            g.drawString(font, "Arena region: " + trim(arena.bounds(), 56), x + 18, infoY, TEXT, false);
+            g.drawString(font, "Spleef floor: " + trim(arena.playFloor(), 56), x + 18, infoY + 13, MUTED, false);
+            g.drawString(font, "Spectator bounds: " + trim(arena.spectatorBounds(), 52), x + 18, infoY + 26, MUTED, false);
         }
         if (data.hasFirstPoint()) {
             BlockPos point = BlockPos.of(data.firstPoint());
-            g.text(font, "First corner: " + point.getX() + ", " + point.getY() + ", " + point.getZ(), x + 330, infoY, GOOD, false);
+            g.drawString(font, "First corner: " + point.getX() + ", " + point.getY() + ", " + point.getZ(), x + 330, infoY, GOOD, false);
         }
         if (data.hasSelection()) {
             BlockPos p1 = BlockPos.of(data.selectionPoint1()), p2 = BlockPos.of(data.selectionPoint2());
-            g.text(font, "New arena selection: " + p1.getX() + "," + p1.getY() + "," + p1.getZ()
+            g.drawString(font, "New arena selection: " + p1.getX() + "," + p1.getY() + "," + p1.getZ()
                     + " -> " + p2.getX() + "," + p2.getY() + "," + p2.getZ(), x + 18, infoY + 45, GOOD, false);
-            g.text(font, data.selectionVolume() + " selected blocks", x + 18, infoY + 58, GOOD, false);
-        } else g.text(font, "To create a game, select New arena bounds and left-click two corners.", x + 18, infoY + 45, MUTED, false);
+            g.drawString(font, data.selectionVolume() + " selected blocks", x + 18, infoY + 58, GOOD, false);
+        } else g.drawString(font, "To create a game, select New arena bounds and left-click two corners.", x + 18, infoY + 45, MUTED, false);
         if (confirmRestore) {
-            g.text(font, trim("Restore replaces the arena with its saved snapshot. It is blocked while this arena has an active match.", 76),
+            g.drawString(font, trim("Restore replaces the arena with its saved snapshot. It is blocked while this arena has an active match.", 76),
                     x + 18, y + H - 80, WARNING, false);
-        } else if (!data.notice().isBlank()) g.text(font, trim(data.notice(), 76), x + 18, y + H - 80,
+        } else if (!data.notice().isBlank()) g.drawString(font, trim(data.notice(), 76), x + 18, y + H - 80,
                 data.error() ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private int left() { return (width - W) / 2; }

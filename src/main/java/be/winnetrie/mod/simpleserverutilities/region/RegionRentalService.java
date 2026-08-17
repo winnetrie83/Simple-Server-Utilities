@@ -135,7 +135,7 @@ public final class RegionRentalService {
         RentState before = RentState.capture(region, player.getUUID());
         long targetSequence = rentData.getRentalSequence() + 1L;
         UUID operationId = UUID.randomUUID();
-        String baseKey = "region-rent:" + region.getDimension().identifier() + ":"
+        String baseKey = "region-rent:" + region.getDimension().location() + ":"
                 + region.getName().toLowerCase(java.util.Locale.ROOT) + ":"
                 + player.getUUID() + ":" + targetSequence;
 
@@ -403,7 +403,7 @@ public final class RegionRentalService {
             RegionRentData rentData = region.getRentData();
             long refundMinor = renter == null ? 0L : Math.max(0L, frozenRefundMinor);
             long targetSequence = rentData.getRentalSequence() + 1L;
-            String baseKey = "region-unrent:" + region.getDimension().identifier() + ":"
+            String baseKey = "region-unrent:" + region.getDimension().location() + ":"
                     + region.getName().toLowerCase(java.util.Locale.ROOT) + ":" + targetSequence;
             RegionRentOperationRecord journal = RegionRentOperationRecord.prepared(
                     UUID.randomUUID(),
@@ -588,7 +588,7 @@ public final class RegionRentalService {
 
 
     private static Object lockFor(Region region) {
-        String key = region.getDimension().identifier() + ":" + region.getName().toLowerCase(java.util.Locale.ROOT);
+        String key = region.getDimension().location() + ":" + region.getName().toLowerCase(java.util.Locale.ROOT);
         return REGION_LOCKS.computeIfAbsent(key, ignored -> new Object());
     }
 

@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record NpcSpawnProfileEditorSubmitPayload(String originalId, String profileJson,
         boolean rebindSpawner, long requestId) implements CustomPacketPayload {
     public static final Type<NpcSpawnProfileEditorSubmitPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_spawn_profile_editor_submit"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_spawn_profile_editor_submit"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcSpawnProfileEditorSubmitPayload> STREAM_CODEC =
             StreamCodec.of((buffer, payload) -> {
                 buffer.writeUtf(payload.originalId, 64);

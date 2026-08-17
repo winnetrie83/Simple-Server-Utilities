@@ -1,7 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.client.gui;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 
 /**
@@ -119,11 +119,11 @@ public final class SsuGuiScale {
      * 100% this deliberately does nothing so their original behaviour remains
      * byte-for-byte equivalent from the user's perspective.
      */
-    public static void fullscreenDimWhenScaled(GuiGraphicsExtractor graphics, Screen screen, int color) {
+    public static void fullscreenDimWhenScaled(GuiGraphics graphics, Screen screen, int color) {
         if (isScaled(screen)) fullscreenDim(graphics, screen, color);
     }
 
-    public static void fullscreenDim(GuiGraphicsExtractor graphics, Screen screen, int color) {
+    public static void fullscreenDim(GuiGraphics graphics, Screen screen, int color) {
         float scale = scale(screen);
         if (scale >= 0.999F) {
             graphics.fill(0, 0, screen.width, screen.height, color);
@@ -131,12 +131,12 @@ public final class SsuGuiScale {
         }
         float centerX = screen.width * 0.5F;
         float centerY = screen.height * 0.5F;
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(centerX, centerY);
-        graphics.pose().scale(1.0F / scale, 1.0F / scale);
-        graphics.pose().translate(-centerX, -centerY);
+        graphics.pose().pushPose();
+        graphics.pose().translate(centerX, centerY, 0.0F);
+        graphics.pose().scale(1.0F / scale, 1.0F / scale, 1.0F);
+        graphics.pose().translate(-centerX, -centerY, 0.0F);
         graphics.fill(0, 0, screen.width, screen.height, color);
-        graphics.pose().popMatrix();
+        graphics.pose().popPose();
     }
 
     private static int clampPercent(int percent) {

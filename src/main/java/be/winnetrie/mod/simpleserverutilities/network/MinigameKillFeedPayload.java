@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** One short-lived kill/objective feed line. */
 public record MinigameKillFeedPayload(String text, int color, int lifetimeTicks) implements CustomPacketPayload {
     public static final Type<MinigameKillFeedPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_kill_feed"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_kill_feed"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameKillFeedPayload> STREAM_CODEC =
             StreamCodec.of(MinigameKillFeedPayload::encode, MinigameKillFeedPayload::decode);
 

@@ -1,7 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import com.google.common.reflect.TypeToken;
 import be.winnetrie.mod.simpleserverutilities.client.identity.DamageIndicatorClientState;
 import be.winnetrie.mod.simpleserverutilities.client.identity.DamageIndicatorRenderer;
 import be.winnetrie.mod.simpleserverutilities.client.identity.IdentityClientEvents;
@@ -15,8 +14,8 @@ import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramClientStat
 import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramRenderer;
 import be.winnetrie.mod.simpleserverutilities.client.npc.NpcLabelClientState;
 import be.winnetrie.mod.simpleserverutilities.client.npc.NpcCustomTextureClientState;
-import be.winnetrie.mod.simpleserverutilities.client.npc.NpcTextureRenderState;
 import be.winnetrie.mod.simpleserverutilities.client.npc.NpcLabelRenderer;
+import be.winnetrie.mod.simpleserverutilities.client.gui.SsuGuiScaleInputEvents;
 import be.winnetrie.mod.simpleserverutilities.client.gui.ManagedDimensionScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.ClaimMapScreen;
 import be.winnetrie.mod.simpleserverutilities.client.gui.SsuDashboardScreen;
@@ -92,6 +91,7 @@ import be.winnetrie.mod.simpleserverutilities.client.visualization.BorderVisuali
 import be.winnetrie.mod.simpleserverutilities.client.visualization.ClaimRegionBorderRenderer;
 import be.winnetrie.mod.simpleserverutilities.client.utilitymining.UtilityMiningClientState;
 import be.winnetrie.mod.simpleserverutilities.client.utilitymining.UtilityMiningOutlineRenderer;
+import be.winnetrie.mod.simpleserverutilities.network.ClientPayloadRouter;
 import be.winnetrie.mod.simpleserverutilities.network.BorderVisualizationPayload;
 import be.winnetrie.mod.simpleserverutilities.network.EntityInsightPayload;
 import be.winnetrie.mod.simpleserverutilities.network.BlockInformationContentPayload;
@@ -185,13 +185,13 @@ import be.winnetrie.mod.simpleserverutilities.network.UtilityMiningPreviewPayloa
 import be.winnetrie.mod.simpleserverutilities.network.UtilityMiningPreviewRequestPayload;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
-import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.debug.DebugRenderer;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -199,16 +199,14 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
-import net.neoforged.neoforge.client.event.RegisterDebugRenderersEvent;
-import net.neoforged.neoforge.client.event.AddClientReloadListenersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
-import net.neoforged.neoforge.client.renderstate.RegisterRenderStateModifiersEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import org.lwjgl.glfw.GLFW;
@@ -223,9 +221,7 @@ import be.winnetrie.mod.simpleserverutilities.client.npc.SsuPlayerNpcRenderer;
 @EventBusSubscriber(modid = SimpleServerUtilities.MODID, value = Dist.CLIENT)
 public class SimpleServerUtilitiesClient {
 
-    private static final KeyMapping.Category SSU_CATEGORY = new KeyMapping.Category(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "general")
-    );
+    private static final String SSU_CATEGORY = "key.categories.simpleserverutilities";
     private static final KeyMapping OPEN_MENU = new KeyMapping(
             "key.simpleserverutilities.open_menu",
             InputConstants.Type.KEYSYM,
@@ -281,13 +277,15 @@ public class SimpleServerUtilitiesClient {
     private static boolean lastVeinHeld;
 
     public SimpleServerUtilitiesClient(ModContainer container) {
+        registerClientPayloadHandlers();
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
         NeoForge.EVENT_BUS.addListener(SimpleServerUtilitiesClient::onClientLogout);
         NeoForge.EVENT_BUS.addListener(SimpleServerUtilitiesClient::onClientTick);
+        NeoForge.EVENT_BUS.addListener(SimpleServerUtilitiesClient::onRenderLevelStage);
         NeoForge.EVENT_BUS.register(HologramClientEvents.class);
         NeoForge.EVENT_BUS.register(IdentityClientEvents.class);
         NeoForge.EVENT_BUS.register(EntityInsightClientEvents.class);
-        NeoForge.EVENT_BUS.addListener(RegionSnapshotPreviewRenderer::onSubmitCustomGeometry);
+        NeoForge.EVENT_BUS.register(SsuGuiScaleInputEvents.class);
     }
 
     @SubscribeEvent
@@ -301,19 +299,7 @@ public class SimpleServerUtilitiesClient {
     }
 
     @SubscribeEvent
-    static void onRegisterRenderStateModifiers(RegisterRenderStateModifiersEvent event) {
-        event.registerEntityModifier(
-                new TypeToken<LivingEntityRenderer<LivingEntity, LivingEntityRenderState, ?>>() {},
-                (entity, state) -> state.setRenderData(
-                        NpcTextureRenderState.CUSTOM_TEXTURE,
-                        NpcCustomTextureClientState.textureForEntity(entity.getId())
-                )
-        );
-    }
-
-    @SubscribeEvent
     static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
-        event.registerCategory(SSU_CATEGORY);
         event.register(OPEN_MENU);
         event.register(OPEN_WORLD_MAP);
         event.register(WORLD_EDIT_COMPACT);
@@ -327,31 +313,31 @@ public class SimpleServerUtilitiesClient {
     @SubscribeEvent
     static void onRegisterGuiLayers(RegisterGuiLayersEvent event) {
         event.registerAboveAll(
-                Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minimap"),
+                ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minimap"),
                 MinimapClientState::render
         );
         event.registerAboveAll(
-                Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "block_information"),
+                ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "block_information"),
                 BlockInformationClientState::render
         );
         event.registerAboveAll(
-                Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "utility_mining_info"),
+                ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "utility_mining_info"),
                 UtilityMiningClientState::render
         );
         event.registerAboveAll(
-                Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_hud"),
+                ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_hud"),
                 MinigameHudClientState::render
         );
         event.registerAboveAll(
-                Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_cast_bar"),
+                ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_cast_bar"),
                 MinigameCastBarClientState::render
         );
         event.registerAboveAll(
-                Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_kill_feed"),
+                ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_kill_feed"),
                 MinigameKillFeedClientState::render
         );
         event.registerAboveAll(
-                Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_snapshot_preview_controls"),
+                ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_snapshot_preview_controls"),
                 RegionSnapshotPreviewClientState::render
         );
     }
@@ -367,279 +353,278 @@ public class SimpleServerUtilitiesClient {
                 be.winnetrie.mod.simpleserverutilities.client.gui.PlayerInventoryAdminScreen::new);
     }
 
-    @SubscribeEvent
-    static void onRegisterClientPayloadHandlers(RegisterClientPayloadHandlersEvent event) {
-        event.register(ClaimMapDataPayload.TYPE, (payload, context) ->
+    private static void registerClientPayloadHandlers() {
+        ClientPayloadRouter.register(ClaimMapDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof ClaimMapScreen screen) {
+                    if (minecraft.screen instanceof ClaimMapScreen screen) {
                         screen.acceptSnapshot(payload);
                     } else {
-                        minecraft.setScreenAndShow(new ClaimMapScreen(payload, minecraft.gui.screen()));
+                        minecraft.setScreen(new ClaimMapScreen(payload, minecraft.screen));
                     }
                 })
         );
 
-        event.register(BorderVisualizationPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(BorderVisualizationPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> BorderVisualizationClientState.apply(payload))
         );
 
-        event.register(BlockInformationStatePayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(BlockInformationStatePayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> BlockInformationClientState.apply(payload))
         );
 
-        event.register(BlockInformationContentPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(BlockInformationContentPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> BlockInformationClientState.applyContent(payload))
         );
 
-        event.register(SsuMenuSnapshotPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(SsuMenuSnapshotPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     MinimapClientState.applySettings(payload.uiSettings());
                     MapMarkerClientState.applySettings(payload.uiSettings());
                     AerialMapAtlas.setLiveUpdateRadiusChunks(payload.uiSettings().mapLiveUpdateRadiusChunks());
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof SsuDashboardScreen screen) {
+                    if (minecraft.screen instanceof SsuDashboardScreen screen) {
                         screen.acceptSnapshot(payload);
                     } else {
-                        minecraft.setScreenAndShow(new SsuDashboardScreen(payload));
+                        minecraft.setScreen(new SsuDashboardScreen(payload));
                     }
                 })
         );
 
-        event.register(SsuMenuPageDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(SsuMenuPageDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof SsuDashboardScreen screen) {
+                    if (minecraft.screen instanceof SsuDashboardScreen screen) {
                         screen.acceptPageData(payload);
-                    } else if (minecraft.gui.screen() instanceof KnownPlayerPickerScreen picker) {
+                    } else if (minecraft.screen instanceof KnownPlayerPickerScreen picker) {
                         picker.accept(payload);
                     }
                 })
         );
 
-        event.register(SsuMenuActionResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(SsuMenuActionResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof SsuDashboardScreen screen) {
+                    if (minecraft.screen instanceof SsuDashboardScreen screen) {
                         screen.acceptActionResult(payload);
-                    } else if (minecraft.gui.screen() instanceof RegionPermissionScreen screen) {
+                    } else if (minecraft.screen instanceof RegionPermissionScreen screen) {
                         screen.acceptActionResult(payload);
                     }
                 })
         );
 
-        event.register(SsuPermissionEditorDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(SsuPermissionEditorDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
                     if ("region".equals(payload.mode())) {
-                        if (minecraft.gui.screen() instanceof RegionPermissionScreen screen) {
+                        if (minecraft.screen instanceof RegionPermissionScreen screen) {
                             screen.acceptData(payload);
                         } else {
-                            minecraft.setScreenAndShow(new RegionPermissionScreen(payload, minecraft.gui.screen()));
+                            minecraft.setScreen(new RegionPermissionScreen(payload, minecraft.screen));
                         }
-                    } else if (minecraft.gui.screen() instanceof SsuDashboardScreen screen) {
+                    } else if (minecraft.screen instanceof SsuDashboardScreen screen) {
                         screen.acceptPermissionEditorData(payload);
                     }
                 })
         );
 
-        event.register(SsuDimensionManagerDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(SsuDimensionManagerDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof ManagedDimensionScreen screen) {
+                    if (minecraft.screen instanceof ManagedDimensionScreen screen) {
                         screen.acceptData(payload);
                     } else {
-                        minecraft.setScreenAndShow(new ManagedDimensionScreen(payload, minecraft.gui.screen()));
+                        minecraft.setScreen(new ManagedDimensionScreen(payload, minecraft.screen));
                     }
                 })
         );
 
-        event.register(SsuPlayerProfileDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(SsuPlayerProfileDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof SsuDashboardScreen screen) {
+                    if (minecraft.screen instanceof SsuDashboardScreen screen) {
                         screen.acceptPlayerProfileData(payload);
                     }
                 })
         );
 
-        event.register(SsuPropertySettingsDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(SsuPropertySettingsDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof PropertySettingsScreen screen) {
+                    if (minecraft.screen instanceof PropertySettingsScreen screen) {
                         screen.acceptData(payload);
                     } else {
-                        minecraft.setScreenAndShow(new PropertySettingsScreen(payload, minecraft.gui.screen()));
+                        minecraft.setScreen(new PropertySettingsScreen(payload, minecraft.screen));
                     }
                 })
         );
 
-        event.register(SsuTrustedPlayersDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(SsuTrustedPlayersDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof TrustedPlayersScreen screen) {
+                    if (minecraft.screen instanceof TrustedPlayersScreen screen) {
                         screen.acceptData(payload);
-                    } else if (minecraft.gui.screen() instanceof PropertySettingsScreen parent) {
-                        minecraft.setScreenAndShow(new TrustedPlayersScreen(payload, parent));
+                    } else if (minecraft.screen instanceof PropertySettingsScreen parent) {
+                        minecraft.setScreen(new TrustedPlayersScreen(payload, parent));
                     }
                 })
         );
 
-        event.register(AuctionHouseDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(AuctionHouseDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof AuctionHouseScreen screen) {
+                    if (minecraft.screen instanceof AuctionHouseScreen screen) {
                         screen.acceptData(payload);
                     } else {
-                        minecraft.setScreenAndShow(new AuctionHouseScreen(payload));
+                        minecraft.setScreen(new AuctionHouseScreen(payload));
                     }
                 })
         );
 
-        event.register(AuctionHouseActionResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(AuctionHouseActionResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof AuctionHouseScreen screen) {
+                    if (minecraft.screen instanceof AuctionHouseScreen screen) {
                         screen.acceptResult(payload);
-                    } else if (minecraft.gui.screen() instanceof AuctionSellScreen screen) {
-                        screen.acceptResult(payload);
-                    }
-                })
-        );
-
-        event.register(MailDataPayload.TYPE, (payload, context) ->
-                context.enqueueWork(() -> {
-                    Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof MailScreen screen) {
-                        screen.acceptData(payload);
-                    } else {
-                        minecraft.setScreenAndShow(new MailScreen(payload));
-                    }
-                })
-        );
-
-        event.register(MailComposeResultPayload.TYPE, (payload, context) ->
-                context.enqueueWork(() -> {
-                    Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof MailComposeScreen screen) {
+                    } else if (minecraft.screen instanceof AuctionSellScreen screen) {
                         screen.acceptResult(payload);
                     }
                 })
         );
 
-        event.register(MailRecipientSuggestionsPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MailDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof MailComposeScreen screen) {
+                    if (minecraft.screen instanceof MailScreen screen) {
+                        screen.acceptData(payload);
+                    } else {
+                        minecraft.setScreen(new MailScreen(payload));
+                    }
+                })
+        );
+
+        ClientPayloadRouter.register(MailComposeResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.screen instanceof MailComposeScreen screen) {
+                        screen.acceptResult(payload);
+                    }
+                })
+        );
+
+        ClientPayloadRouter.register(MailRecipientSuggestionsPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    if (minecraft.screen instanceof MailComposeScreen screen) {
                         screen.acceptSuggestions(payload);
                     }
                 })
         );
 
-        event.register(MinimapDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinimapDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> MinimapClientState.apply(payload))
         );
 
-        event.register(MapMarkerSyncPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MapMarkerSyncPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> MapMarkerClientState.apply(payload))
         );
 
-        event.register(MapMarkerActionResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MapMarkerActionResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     MapMarkerClientState.applyResult(payload);
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.MapMarkerEditorScreen screen) {
+                    if (minecraft.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.MapMarkerEditorScreen screen) {
                         screen.acceptResult(payload);
-                    } else if (minecraft.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.MapMarkerManagementScreen screen) {
+                    } else if (minecraft.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.MapMarkerManagementScreen screen) {
                         screen.acceptResult(payload);
-                    } else if (minecraft.gui.screen() instanceof WorldMapScreen screen) {
+                    } else if (minecraft.screen instanceof WorldMapScreen screen) {
                         screen.acceptMarkerResult(payload);
                     }
                 })
         );
 
-        event.register(WorldMapDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(WorldMapDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof WorldMapScreen screen) {
+                    if (minecraft.screen instanceof WorldMapScreen screen) {
                         screen.acceptSnapshot(payload);
                     } else {
-                        minecraft.setScreenAndShow(new WorldMapScreen(payload));
+                        minecraft.setScreen(new WorldMapScreen(payload));
                     }
                 })
         );
 
-        event.register(UtilityMiningPreviewPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(UtilityMiningPreviewPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> UtilityMiningClientState.apply(payload))
         );
 
-        event.register(HologramSyncPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(HologramSyncPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> HologramClientState.apply(payload))
         );
 
-        event.register(HologramEditorOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(HologramEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new HologramEditorScreen(payload, minecraft.gui.screen()));
+                    minecraft.setScreen(new HologramEditorScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(HologramEditorResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(HologramEditorResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof HologramEditorScreen screen) {
+                    if (minecraft.screen instanceof HologramEditorScreen screen) {
                         screen.acceptResult(payload);
                     }
                 })
         );
 
-        event.register(EntityInsightPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(EntityInsightPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> EntityInsightClientState.apply(payload))
         );
 
-        event.register(NpcLabelSyncPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcLabelSyncPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> NpcLabelClientState.apply(payload))
         );
 
-        event.register(NpcTextureSyncPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcTextureSyncPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> NpcCustomTextureClientState.apply(payload))
         );
 
-        event.register(NpcEditorOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new NpcEditorScreen(payload, minecraft.gui.screen()));
+                    minecraft.setScreen(new NpcEditorScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(NpcEditorResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcEditorResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcEditorScreen screen) {
+                    if (minecraft.screen instanceof NpcEditorScreen screen) {
                         screen.acceptResult(payload);
                     }
                 })
         );
 
-        event.register(NpcQuestWorkflowOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcQuestWorkflowOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcQuestWorkflowScreen screen) screen.accept(payload);
-                    else minecraft.setScreenAndShow(new NpcQuestWorkflowScreen(payload, minecraft.gui.screen()));
+                    if (minecraft.screen instanceof NpcQuestWorkflowScreen screen) screen.accept(payload);
+                    else minecraft.setScreen(new NpcQuestWorkflowScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(NpcLoadoutResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcLoadoutResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcLoadoutScreen screen) screen.acceptResult(payload);
+                    if (minecraft.screen instanceof NpcLoadoutScreen screen) screen.acceptResult(payload);
                 })
         );
 
-        event.register(NpcAdminListPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcAdminListPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcAdminScreen screen) {
+                    if (minecraft.screen instanceof NpcAdminScreen screen) {
                         // Duplicate/out-of-order list responses update the one manager that is
                         // already visible; never create a second manager layer.
                         screen.accept(payload);
@@ -648,450 +633,450 @@ public class SimpleServerUtilitiesClient {
                         // screen lives on Gui and Gui#setScreen clears NeoForge background layers.
                         // Using the replacement path here prevents a stale manager from remaining
                         // underneath the newly opened manager when the NPC tool is used in the air.
-                        minecraft.gui.setScreen(new NpcAdminScreen(payload));
+                        minecraft.setScreen(new NpcAdminScreen(payload));
                     }
                 })
         );
 
-        event.register(NpcSpawnProfileEditorOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcSpawnProfileEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new NpcSpawnProfileEditorScreen(payload, minecraft.gui.screen()));
+                    minecraft.setScreen(new NpcSpawnProfileEditorScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(NpcSpawnProfileEditorResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcSpawnProfileEditorResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcSpawnProfileEditorScreen screen) screen.acceptResult(payload);
+                    if (minecraft.screen instanceof NpcSpawnProfileEditorScreen screen) screen.acceptResult(payload);
                 })
         );
 
 
-        event.register(NpcFunctionMenuPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcFunctionMenuPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new NpcFunctionMenuScreen(payload, minecraft.gui.screen()));
+                    minecraft.setScreen(new NpcFunctionMenuScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(NpcShopDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcShopDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcShopScreen screen) {
+                    if (minecraft.screen instanceof NpcShopScreen screen) {
                         screen.acceptData(payload);
                     } else {
-                        minecraft.setScreenAndShow(new NpcShopScreen(payload));
+                        minecraft.setScreen(new NpcShopScreen(payload));
                     }
                 })
         );
 
-        event.register(NpcShopAdminDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcShopAdminDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcShopAdminScreen screen) {
+                    if (minecraft.screen instanceof NpcShopAdminScreen screen) {
                         screen.accept(payload);
-                    } else if (minecraft.gui.screen() instanceof NpcShopEditorScreen screen) {
+                    } else if (minecraft.screen instanceof NpcShopEditorScreen screen) {
                         screen.acceptManagerData(payload);
                     } else {
-                        minecraft.setScreenAndShow(new NpcShopAdminScreen(payload, minecraft.gui.screen()));
+                        minecraft.setScreen(new NpcShopAdminScreen(payload, minecraft.screen));
                     }
                 })
         );
 
-        event.register(NpcShopEditorOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcShopEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcShopEditorScreen screen) {
+                    if (minecraft.screen instanceof NpcShopEditorScreen screen) {
                         screen.acceptOpen(payload);
                     } else {
-                        minecraft.setScreenAndShow(new NpcShopEditorScreen(payload, minecraft.gui.screen()));
+                        minecraft.setScreen(new NpcShopEditorScreen(payload, minecraft.screen));
                     }
                 })
         );
 
-        event.register(NpcShopEditorResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcShopEditorResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcShopEditorScreen screen) {
+                    if (minecraft.screen instanceof NpcShopEditorScreen screen) {
                         screen.acceptResult(payload);
-                    } else if (minecraft.gui.screen() instanceof NpcShopAdminScreen screen) {
+                    } else if (minecraft.screen instanceof NpcShopAdminScreen screen) {
                         screen.acceptEditorResult(payload);
                     }
                 })
         );
 
-        event.register(NpcAbilityLibraryDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcAbilityLibraryDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcAbilityLibraryScreen screen) screen.accept(payload);
-                    else minecraft.setScreenAndShow(new NpcAbilityLibraryScreen(payload, minecraft.gui.screen()));
+                    if (minecraft.screen instanceof NpcAbilityLibraryScreen screen) screen.accept(payload);
+                    else minecraft.setScreen(new NpcAbilityLibraryScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(NpcAbilityEditorOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcAbilityEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new NpcAbilityWorkshopScreen(payload, minecraft.gui.screen()));
+                    minecraft.setScreen(new NpcAbilityWorkshopScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(NpcAbilityEditorResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcAbilityEditorResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcAbilityWorkshopScreen screen) screen.acceptResult(payload);
-                    else if (minecraft.gui.screen() instanceof NpcAbilityLibraryScreen screen) screen.acceptEditorResult(payload);
+                    if (minecraft.screen instanceof NpcAbilityWorkshopScreen screen) screen.acceptResult(payload);
+                    else if (minecraft.screen instanceof NpcAbilityLibraryScreen screen) screen.acceptEditorResult(payload);
                 })
         );
 
-        event.register(NpcItemPriceCatalogDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcItemPriceCatalogDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcItemPriceCatalogScreen screen) {
+                    if (minecraft.screen instanceof NpcItemPriceCatalogScreen screen) {
                         screen.accept(payload);
                     } else {
-                        minecraft.setScreenAndShow(new NpcItemPriceCatalogScreen(payload, minecraft.gui.screen()));
+                        minecraft.setScreen(new NpcItemPriceCatalogScreen(payload, minecraft.screen));
                     }
                 })
         );
 
-        event.register(NpcDialogueViewPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcDialogueViewPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcDialogueScreen screen) {
+                    if (minecraft.screen instanceof NpcDialogueScreen screen) {
                         screen.accept(payload);
                     } else if (!payload.closed()) {
-                        minecraft.setScreenAndShow(new NpcDialogueScreen(payload, minecraft.gui.screen()));
+                        minecraft.setScreen(new NpcDialogueScreen(payload, minecraft.screen));
                     }
                 })
         );
 
-        event.register(NpcDialogueEditorOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcDialogueEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new NpcDialogueEditorScreen(payload, minecraft.gui.screen()));
+                    minecraft.setScreen(new NpcDialogueEditorScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(NpcDialogueEditorResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(NpcDialogueEditorResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof NpcDialogueEditorScreen screen) {
+                    if (minecraft.screen instanceof NpcDialogueEditorScreen screen) {
                         screen.acceptResult(payload);
                     }
                 })
         );
 
-        event.register(StatisticEditorOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(StatisticEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new StatisticEditorScreen(payload, minecraft.gui.screen()));
+                    minecraft.setScreen(new StatisticEditorScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(StatisticEditorResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(StatisticEditorResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof StatisticEditorScreen screen) {
+                    if (minecraft.screen instanceof StatisticEditorScreen screen) {
                         screen.acceptResult(payload);
                     }
                 })
         );
 
-        event.register(QuestBookDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(QuestBookDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof QuestBookScreen screen) {
+                    if (minecraft.screen instanceof QuestBookScreen screen) {
                         screen.accept(payload);
                     } else {
-                        minecraft.setScreenAndShow(new QuestBookScreen(payload, minecraft.gui.screen()));
+                        minecraft.setScreen(new QuestBookScreen(payload, minecraft.screen));
                     }
                 })
         );
 
-        event.register(QuestEditorOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(QuestEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new QuestEditorScreen(payload, minecraft.gui.screen()));
+                    minecraft.setScreen(new QuestEditorScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(QuestEditorResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(QuestEditorResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof QuestEditorScreen screen) screen.acceptResult(payload);
+                    if (minecraft.screen instanceof QuestEditorScreen screen) screen.acceptResult(payload);
                 })
         );
 
-        event.register(AchievementMenuDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(AchievementMenuDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof AchievementMenuScreen screen) screen.accept(payload);
-                    else minecraft.setScreenAndShow(new AchievementMenuScreen(payload, minecraft.gui.screen()));
+                    if (minecraft.screen instanceof AchievementMenuScreen screen) screen.accept(payload);
+                    else minecraft.setScreen(new AchievementMenuScreen(payload, minecraft.screen));
                 })
         );
-        event.register(AchievementEditorOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(AchievementEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new AchievementEditorScreen(payload, minecraft.gui.screen()));
+                    minecraft.setScreen(new AchievementEditorScreen(payload, minecraft.screen));
                 })
         );
-        event.register(AchievementEditorResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(AchievementEditorResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof AchievementEditorScreen screen) screen.acceptResult(payload);
+                    if (minecraft.screen instanceof AchievementEditorScreen screen) screen.acceptResult(payload);
                 })
         );
 
 
-        event.register(MinigameLobbyDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameLobbyDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
                     if (payload.adminView()) {
-                        if (minecraft.gui.screen() instanceof MinigameAdminScreen screen) {
+                        if (minecraft.screen instanceof MinigameAdminScreen screen) {
                             screen.accept(payload);
                         } else {
-                            minecraft.setScreenAndShow(new MinigameAdminScreen(payload, minecraft.gui.screen()));
+                            minecraft.setScreen(new MinigameAdminScreen(payload, minecraft.screen));
                         }
-                    } else if (minecraft.gui.screen() instanceof MinigameLobbyScreen screen) {
+                    } else if (minecraft.screen instanceof MinigameLobbyScreen screen) {
                         screen.accept(payload);
                     } else {
-                        minecraft.setScreenAndShow(new MinigameLobbyScreen(payload, minecraft.gui.screen()));
+                        minecraft.setScreen(new MinigameLobbyScreen(payload, minecraft.screen));
                     }
                 })
         );
 
-        event.register(MinigameEditorOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof MinigameEditorScreen screen) {
+                    if (minecraft.screen instanceof MinigameEditorScreen screen) {
                         screen.acceptOpen(payload);
                     } else {
-                        minecraft.setScreenAndShow(MinigameEditorScreen.create(payload, minecraft.gui.screen()));
+                        minecraft.setScreen(MinigameEditorScreen.create(payload, minecraft.screen));
                     }
                 })
         );
 
-        event.register(MinigameEditorResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameEditorResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof MinigameEditorScreen screen) screen.accept(payload);
+                    if (minecraft.screen instanceof MinigameEditorScreen screen) screen.accept(payload);
                 })
         );
 
-        event.register(MinigameHudPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameHudPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> MinigameHudClientState.apply(payload))
         );
 
-        event.register(MinigameKothVisualPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameKothVisualPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> KingOfTheHillVisualClientState.apply(payload))
         );
 
-        event.register(MinigameCastBarPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameCastBarPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> MinigameCastBarClientState.apply(payload))
         );
 
-        event.register(MinigameDominationVisualPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameDominationVisualPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> DominationClientState.apply(payload))
         );
 
-        event.register(MinigameCtfVisualPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameCtfVisualPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> CaptureTheFlagClientState.apply(payload))
         );
 
-        event.register(MinigameSelectionCreateResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameSelectionCreateResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof MinigameSelectionCreateScreen screen) screen.accept(payload);
-                    else if (minecraft.gui.screen() instanceof MinigameSetupCreateScreen screen) screen.accept(payload);
+                    if (minecraft.screen instanceof MinigameSelectionCreateScreen screen) screen.accept(payload);
+                    else if (minecraft.screen instanceof MinigameSetupCreateScreen screen) screen.accept(payload);
                 })
         );
 
-        event.register(MinigameSetupVisualPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameSetupVisualPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> MinigameSetupVisualClientState.apply(payload))
         );
 
-        event.register(MinigameSetupToolOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameSetupToolOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof MinigameSetupToolScreen screen) {
+                    if (minecraft.screen instanceof MinigameSetupToolScreen screen) {
                         screen.accept(payload);
                     } else {
-                        minecraft.setScreenAndShow(new MinigameSetupToolScreen(payload));
+                        minecraft.setScreen(new MinigameSetupToolScreen(payload));
                     }
                 })
         );
 
-        event.register(MinigameResultsPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameResultsPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
                     if (!payload.visible()) {
-                        if (minecraft.gui.screen() instanceof MinigameResultsScreen) minecraft.setScreenAndShow(null);
-                    } else if (minecraft.gui.screen() instanceof MinigameResultsScreen screen) {
+                        if (minecraft.screen instanceof MinigameResultsScreen) minecraft.setScreen(null);
+                    } else if (minecraft.screen instanceof MinigameResultsScreen screen) {
                         screen.accept(payload);
                     } else {
-                        minecraft.setScreenAndShow(new MinigameResultsScreen(payload));
+                        minecraft.setScreen(new MinigameResultsScreen(payload));
                     }
                 })
         );
 
-        event.register(MinigameProfilePayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameProfilePayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof MinigameProfileScreen screen) screen.accept(payload);
-                    else minecraft.setScreenAndShow(new MinigameProfileScreen(payload, minecraft.gui.screen()));
+                    if (minecraft.screen instanceof MinigameProfileScreen screen) screen.accept(payload);
+                    else minecraft.setScreen(new MinigameProfileScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(MinigameMatchOverviewPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameMatchOverviewPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
                     minigameOverviewRequestId = Math.max(minigameOverviewRequestId, payload.requestId() + 1L);
                     if (!payload.active()) {
-                        if (minecraft.gui.screen() instanceof MinigameMatchOverviewScreen) {
-                            minecraft.setScreenAndShow(null);
+                        if (minecraft.screen instanceof MinigameMatchOverviewScreen) {
+                            minecraft.setScreen(null);
                         }
                         if (!payload.notice().isBlank() && minecraft.player != null) {
                             minecraft.player.sendSystemMessage(net.minecraft.network.chat.Component.literal(payload.notice()));
                         }
                         if (payload.openDashboardFallback() && minecraft.player != null) {
-                            minecraft.player.connection.sendUnattendedCommand("ssu menu", null);
+                            minecraft.player.connection.sendCommand("ssu menu");
                         }
-                    } else if (minecraft.gui.screen() instanceof MinigameMatchOverviewScreen screen) {
+                    } else if (minecraft.screen instanceof MinigameMatchOverviewScreen screen) {
                         screen.accept(payload);
                     } else {
-                        minecraft.setScreenAndShow(new MinigameMatchOverviewScreen(payload));
+                        minecraft.setScreen(new MinigameMatchOverviewScreen(payload));
                     }
                 })
         );
 
-        event.register(MinigameKillFeedPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameKillFeedPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> MinigameKillFeedClientState.add(payload))
         );
 
-        event.register(MinigameValidationPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameValidationPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new MinigameValidationScreen(payload, minecraft.gui.screen()));
+                    minecraft.setScreen(new MinigameValidationScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(MinigameDiagnosticsPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(MinigameDiagnosticsPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof MinigameDiagnosticsScreen screen) screen.accept(payload);
-                    else minecraft.setScreenAndShow(new MinigameDiagnosticsScreen(payload, minecraft.gui.screen()));
+                    if (minecraft.screen instanceof MinigameDiagnosticsScreen screen) screen.accept(payload);
+                    else minecraft.setScreen(new MinigameDiagnosticsScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(DungeonLobbyDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(DungeonLobbyDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof DungeonLobbyScreen screen) screen.accept(payload);
-                    else minecraft.setScreenAndShow(new DungeonLobbyScreen(payload, minecraft.gui.screen()));
+                    if (minecraft.screen instanceof DungeonLobbyScreen screen) screen.accept(payload);
+                    else minecraft.setScreen(new DungeonLobbyScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(DungeonEditorOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(DungeonEditorOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new DungeonEditorScreen(payload, minecraft.gui.screen()));
+                    minecraft.setScreen(new DungeonEditorScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(DungeonEditorResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(DungeonEditorResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof DungeonEditorScreen screen) screen.accept(payload);
+                    if (minecraft.screen instanceof DungeonEditorScreen screen) screen.accept(payload);
                 })
         );
 
-        event.register(RegionSetupOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(RegionSetupOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof RegionSelectionEditScreen worldEdit
+                    if (minecraft.screen instanceof RegionSelectionEditScreen worldEdit
                             && "SELECT".equalsIgnoreCase(payload.mode())) {
                         worldEdit.acceptSetupContext(payload);
-                    } else if (minecraft.gui.screen() instanceof RegionSetupScreen screen) screen.accept(payload);
-                    else minecraft.setScreenAndShow(new RegionSetupScreen(payload));
+                    } else if (minecraft.screen instanceof RegionSetupScreen screen) screen.accept(payload);
+                    else minecraft.setScreen(new RegionSetupScreen(payload));
                 })
         );
 
-        event.register(RegionSnapshotPreviewPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(RegionSnapshotPreviewPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
                     boolean wasActive = RegionSnapshotPreviewClientState.active();
                     RegionSnapshotPreviewClientState.accept(payload);
                     if (!payload.active()) {
-                        if (minecraft.gui.screen() instanceof RegionSnapshotPreviewScreen) minecraft.setScreenAndShow(null);
+                        if (minecraft.screen instanceof RegionSnapshotPreviewScreen) minecraft.setScreen(null);
                         return;
                     }
                     if (!wasActive) {
                         RegionSnapshotPreviewClientState.exitFreeMode();
-                        minecraft.setScreenAndShow(new RegionSnapshotPreviewScreen());
-                    } else if (minecraft.gui.screen() instanceof RegionSnapshotPreviewScreen screen) {
+                        minecraft.setScreen(new RegionSnapshotPreviewScreen());
+                    } else if (minecraft.screen instanceof RegionSnapshotPreviewScreen screen) {
                         screen.accept(payload);
                     }
                 })
         );
 
-        event.register(RegionEditorOpenPayload.TYPE, (payload, context) ->
-                context.enqueueWork(() -> Minecraft.getInstance().setScreenAndShow(new RegionEditorScreen(payload)))
+        ClientPayloadRouter.register(RegionEditorOpenPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> Minecraft.getInstance().setScreen(new RegionEditorScreen(payload)))
         );
 
-        event.register(RegionEditorResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(RegionEditorResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof RegionEditorScreen screen) {
+                    if (minecraft.screen instanceof RegionEditorScreen screen) {
                         screen.acceptResult(payload);
                     }
                 })
         );
 
 
-        event.register(RegionSelectionToolOpenPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(RegionSelectionToolOpenPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    minecraft.setScreenAndShow(new RegionSelectionEditScreen(payload, minecraft.gui.screen()));
+                    minecraft.setScreen(new RegionSelectionEditScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(RegionSelectionActionResultPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(RegionSelectionActionResultPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof RegionSelectionEditScreen screen) screen.acceptResult(payload);
-                    else if (minecraft.gui.screen() instanceof WorldEditCompactOverlayScreen screen) screen.acceptResult(payload);
-                    else if (minecraft.gui.screen() instanceof RegionSelectionToolScreen screen) screen.acceptResult(payload);
-                    else if (minecraft.gui.screen() instanceof RegionSetupScreen screen) screen.acceptSelectionResult(payload);
+                    if (minecraft.screen instanceof RegionSelectionEditScreen screen) screen.acceptResult(payload);
+                    else if (minecraft.screen instanceof WorldEditCompactOverlayScreen screen) screen.acceptResult(payload);
+                    else if (minecraft.screen instanceof RegionSelectionToolScreen screen) screen.acceptResult(payload);
+                    else if (minecraft.screen instanceof RegionSetupScreen screen) screen.acceptSelectionResult(payload);
                 })
         );
 
 
-        event.register(TitleManagerDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(TitleManagerDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof TitleManagerScreen screen) screen.accept(payload);
-                    else minecraft.setScreenAndShow(new TitleManagerScreen(payload, minecraft.gui.screen()));
+                    if (minecraft.screen instanceof TitleManagerScreen screen) screen.accept(payload);
+                    else minecraft.setScreen(new TitleManagerScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(RankDisplayDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(RankDisplayDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
-                    if (minecraft.gui.screen() instanceof RankDisplayEditorScreen screen) screen.accept(payload);
-                    else minecraft.setScreenAndShow(new RankDisplayEditorScreen(payload, minecraft.gui.screen()));
+                    if (minecraft.screen instanceof RankDisplayEditorScreen screen) screen.accept(payload);
+                    else minecraft.setScreen(new RankDisplayEditorScreen(payload, minecraft.screen));
                 })
         );
 
-        event.register(PlayerIdentitySyncPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(PlayerIdentitySyncPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> PlayerIdentityClientState.apply(payload))
         );
 
-        event.register(DamageIndicatorPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(DamageIndicatorPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> DamageIndicatorClientState.add(payload))
         );
 
-        event.register(RegionSelectionClientTemplatePayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(RegionSelectionClientTemplatePayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft minecraft = Minecraft.getInstance();
                     try {
@@ -1105,79 +1090,92 @@ public class SimpleServerUtilitiesClient {
                 })
         );
 
-        event.register(be.winnetrie.mod.simpleserverutilities.network.OnboardingStatePayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(be.winnetrie.mod.simpleserverutilities.network.OnboardingStatePayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft m=Minecraft.getInstance();
-                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.OnboardingScreen screen) screen.accept(payload);
-                    else if (!"complete".equals(payload.stage())) m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.OnboardingScreen(payload));
+                    if (m.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.OnboardingScreen screen) screen.accept(payload);
+                    else if (!"complete".equals(payload.stage())) m.setScreen(new be.winnetrie.mod.simpleserverutilities.client.gui.OnboardingScreen(payload));
                 }));
-        event.register(be.winnetrie.mod.simpleserverutilities.network.OnboardingAdminDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(be.winnetrie.mod.simpleserverutilities.network.OnboardingAdminDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft m=Minecraft.getInstance();
-                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.OnboardingAdminScreen screen) screen.accept(payload);
-                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.OnboardingAdminScreen(payload,m.gui.screen()));
+                    if (m.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.OnboardingAdminScreen screen) screen.accept(payload);
+                    else m.setScreen(new be.winnetrie.mod.simpleserverutilities.client.gui.OnboardingAdminScreen(payload,m.screen));
                 }));
-        event.register(be.winnetrie.mod.simpleserverutilities.network.PlayerManagementDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(be.winnetrie.mod.simpleserverutilities.network.PlayerManagementDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft m=Minecraft.getInstance();
-                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.PlayerManagementScreen screen) screen.accept(payload);
-                    else if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.JailPunishmentScreen screen) screen.accept(payload);
-                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.PlayerManagementScreen(payload,m.gui.screen()));
+                    if (m.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.PlayerManagementScreen screen) screen.accept(payload);
+                    else if (m.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.JailPunishmentScreen screen) screen.accept(payload);
+                    else m.setScreen(new be.winnetrie.mod.simpleserverutilities.client.gui.PlayerManagementScreen(payload,m.screen));
                 }));
-        event.register(be.winnetrie.mod.simpleserverutilities.network.JailDashboardPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(be.winnetrie.mod.simpleserverutilities.network.JailDashboardPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft m=Minecraft.getInstance();
-                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.JailDashboardScreen screen) screen.accept(payload);
-                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.JailDashboardScreen(payload));
+                    if (m.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.JailDashboardScreen screen) screen.accept(payload);
+                    else m.setScreen(new be.winnetrie.mod.simpleserverutilities.client.gui.JailDashboardScreen(payload));
                 }));
-        event.register(be.winnetrie.mod.simpleserverutilities.network.KitDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(be.winnetrie.mod.simpleserverutilities.network.KitDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft m=Minecraft.getInstance();
-                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.KitScreen screen) screen.accept(payload);
-                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.KitScreen(payload,m.gui.screen()));
+                    if (m.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.KitScreen screen) screen.accept(payload);
+                    else m.setScreen(new be.winnetrie.mod.simpleserverutilities.client.gui.KitScreen(payload,m.screen));
                 }));
-        event.register(be.winnetrie.mod.simpleserverutilities.network.KitContentsResultPayload.TYPE, (payload, context) ->
-                context.enqueueWork(() -> {Minecraft m=Minecraft.getInstance();if(m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.KitEditorScreen screen)screen.accept(payload);}));
-        event.register(be.winnetrie.mod.simpleserverutilities.network.JailAdminDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(be.winnetrie.mod.simpleserverutilities.network.KitContentsResultPayload.TYPE, (payload, context) ->
+                context.enqueueWork(() -> {Minecraft m=Minecraft.getInstance();if(m.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.KitEditorScreen screen)screen.accept(payload);}));
+        ClientPayloadRouter.register(be.winnetrie.mod.simpleserverutilities.network.JailAdminDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft m=Minecraft.getInstance();
-                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.JailAdministrationScreen screen) screen.accept(payload);
-                    else if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.JailPrisonerOverviewScreen screen) screen.accept(payload);
-                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.JailAdministrationScreen(payload,m.gui.screen()));
+                    if (m.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.JailAdministrationScreen screen) screen.accept(payload);
+                    else if (m.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.JailPrisonerOverviewScreen screen) screen.accept(payload);
+                    else m.setScreen(new be.winnetrie.mod.simpleserverutilities.client.gui.JailAdministrationScreen(payload,m.screen));
                 }));
-        event.register(be.winnetrie.mod.simpleserverutilities.network.MineDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(be.winnetrie.mod.simpleserverutilities.network.MineDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft m=Minecraft.getInstance();
-                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.MineScreen screen) screen.accept(payload);
-                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.MineScreen(payload,m.gui.screen()));
+                    if (m.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.MineScreen screen) screen.accept(payload);
+                    else m.setScreen(new be.winnetrie.mod.simpleserverutilities.client.gui.MineScreen(payload,m.screen));
                 }));
-        event.register(be.winnetrie.mod.simpleserverutilities.network.ServerOperationsDataPayload.TYPE, (payload, context) ->
+        ClientPayloadRouter.register(be.winnetrie.mod.simpleserverutilities.network.ServerOperationsDataPayload.TYPE, (payload, context) ->
                 context.enqueueWork(() -> {
                     Minecraft m=Minecraft.getInstance();
-                    if (m.gui.screen() instanceof be.winnetrie.mod.simpleserverutilities.client.gui.ServerOperationsScreen screen) screen.accept(payload);
-                    else m.setScreenAndShow(new be.winnetrie.mod.simpleserverutilities.client.gui.ServerOperationsScreen(payload,m.gui.screen()));
+                    if (m.screen instanceof be.winnetrie.mod.simpleserverutilities.client.gui.ServerOperationsScreen screen) screen.accept(payload);
+                    else m.setScreen(new be.winnetrie.mod.simpleserverutilities.client.gui.ServerOperationsScreen(payload,m.screen));
                 }));
     }
 
     @SubscribeEvent
-    static void onAddClientReloadListeners(AddClientReloadListenersEvent event) {
-        event.addListener(Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "hologram_image_cache"),
-        (ResourceManagerReloadListener) resourceManager -> HologramImageCache.clear());
+    static void onRegisterClientReloadListeners(RegisterClientReloadListenersEvent event) {
+        event.registerReloadListener((ResourceManagerReloadListener) resourceManager -> HologramImageCache.clear());
     }
 
-    @SubscribeEvent
-    static void onRegisterDebugRenderers(RegisterDebugRenderersEvent event) {
-        event.register(ClaimRegionBorderRenderer::new);
-        event.register(UtilityMiningOutlineRenderer::new);
-        event.register(HologramRenderer::new);
-        event.register(NpcLabelRenderer::new);
-        event.register(MapMarkerRenderer::new);
-        event.register(DominationRenderer::new);
-        event.register(MinigameSetupVisualRenderer::new);
-        event.register(KingOfTheHillVisualRenderer::new);
-        event.register(PlayerTitleRenderer::new);
-        event.register(DamageIndicatorRenderer::new);
-        event.register(RegionSnapshotPreviewRenderer::new);
+    private static java.util.List<DebugRenderer.SimpleDebugRenderer> worldRenderers;
+
+    private static void onRenderLevelStage(RenderLevelStageEvent event) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) return;
+        if (worldRenderers == null) {
+            worldRenderers = java.util.List.of(
+                    new ClaimRegionBorderRenderer(minecraft),
+                    new UtilityMiningOutlineRenderer(minecraft),
+                    new HologramRenderer(minecraft),
+                    new NpcLabelRenderer(minecraft),
+                    new MapMarkerRenderer(minecraft),
+                    new DominationRenderer(minecraft),
+                    new MinigameSetupVisualRenderer(minecraft),
+                    new KingOfTheHillVisualRenderer(minecraft),
+                    new PlayerTitleRenderer(minecraft),
+                    new DamageIndicatorRenderer(minecraft),
+                    new RegionSnapshotPreviewRenderer(minecraft)
+            );
+        }
+        MultiBufferSource.BufferSource buffers = minecraft.renderBuffers().bufferSource();
+        Vec3 camera = event.getCamera().getPosition();
+        for (DebugRenderer.SimpleDebugRenderer renderer : worldRenderers) {
+            renderer.render(event.getPoseStack(), buffers, camera.x, camera.y, camera.z);
+        }
+        buffers.endBatch();
     }
 
     private static void onClientTick(ClientTickEvent.Post event) {
@@ -1192,29 +1190,29 @@ public class SimpleServerUtilitiesClient {
         while (WORLD_EDIT_COMPACT.consumeClick()) {
             if (minecraft.player != null && minecraft.level != null
                     && isHoldingWorldEditTool(minecraft)
-                    && (minecraft.gui.screen() == null || minecraft.gui.screen() instanceof WorldEditCompactOverlayScreen)) {
-                if (minecraft.gui.screen() instanceof WorldEditCompactOverlayScreen) minecraft.setScreenAndShow(null);
-                else minecraft.setScreenAndShow(new WorldEditCompactOverlayScreen());
+                    && (minecraft.screen == null || minecraft.screen instanceof WorldEditCompactOverlayScreen)) {
+                if (minecraft.screen instanceof WorldEditCompactOverlayScreen) minecraft.setScreen(null);
+                else minecraft.setScreen(new WorldEditCompactOverlayScreen());
             }
         }
         tickUtilityMining(minecraft);
         while (OPEN_MENU.consumeClick()) {
-            if (minecraft.player != null && minecraft.gui.screen() == null) {
-                ClientPacketDistributor.sendToServer(new MinigameMatchOverviewRequestPayload(
+            if (minecraft.player != null && minecraft.screen == null) {
+                PacketDistributor.sendToServer(new MinigameMatchOverviewRequestPayload(
                         "open", minigameOverviewRequestId++));
             }
         }
         while (OPEN_WORLD_MAP.consumeClick()) {
-            if (minecraft.player != null && minecraft.gui.screen() == null) {
-                ClientPacketDistributor.sendToServer(new WorldMapRequestPayload(
-                        minecraft.player.chunkPosition().x(),
-                        minecraft.player.chunkPosition().z(),
+            if (minecraft.player != null && minecraft.screen == null) {
+                PacketDistributor.sendToServer(new WorldMapRequestPayload(
+                        minecraft.player.chunkPosition().x,
+                        minecraft.player.chunkPosition().z,
                         8
                 ));
             }
         }
         while (TOGGLE_MINIGAME_HUD.consumeClick()) {
-            if (minecraft.player != null && minecraft.gui.screen() == null
+            if (minecraft.player != null && minecraft.screen == null
                     && MinigameHudClientState.isServerVisible()) {
                 String mode = MinigameHudClientState.cycleDisplayMode();
                 minecraft.player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
@@ -1224,13 +1222,13 @@ public class SimpleServerUtilitiesClient {
         MinigameKillFeedClientState.tick();
         DamageIndicatorClientState.tick();
         while (SPECTATE_PREVIOUS.consumeClick()) {
-            if (minecraft.player != null && minecraft.gui.screen() == null) {
-                ClientPacketDistributor.sendToServer(new MinigameSpectatorActionPayload("previous"));
+            if (minecraft.player != null && minecraft.screen == null) {
+                PacketDistributor.sendToServer(new MinigameSpectatorActionPayload("previous"));
             }
         }
         while (SPECTATE_NEXT.consumeClick()) {
-            if (minecraft.player != null && minecraft.gui.screen() == null) {
-                ClientPacketDistributor.sendToServer(new MinigameSpectatorActionPayload("next"));
+            if (minecraft.player != null && minecraft.screen == null) {
+                PacketDistributor.sendToServer(new MinigameSpectatorActionPayload("next"));
             }
         }
     }
@@ -1279,14 +1277,14 @@ public class SimpleServerUtilitiesClient {
         boolean veinHeld = ACTIVATE_VEINMINER.isDown();
         if (treeHeld != lastTreeHeld || veinHeld != lastVeinHeld
                 || ((treeHeld || veinHeld) && utilityMiningTick % 20 == 0)) {
-            ClientPacketDistributor.sendToServer(new UtilityMiningActivationPayload(treeHeld, veinHeld));
+            PacketDistributor.sendToServer(new UtilityMiningActivationPayload(treeHeld, veinHeld));
             lastTreeHeld = treeHeld;
             lastVeinHeld = veinHeld;
         }
 
-        if (minecraft.gui.screen() == null && utilityMiningTick % 4 == 0
+        if (minecraft.screen == null && utilityMiningTick % 4 == 0
                 && minecraft.hitResult instanceof BlockHitResult blockHit) {
-            ClientPacketDistributor.sendToServer(UtilityMiningPreviewRequestPayload.at(blockHit.getBlockPos()));
+            PacketDistributor.sendToServer(UtilityMiningPreviewRequestPayload.at(blockHit.getBlockPos()));
         }
     }
 }

@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentCondition;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcDialogueChoice;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcDialogueDefinition;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcDialogueNode;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
@@ -121,29 +121,29 @@ public final class NpcDialoguePreviewScreen extends Screen {
 
     @Override
     public void onClose() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
         SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
-        graphics.outline(x, y, W, H, BORDER);
-        graphics.text(font, "Dialogue preview • " + trim(dialogue.displayName, 52), x + 20, y + 14, TEXT, true);
+        graphics.renderOutline(x, y, W, H, BORDER);
+        graphics.drawString(font, "Dialogue preview • " + trim(dialogue.displayName, 52), x + 20, y + 14, TEXT, true);
         NpcDialogueNode node = currentNode();
         if (node == null || finished) {
-            graphics.text(font, finished ? "Preview branch finished" : "Missing preview node", x + 20, y + 42, WARNING, true);
-            graphics.text(font, trim(notice, 84), x + 20, y + 66, TEXT, false);
+            graphics.drawString(font, finished ? "Preview branch finished" : "Missing preview node", x + 20, y + 42, WARNING, true);
+            graphics.drawString(font, trim(notice, 84), x + 20, y + 66, TEXT, false);
         } else {
-            graphics.text(font, node.speaker == null || node.speaker.isBlank() ? npcName : node.speaker, x + 20, y + 38, GOOD, false);
+            graphics.drawString(font, node.speaker == null || node.speaker.isBlank() ? npcName : node.speaker, x + 20, y + 38, GOOD, false);
             List<FormattedCharSequence> lines = font.split(SsuRichTextComponents.parse(node.text == null ? "" : node.text), W - 40);
             for (int index = 0; index < Math.min(10, lines.size()); index++) {
-                graphics.text(font, lines.get(index), x + 20, y + 56 + index * 10, TEXT, false);
+                graphics.drawString(font, lines.get(index), x + 20, y + 56 + index * 10, TEXT, false);
             }
-            graphics.text(font, trim(notice, 84), x + 20, y + 160, MUTED, false);
+            graphics.drawString(font, trim(notice, 84), x + 20, y + 160, MUTED, false);
         }
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     private static String conditionSummary(ContentCondition condition) {

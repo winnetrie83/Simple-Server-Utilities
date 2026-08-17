@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.client.gui.RegionSnapshotPreviewSc
 import be.winnetrie.mod.simpleserverutilities.network.RegionSnapshotPreviewPayload;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 
 /** Client-only state, chunk assembler and free-inspection controller for snapshot previews. */
 public final class RegionSnapshotPreviewClientState {
@@ -55,15 +55,15 @@ public final class RegionSnapshotPreviewClientState {
             clear();
             return true;
         }
-        if (minecraft.gui.screen() != null) {
-            minecraft.setScreenAndShow(null);
+        if (minecraft.screen != null) {
+            minecraft.setScreen(null);
             return true;
         }
         boolean attackDown = minecraft.options.keyAttack.isDown();
         if (attackDown && !previousAttackDown) {
             exitFreeMode();
             minecraft.options.keyAttack.setDown(false);
-            minecraft.setScreenAndShow(new RegionSnapshotPreviewScreen());
+            minecraft.setScreen(new RegionSnapshotPreviewScreen());
             previousAttackDown = false;
             return true;
         }
@@ -71,16 +71,16 @@ public final class RegionSnapshotPreviewClientState {
         return true;
     }
 
-    public static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
+    public static void render(GuiGraphics graphics, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (!freeMode() || minecraft.player == null || minecraft.gui.screen() != null) return;
+        if (!freeMode() || minecraft.player == null || minecraft.screen != null) return;
         Snapshot data = snapshot();
         String title = "Snapshot preview · Free mode";
         String progress = data.complete() ? "" : " · streaming " + data.receivedBlocks() + "/" + data.totalBlocks();
         String help = "Move and inspect freely · Left-click to return to edit controls" + progress;
-        graphics.text(minecraft.font, title, (graphics.guiWidth() - minecraft.font.width(title)) / 2,
+        graphics.drawString(minecraft.font, title, (graphics.guiWidth() - minecraft.font.width(title)) / 2,
                 10, 0xFF6FE7FF, true);
-        graphics.text(minecraft.font, help, (graphics.guiWidth() - minecraft.font.width(help)) / 2,
+        graphics.drawString(minecraft.font, help, (graphics.guiWidth() - minecraft.font.width(help)) / 2,
                 23, 0xFFF3F5F7, true);
     }
 

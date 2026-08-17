@@ -19,7 +19,7 @@ import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -170,7 +170,7 @@ public final class NpcSpawnManager {
     /** True when this exact vanilla Spawner block is currently owned by an enabled SSU spawn profile. */
     public synchronized boolean controlsSpawner(ServerLevel level, BlockPos pos) {
         if (level == null || pos == null) return false;
-        String dimension = level.dimension().identifier().toString();
+        String dimension = level.dimension().location().toString();
         for (NpcSpawnProfile profile : profiles.values()) {
             if (!profile.enabled || profile.source() != NpcSpawnSource.SPAWNER) continue;
             String profileDimension = profile.spawnerDimension.isBlank() ? profile.dimension : profile.spawnerDimension;
@@ -198,7 +198,7 @@ public final class NpcSpawnManager {
         NpcSpawnProfile profile = profiles.get(NpcDefinition.sanitizeId(rawProfileId));
         if (player == null || profile == null || npcs.definition(profile.definitionId) == null) return false;
         if (profile.source() == NpcSpawnSource.SPAWNER) return spawnSpawnerGroup(profile, true) > 0;
-        ServerLevel level = player.level();
+        ServerLevel level = (ServerLevel) player.level();
         BlockPos base = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                 new BlockPos(player.blockPosition().getX() + 3, 0, player.blockPosition().getZ() + 3));
         return spawnGroup(profile, level, base, player.getRandom(), 1, true) > 0;
@@ -291,11 +291,11 @@ public final class NpcSpawnManager {
 
     private boolean validCommonPosition(NpcSpawnProfile profile, ServerLevel level, BlockPos position) {
         if (position.getY() < profile.minY || position.getY() > profile.maxY || !basicSpace(level, position)) return false;
-        String biome = level.getBiome(position).unwrapKey().map(key -> key.identifier().toString()).orElse("unknown");
+        String biome = level.getBiome(position).unwrapKey().map(key -> key.location().toString()).orElse("unknown");
         if (!profile.biomes.isEmpty() && !profile.biomes.contains(biome)) return false;
         int light = Math.max(level.getBrightness(LightLayer.BLOCK, position), level.getBrightness(LightLayer.SKY, position));
         if (light < profile.minLight || light > profile.maxLight) return false;
-        long dayTime = Math.floorMod(level.getDefaultClockTime(), 24_000L);
+        long dayTime = Math.floorMod(level.getDayTime(), 24_000L);
         boolean daylight = dayTime < 13_000L;
         return switch (profile.time()) {
             case DAY -> daylight;
@@ -305,7 +305,7 @@ public final class NpcSpawnManager {
     }
 
     private static boolean basicSpace(ServerLevel level, BlockPos position) {
-        if (!level.isLoaded(position) || position.getY() <= level.getMinY() + 1 || position.getY() >= level.getMaxY() - 2) return false;
+        if (!level.isLoaded(position) || position.getY() <= level.getMinBuildHeight() + 1 || position.getY() >= (level.getMaxBuildHeight() - 1) - 2) return false;
         if (!level.getBlockState(position).getCollisionShape(level, position).isEmpty()) return false;
         BlockPos above = position.above();
         if (!level.getBlockState(above).getCollisionShape(level, above).isEmpty()) return false;
@@ -377,7 +377,7 @@ public final class NpcSpawnManager {
     private ServerLevel level(String rawDimension) {
         if (server == null) return null;
         try {
-            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, Identifier.parse(rawDimension));
+            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(rawDimension));
             return server.getLevel(key);
         } catch (RuntimeException ignored) {
             return null;

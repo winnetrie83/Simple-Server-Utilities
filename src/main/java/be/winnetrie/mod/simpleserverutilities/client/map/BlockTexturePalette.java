@@ -14,14 +14,10 @@ import java.util.Locale;
 import com.mojang.blaze3d.platform.NativeImage;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.color.block.BlockTintSource;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.block.BlockStateModelSet;
-import net.minecraft.client.renderer.block.FluidModel;
-import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
-import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.resources.model.geometry.BakedQuad;
+import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -46,7 +42,6 @@ final class BlockTexturePalette {
 
     private static final Map<BlockState, TextureProfile> CACHE = new IdentityHashMap<>();
     private static ModelManager observedModelManager;
-    private static BlockStateModelSet observedModelSet;
     private static int generation;
     private static int fingerprintGeneration = Integer.MIN_VALUE;
     private static String cachedFingerprint = "";
@@ -60,10 +55,8 @@ final class BlockTexturePalette {
      */
     static int ensureCurrent() {
         ModelManager current = Minecraft.getInstance().getModelManager();
-        BlockStateModelSet currentSet = current.getBlockStateModelSet();
-        if (current != observedModelManager || currentSet != observedModelSet) {
+        if (current != observedModelManager) {
             observedModelManager = current;
-            observedModelSet = currentSet;
             CACHE.clear();
             generation++;
         }
@@ -73,7 +66,6 @@ final class BlockTexturePalette {
     static void clear() {
         CACHE.clear();
         observedModelManager = null;
-        observedModelSet = null;
         generation++;
         fingerprintGeneration = Integer.MIN_VALUE;
         cachedFingerprint = "";
@@ -145,31 +137,13 @@ final class BlockTexturePalette {
     private static TextureProfile buildProfile(BlockState state, ClientLevel level, BlockPos pos) {
         int fallback = fallbackColor(state, level, pos);
         try {
-            BlockStateModelSet modelSet = Minecraft.getInstance()
-                    .getModelManager()
-                    .getBlockStateModelSet();
+            BakedModel model = Minecraft.getInstance().getBlockRenderer().getBlockModel(state);
 
-            // Fluids use their dedicated model rather than a generic block
-            // particle. This preserves the active resource pack's still-water
-            // and still-lava texture before depth/tint processing is applied.
-            if (!state.getFluidState().isEmpty()) {
-                FluidModel fluidModel = Minecraft.getInstance()
-                        .getModelManager()
-                        .getFluidStateModelSet()
-                        .get(state.getFluidState());
-                NativeImage fluidImage = usableImage(fluidModel.stillMaterial().sprite());
-                if (fluidImage != null) {
-                    return fromImage(fluidImage, fallback);
-                }
-            }
-
-            // Prefer actual upward-facing model quads. This keeps log rings,
-            // paths, slabs, roofs and resource-pack replacements visually
-            // faithful from an aerial viewpoint. General quads are a fallback
-            // for cross models and unusual modded geometry.
-            List<TextureAtlasSprite> sprites = modelSprites(modelSet, state, Direction.UP);
+            // 1.21.1 still exposes the classic baked-model API. Prefer top-facing
+            // quads for an aerial map, then general quads, then the particle icon.
+            List<TextureAtlasSprite> sprites = modelSprites(model, state, Direction.UP);
             if (sprites.isEmpty()) {
-                sprites = modelSprites(modelSet, state, null);
+                sprites = modelSprites(model, state, null);
             }
             if (!sprites.isEmpty()) {
                 TextureProfile modelProfile = fromSprites(sprites, fallback);
@@ -178,14 +152,14 @@ final class BlockTexturePalette {
                 }
             }
 
-            TextureAtlasSprite sprite = modelSet.getParticleMaterial(state).sprite();
+            TextureAtlasSprite sprite = model.getParticleIcon();
             NativeImage image = usableImage(sprite);
             if (image != null) {
                 return fromImage(image, fallback);
             }
         } catch (Throwable ignored) {
-            // Modded models can fail to expose usable quads or a particle
-            // sprite. The map must still render, so use Minecraft's map colour.
+            // Modded/dynamic models may not expose stable baked quads. Keep the
+            // map usable by falling back to Minecraft's map colour.
         }
 
         int[] cells = new int[CELLS];
@@ -196,28 +170,22 @@ final class BlockTexturePalette {
     }
 
     private static List<TextureAtlasSprite> modelSprites(
-            BlockStateModelSet modelSet,
+            BakedModel model,
             BlockState state,
             Direction direction
     ) {
         List<TextureAtlasSprite> sprites = new ArrayList<>();
         Map<TextureAtlasSprite, Boolean> seen = new IdentityHashMap<>();
-        BlockStateModel model = modelSet.get(state);
-        List<BlockStateModelPart> parts = new ArrayList<>();
-        model.collectParts(RandomSource.create(), parts);
-
-        for (BlockStateModelPart part : parts) {
-            List<BakedQuad> quads = part.getQuads(direction);
-            if (quads == null) {
-                continue;
-            }
-            for (BakedQuad quad : quads) {
-                TextureAtlasSprite sprite = quad.materialInfo().sprite();
-                if (sprite != null && usableImage(sprite) != null && seen.put(sprite, Boolean.TRUE) == null) {
-                    sprites.add(sprite);
-                    if (sprites.size() >= 12) {
-                        return sprites;
-                    }
+        List<BakedQuad> quads = model.getQuads(state, direction, RandomSource.create());
+        if (quads == null) {
+            return sprites;
+        }
+        for (BakedQuad quad : quads) {
+            TextureAtlasSprite sprite = quad.getSprite();
+            if (sprite != null && usableImage(sprite) != null && seen.put(sprite, Boolean.TRUE) == null) {
+                sprites.add(sprite);
+                if (sprites.size() >= 12) {
+                    break;
                 }
             }
         }
@@ -297,7 +265,7 @@ final class BlockTexturePalette {
 
                 for (int y = minY; y < maxY && y < image.getHeight(); y++) {
                     for (int x = minX; x < maxX && x < image.getWidth(); x++) {
-                        int pixel = image.getPixel(x, y);
+                        int pixel = image.getPixelRGBA(x, y);
                         int alpha = (pixel >>> 24) & 0xFF;
                         totalAlpha += alpha;
                         accumulator.add(pixel, alpha);
@@ -310,7 +278,7 @@ final class BlockTexturePalette {
         ColorAccumulator whole = new ColorAccumulator();
         for (int y = 0; y < image.getHeight(); y++) {
             for (int x = 0; x < image.getWidth(); x++) {
-                int pixel = image.getPixel(x, y);
+                int pixel = image.getPixelRGBA(x, y);
                 whole.add(pixel, (pixel >>> 24) & 0xFF);
             }
         }
@@ -323,19 +291,9 @@ final class BlockTexturePalette {
 
     private static int resolveTint(BlockState state, ClientLevel level, BlockPos pos) {
         try {
-            Minecraft minecraft = Minecraft.getInstance();
-            BlockTintSource source = minecraft.getBlockColors().getTintSource(state, 0);
-            if (source == null && !state.getFluidState().isEmpty()) {
-                source = minecraft.getModelManager()
-                        .getFluidStateModelSet()
-                        .get(state.getFluidState())
-                        .tintSource();
-            }
-            if (source != null) {
-                int tint = source.colorInWorld(state, level, pos);
-                if (tint != -1) {
-                    return 0xFF000000 | (tint & 0x00FFFFFF);
-                }
+            int tint = Minecraft.getInstance().getBlockColors().getColor(state, level, pos, 0);
+            if (tint != -1) {
+                return 0xFF000000 | (tint & 0x00FFFFFF);
             }
         } catch (Throwable ignored) {
             // A broken third-party tint provider should not break the map.
@@ -347,7 +305,7 @@ final class BlockTexturePalette {
         try {
             MapColor mapColor = state.getMapColor(level, pos);
             if (mapColor != MapColor.NONE) {
-                return mapColor.calculateARGBColor(MapColor.Brightness.NORMAL);
+                return mapColor.calculateRGBColor(MapColor.Brightness.NORMAL);
             }
         } catch (Throwable ignored) {
             // Keep a neutral fallback for unusual modded states.

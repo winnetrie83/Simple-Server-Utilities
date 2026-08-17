@@ -8,7 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.mail.MailRichText;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record MailDataPayload(
         String mode,
@@ -35,7 +35,7 @@ public record MailDataPayload(
     private static final int MAX_ENTRIES = 20;
 
     public static final Type<MailDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "mail_data")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "mail_data")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, MailDataPayload> STREAM_CODEC =
             StreamCodec.of(MailDataPayload::encode, MailDataPayload::decode);

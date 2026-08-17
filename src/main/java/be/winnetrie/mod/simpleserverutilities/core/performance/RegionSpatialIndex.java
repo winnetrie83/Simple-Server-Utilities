@@ -114,7 +114,7 @@ public final class RegionSpatialIndex {
     }
 
     public synchronized CandidateResult candidatesAt(ResourceKey<Level> dimension, BlockPos pos) {
-        String dimensionId = dimension.identifier().toString();
+        String dimensionId = dimension.location().toString();
         DimensionIndex index = dimensions.get(dimensionId);
         if (index == null) {
             return CandidateResult.empty();
@@ -138,7 +138,7 @@ public final class RegionSpatialIndex {
             int maxX,
             int maxZ
     ) {
-        String dimensionId = dimension.identifier().toString();
+        String dimensionId = dimension.location().toString();
         DimensionIndex index = dimensions.get(dimensionId);
         if (index == null) {
             return CandidateResult.empty();
@@ -192,7 +192,7 @@ public final class RegionSpatialIndex {
     }
 
     private static String dimensionId(Region region) {
-        return region.getDimension().identifier().toString();
+        return region.getDimension().location().toString();
     }
 
     private static long key(int x, int z) {

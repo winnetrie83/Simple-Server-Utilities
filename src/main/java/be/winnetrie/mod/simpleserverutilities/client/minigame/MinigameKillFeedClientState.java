@@ -7,7 +7,7 @@ import java.util.List;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameKillFeedPayload;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 
 /** Compact upper-right kill/objective feed with bounded fading entries. */
 public final class MinigameKillFeedClientState {
@@ -33,10 +33,10 @@ public final class MinigameKillFeedClientState {
         clientTick = 0L;
     }
 
-    public static synchronized void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
+    public static synchronized void render(GuiGraphics graphics, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null || minecraft.gui.screen() != null
-                || minecraft.gui.hud.isHidden() || ENTRIES.isEmpty()) return;
+        if (minecraft.player == null || minecraft.screen != null
+                || minecraft.options.hideGui || ENTRIES.isEmpty()) return;
         int y = 42;
         Iterator<Entry> iterator = ENTRIES.iterator();
         while (iterator.hasNext()) {
@@ -47,7 +47,7 @@ public final class MinigameKillFeedClientState {
             int textWidth = minecraft.font.width(entry.text);
             int x = graphics.guiWidth() - textWidth - 12;
             graphics.fill(x - 5, y - 3, x + textWidth + 5, y + 11, (alpha << 24) | 0x10151C);
-            graphics.text(minecraft.font, entry.text, x, y, (alpha << 24) | (entry.color & 0x00FFFFFF), true);
+            graphics.drawString(minecraft.font, entry.text, x, y, (alpha << 24) | (entry.color & 0x00FFFFFF), true);
             y += 15;
         }
     }

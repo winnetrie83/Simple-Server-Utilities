@@ -43,8 +43,7 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.neoforged.neoforge.transfer.ResourceHandler;
-import net.neoforged.neoforge.transfer.item.ItemResource;
+import net.neoforged.neoforge.items.IItemHandler;
 
 /** Synchronizes Block Information permissions and safe, server-authoritative content previews. */
 public final class BlockInformationService {
@@ -246,7 +245,7 @@ public final class BlockInformationService {
             BlockPos pos,
             int maximumItems
     ) {
-        if (!level.hasChunkAt(pos) || !player.isWithinBlockInteractionRange(pos, 0.25D)
+        if (!level.hasChunkAt(pos) || !withinBlockInteractionRange(player, pos, 0.25D)
                 || !ProtectionHelper.canPlayerInteract(player, level, pos)) {
             return BlockInformationContentPayload.clear();
         }
@@ -288,7 +287,7 @@ public final class BlockInformationService {
             return payloadForItems(level, pos, directItems, directItems.size(), 4, maximumItems);
         }
 
-        ResourceHandler<ItemResource> itemHandler = getBlockItemHandler(level, pos, state, blockEntity);
+        IItemHandler itemHandler = getBlockItemHandler(level, pos, state, blockEntity);
         if (itemHandler != null) {
             return payloadForHandler(level, pos.asLong(), BlockInformationContentPayload.TARGET_BLOCK,
                     itemHandler, maximumItems);
@@ -302,7 +301,7 @@ public final class BlockInformationService {
             Entity entity,
             int maximumItems
     ) {
-        if (entity == null || entity.isRemoved() || !player.isWithinEntityInteractionRange(entity, 0.25D)
+        if (entity == null || entity.isRemoved() || !withinEntityInteractionRange(player, entity, 0.25D)
                 || !ProtectionHelper.canPlayerInteract(player, level, entity.blockPosition())) {
             return BlockInformationContentPayload.clear();
         }
@@ -334,7 +333,7 @@ public final class BlockInformationService {
             }
             return payloadForContainer(level, entity.getId(), container, maximumItems);
         } else {
-            ResourceHandler<ItemResource> itemHandler = getEntityItemHandler(entity);
+            IItemHandler itemHandler = getEntityItemHandler(entity);
             if (itemHandler == null) return BlockInformationContentPayload.clear();
             return payloadForHandler(level, entity.getId(), BlockInformationContentPayload.TARGET_ENTITY,
                     itemHandler, maximumItems);
@@ -343,10 +342,22 @@ public final class BlockInformationService {
         return payloadForEntity(level, entity.getId(), items, items.size(), totalSlots, maximumItems);
     }
 
+
+    private static boolean withinBlockInteractionRange(ServerPlayer player, BlockPos pos, double extra) {
+        double range = Math.max(0.0D, player.blockInteractionRange() + extra);
+        Vec3 eye = player.getEyePosition();
+        return new AABB(pos).distanceToSqr(eye) <= range * range;
+    }
+
+    private static boolean withinEntityInteractionRange(ServerPlayer player, Entity entity, double extra) {
+        double range = Math.max(0.0D, player.entityInteractionRange() + extra);
+        return entity.getBoundingBox().distanceToSqr(player.getEyePosition()) <= range * range;
+    }
+
     private static boolean canInspectChest(ServerPlayer player, ServerLevel level, BlockPos pos, BlockState state) {
         if (!canInspectContainerBlockEntity(player, level.getBlockEntity(pos))) return false;
         if (state.hasProperty(ChestBlock.TYPE) && state.getValue(ChestBlock.TYPE) != net.minecraft.world.level.block.state.properties.ChestType.SINGLE) {
-            BlockPos otherPos = ChestBlock.getConnectedBlockPos(pos, state);
+            BlockPos otherPos = pos.relative(ChestBlock.getConnectedDirection(state));
             if (!ProtectionHelper.canPlayerInteract(player, level, otherPos)
                     || !canInspectContainerBlockEntity(player, level.getBlockEntity(otherPos))) return false;
         }
@@ -401,7 +412,7 @@ public final class BlockInformationService {
         boolean truncated = usedSlots > items.size() || totalSlots > scanSlots;
         return new BlockInformationContentPayload(
                 targetType,
-                level.dimension().identifier().toString(),
+                level.dimension().location().toString(),
                 targetId,
                 items,
                 usedSlots,
@@ -452,7 +463,7 @@ public final class BlockInformationService {
         }
         return new BlockInformationContentPayload(
                 targetType,
-                level.dimension().identifier().toString(),
+                level.dimension().location().toString(),
                 targetId,
                 shown,
                 usedSlots,
@@ -460,24 +471,24 @@ public final class BlockInformationService {
                 usedSlots > shown.size());
     }
 
-    private static ResourceHandler<ItemResource> getBlockItemHandler(
+    private static IItemHandler getBlockItemHandler(
             ServerLevel level,
             BlockPos pos,
             BlockState state,
             BlockEntity blockEntity
     ) {
         try {
-            return level.getCapability(Capabilities.Item.BLOCK, pos, state, blockEntity, null);
+            return level.getCapability(Capabilities.ItemHandler.BLOCK, pos, state, blockEntity, null);
         } catch (RuntimeException ignored) {
             // A broken third-party capability must not crash Block Information or the server tick.
             return null;
         }
     }
 
-    private static ResourceHandler<ItemResource> getEntityItemHandler(Entity entity) {
+    private static IItemHandler getEntityItemHandler(Entity entity) {
         try {
-            ResourceHandler<ItemResource> handler = entity.getCapability(Capabilities.Item.ENTITY);
-            return handler != null ? handler : entity.getCapability(Capabilities.Item.ENTITY_AUTOMATION, null);
+            IItemHandler handler = entity.getCapability(Capabilities.ItemHandler.ENTITY);
+            return handler != null ? handler : entity.getCapability(Capabilities.ItemHandler.ENTITY_AUTOMATION, null);
         } catch (RuntimeException ignored) {
             return null;
         }
@@ -487,13 +498,13 @@ public final class BlockInformationService {
             ServerLevel level,
             long targetId,
             int targetType,
-            ResourceHandler<ItemResource> handler,
+            IItemHandler handler,
             int maximumItems
     ) {
         if (handler == null) return BlockInformationContentPayload.clear();
         int totalSlots;
         try {
-            totalSlots = Math.max(0, handler.size());
+            totalSlots = Math.max(0, handler.getSlots());
         } catch (RuntimeException ignored) {
             return BlockInformationContentPayload.clear();
         }
@@ -502,18 +513,17 @@ public final class BlockInformationService {
         List<ItemStack> items = new ArrayList<>();
         try {
             for (int slot = 0; slot < scanSlots; slot++) {
-                ItemResource resource = handler.getResource(slot);
-                int amount = handler.getAmountAsInt(slot);
-                if (resource == null || resource.isEmpty() || amount <= 0) continue;
+                ItemStack stack = handler.getStackInSlot(slot);
+                if (stack == null || stack.isEmpty()) continue;
                 usedSlots++;
-                if (items.size() < maximumItems) items.add(resource.toStack(amount));
+                if (items.size() < maximumItems) items.add(stack.copy());
             }
         } catch (RuntimeException ignored) {
             return BlockInformationContentPayload.clear();
         }
         return new BlockInformationContentPayload(
                 targetType,
-                level.dimension().identifier().toString(),
+                level.dimension().location().toString(),
                 targetId,
                 items,
                 usedSlots,
@@ -523,7 +533,7 @@ public final class BlockInformationService {
 
     private record TargetRef(int type, String dimension, long id) {
         static TargetRef from(ServerPlayer player, HitResult hit) {
-            String dimension = player.level().dimension().identifier().toString();
+            String dimension = player.level().dimension().location().toString();
             if (hit instanceof EntityHitResult entityHit) {
                 return new TargetRef(
                         BlockInformationContentPayload.TARGET_ENTITY,

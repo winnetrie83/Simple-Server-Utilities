@@ -7,14 +7,14 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** One bounded page of reusable shared shops for the visual administrator library. */
 public record NpcShopAdminDataPayload(String query, int pageIndex, int pageCount, int totalShops,
         List<Entry> entries, String notice, boolean error, long requestId) implements CustomPacketPayload {
     public static final int MAX_ENTRIES = 10;
     public static final Type<NpcShopAdminDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_admin_data"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_admin_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcShopAdminDataPayload> STREAM_CODEC =
             StreamCodec.of(NpcShopAdminDataPayload::encode, NpcShopAdminDataPayload::decode);
 

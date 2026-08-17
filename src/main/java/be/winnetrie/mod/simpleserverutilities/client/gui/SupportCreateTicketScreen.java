@@ -4,7 +4,7 @@ import com.google.gson.JsonArray;
 
 import be.winnetrie.mod.simpleserverutilities.serverops.SupportRichText;
 import be.winnetrie.mod.simpleserverutilities.serverops.SupportTicketCategory;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -42,14 +42,14 @@ public final class SupportCreateTicketScreen extends Screen {
 
         if (category.requiresTarget()) {
             addRenderableWidget(Button.builder(Component.literal(reportTargetName.isBlank() ? "Choose player" : "Player: " + trim(reportTargetName, 20)),
-                    button -> minecraft.setScreenAndShow(new SupportPlayerPickerScreen(this, reportTargets, (id, name) -> {
+                    button -> minecraft.setScreen(new SupportPlayerPickerScreen(this, reportTargets, (id, name) -> {
                         reportTargetId = id;
                         reportTargetName = name;
                     }))).bounds(x + 188, y + 54, 150, 20).build());
         }
 
         addRenderableWidget(Button.builder(Component.literal(body.isBlank() ? "Write description" : "Edit description"), button ->
-                minecraft.setScreenAndShow(new RichTextValueEditorScreen(this, "Ticket description",
+                minecraft.setScreen(new RichTextValueEditorScreen(this, "Ticket description",
                         "Describe the issue clearly. Rich text is supported.", body,
                         SupportRichText::normalize, SupportRichText.MAX_VISIBLE_CHARACTERS,
                         SupportRichText.MAX_STORED_CHARACTERS, SupportRichText.MAX_LINES,
@@ -58,7 +58,7 @@ public final class SupportCreateTicketScreen extends Screen {
 
         Button send = addRenderableWidget(Button.builder(Component.literal("Send ticket"), button -> {
             parent.createTicket(category, body, reportTargetId);
-            if (minecraft != null) minecraft.setScreenAndShow(parent);
+            if (minecraft != null) minecraft.setScreen(parent);
         }).bounds(x + W - 112, y + H - 34, 94, 20).build());
         send.active = SupportRichText.plainText(body).trim().length() >= 3
                 && (!category.requiresTarget() || !reportTargetId.isBlank());
@@ -67,24 +67,24 @@ public final class SupportCreateTicketScreen extends Screen {
                 .bounds(x + 18, y + H - 34, 72, 20).build());
     }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, "Create support ticket", x + 18, y + 16, TEXT, true);
-        g.text(font, "Choose a category and write the first message.", x + 18, y + 32, MUTED, false);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Create support ticket", x + 18, y + 16, TEXT, true);
+        g.drawString(font, "Choose a category and write the first message.", x + 18, y + 32, MUTED, false);
         String preview = SupportRichText.compactPreview(body, 62);
-        g.text(font, preview.isBlank() ? "Description: not written yet" : "Description: " + preview,
+        g.drawString(font, preview.isBlank() ? "Description: not written yet" : "Description: " + preview,
                 x + 18, y + 122, preview.isBlank() ? WARNING : GOOD, false);
         if (category.requiresTarget()) {
-            g.text(font, reportTargetName.isBlank() ? "A reported player is required." : "Reported player: " + reportTargetName,
+            g.drawString(font, reportTargetName.isBlank() ? "A reported player is required." : "Reported player: " + reportTargetName,
                     x + 18, y + 140, reportTargetName.isBlank() ? WARNING : MUTED, false);
         }
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
     private int left() { return (width - W) / 2; }
     private int top() { return (height - H) / 2; }

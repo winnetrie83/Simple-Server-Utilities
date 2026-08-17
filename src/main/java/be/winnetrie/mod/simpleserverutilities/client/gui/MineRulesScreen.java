@@ -7,16 +7,15 @@ import com.google.gson.Gson;
 
 import be.winnetrie.mod.simpleserverutilities.mine.MineDefinition;
 import be.winnetrie.mod.simpleserverutilities.network.MineActionPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Mining, drop, warning and integrated status-hologram rules for one mine. */
 public final class MineRulesScreen extends Screen {
@@ -63,40 +62,40 @@ public final class MineRulesScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("Save rules"),v->save()).bounds(x+W-104,y+H-27,88,19).build());
     }
 
-    @Override public boolean mouseClicked(MouseButtonEvent event,boolean doubleClick){
-        int mx=(int)event.x(),my=(int)event.y(),button=event.buttonInfo().button();
+    @Override public boolean mouseClicked(double mouseX, double mouseY, int button){
+        int mx=(int)mouseX,my=(int)mouseY;
         int slot=dropSlotAt(mx,my);if(slot>=0){captureSelectedDrop();if(button==1){dropItems[slot]=null;dropMin[slot]=1;dropMax[slot]=1;dropChance[slot]=100D;}selectedDrop=slot;rebuildWidgets();return true;}
-        if(button==0||button==1){int inv=inventorySlotAt(mx,my);if(inv>=0){ItemStack stack=inventory(inv);if(stack.isEmpty()){notice="That inventory slot is empty.";return true;}Identifier id=BuiltInRegistries.ITEM.getKey(stack.getItem());if(id==null){notice="That item cannot be used as a custom drop.";return true;}captureSelectedDrop();dropItems[selectedDrop]=id.toString();notice="Custom drop slot "+(selectedDrop+1)+" set to "+stack.getHoverName().getString()+".";return true;}}
-        return super.mouseClicked(event,doubleClick);
+        if(button==0||button==1){int inv=inventorySlotAt(mx,my);if(inv>=0){ItemStack stack=inventory(inv);if(stack.isEmpty()){notice="That inventory slot is empty.";return true;}ResourceLocation id=BuiltInRegistries.ITEM.getKey(stack.getItem());if(id==null){notice="That item cannot be used as a custom drop.";return true;}captureSelectedDrop();dropItems[selectedDrop]=id.toString();notice="Custom drop slot "+(selectedDrop+1)+" set to "+stack.getHoverName().getString()+".";return true;}}
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private void save(){
         captureFields();MineDefinition copy=mine.copy();copy.dropMode=dropMode;copy.experienceMultiplier=xpMultiplier;copy.allowFortune=allowFortune;copy.allowSilkTouch=allowSilk;copy.warningMode=warningMode;copy.warningSound=warningSound;copy.statusHologramEnabled=hologramEnabled;copy.hologramViewDistance=hologramDistance;copy.customDrops=new ArrayList<>();
         for(int i=0;i<9;i++){String id=dropItems[i];if(id==null||id.isBlank())continue;copy.customDrops.add(new MineDefinition.DropEntry(id,dropMin[i],dropMax[i],dropChance[i]));}
-        copy.normalize();back();ClientPacketDistributor.sendToServer(new MineActionPayload("admin_rules_save",mine.id,GSON.toJson(copy),1L));
+        copy.normalize();back();PacketDistributor.sendToServer(new MineActionPayload("admin_rules_save",mine.id,GSON.toJson(copy),1L));
     }
     private void captureFields(){captureSelectedDrop();xpMultiplier=doubleValue(xpBox,xpMultiplier);hologramDistance=doubleValue(hologramRangeBox,hologramDistance);}
     private void captureSelectedDrop(){if(minBox==null||maxBox==null||chanceBox==null)return;int min=intValue(minBox,dropMin[selectedDrop]);int max=intValue(maxBox,dropMax[selectedDrop]);dropMin[selectedDrop]=Math.max(0,min);dropMax[selectedDrop]=Math.max(dropMin[selectedDrop],max);dropChance[selectedDrop]=Math.max(0D,Math.min(100D,doubleValue(chanceBox,dropChance[selectedDrop])));}
     private EditBox box(int x,int y,int w,String value,int max,String hint){EditBox e=new EditBox(font,x,y,w,19,Component.literal(hint));e.setHint(Component.literal(hint));e.setMaxLength(max);e.setValue(value);addRenderableWidget(e);return e;}
-    private void back(){if(minecraft!=null)minecraft.setScreenAndShow(parent);}
+    private void back(){if(minecraft!=null)minecraft.setScreen(parent);}
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float partialTick){
-        int x=left(),y=top();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+W,y+H,PANEL);g.outline(x,y,W,H,BORDER);g.text(font,"Mining rules — "+mine.displayName,x+16,y+14,TEXT,true);
-        g.text(font,"Drops",x+18,y+34,MUTED,false);g.text(font,"XP multiplier",x+140,y+34,MUTED,false);g.text(font,"Vanilla enchantment behaviour",x+208,y+34,MUTED,false);
-        g.text(font,"Reset warning",x+18,y+70,MUTED,false);g.text(font,"Generated mine status display",x+274,y+70,MUTED,false);g.text(font,"Range",x+412,y+70,MUTED,false);
-        g.text(font,"Custom drops",x+18,y+118,"CUSTOM".equals(dropMode)?GOOD:MUTED,false);g.text(font,"Select a slot, then click an inventory item. Right-click a drop slot to clear it.",x+18,y+128,MUTED,false);
+    @Override public void render(GuiGraphics g,int mouseX,int mouseY,float partialTick){
+        int x=left(),y=top();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+W,y+H,PANEL);g.renderOutline(x,y,W,H,BORDER);g.drawString(font,"Mining rules — "+mine.displayName,x+16,y+14,TEXT,true);
+        g.drawString(font,"Drops",x+18,y+34,MUTED,false);g.drawString(font,"XP multiplier",x+140,y+34,MUTED,false);g.drawString(font,"Vanilla enchantment behaviour",x+208,y+34,MUTED,false);
+        g.drawString(font,"Reset warning",x+18,y+70,MUTED,false);g.drawString(font,"Generated mine status display",x+274,y+70,MUTED,false);g.drawString(font,"Range",x+412,y+70,MUTED,false);
+        g.drawString(font,"Custom drops",x+18,y+118,"CUSTOM".equals(dropMode)?GOOD:MUTED,false);g.drawString(font,"Select a slot, then click an inventory item. Right-click a drop slot to clear it.",x+18,y+128,MUTED,false);
         for(int i=0;i<9;i++)drawDropSlot(g,i,x+22+i*24,y+143,mouseX,mouseY);
-        g.text(font,"Selected #"+(selectedDrop+1),x+255,y+119,TEXT,false);g.text(font,"Min",x+255,y+128,MUTED,false);g.text(font,"Max",x+315,y+128,MUTED,false);g.text(font,"Chance %",x+375,y+128,MUTED,false);
-        if(!"CUSTOM".equals(dropMode))g.text(font,"Custom slots are stored but only used when Drop mode is Custom.",x+18,y+169,WARNING,false);
-        g.text(font,"Inventory",x+18,y+187,MUTED,false);renderInventory(g,x+18,y+201,mouseX,mouseY);
-        int rx=x+214,ry=y+199;g.text(font,"Rule summary",rx,ry,MUTED,false);g.text(font,"Normal = vanilla drops",rx,ry+17,TEXT,false);g.text(font,"None = no item drops",rx,ry+32,TEXT,false);g.text(font,"Custom = configured slots",rx,ry+47,TEXT,false);g.text(font,"XP multiplier applies in every mode.",rx,ry+69,MUTED,false);g.text(font,"Fortune/Silk toggles only affect Normal mode.",rx,ry+84,MUTED,false);
-        if(!notice.isBlank())g.text(font,trim(notice,69),x+16,y+H-45,GOOD,false);super.extractRenderState(g,mouseX,mouseY,partialTick);
+        g.drawString(font,"Selected #"+(selectedDrop+1),x+255,y+119,TEXT,false);g.drawString(font,"Min",x+255,y+128,MUTED,false);g.drawString(font,"Max",x+315,y+128,MUTED,false);g.drawString(font,"Chance %",x+375,y+128,MUTED,false);
+        if(!"CUSTOM".equals(dropMode))g.drawString(font,"Custom slots are stored but only used when Drop mode is Custom.",x+18,y+169,WARNING,false);
+        g.drawString(font,"Inventory",x+18,y+187,MUTED,false);renderInventory(g,x+18,y+201,mouseX,mouseY);
+        int rx=x+214,ry=y+199;g.drawString(font,"Rule summary",rx,ry,MUTED,false);g.drawString(font,"Normal = vanilla drops",rx,ry+17,TEXT,false);g.drawString(font,"None = no item drops",rx,ry+32,TEXT,false);g.drawString(font,"Custom = configured slots",rx,ry+47,TEXT,false);g.drawString(font,"XP multiplier applies in every mode.",rx,ry+69,MUTED,false);g.drawString(font,"Fortune/Silk toggles only affect Normal mode.",rx,ry+84,MUTED,false);
+        if(!notice.isBlank())g.drawString(font,trim(notice,69),x+16,y+H-45,GOOD,false);super.render(g,mouseX,mouseY,partialTick);
     }
 
-    private void drawDropSlot(GuiGraphicsExtractor g,int index,int x,int y,int mx,int my){boolean hover=SsuGuiGeometry.inside(mx,my,x,y,20,20);g.fill(x,y,x+20,y+20,0xFF090D12);g.outline(x,y,20,20,index==selectedDrop?SELECTED:(hover?GOOD:BORDER));ItemStack stack=dropStack(index);if(!stack.isEmpty()){g.item(stack,x+2,y+2);if(hover)g.setTooltipForNextFrame(font,stack,mx,my);}}
-    private ItemStack dropStack(int index){String id=dropItems[index];if(id==null||id.isBlank())return ItemStack.EMPTY;try{var item=BuiltInRegistries.ITEM.getOptional(Identifier.parse(id)).orElse(null);return item==null?ItemStack.EMPTY:new ItemStack(item);}catch(Exception ignored){return ItemStack.EMPTY;}}
-    private void renderInventory(GuiGraphicsExtractor g,int startX,int startY,int mx,int my){for(int row=0;row<3;row++)for(int col=0;col<9;col++)drawInventorySlot(g,9+row*9+col,startX+col*18,startY+row*18,mx,my);int hotbarY=startY+60;for(int col=0;col<9;col++)drawInventorySlot(g,col,startX+col*18,hotbarY,mx,my);}
-    private void drawInventorySlot(GuiGraphicsExtractor g,int slot,int x,int y,int mx,int my){boolean hover=SsuGuiGeometry.inside(mx,my,x,y,18,18);g.fill(x,y,x+18,y+18,hover?0xFF28323C:0xD00B1015);g.outline(x,y,18,18,hover?GOOD:BORDER);ItemStack stack=inventory(slot);if(!stack.isEmpty()){g.item(stack,x+1,y+1);g.itemDecorations(font,stack,x+1,y+1);if(hover)g.setTooltipForNextFrame(font,stack,mx,my);}}
+    private void drawDropSlot(GuiGraphics g,int index,int x,int y,int mx,int my){boolean hover=SsuGuiGeometry.inside(mx,my,x,y,20,20);g.fill(x,y,x+20,y+20,0xFF090D12);g.renderOutline(x,y,20,20,index==selectedDrop?SELECTED:(hover?GOOD:BORDER));ItemStack stack=dropStack(index);if(!stack.isEmpty()){g.renderItem(stack,x+2,y+2);if(hover)g.renderTooltip(font,stack,mx,my);}}
+    private ItemStack dropStack(int index){String id=dropItems[index];if(id==null||id.isBlank())return ItemStack.EMPTY;try{var item=BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(id)).orElse(null);return item==null?ItemStack.EMPTY:new ItemStack(item);}catch(Exception ignored){return ItemStack.EMPTY;}}
+    private void renderInventory(GuiGraphics g,int startX,int startY,int mx,int my){for(int row=0;row<3;row++)for(int col=0;col<9;col++)drawInventorySlot(g,9+row*9+col,startX+col*18,startY+row*18,mx,my);int hotbarY=startY+60;for(int col=0;col<9;col++)drawInventorySlot(g,col,startX+col*18,hotbarY,mx,my);}
+    private void drawInventorySlot(GuiGraphics g,int slot,int x,int y,int mx,int my){boolean hover=SsuGuiGeometry.inside(mx,my,x,y,18,18);g.fill(x,y,x+18,y+18,hover?0xFF28323C:0xD00B1015);g.renderOutline(x,y,18,18,hover?GOOD:BORDER);ItemStack stack=inventory(slot);if(!stack.isEmpty()){g.renderItem(stack,x+1,y+1);g.renderItemDecorations(font,stack,x+1,y+1);if(hover)g.renderTooltip(font,stack,mx,my);}}
     private int dropSlotAt(int mx,int my){int x=left()+22,y=top()+143;for(int i=0;i<9;i++)if(SsuGuiGeometry.inside(mx,my,x+i*24,y,20,20))return i;return-1;}
     private int inventorySlotAt(int mx,int my){int x=left()+18,y=top()+201;for(int row=0;row<3;row++)for(int col=0;col<9;col++)if(SsuGuiGeometry.inside(mx,my,x+col*18,y+row*18,18,18))return 9+row*9+col;int hotbar=y+60;for(int col=0;col<9;col++)if(SsuGuiGeometry.inside(mx,my,x+col*18,hotbar,18,18))return col;return-1;}
     private ItemStack inventory(int slot){if(minecraft==null||minecraft.player==null||slot<0||slot>=36)return ItemStack.EMPTY;ItemStack stack=minecraft.player.getInventory().getItem(slot);return stack==null?ItemStack.EMPTY:stack;}

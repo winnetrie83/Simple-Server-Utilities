@@ -6,7 +6,7 @@ import com.mojang.serialization.JsonOps;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.item.ItemStack;
 
@@ -30,7 +30,7 @@ public final class NpcItemCodec {
         }
         if (legacyItemId == null || legacyItemId.isBlank()) return ItemStack.EMPTY;
         try {
-            ItemStack stack = BuiltInRegistries.ITEM.getOptional(Identifier.parse(legacyItemId.trim()))
+            ItemStack stack = BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(legacyItemId.trim()))
                     .map(ItemStack::new).orElse(ItemStack.EMPTY);
             if (!stack.isEmpty()) stack.setCount(Math.max(1, Math.min(stack.getMaxStackSize(), legacyCount)));
             return stack;

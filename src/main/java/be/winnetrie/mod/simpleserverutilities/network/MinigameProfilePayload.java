@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Cosmetic-only minigame progression profile, ratings and configured weekly challenge progress. */
 public record MinigameProfilePayload(
@@ -40,7 +40,7 @@ public record MinigameProfilePayload(
 ) implements CustomPacketPayload {
     public static final int MAX_VALUES = 64;
     public static final Type<MinigameProfilePayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_profile"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_profile"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameProfilePayload> STREAM_CODEC =
             StreamCodec.of(MinigameProfilePayload::encode, MinigameProfilePayload::decode);
 

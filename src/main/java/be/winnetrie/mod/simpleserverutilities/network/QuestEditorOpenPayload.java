@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Complete bounded state required by the compact guided quest editor. */
 public record QuestEditorOpenPayload(
@@ -19,7 +19,7 @@ public record QuestEditorOpenPayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<QuestEditorOpenPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "quest_editor_open"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "quest_editor_open"));
     public static final StreamCodec<RegistryFriendlyByteBuf, QuestEditorOpenPayload> STREAM_CODEC =
             StreamCodec.of(QuestEditorOpenPayload::encode, QuestEditorOpenPayload::decode);
 

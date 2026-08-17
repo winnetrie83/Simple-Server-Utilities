@@ -8,7 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record MinigameEditorOpenPayload(
         String originalMinigameId,
@@ -21,7 +21,7 @@ public record MinigameEditorOpenPayload(
 ) implements CustomPacketPayload {
     public static final int MAX_ACTION_TYPES = 64;
     public static final Type<MinigameEditorOpenPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_editor_open"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_editor_open"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameEditorOpenPayload> STREAM_CODEC =
             StreamCodec.of(MinigameEditorOpenPayload::encode, MinigameEditorOpenPayload::decode);
 

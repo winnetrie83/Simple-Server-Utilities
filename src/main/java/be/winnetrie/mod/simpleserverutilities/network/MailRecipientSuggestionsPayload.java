@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Bounded server-authoritative suggestions for the compose recipient field. */
 public record MailRecipientSuggestionsPayload(String query, long requestId, List<String> names)
@@ -15,7 +15,7 @@ public record MailRecipientSuggestionsPayload(String query, long requestId, List
     private static final int MAX_NAMES = 256;
 
     public static final Type<MailRecipientSuggestionsPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "mail_recipient_suggestions")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "mail_recipient_suggestions")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, MailRecipientSuggestionsPayload> STREAM_CODEC =
             StreamCodec.of(MailRecipientSuggestionsPayload::encode, MailRecipientSuggestionsPayload::decode);

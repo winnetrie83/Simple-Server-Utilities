@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Region creation submitted from the GUI-first region selection tool. */
 public record RegionEditorSubmitPayload(
@@ -29,7 +29,7 @@ public record RegionEditorSubmitPayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<RegionEditorSubmitPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_editor_submit")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "region_editor_submit")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, RegionEditorSubmitPayload> STREAM_CODEC =
             StreamCodec.of(RegionEditorSubmitPayload::encode, RegionEditorSubmitPayload::decode);

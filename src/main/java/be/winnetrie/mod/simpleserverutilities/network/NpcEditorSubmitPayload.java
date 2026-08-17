@@ -25,7 +25,7 @@ import be.winnetrie.mod.simpleserverutilities.npc.NpcCustomModelAssets;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 public record NpcEditorSubmitPayload(
@@ -61,7 +61,7 @@ public record NpcEditorSubmitPayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<NpcEditorSubmitPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_editor_submit"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_editor_submit"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcEditorSubmitPayload> STREAM_CODEC =
             StreamCodec.of(NpcEditorSubmitPayload::encode, NpcEditorSubmitPayload::decode);
 
@@ -154,12 +154,12 @@ public record NpcEditorSubmitPayload(
         b.writeDouble(p.meleeDamageMultiplier); b.writeDouble(p.rangedDamageMultiplier); b.writeDouble(p.magicDamageMultiplier);
         b.writeDouble(p.walkingSpeed); b.writeDouble(p.runningSpeed); b.writeDouble(p.followRange);
         b.writeDouble(p.knockbackResistance); b.writeDouble(p.scale); b.writeDouble(p.homeRadius);
-        ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, p.mainHandItem);
-        ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, p.offHandItem);
-        ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, p.headItem);
-        ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, p.chestItem);
-        ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, p.legsItem);
-        ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, p.feetItem);
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(b, p.mainHandItem);
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(b, p.offHandItem);
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(b, p.headItem);
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(b, p.chestItem);
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(b, p.legsItem);
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(b, p.feetItem);
         b.writeVarInt(p.lootRolls); NpcEditorOpenPayload.writeLoot(b, p.loot);
         b.writeBoolean(p.scheduleEnabled); NpcEditorOpenPayload.writeSchedule(b, p.schedule);
         b.writeUtf(p.patrolMode, 16); NpcEditorOpenPayload.writePatrol(b, p.patrol);
@@ -198,12 +198,12 @@ public record NpcEditorSubmitPayload(
         double meleeDamageMultiplier = b.readDouble(), rangedDamageMultiplier = b.readDouble(), magicDamageMultiplier = b.readDouble();
         double walkingSpeed = b.readDouble(), runningSpeed = b.readDouble(), followRange = b.readDouble();
         double knockback = b.readDouble(), scale = b.readDouble(), homeRadius = b.readDouble();
-        ItemStack main = ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b);
-        ItemStack off = ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b);
-        ItemStack head = ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b);
-        ItemStack chest = ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b);
-        ItemStack legs = ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b);
-        ItemStack feet = ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b);
+        ItemStack main = ItemStack.OPTIONAL_STREAM_CODEC.decode(b);
+        ItemStack off = ItemStack.OPTIONAL_STREAM_CODEC.decode(b);
+        ItemStack head = ItemStack.OPTIONAL_STREAM_CODEC.decode(b);
+        ItemStack chest = ItemStack.OPTIONAL_STREAM_CODEC.decode(b);
+        ItemStack legs = ItemStack.OPTIONAL_STREAM_CODEC.decode(b);
+        ItemStack feet = ItemStack.OPTIONAL_STREAM_CODEC.decode(b);
         int rolls = b.readVarInt(); List<NpcEditorLootSlot> loot = NpcEditorOpenPayload.readLoot(b);
         boolean scheduleEnabled = b.readBoolean(); List<NpcScheduleEntry> schedule = NpcEditorOpenPayload.readSchedule(b);
         String patrolMode = b.readUtf(16); List<NpcPatrolPoint> patrol = NpcEditorOpenPayload.readPatrol(b);

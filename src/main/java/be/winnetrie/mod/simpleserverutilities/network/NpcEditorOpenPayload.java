@@ -26,7 +26,7 @@ import be.winnetrie.mod.simpleserverutilities.npc.NpcCustomModelAssets;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 /** Complete bounded state for creating or editing one NPC placement and its linked template. */
@@ -65,7 +65,7 @@ public record NpcEditorOpenPayload(
         List<String> availableLocalSkins
 ) implements CustomPacketPayload {
     public static final Type<NpcEditorOpenPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_editor_open"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_editor_open"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcEditorOpenPayload> STREAM_CODEC =
             StreamCodec.of(NpcEditorOpenPayload::encode, NpcEditorOpenPayload::decode);
 
@@ -209,12 +209,12 @@ public record NpcEditorOpenPayload(
         b.writeDouble(p.meleeDamageMultiplier); b.writeDouble(p.rangedDamageMultiplier); b.writeDouble(p.magicDamageMultiplier);
         b.writeDouble(p.walkingSpeed); b.writeDouble(p.runningSpeed); b.writeDouble(p.followRange);
         b.writeDouble(p.knockbackResistance); b.writeDouble(p.scale); b.writeDouble(p.homeRadius);
-        ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, p.mainHandItem);
-        ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, p.offHandItem);
-        ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, p.headItem);
-        ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, p.chestItem);
-        ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, p.legsItem);
-        ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, p.feetItem);
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(b, p.mainHandItem);
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(b, p.offHandItem);
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(b, p.headItem);
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(b, p.chestItem);
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(b, p.legsItem);
+        ItemStack.OPTIONAL_STREAM_CODEC.encode(b, p.feetItem);
         b.writeVarInt(p.lootRolls); writeLoot(b, p.loot);
         b.writeBoolean(p.scheduleEnabled); writeSchedule(b, p.schedule);
         b.writeUtf(p.patrolMode, 16); writePatrol(b, p.patrol);
@@ -265,12 +265,12 @@ public record NpcEditorOpenPayload(
         double meleeDamageMultiplier = b.readDouble(), rangedDamageMultiplier = b.readDouble(), magicDamageMultiplier = b.readDouble();
         double walkingSpeed = b.readDouble(), runningSpeed = b.readDouble(), followRange = b.readDouble();
         double knockback = b.readDouble(), scale = b.readDouble(), homeRadius = b.readDouble();
-        ItemStack main = ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b);
-        ItemStack off = ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b);
-        ItemStack head = ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b);
-        ItemStack chest = ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b);
-        ItemStack legs = ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b);
-        ItemStack feet = ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b);
+        ItemStack main = ItemStack.OPTIONAL_STREAM_CODEC.decode(b);
+        ItemStack off = ItemStack.OPTIONAL_STREAM_CODEC.decode(b);
+        ItemStack head = ItemStack.OPTIONAL_STREAM_CODEC.decode(b);
+        ItemStack chest = ItemStack.OPTIONAL_STREAM_CODEC.decode(b);
+        ItemStack legs = ItemStack.OPTIONAL_STREAM_CODEC.decode(b);
+        ItemStack feet = ItemStack.OPTIONAL_STREAM_CODEC.decode(b);
         int rolls = b.readVarInt(); List<NpcEditorLootSlot> loot = readLoot(b);
         boolean scheduleEnabled = b.readBoolean(); List<NpcScheduleEntry> schedule = readSchedule(b);
         String patrolMode = b.readUtf(16); List<NpcPatrolPoint> patrol = readPatrol(b);
@@ -460,7 +460,7 @@ public record NpcEditorOpenPayload(
     static void writeLoot(RegistryFriendlyByteBuf b, List<NpcEditorLootSlot> entries) {
         b.writeVarInt(entries.size());
         for (NpcEditorLootSlot entry : entries) {
-            ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.encode(b, entry.item());
+            ItemStack.OPTIONAL_STREAM_CODEC.encode(b, entry.item());
             b.writeVarInt(entry.chanceHundredthPercent());
         }
     }
@@ -470,7 +470,7 @@ public record NpcEditorOpenPayload(
         if (count < 0 || count > 9) throw new IllegalArgumentException("Invalid NPC loot slot count");
         List<NpcEditorLootSlot> result = new ArrayList<>(9);
         for (int i = 0; i < count; i++) {
-            result.add(new NpcEditorLootSlot(ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC.decode(b), b.readVarInt()));
+            result.add(new NpcEditorLootSlot(ItemStack.OPTIONAL_STREAM_CODEC.decode(b), b.readVarInt()));
         }
         while (result.size() < 9) result.add(new NpcEditorLootSlot(ItemStack.EMPTY, 10_000));
         return List.copyOf(result);

@@ -47,15 +47,11 @@ import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityProcessor;
-import net.minecraft.world.entity.EntitySpawnReason;
-import net.minecraft.world.entity.EntitySpawnRequest;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.decoration.HangingEntity;
 import net.minecraft.world.level.block.Block;
@@ -63,7 +59,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
-import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.phys.AABB;
 
 /**
@@ -182,7 +177,7 @@ public final class RegionSnapshotManager {
         root.addProperty("version", FORMAT_VERSION);
         root.addProperty("status", COMPLETE_STATUS);
         root.addProperty("region", region.getName());
-        root.addProperty("dimension", region.getDimension().identifier().toString());
+        root.addProperty("dimension", region.getDimension().location().toString());
         root.addProperty("minX", region.getMinX());
         root.addProperty("minY", region.getMinY());
         root.addProperty("minZ", region.getMinZ());
@@ -412,7 +407,7 @@ public final class RegionSnapshotManager {
 
     private void validateSnapshot(JsonObject root, Region region) {
         String snapshotDimension = getString(root, "dimension", "");
-        String regionDimension = region.getDimension().identifier().toString();
+        String regionDimension = region.getDimension().location().toString();
         if (!snapshotDimension.equals(regionDimension)) {
             throw new IllegalStateException("Snapshot dimension does not match the current region dimension.");
         }
@@ -491,14 +486,11 @@ public final class RegionSnapshotManager {
 
     private static String captureEntitySnbt(ServerLevel level, Entity entity) {
         try {
-            TagValueOutput output = TagValueOutput.createWithContext(
-                    ProblemReporter.DISCARDING,
-                    level.registryAccess()
-            );
-            if (!entity.save(output)) {
+            CompoundTag tag = new CompoundTag();
+            if (!entity.save(tag)) {
                 return "";
             }
-            return output.buildResult().toString();
+            return tag.toString();
         } catch (RuntimeException e) {
             if (ENTITY_CAPTURE_WARNING.compareAndSet(false, true)) {
                 SimpleServerUtilities.LOGGER.warn(
@@ -534,12 +526,7 @@ public final class RegionSnapshotManager {
              * region reaches the restore phase before end-of-tick cleanup.
              */
             tag.remove("UUID");
-            Entity entity = EntityType.loadEntityRecursive(
-                    tag,
-                    level,
-                    new EntitySpawnRequest(EntitySpawnReason.LOAD, false),
-                    EntityProcessor.NOP
-            );
+            Entity entity = EntityType.loadEntityRecursive(tag, level, loaded -> loaded);
             if (entity == null || !intersects(region, entity.getBoundingBox())) {
                 return false;
             }
@@ -606,7 +593,7 @@ public final class RegionSnapshotManager {
 
     private JsonObject blockStateToJson(BlockState state) {
         JsonObject json = new JsonObject();
-        Identifier blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         json.addProperty("block", blockId.toString());
         if (!state.getProperties().isEmpty()) {
             JsonObject properties = new JsonObject();
@@ -619,7 +606,7 @@ public final class RegionSnapshotManager {
     }
 
     private static BlockState blockStateFromJson(JsonObject json) {
-        Identifier blockId = Identifier.parse(json.get("block").getAsString());
+        ResourceLocation blockId = ResourceLocation.parse(json.get("block").getAsString());
         Block block = BuiltInRegistries.BLOCK.getOptional(blockId).orElse(Blocks.AIR);
         BlockState state = block.defaultBlockState();
         if (!json.has("properties")) {
@@ -834,7 +821,7 @@ public final class RegionSnapshotManager {
         root.addProperty("version", 1);
         root.addProperty("jobId", jobId.toString());
         root.addProperty("region", region.getName());
-        root.addProperty("dimension", region.getDimension().identifier().toString());
+        root.addProperty("dimension", region.getDimension().location().toString());
         root.addProperty("status", status);
         root.addProperty("phase", phase);
         root.addProperty("completedOperations", completed);

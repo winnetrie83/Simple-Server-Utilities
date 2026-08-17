@@ -8,16 +8,15 @@ import java.util.List;
 import be.winnetrie.mod.simpleserverutilities.network.NpcItemPriceCatalogActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcItemPriceCatalogDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcItemPriceCatalogRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Searchable administrator GUI for global vanilla and modded item base prices. */
 public final class NpcItemPriceCatalogScreen extends Screen {
@@ -96,7 +95,7 @@ public final class NpcItemPriceCatalogScreen extends Screen {
     }
 
     private void request(int page) {
-        ClientPacketDistributor.sendToServer(new NpcItemPriceCatalogRequestPayload(
+        PacketDistributor.sendToServer(new NpcItemPriceCatalogRequestPayload(
                 searchBox == null ? data.query() : searchBox.getValue(), Math.max(0, page), nextRequestId++));
     }
 
@@ -106,7 +105,7 @@ public final class NpcItemPriceCatalogScreen extends Screen {
         try {
             long buy = parseMoney(buyBox.getValue());
             long sell = parseMoney(sellBox.getValue());
-            ClientPacketDistributor.sendToServer(new NpcItemPriceCatalogActionPayload(entry.itemId(), buy, sell,
+            PacketDistributor.sendToServer(new NpcItemPriceCatalogActionPayload(entry.itemId(), buy, sell,
                     searchBox == null ? data.query() : searchBox.getValue(), data.pageIndex(), nextRequestId++));
         } catch (IllegalArgumentException exception) {
             notice = exception.getMessage(); noticeError = true;
@@ -120,23 +119,23 @@ public final class NpcItemPriceCatalogScreen extends Screen {
     }
 
     @Override public void onClose() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int left = left(), top = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(left, top, left + W, top + H, PANEL);
-        g.outline(left, top, W, H, BORDER);
-        g.text(font, "Item Price Catalog", left + 16, top + 14, TEXT, true);
-        g.text(font, data.totalItems() + " registered item(s)", left + W - 158, top + 14, MUTED, false);
+        g.renderOutline(left, top, W, H, BORDER);
+        g.drawString(font, "Item Price Catalog", left + 16, top + 14, TEXT, true);
+        g.drawString(font, data.totalItems() + " registered item(s)", left + W - 158, top + 14, MUTED, false);
         int listTop = top + 64, listBottom = top + H - 68;
         g.fill(left + 12, listTop, left + W - 12, listBottom, SUBPANEL);
-        g.outline(left + 12, listTop, W - 24, listBottom - listTop, BORDER);
-        g.text(font, "Item", left + 40, listTop + 4, MUTED, false);
-        g.text(font, "Registry ID", left + 190, listTop + 4, MUTED, false);
-        g.text(font, "Buys", left + 430, listTop + 4, MUTED, false);
-        g.text(font, "Sells", left + 510, listTop + 4, MUTED, false);
+        g.renderOutline(left + 12, listTop, W - 24, listBottom - listTop, BORDER);
+        g.drawString(font, "Item", left + 40, listTop + 4, MUTED, false);
+        g.drawString(font, "Registry ID", left + 190, listTop + 4, MUTED, false);
+        g.drawString(font, "Buys", left + 430, listTop + 4, MUTED, false);
+        g.drawString(font, "Sells", left + 510, listTop + 4, MUTED, false);
         rows.clear();
         for (int index = 0; index < data.entries().size(); index++) {
             int y = listTop + 16 + index * ROW_HEIGHT;
@@ -145,32 +144,32 @@ public final class NpcItemPriceCatalogScreen extends Screen {
             var entry = data.entries().get(index);
             g.fill(row.x(), row.y(), row.x() + row.width(), row.y() + row.height(), index == selectedIndex ? SELECTED : ROW);
             ItemStack stack = item(entry.itemId());
-            if (!stack.isEmpty()) g.item(stack, row.x(), row.y() - 1);
-            g.text(font, trim(entry.displayName(), 22), row.x() + 22, row.y() + 3, TEXT, false);
-            g.text(font, trim(entry.itemId(), 31), row.x() + 174, row.y() + 3, MUTED, false);
-            g.text(font, entry.buyPriceMinor() <= 0 ? "Off" : money(entry.buyPriceMinor()), row.x() + 414, row.y() + 3,
+            if (!stack.isEmpty()) g.renderItem(stack, row.x(), row.y() - 1);
+            g.drawString(font, trim(entry.displayName(), 22), row.x() + 22, row.y() + 3, TEXT, false);
+            g.drawString(font, trim(entry.itemId(), 31), row.x() + 174, row.y() + 3, MUTED, false);
+            g.drawString(font, entry.buyPriceMinor() <= 0 ? "Off" : money(entry.buyPriceMinor()), row.x() + 414, row.y() + 3,
                     entry.buyPriceMinor() > 0 ? GOOD : MUTED, false);
-            g.text(font, entry.sellPriceMinor() <= 0 ? "Off" : money(entry.sellPriceMinor()), row.x() + 494, row.y() + 3,
+            g.drawString(font, entry.sellPriceMinor() <= 0 ? "Off" : money(entry.sellPriceMinor()), row.x() + 494, row.y() + 3,
                     entry.sellPriceMinor() > 0 ? GOOD : MUTED, false);
         }
-        if (data.entries().isEmpty()) g.text(font, "No registered items match this search.", left + 28, listTop + 30, MUTED, false);
-        g.text(font, "Player buys/item", left + 218, top + H - 68, MUTED, false);
-        g.text(font, "Player sells/item", left + 330, top + H - 68, MUTED, false);
-        g.text(font, "Page " + (data.pageIndex() + 1) + "/" + data.pageCount(), left + 84, top + H - 24, MUTED, false);
-        if (!notice.isBlank()) g.text(font, trim(notice, 54), left + 158, top + H - 24, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (data.entries().isEmpty()) g.drawString(font, "No registered items match this search.", left + 28, listTop + 30, MUTED, false);
+        g.drawString(font, "Player buys/item", left + 218, top + H - 68, MUTED, false);
+        g.drawString(font, "Player sells/item", left + 330, top + H - 68, MUTED, false);
+        g.drawString(font, "Page " + (data.pageIndex() + 1) + "/" + data.pageCount(), left + 84, top + H - 24, MUTED, false);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 54), left + 158, top + H - 24, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    @Override public boolean mouseClicked(double mouseX, double mouseY, int button) {
         for (RowBounds row : rows) {
-            if (row.contains((int) event.x(), (int) event.y())) {
+            if (row.contains((int) mouseX, (int) mouseY)) {
                 selectedIndex = row.index();
                 notice = "";
                 rebuildWidgets();
                 return true;
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private NpcItemPriceCatalogDataPayload.Entry selected() {
@@ -184,7 +183,7 @@ public final class NpcItemPriceCatalogScreen extends Screen {
 
     private ItemStack item(String rawId) {
         try {
-            return BuiltInRegistries.ITEM.getOptional(Identifier.parse(rawId))
+            return BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(rawId))
                     .map(item -> item.getDefaultInstance()).orElse(ItemStack.EMPTY);
         } catch (RuntimeException ignored) { return ItemStack.EMPTY; }
     }

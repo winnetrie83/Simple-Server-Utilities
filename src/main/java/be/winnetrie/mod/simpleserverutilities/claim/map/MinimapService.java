@@ -34,9 +34,9 @@ public final class MinimapService {
         var preferences = SimpleServerUtilities.UI_PREFERENCES.ensurePlayer(player);
         boolean allowed = PermissionService.getBoolean(player, PermissionKeys.MINIMAP_USE, true);
         boolean enabled = allowed && preferences.isMinimapEnabled();
-        String dimension = player.level().dimension().identifier().toString();
-        int centerChunkX = player.chunkPosition().x();
-        int centerChunkZ = player.chunkPosition().z();
+        String dimension = player.level().dimension().location().toString();
+        int centerChunkX = player.chunkPosition().x;
+        int centerChunkZ = player.chunkPosition().z;
 
         List<MinimapDataPayload.ClaimOverlay> claims = enabled && preferences.isMinimapShowClaims()
                 ? collectClaims(player, dimension, centerChunkX, centerChunkZ)
@@ -113,7 +113,7 @@ public final class MinimapService {
 
         List<MinimapDataPayload.RegionOverlay> result = new ArrayList<>();
         for (var region : SimpleServerUtilities.REGIONS.getAll()) {
-            if (!dimension.equals(region.getDimension().identifier().toString())) {
+            if (!dimension.equals(region.getDimension().location().toString())) {
                 continue;
             }
             if (region.getMaxX() < minBlockX || region.getMinX() > maxBlockX

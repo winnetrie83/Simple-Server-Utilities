@@ -10,16 +10,16 @@ import be.winnetrie.mod.simpleserverutilities.network.AchievementEditorRequestPa
 import be.winnetrie.mod.simpleserverutilities.network.AchievementMenuDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.AchievementMenuRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextComponents;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Compact achievement browser/comparison screen. Hidden entries are filtered server-side. */
 public final class AchievementMenuScreen extends Screen {
@@ -85,17 +85,17 @@ public final class AchievementMenuScreen extends Screen {
 
     private void openPlayerPicker(){
         if(minecraft==null)return;
-        minecraft.setScreenAndShow(new KnownPlayerPickerScreen(this,this::selectPlayer,"Choose a player to inspect achievement progress."));
+        minecraft.setScreen(new KnownPlayerPickerScreen(this,this::selectPlayer,"Choose a player to inspect achievement progress."));
     }
     private void selectPlayer(String value){requestedTarget=value==null?"":value.trim();send("admin_refresh","",data.filter(),0);}
     private void filter(String value){send(data.adminView()?"admin_refresh":"refresh","",value,0);}
     private void request(String action,String id,int page){send(action,id,data.filter(),page);}
     private void send(String action,String id,String filter,int page){
         if(awaiting)return;awaiting=true;
-        ClientPacketDistributor.sendToServer(new AchievementMenuRequestPayload(action,requestedTarget,id.isBlank()?selectedId:id,filter,page,nextRequestId++));
+        PacketDistributor.sendToServer(new AchievementMenuRequestPayload(action,requestedTarget,id.isBlank()?selectedId:id,filter,page,nextRequestId++));
         rebuildWidgets();
     }
-    private void edit(String id){ClientPacketDistributor.sendToServer(new AchievementEditorRequestPayload(id,nextRequestId++));}
+    private void edit(String id){PacketDistributor.sendToServer(new AchievementEditorRequestPayload(id,nextRequestId++));}
     private AchievementMenuDataPayload.Entry selected(){for(var a:data.achievements())if(a.id().equals(selectedId))return a;return data.achievements().isEmpty()?null:data.achievements().getFirst();}
 
     public void accept(AchievementMenuDataPayload p){
@@ -104,63 +104,63 @@ public final class AchievementMenuScreen extends Screen {
         if(!found)selectedId=p.achievements().isEmpty()?"":p.achievements().getFirst().id();rebuildWidgets();
     }
     public void refreshFromEditor(){send(data.adminView()?"admin_refresh":"refresh","",data.filter(),data.page());}
-    @Override public void onClose(){if(minecraft!=null)minecraft.setScreenAndShow(parent);}
+    @Override public void onClose(){if(minecraft!=null)minecraft.setScreen(parent);}
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float pt){
-        int x=px(),y=py();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+W,y+H,PANEL);g.outline(x,y,W,H,BORDER);
-        g.text(font,data.adminView()?"Achievement Administration":"Achievements",x+10,y+12,TEXT,true);
-        g.text(font,"Viewing "+data.targetName()+" • "+data.totalAchievements()+" visible • "+(data.page()+1)+"/"+data.totalPages(),x+190,y+14,MUTED,false);
+    @Override public void render(GuiGraphics g,int mx,int my,float pt){
+        int x=px(),y=py();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+W,y+H,PANEL);g.renderOutline(x,y,W,H,BORDER);
+        g.drawString(font,data.adminView()?"Achievement Administration":"Achievements",x+10,y+12,TEXT,true);
+        g.drawString(font,"Viewing "+data.targetName()+" • "+data.totalAchievements()+" visible • "+(data.page()+1)+"/"+data.totalPages(),x+190,y+14,MUTED,false);
         g.fill(x+LEFT,y+60,x+LEFT+1,y+H-34,BORDER);
         for(int i=0;i<Math.min(ROWS,data.achievements().size());i++){
-            var a=data.achievements().get(i);int ry=y+64+i*25;g.text(font,a.targetEarned()?"✓":"○",x+14,ry+6,a.targetEarned()?GOOD:MUTED,true);
-            if(a.hidden())g.text(font,"◆",x+LEFT-22,ry+6,WARN,true);
+            var a=data.achievements().get(i);int ry=y+64+i*25;g.drawString(font,a.targetEarned()?"✓":"○",x+14,ry+6,a.targetEarned()?GOOD:MUTED,true);
+            if(a.hidden())g.drawString(font,"◆",x+LEFT-22,ry+6,WARN,true);
         }
         var a=selected();
-        if(a==null)g.text(font,"No achievements match this filter.",x+LEFT+12,y+78,MUTED,false);
+        if(a==null)g.drawString(font,"No achievements match this filter.",x+LEFT+12,y+78,MUTED,false);
         else drawAchievement(g,a,x+LEFT+12,y+(data.adminView()?66:44),mx,my);
-        if(!data.notice().isBlank())g.text(font,trim(data.notice(),68),x+142,y+H-23,data.error()?ERROR:GOOD,false);
-        else if(awaiting)g.text(font,"Updating achievements…",x+142,y+H-23,MUTED,false);
-        super.extractRenderState(g,mx,my,pt);
+        if(!data.notice().isBlank())g.drawString(font,trim(data.notice(),68),x+142,y+H-23,data.error()?ERROR:GOOD,false);
+        else if(awaiting)g.drawString(font,"Updating achievements…",x+142,y+H-23,MUTED,false);
+        super.render(g,mx,my,pt);
     }
 
-    private void drawAchievement(GuiGraphicsExtractor g,AchievementMenuDataPayload.Entry a,int x,int y,int mx,int my){
+    private void drawAchievement(GuiGraphics g,AchievementMenuDataPayload.Entry a,int x,int y,int mx,int my){
         int detailWidth=W-LEFT-34;
         List<FormattedCharSequence> title=font.split(SsuRichTextComponents.parse(a.title()),detailWidth);
-        if(!title.isEmpty())g.text(font,title.getFirst(),x,y,TEXT,true);
-        g.text(font,a.category()+(a.hidden()?" • Hidden":"")+(a.enabled()?"":" • Disabled"),x,y+15,a.hidden()?WARN:MUTED,false);
+        if(!title.isEmpty())g.drawString(font,title.getFirst(),x,y,TEXT,true);
+        g.drawString(font,a.category()+(a.hidden()?" • Hidden":"")+(a.enabled()?"":" • Disabled"),x,y+15,a.hidden()?WARN:MUTED,false);
         List<FormattedCharSequence> info=font.split(SsuRichTextComponents.parse(a.info()),detailWidth);
-        for(int i=0;i<Math.min(4,info.size());i++)g.text(font,info.get(i),x,y+33+i*10,TEXT,false);
+        for(int i=0;i<Math.min(4,info.size());i++)g.drawString(font,info.get(i),x,y+33+i*10,TEXT,false);
 
         int oy=y+80;String compare=data.targetName().equals(data.viewerName())?data.targetName():data.targetName()+" vs "+data.viewerName();
-        g.text(font,"Progress — "+compare,x,oy,ACCENT,true);
+        g.drawString(font,"Progress — "+compare,x,oy,ACCENT,true);
         int row=0;for(var o:a.objectives()){
             if(row>=6)break;long tv=Math.min(o.targetValue(),o.required()),vv=Math.min(o.viewerValue(),o.required());
             String line=(tv>=o.required()?"✓ ":o.optional()?"○ ":"• ")+o.description()+"  "+tv+"/"+o.required();
             if(!data.targetName().equals(data.viewerName()))line+=" • You "+vv+"/"+o.required();
-            g.text(font,trim(line,48),x,oy+14+row*12,tv>=o.required()?GOOD:TEXT,false);row++;
+            g.drawString(font,trim(line,48),x,oy+14+row*12,tv>=o.required()?GOOD:TEXT,false);row++;
         }
 
-        int ry=oy+22+Math.max(3,row)*12;g.text(font,"Reward",x,ry,ACCENT,true);
+        int ry=oy+22+Math.max(3,row)*12;g.drawString(font,"Reward",x,ry,ACCENT,true);
         int rewardY=ry+13;
         for(int i=0;i<Math.min(4,a.rewards().size());i++)rewardY+=drawReward(g,a.rewards().get(i),x,rewardY,mx,my);
         int earnedY=Math.min(y+252,rewardY+3);
-        if(a.targetEarned())g.text(font,"Earned: "+date(a.targetAchievedAt()),x,earnedY,GOOD,false);else g.text(font,"Not earned yet",x,earnedY,MUTED,false);
+        if(a.targetEarned())g.drawString(font,"Earned: "+date(a.targetAchievedAt()),x,earnedY,GOOD,false);else g.drawString(font,"Not earned yet",x,earnedY,MUTED,false);
     }
 
-    private int drawReward(GuiGraphicsExtractor g,AchievementMenuDataPayload.Reward reward,int x,int y,int mx,int my){
+    private int drawReward(GuiGraphics g,AchievementMenuDataPayload.Reward reward,int x,int y,int mx,int my){
         ItemStack stack=itemStack(reward);
         if(!stack.isEmpty()){
-            g.fill(x,y,x+19,y+19,CARD);g.outline(x,y,19,19,BORDER);g.item(stack,x+2,y+2);
-            if(mx>=x&&mx<x+19&&my>=y&&my<y+19)g.setTooltipForNextFrame(font,stack,mx,my);
+            g.fill(x,y,x+19,y+19,CARD);g.renderOutline(x,y,19,19,BORDER);g.renderItem(stack,x+2,y+2);
+            if(mx>=x&&mx<x+19&&my>=y&&my<y+19)g.renderTooltip(font,stack,mx,my);
             String label=Math.max(1,reward.count())+" × "+stack.getHoverName().getString();
-            g.text(font,trim(label,38),x+24,y+5,TEXT,false);return 21;
+            g.drawString(font,trim(label,38),x+24,y+5,TEXT,false);return 21;
         }
-        g.text(font,"• "+trim(reward.label(),45),x,y+3,TEXT,false);return 16;
+        g.drawString(font,"• "+trim(reward.label(),45),x,y+3,TEXT,false);return 16;
     }
     private ItemStack itemStack(AchievementMenuDataPayload.Reward reward){
         if(reward==null||reward.itemId().isBlank())return ItemStack.EMPTY;
         try{
-            var item=BuiltInRegistries.ITEM.getOptional(Identifier.parse(reward.itemId())).orElse(null);
+            var item=BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(reward.itemId())).orElse(null);
             if(item==null)return ItemStack.EMPTY;ItemStack stack=new ItemStack(item);stack.setCount(Math.max(1,Math.min(99,reward.count())));return stack;
         }catch(RuntimeException ignored){return ItemStack.EMPTY;}
     }

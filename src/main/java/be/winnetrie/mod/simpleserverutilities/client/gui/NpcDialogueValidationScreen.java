@@ -3,7 +3,7 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.npc.NpcDialogueValidation;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -44,21 +44,21 @@ public final class NpcDialogueValidationScreen extends Screen {
 
     @Override
     public void onClose() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
         SsuGuiScale.fullscreenDim(graphics, this, 0xA9000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
-        graphics.outline(x, y, W, H, BORDER);
-        graphics.text(font, "Dialogue validation", x + 12, y + 12, TEXT, true);
-        graphics.text(font, report.summary(), x + 12, y + 30,
+        graphics.renderOutline(x, y, W, H, BORDER);
+        graphics.drawString(font, "Dialogue validation", x + 12, y + 12, TEXT, true);
+        graphics.drawString(font, report.summary(), x + 12, y + 30,
                 report.errorCount() > 0 ? ERROR : report.warningCount() > 0 ? WARNING : GOOD, false);
 
         if (report.issues().isEmpty()) {
-            graphics.text(font, "The graph, registered handlers and known service targets passed validation.",
+            graphics.drawString(font, "The graph, registered handlers and known service targets passed validation.",
                     x + 12, y + 62, GOOD, false);
         } else {
             int start = page * PAGE_SIZE;
@@ -68,14 +68,14 @@ public final class NpcDialogueValidationScreen extends Screen {
                 int rowY = y + 58 + (index - start) * 20;
                 String prefix = issue.severity() == NpcDialogueValidation.Severity.ERROR ? "ERROR" : "WARN";
                 int colour = issue.severity() == NpcDialogueValidation.Severity.ERROR ? ERROR : WARNING;
-                graphics.text(font, prefix, x + 12, rowY, colour, true);
-                graphics.text(font, trim(issue.location(), 34), x + 58, rowY, MUTED, false);
-                graphics.text(font, trim(issue.message(), 78), x + 190, rowY, TEXT, false);
+                graphics.drawString(font, prefix, x + 12, rowY, colour, true);
+                graphics.drawString(font, trim(issue.location(), 34), x + 58, rowY, MUTED, false);
+                graphics.drawString(font, trim(issue.message(), 78), x + 190, rowY, TEXT, false);
             }
             int pages = Math.max(1, (report.issues().size() + PAGE_SIZE - 1) / PAGE_SIZE);
-            graphics.text(font, "Page " + (page + 1) + "/" + pages, x + 190, y + H - 21, MUTED, false);
+            graphics.drawString(font, "Page " + (page + 1) + "/" + pages, x + 190, y + H - 21, MUTED, false);
         }
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     private int px() { return (width - W) / 2; }

@@ -3,7 +3,7 @@ package be.winnetrie.mod.simpleserverutilities.client.minigame;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameCastBarPayload;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 
 /** Bottom-center interruptible action bar used by minigames. */
 public final class MinigameCastBarClientState {
@@ -32,9 +32,9 @@ public final class MinigameCastBarClientState {
         color = 0xFFFFFF;
     }
 
-    public static synchronized void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
+    public static synchronized void render(GuiGraphics graphics, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (!visible || minecraft.player == null || minecraft.gui.screen() != null) return;
+        if (!visible || minecraft.player == null || minecraft.screen != null) return;
         int width = 182;
         int height = 12;
         int x = (minecraft.getWindow().getGuiScaledWidth() - width) / 2;
@@ -42,12 +42,12 @@ public final class MinigameCastBarClientState {
         graphics.fill(x, y, x + width, y + height, 0xD010141A);
         int fill = Math.round((width - 4) * Math.max(0.0F, Math.min(1.0F, progress)));
         graphics.fill(x + 2, y + 2, x + 2 + fill, y + height - 2, 0xFF000000 | color);
-        graphics.outline(x, y, width, height, 0xFFE8EEF3);
+        graphics.renderOutline(x, y, width, height, 0xFFE8EEF3);
         int textX = x + (width - minecraft.font.width(label)) / 2;
-        graphics.text(minecraft.font, label, textX, y - 12, 0xFFFFFFFF, true);
+        graphics.drawString(minecraft.font, label, textX, y - 12, 0xFFFFFFFF, true);
         if (!instruction.isBlank()) {
             int instructionX = (minecraft.getWindow().getGuiScaledWidth() - minecraft.font.width(instruction)) / 2;
-            graphics.text(minecraft.font, instruction, instructionX, y - 28, 0xFFE8EEF3, true);
+            graphics.drawString(minecraft.font, instruction, instructionX, y - 28, 0xFFE8EEF3, true);
         }
     }
 }

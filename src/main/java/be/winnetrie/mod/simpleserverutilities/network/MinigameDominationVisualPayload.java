@@ -7,14 +7,14 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Live world labels and two-tone assault visuals for Domination nodes. */
 public record MinigameDominationVisualPayload(boolean visible, List<Entry> nodes)
         implements CustomPacketPayload {
     public static final int MAX_NODES = 9;
     public static final Type<MinigameDominationVisualPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_domination_visual"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_domination_visual"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameDominationVisualPayload> STREAM_CODEC =
             StreamCodec.of(MinigameDominationVisualPayload::encode, MinigameDominationVisualPayload::decode);
 

@@ -5,12 +5,12 @@ import java.util.List;
 import be.winnetrie.mod.simpleserverutilities.identity.RichTextComponents;
 import be.winnetrie.mod.simpleserverutilities.network.OnboardingActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.OnboardingStatePayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Mandatory first-join rules and optional introduction screen. */
 public final class OnboardingScreen extends Screen {
@@ -40,7 +40,7 @@ public final class OnboardingScreen extends Screen {
         data = next;
         if (changedPage || changedKind) lineOffset = 0;
         if ("complete".equals(next.stage())) {
-            if (minecraft != null) minecraft.setScreenAndShow(null);
+            if (minecraft != null) minecraft.setScreen(null);
             return;
         }
         rebuildWidgets();
@@ -77,7 +77,7 @@ public final class OnboardingScreen extends Screen {
         if (rulesStage(data)) {
             boolean confirmation = "rules_confirm".equals(data.stage());
             addRenderableWidget(Button.builder(Component.literal(confirmation ? "Confirm acceptance" : "Accept rules"),
-                    button -> ClientPacketDistributor.sendToServer(new OnboardingActionPayload(
+                    button -> PacketDistributor.sendToServer(new OnboardingActionPayload(
                             confirmation ? "accept_rules_confirm" : "accept_rules_first", 0, request++)))
                     .bounds(x + W - 170, y + H - 30, 154, 20).build());
             return;
@@ -100,42 +100,42 @@ public final class OnboardingScreen extends Screen {
     }
 
     private void send(String action, int page) {
-        ClientPacketDistributor.sendToServer(new OnboardingActionPayload(action, page, request++));
+        PacketDistributor.sendToServer(new OnboardingActionPayload(action, page, request++));
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int x = left();
         int y = top();
         boolean rules = rulesStage(data);
         SsuGuiScale.fullscreenDim(graphics, this, 0xB0000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
-        graphics.outline(x, y, W, H, BORDER);
-        graphics.text(font, "Welcome to the server", x + 18, y + 16, TEXT, true);
+        graphics.renderOutline(x, y, W, H, BORDER);
+        graphics.drawString(font, "Welcome to the server", x + 18, y + 16, TEXT, true);
         String subtitle = rules
                 ? ("rules_confirm".equals(data.stage())
                         ? "Confirm that you accept these rules."
                         : "Read the complete rules before accepting.")
                 : "Introduction " + (data.pageIndex() + 1) + " / " + Math.max(1, data.pageCount());
-        graphics.text(font, subtitle, x + 18, y + 35, MUTED, false);
+        graphics.drawString(font, subtitle, x + 18, y + 35, MUTED, false);
         if (confirmDecline) {
-            graphics.text(font, "Click Confirm leave to decline the rules and disconnect.", x + 18, y + 50, ERROR, false);
+            graphics.drawString(font, "Click Confirm leave to decline the rules and disconnect.", x + 18, y + 50, ERROR, false);
         }
 
         List<FormattedCharSequence> lines = bodyLines();
         int from = Math.max(0, Math.min(lineOffset, Math.max(0, lines.size() - 1)));
         int to = Math.min(lines.size(), from + VISIBLE_LINES);
         for (int index = from; index < to; index++) {
-            graphics.text(font, lines.get(index), x + 20, y + 62 + (index - from) * 12, TEXT, false);
+            graphics.drawString(font, lines.get(index), x + 20, y + 62 + (index - from) * 12, TEXT, false);
         }
         if (lines.size() > VISIBLE_LINES) {
-            graphics.text(font, "Text " + (from + 1) + "–" + to + " / " + lines.size(), x + 178, y + H - 25,
+            graphics.drawString(font, "Text " + (from + 1) + "–" + to + " / " + lines.size(), x + 178, y + H - 25,
                     MUTED, false);
         }
         if (!data.notice().isBlank()) {
-            graphics.text(font, data.notice(), x + 18, y + H - 52, data.error() ? ERROR : GOOD, false);
+            graphics.drawString(font, data.notice(), x + 18, y + H - 52, data.error() ? ERROR : GOOD, false);
         }
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     private List<FormattedCharSequence> bodyLines() {

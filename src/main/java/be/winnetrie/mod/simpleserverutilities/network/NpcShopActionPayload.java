@@ -5,13 +5,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Direct click action for one current NPC shop session; quantity carries the clicked inventory slot for sales. */
 public record NpcShopActionPayload(String action, String instanceId, String shopId, String entryId,
                                    int quantity, int pageIndex, long requestId) implements CustomPacketPayload {
     public static final Type<NpcShopActionPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_action"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_action"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcShopActionPayload> STREAM_CODEC =
             StreamCodec.of(NpcShopActionPayload::encode, NpcShopActionPayload::decode);
     public NpcShopActionPayload {

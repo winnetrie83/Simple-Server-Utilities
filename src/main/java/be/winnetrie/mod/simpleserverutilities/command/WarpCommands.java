@@ -19,7 +19,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -287,7 +287,7 @@ public class WarpCommands {
 
     private static ServerLevel getWarpLevel(ServerPlayer player, Warp warp) {
         try {
-            Identifier dimensionId = Identifier.parse(warp.getDimension());
+            ResourceLocation dimensionId = ResourceLocation.parse(warp.getDimension());
             ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimensionId);
 
             return player.level().getServer().getLevel(dimension);

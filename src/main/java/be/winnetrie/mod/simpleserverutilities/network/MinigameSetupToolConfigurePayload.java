@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Selects the target/action used by the server-authoritative Minigame Setup Tool. */
 public record MinigameSetupToolConfigurePayload(
@@ -17,7 +17,7 @@ public record MinigameSetupToolConfigurePayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<MinigameSetupToolConfigurePayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_setup_configure"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_setup_configure"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameSetupToolConfigurePayload> STREAM_CODEC =
             StreamCodec.of(MinigameSetupToolConfigurePayload::encode, MinigameSetupToolConfigurePayload::decode);
 

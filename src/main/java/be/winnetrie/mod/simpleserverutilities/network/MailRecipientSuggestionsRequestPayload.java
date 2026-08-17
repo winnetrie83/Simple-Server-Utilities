@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Requests a small alphabetic list of known-player name suggestions. */
 public record MailRecipientSuggestionsRequestPayload(String query, long requestId) implements CustomPacketPayload {
     public static final Type<MailRecipientSuggestionsRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "mail_recipient_suggestions_request")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "mail_recipient_suggestions_request")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, MailRecipientSuggestionsRequestPayload> STREAM_CODEC =
             StreamCodec.of(MailRecipientSuggestionsRequestPayload::encode,

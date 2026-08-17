@@ -3,13 +3,13 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 import be.winnetrie.mod.simpleserverutilities.network.RegionEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionEditorSubmitPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Minimal region-creation GUI opened from the region selection tool.
@@ -65,7 +65,7 @@ public final class RegionEditorScreen extends Screen {
             return;
         }
         long requestId = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new RegionEditorSubmitPayload(
+        PacketDistributor.sendToServer(new RegionEditorSubmitPayload(
                 rawName,
                 0,
                 false,
@@ -98,7 +98,7 @@ public final class RegionEditorScreen extends Screen {
                 minecraft.player.sendSystemMessage(Component.literal(
                         payload.message() + " Configure it under Admin Center > Regions > Settings."));
             }
-            if (minecraft != null) minecraft.setScreenAndShow(null);
+            if (minecraft != null) minecraft.setScreen(null);
             return;
         }
         notice = payload.message();
@@ -106,29 +106,29 @@ public final class RegionEditorScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = panelX();
         int y = panelY();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, PANEL);
-        g.outline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
-        g.text(font, "Create Server Region", x + 20, y + 15, TEXT, true);
+        g.renderOutline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
+        g.drawString(font, "Create Server Region", x + 20, y + 15, TEXT, true);
         BlockPos p1 = BlockPos.of(selection.point1());
         BlockPos p2 = BlockPos.of(selection.point2());
-        g.text(font, "Selection: " + compact(p1) + " → " + compact(p2), x + 20, y + 34, MUTED, false);
-        g.text(font, "Dimension: " + shortDimension(selection.dimension()), x + 20, y + 48, MUTED, false);
-        g.text(font, "Region name", x + 20, y + 66, MUTED, false);
-        g.text(font, "Protection, priority, rent and messages are configured afterwards under", x + 20, y + 112, MUTED, false);
-        g.text(font, "Admin Center > Regions > Settings.", x + 20, y + 126, GOOD, false);
+        g.drawString(font, "Selection: " + compact(p1) + " → " + compact(p2), x + 20, y + 34, MUTED, false);
+        g.drawString(font, "Dimension: " + shortDimension(selection.dimension()), x + 20, y + 48, MUTED, false);
+        g.drawString(font, "Region name", x + 20, y + 66, MUTED, false);
+        g.drawString(font, "Protection, priority, rent and messages are configured afterwards under", x + 20, y + 112, MUTED, false);
+        g.drawString(font, "Admin Center > Regions > Settings.", x + 20, y + 126, GOOD, false);
         if (!notice.isBlank()) {
-            g.text(font, trim(notice, 66), x + 20, y + 148, noticeError ? ERROR : GOOD, false);
+            g.drawString(font, trim(notice, 66), x + 20, y + 148, noticeError ? ERROR : GOOD, false);
         }
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     @Override
     public void onClose() {
-        if (minecraft != null && parent != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null && parent != null) minecraft.setScreen(parent);
         else super.onClose();
     }
 

@@ -26,6 +26,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 public final class EntityInsightService {
     private static final long FLEEING_HIT_TTL_MILLIS = 5_000L;
     private static final Map<UUID, Long> RECENT_PLAYER_HITS = new ConcurrentHashMap<>();
+    private static final Map<UUID, UUID> RECENT_PLAYER_ATTACKERS = new ConcurrentHashMap<>();
     private static final Map<UUID, Integer> LAST_SENT_HASH = new ConcurrentHashMap<>();
     private static final Set<String> NEUTRAL_TYPES = Set.of(
             "minecraft:bee",
@@ -82,7 +83,7 @@ public final class EntityInsightService {
     private static boolean eligible(ServerPlayer viewer, LivingEntity entity, double rangeSquared) {
         if (entity == viewer || entity instanceof Player || entity instanceof ArmorStand) return false;
         if (!entity.isAlive() || entity.isInvisible()) return false;
-        if (entity.entityTags().contains("ssu_npc")) return false;
+        if (entity.getTags().contains("ssu_npc")) return false;
         return viewer.distanceToSqr(entity) <= rangeSquared;
     }
 
@@ -117,9 +118,12 @@ public final class EntityInsightService {
         long now = System.currentTimeMillis();
         if (hitAt == null || now - hitAt > FLEEING_HIT_TTL_MILLIS) {
             RECENT_PLAYER_HITS.remove(entity.getUUID());
+            RECENT_PLAYER_ATTACKERS.remove(entity.getUUID());
             return false;
         }
-        Player player = entity.getLastHurtByPlayer();
+        UUID attackerId = RECENT_PLAYER_ATTACKERS.get(entity.getUUID());
+        if (attackerId == null || entity.level().getServer() == null) return false;
+        ServerPlayer player = entity.level().getServer().getPlayerList().getPlayer(attackerId);
         if (player == null || !player.isAlive() || entity.distanceToSqr(player) > 256.0D) return false;
         Vec3 velocity = mob.getDeltaMovement();
         if (velocity.horizontalDistanceSqr() < 0.0025D) return false;
@@ -128,8 +132,10 @@ public final class EntityInsightService {
         return horizontalAway > 0.01D;
     }
 
-    public static void notePlayerHit(LivingEntity entity) {
-        if (entity != null) RECENT_PLAYER_HITS.put(entity.getUUID(), System.currentTimeMillis());
+    public static void notePlayerHit(LivingEntity entity, ServerPlayer attacker) {
+        if (entity == null || attacker == null) return;
+        RECENT_PLAYER_HITS.put(entity.getUUID(), System.currentTimeMillis());
+        RECENT_PLAYER_ATTACKERS.put(entity.getUUID(), attacker.getUUID());
     }
 
     public static void clearViewer(UUID viewerId) {
@@ -138,7 +144,11 @@ public final class EntityInsightService {
 
     public static void cleanupRecentHits() {
         long cutoff = System.currentTimeMillis() - FLEEING_HIT_TTL_MILLIS * 2L;
-        RECENT_PLAYER_HITS.entrySet().removeIf(entry -> entry.getValue() < cutoff);
+        RECENT_PLAYER_HITS.entrySet().removeIf(entry -> {
+            if (entry.getValue() >= cutoff) return false;
+            RECENT_PLAYER_ATTACKERS.remove(entry.getKey());
+            return true;
+        });
     }
 
     private static void sendIfChanged(ServerPlayer viewer, EntityInsightPayload payload) {

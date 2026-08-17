@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record NpcItemPriceCatalogRequestPayload(String query, int pageIndex, long requestId)
         implements CustomPacketPayload {
     public static final Type<NpcItemPriceCatalogRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_item_price_catalog_request"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_item_price_catalog_request"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcItemPriceCatalogRequestPayload> STREAM_CODEC =
             StreamCodec.of(NpcItemPriceCatalogRequestPayload::encode, NpcItemPriceCatalogRequestPayload::decode);
 

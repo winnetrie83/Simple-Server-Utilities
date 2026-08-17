@@ -5,12 +5,12 @@ import java.util.function.Consumer;
 
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuPageDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuMenuPageRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Server-paged picker for every player identity SSU currently knows about. */
 public final class KnownPlayerPickerScreen extends Screen {
@@ -86,7 +86,7 @@ public final class KnownPlayerPickerScreen extends Screen {
         loading = true;
         requestedOnce = true;
         pendingRequest = nextRequest++;
-        ClientPacketDistributor.sendToServer(new SsuMenuPageRequestPayload(
+        PacketDistributor.sendToServer(new SsuMenuPageRequestPayload(
                 "known_players", page, PAGE_SIZE, query, pendingRequest));
         rebuildWidgets();
     }
@@ -94,25 +94,25 @@ public final class KnownPlayerPickerScreen extends Screen {
     private void choose(SsuMenuPageDataPayload.AccountEntry account) {
         String value = account.name().isBlank() ? account.id() : account.name();
         selection.accept(value);
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     private int pages() { return Math.max(1, (data.totalItems() + PAGE_SIZE - 1) / PAGE_SIZE); }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, "Choose known player", x + 16, y + 16, TEXT, true);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Choose known player", x + 16, y + 16, TEXT, true);
         String status = loading ? "Loading players…" : data.error() ? data.notice()
                 : data.totalItems() == 0 ? "No matching players." : description;
-        g.text(font, status, x + 16, y + 28, data.error() ? ERROR : MUTED, false);
-        g.centeredText(font, "Page " + (page + 1) + "/" + pages(), x + W / 2, y + H - 29, MUTED);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        g.drawString(font, status, x + 16, y + 28, data.error() ? ERROR : MUTED, false);
+        g.drawCenteredString(font, "Page " + (page + 1) + "/" + pages(), x + W / 2, y + H - 29, MUTED);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
     private int left() { return (width - W) / 2; }
     private int top() { return (height - H) / 2; }

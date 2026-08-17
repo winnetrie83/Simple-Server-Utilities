@@ -4,13 +4,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Requests one filtered page from the visual NPC shop library manager. */
 public record NpcShopAdminRequestPayload(String query, int pageIndex, long requestId)
         implements CustomPacketPayload {
     public static final Type<NpcShopAdminRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_admin_request"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_admin_request"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcShopAdminRequestPayload> STREAM_CODEC =
             StreamCodec.of(NpcShopAdminRequestPayload::encode, NpcShopAdminRequestPayload::decode);
 

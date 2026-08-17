@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Requests server-authoritative overlays for a world-map viewport. */
 public record WorldMapRequestPayload(
@@ -14,7 +14,7 @@ public record WorldMapRequestPayload(
 ) implements CustomPacketPayload {
 
     public static final Type<WorldMapRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "world_map_request")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "world_map_request")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, WorldMapRequestPayload> STREAM_CODEC =

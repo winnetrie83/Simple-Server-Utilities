@@ -36,18 +36,17 @@ import be.winnetrie.mod.simpleserverutilities.network.MineRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.OnboardingAdminRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.time.GameCalendar;
 import be.winnetrie.mod.simpleserverutilities.mixin.PlayerSkinWidgetAccessor;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.PlayerSkinWidget;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.sounds.SoundEvents;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Page-driven dashboard. The shell contains only compact status/counts; lists
@@ -73,27 +72,27 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
     private static final int DROPDOWN_VISIBLE_ROWS = 8;
     private static final int TILE_SIZE = 54;
     private static final int TILE_LABEL_HEIGHT = 18;
-    private static final Identifier BUTTON_TEXTURE = texture("button.png");
-    private static final Identifier BUTTON_GLOW_TEXTURE = texture("button_glow.png");
-    private static final Identifier BUTTON_BACK_TEXTURE = texture("button_back.png");
-    private static final Identifier BUTTON_BACK_GLOW_TEXTURE = texture("button_back_glow.png");
-    private static final Identifier PORTRAIT_FRAME = texture("portrait_framework.png");
-    private static final Identifier ICON_CLAIM = texture("claim_land.png");
-    private static final Identifier ICON_TRAVEL = texture("travel.png");
-    private static final Identifier ICON_WALLET = texture("wallet.png");
-    private static final Identifier ICON_MAIL = texture("mail.png");
-    private static final Identifier ICON_MINIGAMES = texture("games.png");
-    private static final Identifier ICON_ACHIEVEMENTS = texture("achievements.png");
-    private static final Identifier ICON_COSMETICS = texture("cosmetics.png");
-    private static final Identifier ICON_QUESTBOOK = texture("questbook.png");
-    private static final Identifier ICON_SETTINGS = texture("cogwheel.png");
-    private static final Identifier ICON_MARKET = texture("market.png");
-    private static final Identifier ICON_PLAYERS = texture("multiplayer.png");
-    private static final Identifier ICON_PORTAL = texture("portal.png");
-    private static final Identifier ICON_SHIELD = texture("shield.png");
-    private static final Identifier ICON_TICKET = texture("ticket.png");
-    private static final Identifier ICON_KITS = texture("kits.png");
-    private static final Identifier ICON_MINES = texture("mines.png");
+    private static final ResourceLocation BUTTON_TEXTURE = texture("button.png");
+    private static final ResourceLocation BUTTON_HOVER_TEXTURE = texture("button_hover.png");
+    private static final ResourceLocation BUTTON_BACK_TEXTURE = texture("button_back.png");
+    private static final ResourceLocation BUTTON_BACK_HOVER_TEXTURE = texture("button_back_hover.png");
+    private static final ResourceLocation PORTRAIT_FRAME = texture("portrait_framework.png");
+    private static final ResourceLocation ICON_CLAIM = texture("claim_land.png");
+    private static final ResourceLocation ICON_TRAVEL = texture("travel.png");
+    private static final ResourceLocation ICON_WALLET = texture("wallet.png");
+    private static final ResourceLocation ICON_MAIL = texture("mail.png");
+    private static final ResourceLocation ICON_MINIGAMES = texture("games.png");
+    private static final ResourceLocation ICON_ACHIEVEMENTS = texture("achievements.png");
+    private static final ResourceLocation ICON_COSMETICS = texture("cosmetics.png");
+    private static final ResourceLocation ICON_QUESTBOOK = texture("questbook.png");
+    private static final ResourceLocation ICON_SETTINGS = texture("cogwheel.png");
+    private static final ResourceLocation ICON_MARKET = texture("market.png");
+    private static final ResourceLocation ICON_PLAYERS = texture("multiplayer.png");
+    private static final ResourceLocation ICON_PORTAL = texture("portal.png");
+    private static final ResourceLocation ICON_SHIELD = texture("shield.png");
+    private static final ResourceLocation ICON_TICKET = texture("ticket.png");
+    private static final ResourceLocation ICON_KITS = texture("kits.png");
+    private static final ResourceLocation ICON_MINES = texture("mines.png");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("dd/MM HH:mm")
             .withZone(ZoneId.systemDefault());
 
@@ -342,18 +341,17 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         clearReferences();
         Layout l = layout();
         if (l.sidebarVisible() && minecraft.player != null) {
-            // PlayerSkinWidget submits its 3D player render in physical GUI coordinates
-            // instead of inheriting the surrounding Screen pose transform. Keep its
-            // logical anchor identical, but explicitly map position + size to the SSU scale.
+            // In 1.21.1 PlayerSkinWidget is rendered through the same GuiGraphics pose
+            // as the rest of the Screen. Keep it in logical SSU coordinates and let
+            // ScreenSsuGuiScaleMixin apply the scale exactly once. Pre-scaling these
+            // values caused the portrait to be scaled twice and pulled toward screen centre.
             skin = new PlayerSkinWidget(
-                    SsuGuiScale.physicalLength(this, 32),
-                    SsuGuiScale.physicalLength(this, 48),
+                    32,
+                    48,
                     minecraft.getEntityModels(),
                     () -> minecraft.player.getSkin());
             // The transparent opening in portrait_framework.png is x=11..42, y=17..64.
-            skin.setPosition(
-                    SsuGuiScale.physicalX(this, l.sidebarX() + 34),
-                    SsuGuiScale.physicalY(this, l.panelY() + 71));
+            skin.setPosition(l.sidebarX() + 34, l.panelY() + 71);
             addRenderableWidget(skin);
 
             Rect profile = profileBounds(l);
@@ -1210,7 +1208,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         addRenderableWidget(rankRenameBox);
         int secondaryX = l.contentX() + renameWidth + 6;
         addRenderableWidget(Button.builder(Component.literal("Title manager"), ignored ->
-                        ClientPacketDistributor.sendToServer(new TitleManagerRequestPayload(true, nextRequestId++)))
+                        PacketDistributor.sendToServer(new TitleManagerRequestPayload(true, nextRequestId++)))
                 .bounds(secondaryX, top + 25, 102, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Refresh"), ignored -> requestPage(false))
                 .bounds(secondaryX + 108, top + 25, 82, 20).build());
@@ -1251,7 +1249,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
                         rebuildWidgets();
                     }).bounds(right - 350, y, 58, 20).build());
             addRenderableWidget(Button.builder(Component.literal("Prefix"), ignored ->
-                            ClientPacketDistributor.sendToServer(new RankDisplayRequestPayload(entry.owner())))
+                            PacketDistributor.sendToServer(new RankDisplayRequestPayload(entry.owner())))
                     .bounds(right - 288, y, 58, 20).build());
             Button makeDefault = Button.builder(Component.literal("Default"), ignored -> action("rank_default", entry.owner(), "", ""))
                     .bounds(right - 226, y, 58, 20).build();
@@ -1280,7 +1278,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             payAmountBox = box(l.contentX() + playerW + pickerW + gap * 2, top, amountW, "Amount", draftPayAmount,
                     value -> draftPayAmount = value);
             addRenderableWidget(payPlayerBox);
-            addRenderableWidget(Button.builder(Component.literal("…"), ignored -> minecraft.setScreenAndShow(
+            addRenderableWidget(Button.builder(Component.literal("…"), ignored -> minecraft.setScreen(
                             new KnownPlayerPickerScreen(this, value -> {
                                 draftPayPlayer = value;
                                 rebuildWidgets();
@@ -1814,7 +1812,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
                         "The rank prefix remains visible in chat even when this is OFF.");
                 int row = twoColumns ? 27 : 54;
                 addRenderableWidget(Button.builder(Component.literal("Choose player title"), ignored ->
-                                ClientPacketDistributor.sendToServer(new TitleManagerRequestPayload(false, nextRequestId++)))
+                                PacketDistributor.sendToServer(new TitleManagerRequestPayload(false, nextRequestId++)))
                         .bounds(x, y + row, w, 20).build());
             }
             case COMBAT -> {
@@ -2015,7 +2013,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             int current = currentValue();
             if (current == lastSent) return;
             lastSent = current;
-            ClientPacketDistributor.sendToServer(new PlayerUiSettingUpdatePayload(key, Integer.toString(current)));
+            PacketDistributor.sendToServer(new PlayerUiSettingUpdatePayload(key, Integer.toString(current)));
         }
 
         private int currentValue() {
@@ -2292,7 +2290,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
 
         if (!selectedProfilePlayer.isBlank()) {
             addRenderableWidget(Button.builder(Component.literal("Manage"), ignored ->
-                            ClientPacketDistributor.sendToServer(new PlayerManagementRequestPayload(selectedProfilePlayer, nextRequestId++)))
+                            PacketDistributor.sendToServer(new PlayerManagementRequestPayload(selectedProfilePlayer, nextRequestId++)))
                     .bounds(l.contentRight() - 82, l.footerY(), 82, 20).build());
             if (snapshot.adminAccess().permissions()) {
                 addRenderableWidget(Button.builder(Component.literal("Permissions"), ignored ->
@@ -2408,7 +2406,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         int textWidth = font.width(selected);
         int buttonX = Math.min(l.contentRight() - 96, l.contentX() + textWidth + 18);
         addRenderableWidget(Button.builder(Component.literal("Choose title"), ignored ->
-                        ClientPacketDistributor.sendToServer(new TitleManagerRequestPayload(false, nextRequestId++)))
+                        PacketDistributor.sendToServer(new TitleManagerRequestPayload(false, nextRequestId++)))
                 .bounds(buttonX, l.contentTop() + 24, 92, 20).build());
     }
 
@@ -2513,14 +2511,14 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
     }
 
     private void openPropertySettings(String kind, String target) {
-        ClientPacketDistributor.sendToServer(new SsuPropertySettingsRequestPayload(
+        PacketDistributor.sendToServer(new SsuPropertySettingsRequestPayload(
                 kind, target, nextRequestId++));
     }
 
     private void action(String action, String target, String secondary, String value) {
         long id = nextRequestId++;
         latestActionRequest = id;
-        ClientPacketDistributor.sendToServer(new SsuMenuActionPayload(action, target, secondary, value, id));
+        PacketDistributor.sendToServer(new SsuMenuActionPayload(action, target, secondary, value, id));
     }
 
     public void refreshCurrentPage() {
@@ -2550,7 +2548,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
                 : page == Page.TRAVEL || page == Page.TRAVEL_ADMIN ? travelFilter + "|" + draftSearch
                 : page == Page.TRANSACTIONS ? transactionRequestQuery()
                 : draftSearch;
-        ClientPacketDistributor.sendToServer(new SsuMenuPageRequestPayload(
+        PacketDistributor.sendToServer(new SsuMenuPageRequestPayload(
                 page.remoteId(), pageIndex, pageRequestSize(), query, id));
     }
 
@@ -2580,7 +2578,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         playerProfileLoading = true;
         long id = nextRequestId++;
         latestPlayerProfileRequest = id;
-        ClientPacketDistributor.sendToServer(new SsuPlayerProfileRequestPayload(
+        PacketDistributor.sendToServer(new SsuPlayerProfileRequestPayload(
                 selectedProfilePlayer,
                 draftPlayerProfileSearch,
                 playerProfilePermissionPage,
@@ -2595,7 +2593,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         permissionLoading = true;
         long id = nextRequestId++;
         latestPermissionRequest = id;
-        ClientPacketDistributor.sendToServer(new SsuPermissionEditorRequestPayload(
+        PacketDistributor.sendToServer(new SsuPermissionEditorRequestPayload(
                 permissionMode,
                 selectedPermissionTarget,
                 selectedPermissionDimension,
@@ -2628,7 +2626,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
 
     private void openPage(Page target) {
         if (target == Page.MAIL) {
-            ClientPacketDistributor.sendToServer(new MailActionPayload("open_mailbox", "", "inbox", 0, nextRequestId++));
+            PacketDistributor.sendToServer(new MailActionPayload("open_mailbox", "", "inbox", 0, nextRequestId++));
             return;
         }
         if (target == Page.AUCTION_HOUSE) {
@@ -2636,60 +2634,60 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             return;
         }
         if (target == Page.QUESTS) {
-            ClientPacketDistributor.sendToServer(new QuestBookRequestPayload("open", "", "menu", 0, nextRequestId++));
+            PacketDistributor.sendToServer(new QuestBookRequestPayload("open", "", "menu", 0, nextRequestId++));
             return;
         }
         if (target == Page.ACHIEVEMENTS || target == Page.ACHIEVEMENTS_ADMIN) {
-            ClientPacketDistributor.sendToServer(new be.winnetrie.mod.simpleserverutilities.network.AchievementMenuRequestPayload(
+            PacketDistributor.sendToServer(new be.winnetrie.mod.simpleserverutilities.network.AchievementMenuRequestPayload(
                     target == Page.ACHIEVEMENTS_ADMIN ? "open_admin" : "open", "", "", "all", 0, nextRequestId++));
             return;
         }
         if (target == Page.MINIGAMES) {
-            ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload("open", "", nextRequestId++));
+            PacketDistributor.sendToServer(new MinigameLobbyRequestPayload("open", "", nextRequestId++));
             return;
         }
         if (target == Page.MINIGAME_ADMIN) {
-            ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload("open_admin", "", nextRequestId++));
+            PacketDistributor.sendToServer(new MinigameLobbyRequestPayload("open_admin", "", nextRequestId++));
             return;
         }
         if (target == Page.DUNGEONS) {
-            ClientPacketDistributor.sendToServer(new DungeonLobbyRequestPayload("open", "", nextRequestId++));
+            PacketDistributor.sendToServer(new DungeonLobbyRequestPayload("open", "", nextRequestId++));
             return;
         }
         if (target == Page.DIMENSIONS) {
-            ClientPacketDistributor.sendToServer(new SsuDimensionManagerRequestPayload("", nextRequestId++));
+            PacketDistributor.sendToServer(new SsuDimensionManagerRequestPayload("", nextRequestId++));
             return;
         }
         if (target == Page.KITS) {
-            ClientPacketDistributor.sendToServer(new KitRequestPayload(false, "", nextRequestId++));
+            PacketDistributor.sendToServer(new KitRequestPayload(false, "", nextRequestId++));
             return;
         }
         if (target == Page.KIT_ADMIN) {
-            ClientPacketDistributor.sendToServer(new KitRequestPayload(true, "", nextRequestId++));
+            PacketDistributor.sendToServer(new KitRequestPayload(true, "", nextRequestId++));
             return;
         }
         if (target == Page.MINES) {
-            ClientPacketDistributor.sendToServer(new MineRequestPayload(false, "", nextRequestId++));
+            PacketDistributor.sendToServer(new MineRequestPayload(false, "", nextRequestId++));
             return;
         }
         if (target == Page.MINE_ADMIN) {
-            ClientPacketDistributor.sendToServer(new MineRequestPayload(true, "", nextRequestId++));
+            PacketDistributor.sendToServer(new MineRequestPayload(true, "", nextRequestId++));
             return;
         }
         if (target == Page.JAIL_ADMIN) {
-            ClientPacketDistributor.sendToServer(new be.winnetrie.mod.simpleserverutilities.network.JailAdminRequestPayload("", nextRequestId++));
+            PacketDistributor.sendToServer(new be.winnetrie.mod.simpleserverutilities.network.JailAdminRequestPayload("", nextRequestId++));
             return;
         }
         if (target == Page.SUPPORT) {
-            ClientPacketDistributor.sendToServer(new be.winnetrie.mod.simpleserverutilities.network.ServerOperationsRequestPayload(false, nextRequestId++));
+            PacketDistributor.sendToServer(new be.winnetrie.mod.simpleserverutilities.network.ServerOperationsRequestPayload(false, nextRequestId++));
             return;
         }
         if (target == Page.SERVER_OPERATIONS) {
-            ClientPacketDistributor.sendToServer(new be.winnetrie.mod.simpleserverutilities.network.ServerOperationsRequestPayload(true, nextRequestId++));
+            PacketDistributor.sendToServer(new be.winnetrie.mod.simpleserverutilities.network.ServerOperationsRequestPayload(true, nextRequestId++));
             return;
         }
         if (target == Page.ONBOARDING_ADMIN) {
-            ClientPacketDistributor.sendToServer(new OnboardingAdminRequestPayload(nextRequestId++));
+            PacketDistributor.sendToServer(new OnboardingAdminRequestPayload(nextRequestId++));
             return;
         }
         if (target == page) return;
@@ -2992,38 +2990,38 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (event.buttonInfo().button() == 0
-                && (handlePermissionDropdownClick(event.x(), event.y())
-                || handlePlayerProfileDropdownClick(event.x(), event.y())
-                || handleTransactionPlayerDropdownClick(event.x(), event.y()))) return true;
-        if (super.mouseClicked(event, doubleClick)) return true;
-        if (event.buttonInfo().button() != 0) return false;
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0
+                && (handlePermissionDropdownClick(mouseX, mouseY)
+                || handlePlayerProfileDropdownClick(mouseX, mouseY)
+                || handleTransactionPlayerDropdownClick(mouseX, mouseY))) return true;
+        if (super.mouseClicked(mouseX, mouseY, button)) return true;
+        if (button != 0) return false;
 
         Layout l = layout();
-        if (closeBounds(l).contains(event.x(), event.y())) {
+        if (closeBounds(l).contains(mouseX, mouseY)) {
             playClick();
             onClose();
             return true;
         }
-        if (snapshot.settingsAvailable() && settingsBounds(l).contains(event.x(), event.y())) {
+        if (snapshot.settingsAvailable() && settingsBounds(l).contains(mouseX, mouseY)) {
             playClick();
             openPage(Page.SETTINGS);
             return true;
         }
-        if (snapshot.administrator() && adminBounds(l).contains(event.x(), event.y())) {
+        if (snapshot.administrator() && adminBounds(l).contains(mouseX, mouseY)) {
             playClick();
             openPage(Page.ADMIN);
             return true;
         }
-        if (page != Page.HOME && backBounds(l).contains(event.x(), event.y())) {
+        if (page != Page.HOME && backBounds(l).contains(mouseX, mouseY)) {
             playClick();
             goBack();
             return true;
         }
         if (useTexturedTiles(l)) {
             for (ModuleTile tile : moduleTiles(l)) {
-                if (tile.module().enabled() && tile.bounds().contains(event.x(), event.y())) {
+                if (tile.module().enabled() && tile.bounds().contains(mouseX, mouseY)) {
                     playClick();
                     openPage(tile.module().page());
                     return true;
@@ -3034,27 +3032,34 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
     }
 
     private void playClick() {
-        AbstractWidget.playButtonClickSound(minecraft.getSoundManager());
+        minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        // The dashboard draws its own flat dim layer. Screen#renderBackground in
+        // Minecraft 1.21.1 additionally applies the vanilla world blur, and is
+        // invoked again by super.render(). Suppress that blur for this screen.
+    }
+
+    @Override
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         Layout l = layout();
         updatePortraitRotation(l, mouseX, mouseY);
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(l.panelX(),l.panelY(),l.panelRight(),l.panelBottom(),PANEL);
-        g.outline(l.panelX(),l.panelY(),l.panelWidth(),l.panelHeight(),PANEL_BORDER);
-        if (l.sidebarVisible()) g.text(font,"Simple Server Utilities",l.panelX()+11,l.panelY()+13,ACCENT,true);
+        g.renderOutline(l.panelX(),l.panelY(),l.panelWidth(),l.panelHeight(),PANEL_BORDER);
+        if (l.sidebarVisible()) g.drawString(font,"Simple Server Utilities",l.panelX()+11,l.panelY()+13,ACCENT,true);
         drawPageTitle(g, l);
         drawDashboardCalendar(g, l);
         drawSidebar(g,l); drawPage(g,l,mouseX,mouseY);
-        if (!notice.isBlank()) g.text(font,trim(notice,90),l.contentX(),l.panelBottom()-43,noticeError?ERROR:GOOD,false);
+        if (!notice.isBlank()) g.drawString(font,trim(notice,90),l.contentX(),l.panelBottom()-43,noticeError?ERROR:GOOD,false);
         if (loading || (page == Page.PERMISSIONS && permissionLoading)
                 || (page == Page.PLAYER_INFO && playerProfileLoading)) {
-            g.text(font,"Loading page…",l.contentRight()-85,l.panelY()+38,WARNING,false);
+            g.drawString(font,"Loading page…",l.contentRight()-85,l.panelY()+38,WARNING,false);
         }
-        super.extractRenderState(g,mouseX,mouseY,partialTick);
+        super.render(g,mouseX,mouseY,partialTick);
         if (skin != null && l.sidebarVisible()) {
-            g.blit(RenderPipelines.GUI_TEXTURED, PORTRAIT_FRAME, l.sidebarX() + 23, l.panelY() + 54,
+            g.blit(PORTRAIT_FRAME, l.sidebarX() + 23, l.panelY() + 54,
                     0, 0, 54, 78, 54, 78);
         }
         drawCloseButton(g, closeBounds(l), mouseX, mouseY);
@@ -3080,7 +3085,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         if (page == Page.SETTINGS) drawSettingsTooltip(g, mouseX, mouseY);
     }
 
-    private void drawPageTitle(GuiGraphicsExtractor g, Layout l) {
+    private void drawPageTitle(GuiGraphics g, Layout l) {
         String title = page.label();
         int left = l.sidebarVisible() ? l.contentX() : l.panelX() + 12;
         int right = Math.min(closeBounds(l).x() - 8, l.contentRight());
@@ -3088,26 +3093,26 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         int titleWidth = Math.max(1, font.width(title));
         float scale = Math.min(1.35F, available / (float) titleWidth);
         int centerX = left + available / 2;
-        g.pose().pushMatrix();
-        g.pose().translate(centerX, l.panelY() + 10);
-        g.pose().scale(scale, scale);
-        g.text(font, title, -titleWidth / 2, 0, TEXT, true);
-        g.pose().popMatrix();
+        g.pose().pushPose();
+        g.pose().translate(centerX, l.panelY() + 10, 0.0F);
+        g.pose().scale(scale, scale, 1.0F);
+        g.drawString(font, title, -titleWidth / 2, 0, TEXT, true);
+        g.pose().popPose();
     }
 
-    private void drawDashboardCalendar(GuiGraphicsExtractor g, Layout l) {
+    private void drawDashboardCalendar(GuiGraphics g, Layout l) {
         if (minecraft == null || minecraft.level == null) return;
-        String calendar = GameCalendar.fromClockTime(minecraft.level.getDefaultClockTime()).displayText();
+        String calendar = GameCalendar.fromClockTime(minecraft.level.getDayTime()).displayText();
         int left = l.sidebarVisible() ? l.contentX() : l.panelX() + 72;
         int right = Math.min(closeBounds(l).x() - 8, l.contentRight());
         int centerX = left + Math.max(1, right - left) / 2;
-        g.centeredText(font, calendar, centerX, l.panelY() + 29, MUTED);
+        g.drawCenteredString(font, calendar, centerX, l.panelY() + 29, MUTED);
     }
 
-    private void drawSettingsTooltip(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+    private void drawSettingsTooltip(GuiGraphics g, int mouseX, int mouseY) {
         for (SettingsTooltip tooltip : settingsTooltips) {
             if (!tooltip.bounds().contains(mouseX, mouseY)) continue;
-            g.setComponentTooltipForNextFrame(font, tooltip.lines(), mouseX, mouseY);
+            g.renderComponentTooltip(font, tooltip.lines(), mouseX, mouseY);
             return;
         }
     }
@@ -3123,10 +3128,9 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         accessor.ssu$setRotationY(yaw);
     }
 
-    private void drawPermissionDropdowns(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
+    private void drawPermissionDropdowns(GuiGraphics g, Layout l, int mouseX, int mouseY) {
         if (!permissionModeDropdownOpen && !permissionTargetDropdownOpen
                 && !permissionDimensionDropdownOpen && !permissionRankDropdownOpen) return;
-        g.nextStratum();
         if (permissionModeDropdownOpen) {
             drawDropdown(g, permissionModeBounds(l), List.of("Players", "Ranks", "Claim roles"), mouseX, mouseY);
         } else if (permissionTargetDropdownOpen) {
@@ -3143,16 +3147,15 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         }
     }
 
-    private void drawPlayerProfileDropdown(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
+    private void drawPlayerProfileDropdown(GuiGraphics g, Layout l, int mouseX, int mouseY) {
         if (!playerProfileDropdownOpen) return;
-        g.nextStratum();
         Rect anchor = playerProfileTargetBounds(l);
         List<SsuPlayerProfileDataPayload.PlayerEntry> options = visiblePlayerProfileTargets();
         Rect list = dropdownListBounds(anchor, Math.max(1, options.size()));
         g.fill(list.x(), list.y(), list.x() + list.width(), list.y() + list.height(), 0xFC151C24);
-        g.outline(list.x(), list.y(), list.width(), list.height(), ACCENT);
+        g.renderOutline(list.x(), list.y(), list.width(), list.height(), ACCENT);
         if (options.isEmpty()) {
-            g.text(font, "No players match this search", list.x() + 5, list.y() + 6, MUTED, false);
+            g.drawString(font, "No players match this search", list.x() + 5, list.y() + 6, MUTED, false);
             return;
         }
         for (int i = 0; i < options.size(); i++) {
@@ -3163,25 +3166,24 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
                 g.fill(list.x() + 1, y + 1, list.x() + list.width() - 1, y + 20, 0xD03A4D5C);
             }
             String label = option.label() + " — " + option.summary();
-            g.text(font, trim(label, Math.max(10, (list.width() - 10) / 6)),
+            g.drawString(font, trim(label, Math.max(10, (list.width() - 10) / 6)),
                     list.x() + 5, y + 6, option.online() ? GOOD : TEXT, false);
         }
         int fullSize = playerProfileData.players().size();
         if (fullSize > DROPDOWN_VISIBLE_ROWS) {
-            g.text(font, (playerProfileDropdownScroll + 1) + "–"
+            g.drawString(font, (playerProfileDropdownScroll + 1) + "–"
                             + Math.min(fullSize, playerProfileDropdownScroll + options.size()) + " / " + fullSize,
                     list.x() + list.width() - 62, list.y() + list.height() - 12, MUTED, false);
         }
     }
 
-    private void drawTransactionPlayerDropdown(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
+    private void drawTransactionPlayerDropdown(GuiGraphics g, Layout l, int mouseX, int mouseY) {
         if (!transactionPlayerDropdownOpen) return;
-        g.nextStratum();
         Rect anchor = transactionPlayerBounds(l);
         List<SsuMenuPageDataPayload.AccountEntry> options = visibleTransactionPlayers();
         Rect list = dropdownListBounds(anchor, Math.max(1, options.size()));
         g.fill(list.x(), list.y(), list.x() + list.width(), list.y() + list.height(), 0xFC151C24);
-        g.outline(list.x(), list.y(), list.width(), list.height(), ACCENT);
+        g.renderOutline(list.x(), list.y(), list.width(), list.height(), ACCENT);
         for (int i = 0; i < options.size(); i++) {
             var option = options.get(i);
             int y = list.y() + i * 20;
@@ -3191,24 +3193,24 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             }
             String label = option.id().isBlank() ? "All players"
                     : option.name() + " — " + option.formattedBalance();
-            g.text(font, trim(label, Math.max(10, (list.width() - 10) / 6)),
+            g.drawString(font, trim(label, Math.max(10, (list.width() - 10) / 6)),
                     list.x() + 5, y + 6, option.id().isBlank() ? ACCENT : TEXT, false);
         }
         int fullSize = transactionPlayerOptions().size();
         if (fullSize > DROPDOWN_VISIBLE_ROWS) {
-            g.text(font, (transactionPlayerDropdownScroll + 1) + "–"
+            g.drawString(font, (transactionPlayerDropdownScroll + 1) + "–"
                             + Math.min(fullSize, transactionPlayerDropdownScroll + options.size()) + " / " + fullSize,
                     list.x() + list.width() - 62, list.y() + list.height() - 12, MUTED, false);
         }
     }
 
-    private void drawDropdown(GuiGraphicsExtractor g, Rect anchor, List<String> options, int mouseX, int mouseY) {
+    private void drawDropdown(GuiGraphics g, Rect anchor, List<String> options, int mouseX, int mouseY) {
         int rows = Math.max(1, options.size());
         Rect list = dropdownListBounds(anchor, rows);
         g.fill(list.x(), list.y(), list.x() + list.width(), list.y() + list.height(), 0xFC151C24);
-        g.outline(list.x(), list.y(), list.width(), list.height(), ACCENT);
+        g.renderOutline(list.x(), list.y(), list.width(), list.height(), ACCENT);
         if (options.isEmpty()) {
-            g.text(font, "No matches", list.x() + 5, list.y() + 6, MUTED, false);
+            g.drawString(font, "No matches", list.x() + 5, list.y() + 6, MUTED, false);
             return;
         }
         for (int i = 0; i < options.size(); i++) {
@@ -3217,20 +3219,20 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
                     && mouseY >= y && mouseY < y + 20) {
                 g.fill(list.x() + 1, y + 1, list.x() + list.width() - 1, y + 20, 0xD03A4D5C);
             }
-            g.text(font, trim(options.get(i), Math.max(10, (list.width() - 10) / 6)),
+            g.drawString(font, trim(options.get(i), Math.max(10, (list.width() - 10) / 6)),
                     list.x() + 5, y + 6, TEXT, false);
         }
         int fullSize = permissionTargetDropdownOpen ? permissionData.targets().size()
                 : permissionDimensionDropdownOpen ? permissionData.dimensions().size()
                 : permissionRankDropdownOpen ? permissionData.rankOptions().size() : options.size();
         if (fullSize > DROPDOWN_VISIBLE_ROWS) {
-            g.text(font, (permissionDropdownScroll + 1) + "–"
+            g.drawString(font, (permissionDropdownScroll + 1) + "–"
                             + Math.min(fullSize, permissionDropdownScroll + options.size()) + " / " + fullSize,
                     list.x() + list.width() - 58, list.y() + list.height() - 12, MUTED, false);
         }
     }
 
-    private void drawPermissionTooltip(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
+    private void drawPermissionTooltip(GuiGraphics g, Layout l, int mouseX, int mouseY) {
         if (permissionModeDropdownOpen || permissionTargetDropdownOpen
                 || permissionDimensionDropdownOpen || permissionRankDropdownOpen) return;
         for (int i = 0; i < permissionData.permissions().size(); i++) {
@@ -3243,7 +3245,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             String current = entry.directValue().isBlank()
                     ? "Effective: " + blank(entry.effectiveValue()) + " (" + entry.source() + ")"
                     : "Override: " + entry.directValue() + " | effective: " + blank(entry.effectiveValue());
-            g.setComponentTooltipForNextFrame(font, List.of(
+            g.renderComponentTooltip(font, List.of(
                     Component.literal(entry.description()),
                     Component.literal(valueInfo),
                     Component.literal("Default: " + blank(entry.defaultValue())),
@@ -3290,40 +3292,36 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         return Math.max(minimum, Math.min(maximum, value));
     }
 
-    private void drawCloseButton(GuiGraphicsExtractor g, Rect bounds, int mouseX, int mouseY) {
+    private void drawCloseButton(GuiGraphics g, Rect bounds, int mouseX, int mouseY) {
         boolean hovered = bounds.contains(mouseX, mouseY);
         g.fill(bounds.x(), bounds.y(), bounds.x() + bounds.width(), bounds.y() + bounds.height(),
                 hovered ? 0xD25B2D35 : CARD);
-        g.outline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), hovered ? 0xFFFF7A86 : PANEL_BORDER);
+        g.renderOutline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), hovered ? 0xFFFF7A86 : PANEL_BORDER);
         String cross = "×";
-        g.text(font, cross, bounds.x() + (bounds.width() - font.width(cross)) / 2,
+        g.drawString(font, cross, bounds.x() + (bounds.width() - font.width(cross)) / 2,
                 bounds.y() + 9, hovered ? 0xFFFFFFFF : TEXT, true);
     }
 
-    private void drawUtilityButton(GuiGraphicsExtractor g, Rect bounds, Identifier icon, boolean selected,
+    private void drawUtilityButton(GuiGraphics g, Rect bounds, ResourceLocation icon, boolean selected,
                                    int mouseX, int mouseY, boolean visible) {
         if (!visible) return;
         boolean hovered = bounds.contains(mouseX, mouseY);
         g.fill(bounds.x(), bounds.y(), bounds.x() + bounds.width(), bounds.y() + bounds.height(),
                 selected ? 0xD03A4D5C : hovered ? 0xD22B3946 : CARD);
-        g.outline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), hovered || selected ? ACCENT : PANEL_BORDER);
+        g.renderOutline(bounds.x(), bounds.y(), bounds.width(), bounds.height(), hovered || selected ? ACCENT : PANEL_BORDER);
         int iconWidth = 16;
         int iconHeight = icon.equals(ICON_SHIELD) ? 19 : 16;
-        g.blit(RenderPipelines.GUI_TEXTURED, icon,
+        g.blit(icon,
                 bounds.x() + (bounds.width() - iconWidth) / 2,
                 bounds.y() + (bounds.height() - iconHeight) / 2,
                 0, 0, iconWidth, iconHeight, iconWidth, iconHeight);
     }
 
-    private void drawBackButton(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
+    private void drawBackButton(GuiGraphics g, Layout l, int mouseX, int mouseY) {
         Rect bounds = backBounds(l);
         boolean hovered = bounds.contains(mouseX, mouseY);
-        g.blit(RenderPipelines.GUI_TEXTURED, BUTTON_BACK_TEXTURE,
+        g.blit(hovered ? BUTTON_BACK_HOVER_TEXTURE : BUTTON_BACK_TEXTURE,
                 bounds.x(), bounds.y(), 0, 0, 54, 20, 54, 20);
-        if (hovered) {
-            g.blit(RenderPipelines.GUI_TEXTURED, BUTTON_BACK_GLOW_TEXTURE,
-                    bounds.x(), bounds.y(), 0, 0, 54, 20, 54, 20);
-        }
     }
 
     private Rect closeBounds(Layout l) { return new Rect(l.panelRight() - 40, l.panelY() + 7, 28, 28); }
@@ -3342,10 +3340,10 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         return new Rect(l.sidebarX() + 8, y, 84, 20);
     }
 
-    private void drawSidebar(GuiGraphicsExtractor g, Layout l) {
+    private void drawSidebar(GuiGraphics g, Layout l) {
         if (!l.sidebarVisible()) return;
         g.fill(l.sidebarX(),l.panelY()+42,l.sidebarX()+100,l.panelBottom()-36,CARD);
-        g.outline(l.sidebarX(),l.panelY()+42,100,l.panelHeight()-78,PANEL_BORDER);
+        g.renderOutline(l.sidebarX(),l.panelY()+42,100,l.panelHeight()-78,PANEL_BORDER);
         int y=l.panelY()+140;
         center(g,snapshot.playerName(),l.sidebarX()+50,y,TEXT);
         center(g,"Rank: "+(snapshot.primaryRank().isBlank()?"default":snapshot.primaryRank()),l.sidebarX()+50,y+15,MUTED);
@@ -3354,7 +3352,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         }
     }
 
-    private void drawPage(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
+    private void drawPage(GuiGraphics g, Layout l, int mouseX, int mouseY) {
         switch(page) {
             case HOME -> drawModuleTiles(g, l, mouseX, mouseY);
             case ADMIN -> drawModuleTiles(g, l, mouseX, mouseY);
@@ -3371,47 +3369,49 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             case PERMISSIONS -> drawPermissions(g,l,mouseX,mouseY); case PLAYER_INFO -> drawPlayerInfo(g,l);
             case ACCOUNTS -> drawAccounts(g,l); case JOBS -> drawJobs(g,l);
             case RENT_OPERATIONS -> drawRentOps(g,l); case CORE -> drawCore(g,l); case PROFILE -> drawProfile(g,l);
-            case MAIL -> g.text(font,"Opening mailbox…",l.contentX(),l.contentTop(),MUTED,false);
-            case AUCTION_HOUSE -> g.text(font,"Opening Auction House…",l.contentX(),l.contentTop(),MUTED,false);
-            case QUESTS -> g.text(font,"Opening Questbook…",l.contentX(),l.contentTop(),MUTED,false);
-            case ACHIEVEMENTS, ACHIEVEMENTS_ADMIN -> g.text(font,"Opening Achievements…",l.contentX(),l.contentTop(),MUTED,false);
+            case MAIL -> g.drawString(font,"Opening mailbox…",l.contentX(),l.contentTop(),MUTED,false);
+            case AUCTION_HOUSE -> g.drawString(font,"Opening Auction House…",l.contentX(),l.contentTop(),MUTED,false);
+            case QUESTS -> g.drawString(font,"Opening Questbook…",l.contentX(),l.contentTop(),MUTED,false);
+            case ACHIEVEMENTS, ACHIEVEMENTS_ADMIN -> g.drawString(font,"Opening Achievements…",l.contentX(),l.contentTop(),MUTED,false);
             case COSMETICS -> {
-                g.text(font, "Cosmetics", l.contentX(), l.contentTop(), TEXT, true);
-                g.text(font, "Cosmetic customization is coming in a future SSU build.", l.contentX(), l.contentTop() + 20, MUTED, false);
+                g.drawString(font, "Cosmetics", l.contentX(), l.contentTop(), TEXT, true);
+                g.drawString(font, "Cosmetic customization is coming in a future SSU build.", l.contentX(), l.contentTop() + 20, MUTED, false);
             }
-            case MINIGAMES -> g.text(font,"Opening Minigame Lobby…",l.contentX(),l.contentTop(),MUTED,false);
-            case MINIGAME_ADMIN -> g.text(font,"Opening Minigame Administration…",l.contentX(),l.contentTop(),MUTED,false);
-            case DUNGEONS -> g.text(font,"Opening Dungeon Lobby…",l.contentX(),l.contentTop(),MUTED,false);
-            case KITS -> g.text(font,"Opening Kits…",l.contentX(),l.contentTop(),MUTED,false);
-            case KIT_ADMIN -> g.text(font,"Opening Kit Administration…",l.contentX(),l.contentTop(),MUTED,false);
-            case MINES -> g.text(font,"Opening Mines…",l.contentX(),l.contentTop(),MUTED,false);
-            case MINE_ADMIN -> g.text(font,"Opening Mine Administration…",l.contentX(),l.contentTop(),MUTED,false);
-            case JAIL_ADMIN -> g.text(font,"Opening Jail Administration…",l.contentX(),l.contentTop(),MUTED,false);
-            case ONBOARDING_ADMIN -> g.text(font,"Opening Onboarding & Spawns…",l.contentX(),l.contentTop(),MUTED,false);
+            case MINIGAMES -> g.drawString(font,"Opening Minigame Lobby…",l.contentX(),l.contentTop(),MUTED,false);
+            case MINIGAME_ADMIN -> g.drawString(font,"Opening Minigame Administration…",l.contentX(),l.contentTop(),MUTED,false);
+            case DUNGEONS -> g.drawString(font,"Opening Dungeon Lobby…",l.contentX(),l.contentTop(),MUTED,false);
+            case KITS -> g.drawString(font,"Opening Kits…",l.contentX(),l.contentTop(),MUTED,false);
+            case KIT_ADMIN -> g.drawString(font,"Opening Kit Administration…",l.contentX(),l.contentTop(),MUTED,false);
+            case MINES -> g.drawString(font,"Opening Mines…",l.contentX(),l.contentTop(),MUTED,false);
+            case MINE_ADMIN -> g.drawString(font,"Opening Mine Administration…",l.contentX(),l.contentTop(),MUTED,false);
+            case JAIL_ADMIN -> g.drawString(font,"Opening Jail Administration…",l.contentX(),l.contentTop(),MUTED,false);
+            case ONBOARDING_ADMIN -> g.drawString(font,"Opening Onboarding & Spawns…",l.contentX(),l.contentTop(),MUTED,false);
         }
     }
 
-    private void drawModuleTiles(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
+    private void drawModuleTiles(GuiGraphics g, Layout l, int mouseX, int mouseY) {
         if (!useTexturedTiles(l)) return;
         for (ModuleTile tile : moduleTiles(l)) {
             Rect b = tile.bounds();
             boolean hovered = tile.module().enabled() && b.contains(mouseX, mouseY);
-            g.blit(RenderPipelines.GUI_TEXTURED, BUTTON_TEXTURE, b.x(), b.y(), 0, 0,
-                    TILE_SIZE, TILE_SIZE, TILE_SIZE, TILE_SIZE);
-            if (hovered) g.blit(RenderPipelines.GUI_TEXTURED, BUTTON_GLOW_TEXTURE, b.x(), b.y(), 0, 0,
+            // 1.21.1's legacy GUI blit path does not reliably alpha-blend a
+            // second translucent texture over an already drawn GUI texture. Use a
+            // precomposited hover texture so the original button remains visible
+            // underneath the intended glow.
+            g.blit(hovered ? BUTTON_HOVER_TEXTURE : BUTTON_TEXTURE, b.x(), b.y(), 0, 0,
                     TILE_SIZE, TILE_SIZE, TILE_SIZE, TILE_SIZE);
             if (!tile.module().enabled()) g.fill(b.x(), b.y(), b.x() + TILE_SIZE, b.y() + TILE_SIZE, 0x85000000);
             drawModuleTileIcon(g, tile.module().icon(), b);
             center(g, tile.module().label(), b.x() + TILE_SIZE / 2, b.y() + TILE_SIZE + 4,
                     tile.module().enabled() ? TEXT : MUTED);
             if (hovered && snapshot.uiSettings().dashboardHints()) {
-                g.setComponentTooltipForNextFrame(font,
+                g.renderComponentTooltip(font,
                         List.of(Component.literal(tile.module().hint())), mouseX, mouseY);
             }
         }
     }
 
-    private void drawModuleTileIcon(GuiGraphicsExtractor g, Identifier icon, Rect bounds) {
+    private void drawModuleTileIcon(GuiGraphics g, ResourceLocation icon, Rect bounds) {
         int sourceWidth = icon.equals(ICON_PLAYERS) ? 32 : 16;
         int sourceHeight = icon.equals(ICON_SHIELD) ? 19 : sourceWidth;
         float scale = sourceWidth >= 32 ? 1.0F : 2.0F;
@@ -3419,12 +3419,12 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         int renderedHeight = Math.round(sourceHeight * scale);
         int x = bounds.x() + (TILE_SIZE - renderedWidth) / 2;
         int y = bounds.y() + (TILE_SIZE - renderedHeight) / 2;
-        g.pose().pushMatrix();
-        g.pose().translate(x, y);
-        g.pose().scale(scale, scale);
-        g.blit(RenderPipelines.GUI_TEXTURED, icon, 0, 0, 0, 0,
+        g.pose().pushPose();
+        g.pose().translate(x, y, 0.0F);
+        g.pose().scale(scale, scale, 1.0F);
+        g.blit(icon, 0, 0, 0, 0,
                 sourceWidth, sourceHeight, sourceWidth, sourceHeight);
-        g.pose().popMatrix();
+        g.pose().popPose();
     }
 
     private boolean useTexturedTiles(Layout l) {
@@ -3453,24 +3453,24 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         return List.copyOf(result);
     }
 
-    private void drawSettingsIntro(GuiGraphicsExtractor g, Layout l) {
+    private void drawSettingsIntro(GuiGraphics g, Layout l) {
         if (settingsCategory == SettingsCategory.INTERFACE) {
-            g.text(font, "SSU scale changes only SSU screens; Minecraft GUI Scale stays untouched.",
+            g.drawString(font, "SSU scale changes only SSU screens; Minecraft GUI Scale stays untouched.",
                     l.contentX(), l.contentTop() + 4, TEXT, false);
             return;
         }
         if (settingsCategory == SettingsCategory.BORDERS) {
-            g.text(font, "Enable claim borders is the master permission for in-world claim outlines.",
+            g.drawString(font, "Enable claim borders is the master permission for in-world claim outlines.",
                     l.contentX(), l.contentTop() + 2, TEXT, false);
-            g.text(font, "Use Show/Hide on your claims; Show other claims controls land owned by others.",
+            g.drawString(font, "Use Show/Hide on your claims; Show other claims controls land owned by others.",
                     l.contentX(), l.contentTop() + 16, MUTED, false);
             return;
         }
-        g.text(font, "Choose a category, then click a setting to change it.",
+        g.drawString(font, "Choose a category, then click a setting to change it.",
                 l.contentX(), l.contentTop() + 4, TEXT, false);
     }
 
-    private void drawModuleSettings(GuiGraphicsExtractor g, Layout l) {
+    private void drawModuleSettings(GuiGraphics g, Layout l) {
         var settings = snapshot.moduleSettings();
         int blocked = (int) settings.moduleStates().stream().filter(v -> v.configuredEnabled() && !v.active()).count();
         int maximum = moduleSettingsMaximumScroll(l);
@@ -3481,29 +3481,29 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
                 ? "Core services stay active; disabled feature data is preserved."
                 : "Configured choices are preserved and resume automatically when requirements return.";
         int firstLineWidth = Math.max(80, l.contentWidth() - (maximum > 0 ? 142 : 0));
-        g.text(font, fitToWidth(introPrimary, firstLineWidth), l.contentX(), l.contentTop(), MUTED, false);
-        g.text(font, fitToWidth(introSecondary, l.contentWidth()), l.contentX(), l.contentTop() + 11, MUTED, false);
+        g.drawString(font, fitToWidth(introPrimary, firstLineWidth), l.contentX(), l.contentTop(), MUTED, false);
+        g.drawString(font, fitToWidth(introSecondary, l.contentWidth()), l.contentX(), l.contentTop() + 11, MUTED, false);
         if (maximum > 0) {
             int columns = moduleSettingsColumns(l);
             int first = moduleSettingsScroll * columns + 1;
             int last = Math.min(moduleSwitches(settings).size(), (moduleSettingsScroll + moduleSettingsVisibleRows(l)) * columns);
             String range = first + "–" + last + " / " + moduleSwitches(settings).size();
-            g.text(font, range, l.contentRight() - font.width(range) - 50, l.contentTop() + 5, MUTED, false);
+            g.drawString(font, range, l.contentRight() - font.width(range) - 50, l.contentTop() + 5, MUTED, false);
         }
         int questModeY = moduleSettingsOptionsTop(l);
-        g.text(font, "Quest entry can use the SSU menu, NPC integration, or both when those modules are active.",
+        g.drawString(font, "Quest entry can use the SSU menu, NPC integration, or both when those modules are active.",
                 l.contentX(), questModeY + 20, MUTED, false);
         int distanceTop = questModeY + 24;
-        g.text(font, "Hologram render/load distance: " + settings.hologramRenderDistance() + " blocks",
+        g.drawString(font, "Hologram render/load distance: " + settings.hologramRenderDistance() + " blocks",
                 l.contentX(), distanceTop + 5, TEXT, false);
-        g.text(font, "Claim border render distance: " + settings.claimBorderRenderDistance() + " blocks",
+        g.drawString(font, "Claim border render distance: " + settings.claimBorderRenderDistance() + " blocks",
                 l.contentX(), distanceTop + 29, TEXT, false);
-        g.text(font, "Region border render distance: " + settings.regionBorderRenderDistance() + " blocks",
+        g.drawString(font, "Region border render distance: " + settings.regionBorderRenderDistance() + " blocks",
                 l.contentX(), distanceTop + 53, TEXT, false);
     }
 
-    private void drawAdminTools(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
-        g.text(font, "Scroll to browse all specialised admin tools.", l.contentX(), l.contentTop(), MUTED, false);
+    private void drawAdminTools(GuiGraphics g, Layout l, int mouseX, int mouseY) {
+        g.drawString(font, "Scroll to browse all specialised admin tools.", l.contentX(), l.contentTop(), MUTED, false);
         List<AdminTool> tools = adminTools();
         int visible = adminToolVisibleRows(l);
         int maximum = Math.max(0, tools.size() - visible);
@@ -3519,16 +3519,16 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             Rect row = new Rect(l.contentX(), y, l.contentWidth(), rowHeight);
             boolean hovered = row.contains(mouseX, mouseY);
             g.fill(row.x(), row.y(), row.x() + row.width(), row.y() + row.height(), hovered ? 0xD02A3743 : CARD);
-            g.outline(row.x(), row.y(), row.width(), row.height(), hovered ? ACCENT : PANEL_BORDER);
-            g.text(font, tool.label(), row.x() + 8, row.y() + 6, TEXT, true);
-            g.text(font, trim(tool.hint(), 62), row.x() + 8, row.y() + 22, MUTED, false);
-            if (hovered) g.setComponentTooltipForNextFrame(font, List.of(Component.literal(tool.hint())), mouseX, mouseY);
+            g.renderOutline(row.x(), row.y(), row.width(), row.height(), hovered ? ACCENT : PANEL_BORDER);
+            g.drawString(font, tool.label(), row.x() + 8, row.y() + 6, TEXT, true);
+            g.drawString(font, trim(tool.hint(), 62), row.x() + 8, row.y() + 22, MUTED, false);
+            if (hovered) g.renderComponentTooltip(font, List.of(Component.literal(tool.hint())), mouseX, mouseY);
         }
-        if (maximum > 0) g.text(font, (adminToolScroll + 1) + "–" + Math.min(tools.size(), adminToolScroll + visible)
+        if (maximum > 0) g.drawString(font, (adminToolScroll + 1) + "–" + Math.min(tools.size(), adminToolScroll + visible)
                 + " / " + tools.size(), l.contentRight() - 118, l.contentTop() + 6, MUTED, false);
     }
 
-    private void drawHolograms(GuiGraphicsExtractor g, Layout l) {
+    private void drawHolograms(GuiGraphics g, Layout l) {
         if (pageData.locations().isEmpty()) empty(g, l, "No holograms on this page.");
         int availableTextWidth = Math.max(42, l.contentWidth() - 198);
         int labelCharacters = Math.max(6, availableTextWidth / 6);
@@ -3539,11 +3539,11 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             if (availableTextWidth >= 230) {
                 label += " | " + shortDim(entry.dimension()) + " @ " + pos(entry.x(), entry.y(), entry.z());
             }
-            g.text(font, trim(label, labelCharacters), l.contentX(), y, TEXT, false);
+            g.drawString(font, trim(label, labelCharacters), l.contentX(), y, TEXT, false);
         }
     }
 
-    private void drawStatistics(GuiGraphicsExtractor g, Layout l) {
+    private void drawStatistics(GuiGraphics g, Layout l) {
         if (pageData.statistics().isEmpty()) empty(g, l, "No custom statistics on this page.");
         int textWidth = Math.max(100, l.contentWidth() - 272);
         int chars = Math.max(12, textWidth / 6);
@@ -3551,35 +3551,35 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             var entry = pageData.statistics().get(i);
             int y = rowTextY(l, i);
             String primary = entry.displayName() + " [" + entry.id() + "]";
-            g.text(font, trim(primary, chars), l.contentX(), y, entry.enabled() ? TEXT : MUTED, false);
+            g.drawString(font, trim(primary, chars), l.contentX(), y, entry.enabled() ? TEXT : MUTED, false);
             String target = "*".equals(entry.target()) ? "all" : entry.target();
-            g.text(font, trim(entry.eventType().toLowerCase(Locale.ROOT).replace('_', ' ') + " • " + target
+            g.drawString(font, trim(entry.eventType().toLowerCase(Locale.ROOT).replace('_', ' ') + " • " + target
                     + " • " + entry.playerCount() + " players • total " + entry.formattedTotal(), chars + 14),
                     l.contentX(), y + 11, MUTED, false);
         }
     }
 
-    private void drawClaims(GuiGraphicsExtractor g,Layout l){if(pageData.claims().isEmpty())empty(g,l,"No claims on this page.");
+    private void drawClaims(GuiGraphics g,Layout l){if(pageData.claims().isEmpty())empty(g,l,"No claims on this page.");
         for(int i=0;i<pageData.claims().size();i++){var e=pageData.claims().get(i);int y=rowTextY(l,i);
-            g.text(font,e.name(),l.contentX(),y,TEXT,false);g.text(font,e.chunkCount()+" chunks | "+shortDim(e.dimension()),l.contentX()+100,y,MUTED,false);}
+            g.drawString(font,e.name(),l.contentX(),y,TEXT,false);g.drawString(font,e.chunkCount()+" chunks | "+shortDim(e.dimension()),l.contentX()+100,y,MUTED,false);}
         if(selectedRow>=0&&selectedRow<pageData.claims().size()){var e=pageData.claims().get(selectedRow);
             detail(g,l,"Claim details",List.of("ID: "+e.id(),"Trusted: "+(e.trustedPlayers().isBlank()?e.trustedCount():e.trustedPlayers()),
                     "Flags: "+e.flags()));}}
-    private void drawHomes(GuiGraphicsExtractor g,Layout l){
+    private void drawHomes(GuiGraphics g,Layout l){
         boolean canSetHere=homeCapability("set_here");
-        g.text(font,"Claim: "+blank(homesClaimName)+" | Total homes: "+snapshot.core().homeCount()+" / "+snapshot.core().maxHomes(),
+        g.drawString(font,"Claim: "+blank(homesClaimName)+" | Total homes: "+snapshot.core().homeCount()+" / "+snapshot.core().maxHomes(),
                 l.contentX(),l.contentTop()+2,MUTED,false);
-        if(!canSetHere)g.text(font,"Stand inside this claim and ensure your home-set permission is allowed to save a home.",
+        if(!canSetHere)g.drawString(font,"Stand inside this claim and ensure your home-set permission is allowed to save a home.",
                 l.contentX(),l.contentTop()+14,WARNING,false);
         if(pageData.locations().isEmpty())empty(g,l,"No homes are linked to this claim. Stand inside it, enter a name and choose Save here.");
         for(int i=0;i<pageData.locations().size();i++){var e=pageData.locations().get(i);int y=rowTextY(l,i);
-            g.text(font,e.name(),l.contentX(),y,TEXT,false);g.text(font,shortDim(e.dimension())+" | "+pos(e.x(),e.y(),e.z()),l.contentX()+100,y,MUTED,false);}}
-    private void drawAdminClaims(GuiGraphicsExtractor g,Layout l){if(pageData.claims().isEmpty())empty(g,l,"No player claims on this page.");
+            g.drawString(font,e.name(),l.contentX(),y,TEXT,false);g.drawString(font,shortDim(e.dimension())+" | "+pos(e.x(),e.y(),e.z()),l.contentX()+100,y,MUTED,false);}}
+    private void drawAdminClaims(GuiGraphics g,Layout l){if(pageData.claims().isEmpty())empty(g,l,"No player claims on this page.");
         for(int i=0;i<pageData.claims().size();i++){var e=pageData.claims().get(i);int y=rowTextY(l,i);
-            g.text(font,trim(e.name(),34),l.contentX(),y,TEXT,false);g.text(font,e.chunkCount()+" chunks | "+shortDim(e.dimension()),l.contentX()+170,y,MUTED,false);}
+            g.drawString(font,trim(e.name(),34),l.contentX(),y,TEXT,false);g.drawString(font,e.chunkCount()+" chunks | "+shortDim(e.dimension()),l.contentX()+170,y,MUTED,false);}
         if(selectedRow>=0&&selectedRow<pageData.claims().size()){var e=pageData.claims().get(selectedRow);
             detail(g,l,"Administrative claim details",List.of("Claim ID: "+e.id(),"Owner / claim: "+e.name(),"Trusted: "+(e.trustedPlayers().isBlank()?e.trustedCount():e.trustedPlayers()),"Flags: "+e.flags()));}}
-    private void drawPlayerWarps(GuiGraphicsExtractor g, Layout l) {
+    private void drawPlayerWarps(GuiGraphics g, Layout l) {
         boolean canRentPermission = Boolean.parseBoolean(pageValue("player_warps", "can_rent", "false"));
         boolean economyEnabled = Boolean.parseBoolean(pageValue("player_warps", "economy_enabled", "false"));
         boolean canRent = canRentPermission && economyEnabled;
@@ -3590,16 +3590,16 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         int currentCount = parseInt(count, 0);
         int maximumCount = parseInt(maximum, 0);
         boolean canCreate = canRent && maximumCount > 0 && currentCount < maximumCount;
-        g.text(font, "Rented warps: " + count + " / " + maximum + " | " + price + " every " + period,
+        g.drawString(font, "Rented warps: " + count + " / " + maximum + " | " + price + " every " + period,
                 l.contentX(), l.contentTop() + 2, canCreate ? GOOD : WARNING, false);
         String availability = canCreate
                 ? "New rentals are prepaid. Use Move here on an existing warp without changing its paid period."
                 : !canRentPermission ? "Your rank does not currently allow new player-warp rentals. Existing rentals remain manageable."
                 : !economyEnabled ? "Economy is disabled, so new rentals are unavailable. Existing rentals remain manageable."
                 : "You reached your rented-warp limit. Existing rentals can still be moved, hidden or deleted.";
-        g.text(font, availability, l.contentX(), l.contentTop() + 15, canCreate ? MUTED : WARNING, false);
+        g.drawString(font, availability, l.contentX(), l.contentTop() + 15, canCreate ? MUTED : WARNING, false);
         if (pageData.locations().isEmpty()) {
-            g.text(font, canRent ? "You do not rent any warps yet." : "No rented warps are available.",
+            g.drawString(font, canRent ? "You do not rent any warps yet." : "No rented warps are available.",
                     l.contentX(), l.contentTop() + 92, MUTED, false);
         }
         for (int i = 0; i < pageData.locations().size(); i++) {
@@ -3609,76 +3609,76 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
                     .filter(meta -> "warp".equals(meta.kind()) && meta.owner().equalsIgnoreCase(entry.name()) && "paid_until".equals(meta.key()))
                     .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse("0");
             long timestamp; try { timestamp = Long.parseLong(paidUntil); } catch (Exception ignored) { timestamp = 0L; }
-            g.text(font, trim(entry.name(), 20), l.contentX(), y, TEXT, false);
+            g.drawString(font, trim(entry.name(), 20), l.contentX(), y, TEXT, false);
             if (l.contentWidth() >= 500) {
-                g.text(font, cap(entry.kind()) + " | paid until " + time(timestamp), l.contentX() + 104, y, MUTED, false);
+                g.drawString(font, cap(entry.kind()) + " | paid until " + time(timestamp), l.contentX() + 104, y, MUTED, false);
             }
         }
     }
 
-    private void drawTravel(GuiGraphicsExtractor g,Layout l,boolean admin){
+    private void drawTravel(GuiGraphics g,Layout l,boolean admin){
         if(pageData.locations().isEmpty())empty(g,l,admin?"No server warps or spawn match this filter.":"No available travel destinations match this filter.");
         int offset=admin?(l.contentWidth()<500?130:106):82;
         for(int i=0;i<pageData.locations().size();i++){var e=pageData.locations().get(i);int y=rowTextY(l,i,offset);
             String shared = "home".equals(e.kind()) && !e.ownerId().isBlank() ? " [shared]" : "";
-            g.text(font,cap(e.kind())+": "+e.name()+shared,l.contentX(),y,TEXT,false);
-            if(admin)g.text(font,shortDim(e.dimension())+" | "+pos(e.x(),e.y(),e.z()),l.contentX()+130,y,MUTED,false);}}
-    private void drawRanks(GuiGraphicsExtractor g, Layout l) {
+            g.drawString(font,cap(e.kind())+": "+e.name()+shared,l.contentX(),y,TEXT,false);
+            if(admin)g.drawString(font,shortDim(e.dimension())+" | "+pos(e.x(),e.y(),e.z()),l.contentX()+130,y,MUTED,false);}}
+    private void drawRanks(GuiGraphics g, Layout l) {
         if (pageData.permissions().isEmpty()) empty(g, l, "No ranks on this page.");
         String help = selectedRow >= 0 ? "Advanced: set priority or add/remove one inherited parent rank."
                 : "Use Manage to edit priority and inheritance; Rename uses the field above.";
-        g.text(font, help, l.contentX(), l.contentTop() + 98, MUTED, false);
+        g.drawString(font, help, l.contentX(), l.contentTop() + 98, MUTED, false);
         for (int i = 0; i < pageData.permissions().size(); i++) {
             var e = pageData.permissions().get(i); int y = rowTextY(l, i, 110);
-            g.text(font, e.owner(), l.contentX(), y, selectedRow == i ? ACCENT : "default".equals(e.key()) ? GOOD : TEXT, false);
-            g.text(font, ("default".equals(e.key()) ? "server default • " : "") + "priority " + e.value() + " • " + e.source(),
+            g.drawString(font, e.owner(), l.contentX(), y, selectedRow == i ? ACCENT : "default".equals(e.key()) ? GOOD : TEXT, false);
+            g.drawString(font, ("default".equals(e.key()) ? "server default • " : "") + "priority " + e.value() + " • " + e.source(),
                     l.contentX() + 100, y, MUTED, false);
         }
     }
-    private void drawWallet(GuiGraphicsExtractor g, Layout l) {
-        g.text(font, "Balance: " + snapshot.economy().formattedBalance(), l.contentX(), l.contentTop(), GOOD, false);
+    private void drawWallet(GuiGraphics g, Layout l) {
+        g.drawString(font, "Balance: " + snapshot.economy().formattedBalance(), l.contentX(), l.contentTop(), GOOD, false);
         if (snapshot.economy().canPay()) {
             int playerW = Math.max(104, Math.min(138, l.contentWidth() / 3));
             int pickerW = 28, gap = 5;
-            g.text(font, "Player", l.contentX(), l.contentTop() + 16, MUTED, false);
-            g.text(font, "Amount", l.contentX() + playerW + pickerW + gap * 2, l.contentTop() + 16, MUTED, false);
+            g.drawString(font, "Player", l.contentX(), l.contentTop() + 16, MUTED, false);
+            g.drawString(font, "Amount", l.contentX() + playerW + pickerW + gap * 2, l.contentTop() + 16, MUTED, false);
         }
         drawTransactionRows(g, l, 88);
     }
 
-    private void drawEconomics(GuiGraphicsExtractor g, Layout l) {
-        g.text(font, "Choose an economy section. These pages are only available to authorized administrators.",
+    private void drawEconomics(GuiGraphics g, Layout l) {
+        g.drawString(font, "Choose an economy section. These pages are only available to authorized administrators.",
                 l.contentX(), l.contentTop() + 4, MUTED, false);
     }
 
-    private void drawTransactions(GuiGraphicsExtractor g, Layout l) {
+    private void drawTransactions(GuiGraphics g, Layout l) {
         String filter = !draftTransactionPlayer.isBlank() ? "Exact player: " + draftTransactionPlayer
                 : selectedTransactionPlayerId.isBlank() ? "All players"
                 : "Selected player: " + blank(selectedTransactionPlayerLabel);
         int filterCharacters = Math.max(12, (l.contentWidth() - 132) / 6);
-        g.text(font, trim(filter, filterCharacters), l.contentX(), l.contentTop() + 80, MUTED, false);
+        g.drawString(font, trim(filter, filterCharacters), l.contentX(), l.contentTop() + 80, MUTED, false);
         drawTransactionRows(g, l, 108);
     }
 
-    private void drawAuctionTax(GuiGraphicsExtractor g, Layout l) {
-        g.text(font, "Auction House sale tax", l.contentX(), l.contentTop() + 4, ACCENT, true);
-        g.text(font, "This percentage is withheld from the seller when a purchase is completed.",
+    private void drawAuctionTax(GuiGraphics g, Layout l) {
+        g.drawString(font, "Auction House sale tax", l.contentX(), l.contentTop() + 4, ACCENT, true);
+        g.drawString(font, "This percentage is withheld from the seller when a purchase is completed.",
                 l.contentX(), l.contentTop() + 19, MUTED, false);
-        g.text(font, "Players can see the active tax while selling, but only economy administrators can change it here.",
+        g.drawString(font, "Players can see the active tax while selling, but only economy administrators can change it here.",
                 l.contentX(), l.contentTop() + 31, MUTED, false);
     }
 
-    private void drawClaimTax(GuiGraphicsExtractor g, Layout l) {
+    private void drawClaimTax(GuiGraphics g, Layout l) {
         boolean enabled = Boolean.parseBoolean(pageValue("claim_tax", "enabled", "false"));
         boolean safetyHalt = Boolean.parseBoolean(pageValue("claim_tax", "safety_halt", "false"));
         long next; try { next = Long.parseLong(pageValue("claim_tax", "next_charge", "0")); } catch (Exception ignored) { next = 0L; }
-        g.text(font, "Recurring Player Claim tax: " + (enabled ? "ENABLED" : "DISABLED")
+        g.drawString(font, "Recurring Player Claim tax: " + (enabled ? "ENABLED" : "DISABLED")
                         + " | earliest due " + time(next),
                 l.contentX(), l.contentTop() + 2, enabled ? WARNING : MUTED, true);
-        g.text(font, "Each claim has its own cycle. Money uses its recorded peak and dimension multiplier.",
+        g.drawString(font, "Each claim has its own cycle. Money uses its recorded peak and dimension multiplier.",
                 l.contentX(), l.contentTop() + 14, MUTED, false);
         if (safetyHalt) {
-            g.text(font, "SAFETY HALT: tax enforcement and claim mutations are fail-closed; inspect the server log.",
+            g.drawString(font, "SAFETY HALT: tax enforcement and claim mutations are fail-closed; inspect the server log.",
                     l.contentX(), l.contentTop() + 26, ERROR, true);
         }
         List<SsuMenuPageDataPayload.PermissionEntry> dimensions = pageData.permissions().stream()
@@ -3686,34 +3686,34 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         for (int i = 0; i < dimensions.size() && i < 7; i++) {
             var entry = dimensions.get(i);
             int y = l.contentTop() + 92 + i * 25;
-            g.text(font, trim(entry.key(), 31), l.contentX(), y, TEXT, false);
-            g.text(font, "x" + entry.value(), l.contentX() + 190, y, ACCENT, false);
+            g.drawString(font, trim(entry.key(), 31), l.contentX(), y, TEXT, false);
+            g.drawString(font, "x" + entry.value(), l.contentX() + 190, y, ACCENT, false);
         }
-        g.text(font, trim("WARNING: failed payment removes all claims/homes and permanently confiscates the exact taxed peak chunks.",
+        g.drawString(font, trim("WARNING: failed payment removes all claims/homes and permanently confiscates the exact taxed peak chunks.",
                         Math.max(28, l.contentWidth() / 6)),
                 l.contentX(), l.footerY() - 13, ERROR, false);
     }
 
-    private void drawWarpRental(GuiGraphicsExtractor g, Layout l) {
+    private void drawWarpRental(GuiGraphics g, Layout l) {
         String active = pageValue("warp_rental", "active", "0");
-        g.text(font, "Player Warp rentals", l.contentX(), l.contentTop() + 5, ACCENT, true);
-        g.text(font, "Players with ssu.warps.rent prepay this amount. Renewal is charged automatically at expiry.",
+        g.drawString(font, "Player Warp rentals", l.contentX(), l.contentTop() + 5, ACCENT, true);
+        g.drawString(font, "Players with ssu.warps.rent prepay this amount. Renewal is charged automatically at expiry.",
                 l.contentX(), l.contentTop() + 20, MUTED, false);
-        g.text(font, "If renewal cannot be paid, the warp is deleted and its name becomes available again.",
+        g.drawString(font, "If renewal cannot be paid, the warp is deleted and its name becomes available again.",
                 l.contentX(), l.contentTop() + 33, WARNING, false);
-        g.text(font, "Active player rentals: " + active, l.contentX(), l.contentTop() + 82, GOOD, false);
+        g.drawString(font, "Active player rentals: " + active, l.contentX(), l.contentTop() + 82, GOOD, false);
     }
 
-    private void drawTransactionRows(GuiGraphicsExtractor g, Layout l, int offset) {
+    private void drawTransactionRows(GuiGraphics g, Layout l, int offset) {
         if (pageData.transactions().isEmpty()) {
-            g.text(font, page == Page.TRANSACTIONS ? "No transactions match the selected player and search."
+            g.drawString(font, page == Page.TRANSACTIONS ? "No transactions match the selected player and search."
                     : "No transactions match this search.", l.contentX(), l.contentTop() + offset + 6, MUTED, false);
         }
         for (int i = 0; i < pageData.transactions().size(); i++) {
             var entry = pageData.transactions().get(i);
             int y = rowTextY(l, i, offset);
-            g.text(font, trim(entry.type() + "  " + entry.formattedAmount(), 28), l.contentX(), y, TEXT, false);
-            g.text(font, entry.status(), l.contentX() + 170, y, MUTED, false);
+            g.drawString(font, trim(entry.type() + "  " + entry.formattedAmount(), 28), l.contentX(), y, TEXT, false);
+            g.drawString(font, entry.status(), l.contentX() + 170, y, MUTED, false);
         }
         if (selectedRow >= 0 && selectedRow < pageData.transactions().size()) {
             var entry = pageData.transactions().get(selectedRow);
@@ -3728,30 +3728,30 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             ));
         }
     }
-    private void drawRegions(GuiGraphicsExtractor g,Layout l){if(pageData.regions().isEmpty())empty(g,l,"No regions on this page.");
-        for(int i=0;i<pageData.regions().size();i++){var e=pageData.regions().get(i);int y=rowTextY(l,i);g.text(font,e.name(),l.contentX(),y,e.rentedByPlayer()?GOOD:TEXT,false);
+    private void drawRegions(GuiGraphics g,Layout l){if(pageData.regions().isEmpty())empty(g,l,"No regions on this page.");
+        for(int i=0;i<pageData.regions().size();i++){var e=pageData.regions().get(i);int y=rowTextY(l,i);g.drawString(font,e.name(),l.contentX(),y,e.rentedByPlayer()?GOOD:TEXT,false);
             String state=e.rentedByPlayer()?"yours | "+e.remainingText():e.rented()?"rented":e.rentable()?e.formattedPrice()+" / "+e.periodText():"not rentable";
-            g.text(font,state,l.contentX()+90,y,MUTED,false);}
+            g.drawString(font,state,l.contentX()+90,y,MUTED,false);}
         if(selectedRow>=0&&selectedRow<pageData.regions().size()){var e=pageData.regions().get(selectedRow);detail(g,l,"Region details",
                 List.of(e.bounds(),"Managers: "+(e.managers().isBlank()?e.managerCount():e.managers()),
                         "Members: "+(e.members().isBlank()?e.memberCount():e.members()),"Flags: "+e.flags(),
                         "Rent: "+e.rentPolicy(),"Priority: "+e.priority()+" | Volume: "+e.volume(),
                         "Spawn: "+(e.hasSpawn()?e.spawn():"none")+" | Snapshot: "+yesNo(e.snapshotAvailable()),
                         "Active job lock: "+yesNo(e.jobLocked())));}}
-    private void drawUtilityMiningAdmin(GuiGraphicsExtractor g,Layout l){
+    private void drawUtilityMiningAdmin(GuiGraphics g,Layout l){
         List<SsuMenuPageDataPayload.PermissionEntry> lists=pageData.permissions().stream().filter(e->"list".equals(e.kind())).toList();
         for(int i=0;i<lists.size();i++){var e=lists.get(i);int y=rowTextY(l,i,l.contentWidth()<430?106:92);
-            g.text(font,cap(e.key().replace('_',' ')),l.contentX(),y,TEXT,false);
-            g.text(font,trim(e.value(),48),l.contentX()+120,y,MUTED,false);}
-        g.text(font,"Add and Remove use the block id field above. Clear empties the selected list immediately.",l.contentX(),l.footerY()-18,MUTED,false);
+            g.drawString(font,cap(e.key().replace('_',' ')),l.contentX(),y,TEXT,false);
+            g.drawString(font,trim(e.value(),48),l.contentX()+120,y,MUTED,false);}
+        g.drawString(font,"Add and Remove use the block id field above. Clear empties the selected list immediately.",l.contentX(),l.footerY()-18,MUTED,false);
     }
 
-    private void drawMaintenance(GuiGraphicsExtractor g, Layout l) {
+    private void drawMaintenance(GuiGraphics g, Layout l) {
         int jobs = pageData.permissions().stream().filter(v -> "jobs".equals(v.key()))
                 .map(v -> parseDisplayInt(v.value())).findFirst().orElse(snapshot.activeJobs());
         long pending = pageData.permissions().stream().filter(v -> "storage_pending".equals(v.key()))
                 .map(v -> parseDisplayLong(v.value())).findFirst().orElse((long) snapshot.pendingStorageWrites());
-        g.text(font, "Runtime: " + jobs + " active job(s) • " + pending + " pending storage record(s)",
+        g.drawString(font, "Runtime: " + jobs + " active job(s) • " + pending + " pending storage record(s)",
                 l.contentX(), l.contentTop() + 4, jobs > 0 ? WARNING : MUTED, false);
         String questState = pageData.permissions().stream().filter(v -> "quests".equals(v.key()))
                 .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse("unavailable");
@@ -3759,17 +3759,17 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
                 .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse("unavailable");
         String dungeonState = pageData.permissions().stream().filter(v -> "dungeons".equals(v.key()))
                 .map(SsuMenuPageDataPayload.PermissionEntry::value).findFirst().orElse("unavailable");
-        g.text(font, trim("Quests: " + questState + " • Minigames: " + minigameState + " • Dungeons: " + dungeonState, 108),
+        g.drawString(font, trim("Quests: " + questState + " • Minigames: " + minigameState + " • Dungeons: " + dungeonState, 108),
                 l.contentX(), l.contentTop() + 14, MUTED, false);
         List<SsuMenuPageDataPayload.PermissionEntry> colors = pageData.permissions().stream()
                 .filter(v -> "color".equals(v.kind())).toList();
         if (colors.isEmpty()) empty(g, l, "No border color categories on this page.");
         for (int i = 0; i < colors.size(); i++) {
             var entry = colors.get(i); int y = rowTextY(l, i, 82);
-            g.text(font, cap(entry.key().replace('_', ' ')), l.contentX(), y, TEXT, false);
-            g.text(font, entry.value() + " • " + entry.source(), l.contentX() + 150, y, MUTED, false);
+            g.drawString(font, cap(entry.key().replace('_', ' ')), l.contentX(), y, TEXT, false);
+            g.drawString(font, entry.value() + " • " + entry.source(), l.contentX() + 150, y, MUTED, false);
         }
-        g.text(font, "Set uses the shared RGB field. Reload is blocked while long-running jobs are active.",
+        g.drawString(font, "Set uses the shared RGB field. Reload is blocked while long-running jobs are active.",
                 l.contentX(), l.footerY() - 18, MUTED, false);
     }
 
@@ -3781,16 +3781,16 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         try { return Long.parseLong(raw); } catch (RuntimeException ignored) { return 0L; }
     }
 
-    private void drawRegionAdmin(GuiGraphicsExtractor g,Layout l){if(pageData.regions().isEmpty())empty(g,l,"No regions on this page.");
+    private void drawRegionAdmin(GuiGraphics g,Layout l){if(pageData.regions().isEmpty())empty(g,l,"No regions on this page.");
         for(int i=0;i<pageData.regions().size();i++){var e=pageData.regions().get(i);int y=rowTextY(l,i,l.contentWidth()<440?130:105);
-            g.text(font,e.name(),l.contentX(),y,selectedRow==i?ACCENT:TEXT,false);
+            g.drawString(font,e.name(),l.contentX(),y,selectedRow==i?ACCENT:TEXT,false);
             String state=e.rented()?"rented by "+blank(e.renterName())+("paused".equalsIgnoreCase(e.remainingText())?" • paused":""):"available";
-            g.text(font,trim(shortDim(e.dimension())+" • "+e.volume()+" blocks • "+state,42),l.contentX()+100,y,MUTED,false);}
-        if(selectedRow<0)g.text(font,"Select a region to show safe snapshot, reset, redefine, clear and rental controls.",l.contentX(),l.footerY()-18,MUTED,false);}
+            g.drawString(font,trim(shortDim(e.dimension())+" • "+e.volume()+" blocks • "+state,42),l.contentX()+100,y,MUTED,false);}
+        if(selectedRow<0)g.drawString(font,"Select a region to show safe snapshot, reset, redefine, clear and rental controls.",l.contentX(),l.footerY()-18,MUTED,false);}
 
-    private void drawPlayerInfo(GuiGraphicsExtractor g, Layout l) {
+    private void drawPlayerInfo(GuiGraphics g, Layout l) {
         if (!playerProfileData.profile().selected()) {
-            g.text(font, "Choose a player from the dropdown or enter an exact name.",
+            g.drawString(font, "Choose a player from the dropdown or enter an exact name.",
                     l.contentX(), l.contentTop() + 58, MUTED, false);
             return;
         }
@@ -3801,7 +3801,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         int permissionX = split < l.contentRight() ? split + 10 : l.contentX();
         int permissionTop = split < l.contentRight() ? top : top + 150;
 
-        g.text(font, profile.name() + (profile.online() ? "  • online" : "  • offline"),
+        g.drawString(font, profile.name() + (profile.online() ? "  • online" : "  • offline"),
                 l.contentX(), top, profile.online() ? GOOD : ACCENT, true);
         List<String> details = List.of(
                 "UUID: " + profile.playerId(),
@@ -3820,33 +3820,33 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         int detailLimit = split < l.contentRight() ? details.size() : Math.min(8, details.size());
         for (int i = 0; i < detailLimit; i++) {
             int maxChars = split < l.contentRight() ? 40 : 74;
-            g.text(font, trim(details.get(i), maxChars), l.contentX(), top + 16 + i * 13,
+            g.drawString(font, trim(details.get(i), maxChars), l.contentX(), top + 16 + i * 13,
                     i == 0 ? MUTED : TEXT, false);
         }
 
-        g.text(font, "Effective permissions", permissionX, permissionTop, ACCENT, true);
+        g.drawString(font, "Effective permissions", permissionX, permissionTop, ACCENT, true);
         if (playerProfileData.permissions().isEmpty()) {
-            g.text(font, "No permission data available.", permissionX, permissionTop + 16, MUTED, false);
+            g.drawString(font, "No permission data available.", permissionX, permissionTop + 16, MUTED, false);
             return;
         }
         for (int i = 0; i < playerProfileData.permissions().size(); i++) {
             SsuPlayerProfileDataPayload.PermissionLine line = playerProfileData.permissions().get(i);
             int y = permissionTop + 16 + i * PROFILE_PERMISSION_ROW_HEIGHT;
-            g.text(font, trim(line.key() + " = " + line.value(), split < l.contentRight() ? 44 : 70),
+            g.drawString(font, trim(line.key() + " = " + line.value(), split < l.contentRight() ? 44 : 70),
                     permissionX, y, TEXT, false);
-            g.text(font, trim(line.source(), split < l.contentRight() ? 44 : 70), permissionX, y + 10, MUTED, false);
+            g.drawString(font, trim(line.source(), split < l.contentRight() ? 44 : 70), permissionX, y + 10, MUTED, false);
         }
     }
 
-    private void drawPermissions(GuiGraphicsExtractor g, Layout l, int mouseX, int mouseY) {
+    private void drawPermissions(GuiGraphics g, Layout l, int mouseX, int mouseY) {
         if (selectedPermissionTarget.isBlank()) {
-            g.text(font, "Choose a player, rank or claim role from the lists above.", l.contentX(), permissionListTop(l) + 8, MUTED, false);
+            g.drawString(font, "Choose a player, rank or claim role from the lists above.", l.contentX(), permissionListTop(l) + 8, MUTED, false);
             return;
         }
-        g.text(font, trim(permissionData.selectedLabel() + " — " + permissionData.targetSummary(), 76),
+        g.drawString(font, trim(permissionData.selectedLabel() + " — " + permissionData.targetSummary(), 76),
                 l.contentX(), l.contentTop() + 76, ACCENT, false);
         if (permissionData.permissions().isEmpty()) {
-            g.text(font, "No permissions match this filter.", l.contentX(), permissionListTop(l) + 8, MUTED, false);
+            g.drawString(font, "No permissions match this filter.", l.contentX(), permissionListTop(l) + 8, MUTED, false);
             return;
         }
         for (int i = 0; i < permissionData.permissions().size(); i++) {
@@ -3854,27 +3854,27 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             int y = permissionListTop(l) + i * PERMISSION_ROW_HEIGHT;
             boolean hovered = permissionRowBounds(l, i).contains(mouseX, mouseY);
             if (hovered) g.fill(l.contentX(), y, l.contentRight(), y + PERMISSION_ROW_HEIGHT - 2, 0x662C3946);
-            g.text(font, trim(entry.key(), 58), l.contentX() + 4, y + 7,
+            g.drawString(font, trim(entry.key(), 58), l.contentX() + 4, y + 7,
                     entry.directValue().isBlank() ? TEXT : GOOD, false);
         }
     }
-    private void drawAccounts(GuiGraphicsExtractor g,Layout l){if(pageData.accounts().isEmpty())empty(g,l,"No economy accounts on this page.");
-        g.text(font,"Admin amount",l.contentX()+106,l.contentTop()+55,MUTED,false);
-        for(int i=0;i<pageData.accounts().size();i++){var e=pageData.accounts().get(i);int y=rowTextY(l,i,76);g.text(font,blank(e.name()),l.contentX(),y,TEXT,false);
-            g.text(font,e.formattedBalance()+" | rev "+e.revision(),l.contentX()+130,y,MUTED,false);}}
-    private void drawJobs(GuiGraphicsExtractor g,Layout l){if(pageData.jobs().isEmpty())empty(g,l,"No active jobs.");for(int i=0;i<pageData.jobs().size();i++){var e=pageData.jobs().get(i);int y=rowTextY(l,i);
-        String progress=e.progress()<0?"unknown":String.format(Locale.ROOT,"%.1f%%",e.progress()*100);g.text(font,trim(e.description(),40),l.contentX(),y,TEXT,false);g.text(font,progress+" | "+e.operations()+" ops",l.contentX()+220,y,MUTED,false);}}
-    private void drawRentOps(GuiGraphicsExtractor g, Layout l) {
-        g.text(font, "Cancellation refunds: player " + snapshot.economy().playerCancelRefundPercent()
+    private void drawAccounts(GuiGraphics g,Layout l){if(pageData.accounts().isEmpty())empty(g,l,"No economy accounts on this page.");
+        g.drawString(font,"Admin amount",l.contentX()+106,l.contentTop()+55,MUTED,false);
+        for(int i=0;i<pageData.accounts().size();i++){var e=pageData.accounts().get(i);int y=rowTextY(l,i,76);g.drawString(font,blank(e.name()),l.contentX(),y,TEXT,false);
+            g.drawString(font,e.formattedBalance()+" | rev "+e.revision(),l.contentX()+130,y,MUTED,false);}}
+    private void drawJobs(GuiGraphics g,Layout l){if(pageData.jobs().isEmpty())empty(g,l,"No active jobs.");for(int i=0;i<pageData.jobs().size();i++){var e=pageData.jobs().get(i);int y=rowTextY(l,i);
+        String progress=e.progress()<0?"unknown":String.format(Locale.ROOT,"%.1f%%",e.progress()*100);g.drawString(font,trim(e.description(),40),l.contentX(),y,TEXT,false);g.drawString(font,progress+" | "+e.operations()+" ops",l.contentX()+220,y,MUTED,false);}}
+    private void drawRentOps(GuiGraphics g, Layout l) {
+        g.drawString(font, "Cancellation refunds: player " + snapshot.economy().playerCancelRefundPercent()
                 + "% • administrator " + snapshot.economy().adminCancelRefundPercent() + "%",
                 l.contentX(), l.contentTop() + 3, ACCENT, false);
         if (pageData.rentOperations().isEmpty()) {
-            g.text(font, "No rent journal records.", l.contentX(), l.contentTop() + 116, MUTED, false);
+            g.drawString(font, "No rent journal records.", l.contentX(), l.contentTop() + 116, MUTED, false);
         }
         for (int i = 0; i < pageData.rentOperations().size(); i++) {
             var e = pageData.rentOperations().get(i); int y = rowTextY(l, i, 110);
-            g.text(font, e.region() + " | " + e.action(), l.contentX(), y, TEXT, false);
-            g.text(font, e.status(), l.contentX() + 170, y, MUTED, false);
+            g.drawString(font, e.region() + " | " + e.action(), l.contentX(), y, TEXT, false);
+            g.drawString(font, e.status(), l.contentX() + 170, y, MUTED, false);
         }
         if (selectedRow >= 0 && selectedRow < pageData.rentOperations().size()) {
             var e = pageData.rentOperations().get(selectedRow);
@@ -3883,21 +3883,21 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
                     "Error: " + blank(e.error())));
         }
     }
-    private void drawCore(GuiGraphicsExtractor g,Layout l){var c=snapshot.core();int y=l.contentTop()+8;
+    private void drawCore(GuiGraphics g,Layout l){var c=snapshot.core();int y=l.contentTop()+8;
         String[] lines={"Active jobs: "+snapshot.activeJobs(),"Pending storage writes: "+snapshot.pendingStorageWrites(),
                 "Permission checks: "+c.permissionChecks()+" | cache "+String.format(Locale.ROOT,"%.1f%%",c.permissionCacheHitPermille()/10D),
                 "Region lookups: "+c.regionLookups()+" | avg candidates "+String.format(Locale.ROOT,"%.2f",c.averageRegionCandidates()),
                 "Region index: "+c.regionIndexCells()+" cells | "+c.regionIndexReferences()+" refs",
-                "Modules: storage, jobs, transactions, economy, claims, permissions, homes, warps, spawn, regions, mines, menu"};for(int i=0;i<lines.length;i++)g.text(font,lines[i],l.contentX(),y+i*18,i==5?GOOD:TEXT,false);}
-    private void drawProfile(GuiGraphicsExtractor g,Layout l){var c=snapshot.core();int y=l.contentTop()+8;
-        g.text(font,"Player: "+snapshot.playerName(),l.contentX(),y,ACCENT,false);
-        g.text(font,"Selected title: "+blank(snapshot.selectedTitle()),l.contentX(),y+18,snapshot.selectedTitleColor(),false);
+                "Modules: storage, jobs, transactions, economy, claims, permissions, homes, warps, spawn, regions, mines, menu"};for(int i=0;i<lines.length;i++)g.drawString(font,lines[i],l.contentX(),y+i*18,i==5?GOOD:TEXT,false);}
+    private void drawProfile(GuiGraphics g,Layout l){var c=snapshot.core();int y=l.contentTop()+8;
+        g.drawString(font,"Player: "+snapshot.playerName(),l.contentX(),y,ACCENT,false);
+        g.drawString(font,"Selected title: "+blank(snapshot.selectedTitle()),l.contentX(),y+18,snapshot.selectedTitleColor(),false);
         String[] lines={"Primary rank: "+snapshot.primaryRank(),"Administrator: "+yesNo(snapshot.administrator()),
                 "Claims: "+c.claimCount()+" ("+c.claimedChunkCount()+" chunks)","Homes: "+c.homeCount(),"Warps: "+c.warpCount(),
                 "Active rentals: "+c.activeRentalCount(),"Balance: "+snapshot.economy().formattedBalance()};
-        for(int i=0;i<lines.length;i++)g.text(font,lines[i],l.contentX(),y+48+i*18,TEXT,false);}
+        for(int i=0;i<lines.length;i++)g.drawString(font,lines[i],l.contentX(),y+48+i*18,TEXT,false);}
 
-    private void detail(GuiGraphicsExtractor g,Layout l,String title,List<String> lines){
+    private void detail(GuiGraphics g,Layout l,String title,List<String> lines){
         boolean transactionLike = page == Page.WALLET || page == Page.TRANSACTIONS;
         int reservedRight = transactionLike ? 70 : 0;
         int usable = Math.max(160, l.contentWidth() - reservedRight);
@@ -3905,10 +3905,10 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         int x = l.contentX() + Math.max(0, (usable - w) / 2);
         int bottom = l.panelBottom() - 38;
         int y = Math.max(l.contentTop() + (transactionLike ? 92 : 20), bottom - 148);
-        g.fill(x,y,x+w,bottom,0xF0202832);g.outline(x,y,w,bottom-y,ACCENT);g.text(font,title,x+7,y+7,ACCENT,true);
+        g.fill(x,y,x+w,bottom,0xF0202832);g.renderOutline(x,y,w,bottom-y,ACCENT);g.drawString(font,title,x+7,y+7,ACCENT,true);
         int visible=Math.max(1,Math.min(7,(bottom-y-28)/13));
-        for(int i=0;i<Math.min(visible,lines.size());i++)g.text(font,trim(lines.get(i),Math.max(24,(w-14)/6)),x+7,y+23+i*13,MUTED,false);}
-    private void empty(GuiGraphicsExtractor g,Layout l,String text){g.text(font,text,l.contentX(),l.contentTop()+62,MUTED,false);}
+        for(int i=0;i<Math.min(visible,lines.size());i++)g.drawString(font,trim(lines.get(i),Math.max(24,(w-14)/6)),x+7,y+23+i*13,MUTED,false);}
+    private void empty(GuiGraphics g,Layout l,String text){g.drawString(font,text,l.contentX(),l.contentTop()+62,MUTED,false);}
 
     private int rowY(Layout l,int i){return rowY(l,i,58);} private int rowY(Layout l,int i,int offset){return l.contentTop()+offset+i*27;}
     private int rowTextY(Layout l,int i){return rowY(l,i)+6;} private int rowTextY(Layout l,int i,int offset){return rowY(l,i,offset)+6;}
@@ -3961,9 +3961,9 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         return MinecraftColorPalette.next(current);
     }
 
-    private void center(GuiGraphicsExtractor g,String s,int x,int y,int color){String v=blank(s);g.text(font,v,x-font.width(v)/2,y,color,false);}
-    private static Identifier texture(String file) {
-        return Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "textures/gui/dashboard/" + file);
+    private void center(GuiGraphics g,String s,int x,int y,int color){String v=blank(s);g.drawString(font,v,x-font.width(v)/2,y,color,false);}
+    private static ResourceLocation texture(String file) {
+        return ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "textures/gui/dashboard/" + file);
     }
     private static String onOff(boolean v){return v?"ON":"OFF";} private static String keepDelete(boolean v){return v?"DELETE":"KEEP";} private static String yesNo(boolean v){return v?"Yes":"No";}
     private static String blank(String v){return v==null||v.isBlank()?"-":v;} private static String cap(String v){return v==null||v.isBlank()?"":Character.toUpperCase(v.charAt(0))+v.substring(1);}
@@ -4023,7 +4023,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         private final String label,subtitle,remote;Page(String l,String s,String r){label=l;subtitle=s;remote=r.trim();}
         String label(){return label;}String subtitle(){return subtitle;}String remoteId(){return remote;}boolean hasRemoteData(){return !remote.isBlank();}
     }
-    private record Module(String label, String hint, Identifier icon, Page page, boolean enabled){}
+    private record Module(String label, String hint, ResourceLocation icon, Page page, boolean enabled){}
     private record AdminTool(String label, String hint, String id){}
     private record ModuleSwitch(String label, String key, boolean configured, boolean active, String reason,
                                 List<String> required, List<String> optional, List<String> integrations){}

@@ -8,7 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.network.MapMarkerActionResultPaylo
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerSyncPayload;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -110,18 +110,18 @@ public final class MapMarkerService {
         ServerLevel level = level(player, dimension);
         if (level == null) return null;
         int y = suppliedY;
-        BlockPos check = new BlockPos(x, Math.max(level.getMinY(), Math.min(level.getMaxY(), suppliedY)), z);
+        BlockPos check = new BlockPos(x, Math.max(level.getMinBuildHeight(), Math.min((level.getMaxBuildHeight() - 1), suppliedY)), z);
         if (resolveSurface && level.hasChunkAt(check)) {
             // Level#getHeight already returns the first free block above WORLD_SURFACE.
             y = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
         }
-        y = Math.max(level.getMinY(), Math.min(level.getMaxY(), y));
+        y = Math.max(level.getMinBuildHeight(), Math.min((level.getMaxBuildHeight() - 1), y));
         return new Coordinates(x, y, z);
     }
 
     private static ServerLevel level(ServerPlayer player, String dimension) {
         try {
-            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, Identifier.parse(dimension));
+            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(dimension));
             return player.level().getServer().getLevel(key);
         } catch (Exception ignored) {
             return null;
@@ -135,7 +135,7 @@ public final class MapMarkerService {
     }
 
     private static String currentDimension(ServerPlayer player) {
-        return player.level().dimension().identifier().toString();
+        return player.level().dimension().location().toString();
     }
 
     private record Coordinates(int x, int y, int z) {

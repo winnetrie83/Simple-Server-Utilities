@@ -47,7 +47,7 @@ public final class MinigameAreaBounds {
     }
 
     public boolean contains(ResourceKey<Level> level, BlockPos pos) {
-        return configured() && level.identifier().toString().equals(dimension)
+        return configured() && level.location().toString().equals(dimension)
                 && pos.getX() >= minX && pos.getX() <= maxX
                 && pos.getY() >= minY && pos.getY() <= maxY
                 && pos.getZ() >= minZ && pos.getZ() <= maxZ;

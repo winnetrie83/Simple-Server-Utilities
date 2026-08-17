@@ -1,14 +1,14 @@
 package be.winnetrie.mod.simpleserverutilities.client.visualization;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.renderer.MultiBufferSource;
+import be.winnetrie.mod.simpleserverutilities.client.render.SsuDebugGizmos;
 import be.winnetrie.mod.simpleserverutilities.client.visualization.BorderVisualizationClientState.LayerState;
 import be.winnetrie.mod.simpleserverutilities.network.BorderVisualizationPayload;
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderLayer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.debug.DebugRenderer;
-import net.minecraft.gizmos.GizmoStyle;
-import net.minecraft.gizmos.Gizmos;
-import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -26,19 +26,16 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
     }
 
     @Override
-    public void emitGizmos(
-            double camX,
-            double camY,
-            double camZ,
-            DebugValueAccess debugValues,
-            Frustum frustum,
-            float partialTicks
-    ) {
+    public void render(PoseStack poseStack, MultiBufferSource bufferSource,
+                       double camX, double camY, double camZ) {
+        SsuDebugGizmos.begin(minecraft, poseStack, bufferSource, camX, camY, camZ);
+        Frustum frustum = null; // 1.21.1 DebugRenderer does not pass its render frustum to child renderers.
+        float partialTicks = minecraft.getTimer().getGameTimeDeltaPartialTick(true);
         if (minecraft.level == null) {
             return;
         }
 
-        String dimension = minecraft.level.dimension().identifier().toString();
+        String dimension = minecraft.level.dimension().location().toString();
 
         for (LayerState layer : BorderVisualizationClientState.snapshot()) {
             if (!dimension.equals(layer.dimension())) {
@@ -91,12 +88,12 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
             }
 
             AABB ribbon = new AABB(minX, lowY, minZ, maxX, highY, maxZ);
-            if (!frustum.isVisible(ribbon)) {
+            if (frustum != null && !frustum.isVisible(ribbon)) {
                 continue;
             }
 
             if (entry.fillColor() != 0) {
-                Gizmos.cuboid(ribbon, GizmoStyle.fill(entry.fillColor()));
+                SsuDebugGizmos.cuboid(ribbon, SsuDebugGizmos.FillStyle.fill(entry.fillColor()));
             }
 
             Vec3 lowStart = new Vec3(visible.x1(), lowY, visible.z1());
@@ -146,7 +143,7 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
             );
 
             if (distanceSquaredToAabb(bounds, camX, camY, camZ) > renderDistanceSquared
-                    || !frustum.isVisible(bounds)) {
+                    || (frustum != null && !frustum.isVisible(bounds))) {
                 continue;
             }
 
@@ -155,7 +152,7 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
             // fits inside the configured radius; individual border edges are clipped below.
             if (entry.fillColor() != 0
                     && farthestDistanceSquaredToAabb(bounds, camX, camY, camZ) <= renderDistanceSquared) {
-                Gizmos.cuboid(bounds, GizmoStyle.fill(entry.fillColor()));
+                SsuDebugGizmos.cuboid(bounds, SsuDebugGizmos.FillStyle.fill(entry.fillColor()));
             }
 
             if (entry.strokeBoxes()) {
@@ -235,7 +232,7 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
             Frustum frustum
     ) {
         LineSegment visible = clipSegmentToSphere(start, end, camera, radius);
-        if (visible == null || !frustum.isVisible(segmentBounds(visible.start(), visible.end()))) return;
+        if (visible == null || (frustum != null && !frustum.isVisible(segmentBounds(visible.start(), visible.end())))) return;
         line(visible.start(), visible.end(), entry, true);
     }
 
@@ -319,7 +316,7 @@ public class ClaimRegionBorderRenderer implements DebugRenderer.SimpleDebugRende
             BorderVisualizationPayload.Entry entry,
             boolean alwaysOnTop
     ) {
-        var gizmo = Gizmos.line(start, end, entry.strokeColor(), entry.strokeWidth());
+        var gizmo = SsuDebugGizmos.line(start, end, entry.strokeColor(), entry.strokeWidth());
         if (alwaysOnTop) {
             gizmo.setAlwaysOnTop();
         }

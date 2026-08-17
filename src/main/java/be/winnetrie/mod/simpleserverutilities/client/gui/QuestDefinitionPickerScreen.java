@@ -6,7 +6,7 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 import be.winnetrie.mod.simpleserverutilities.network.QuestEditorOpenPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -80,19 +80,19 @@ public final class QuestDefinitionPickerScreen extends Screen {
 
     private void choose(String id) {
         callback.accept(id);
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float pt) {
+    @Override public void render(GuiGraphics g, int mx, int my, float pt) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, 0xF0161D25);
-        g.outline(x, y, W, H, 0xFF586978);
-        g.text(font, titleText, x + 12, y + 12, 0xFFF3F5F7, true);
-        g.text(font, filtered().size() + " quest(s)", x + W - 102, y + 13, 0xFFAAB5BE, false);
-        super.extractRenderState(g, mx, my, pt);
+        g.renderOutline(x, y, W, H, 0xFF586978);
+        g.drawString(font, titleText, x + 12, y + 12, 0xFFF3F5F7, true);
+        g.drawString(font, filtered().size() + " quest(s)", x + W - 102, y + 13, 0xFFAAB5BE, false);
+        super.render(g, mx, my, pt);
     }
 
     private int left() { return (width - W) / 2; }

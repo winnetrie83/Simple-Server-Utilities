@@ -39,7 +39,7 @@ import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobLocks;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
@@ -105,7 +105,7 @@ public final class RegionSelectionSchematicManager {
                 destinationMaximum(origin.getZ(), template.sizeZ(), "Z")
         );
         validateVolume(destination.volume());
-        if (destination.minY() < level.getMinY() || destination.maxY() > level.getMaxY()) {
+        if (destination.minY() < level.getMinBuildHeight() || destination.maxY() > (level.getMaxBuildHeight() - 1)) {
             throw new IllegalArgumentException("The template would extend outside the build height.");
         }
         if (!level.getWorldBorder().isWithinBounds(new BlockPos(destination.minX(), destination.minY(), destination.minZ()))
@@ -129,7 +129,7 @@ public final class RegionSelectionSchematicManager {
                 Math.max(source.maxX(), destination.maxX()), Math.max(source.maxY(), destination.maxY()), Math.max(source.maxZ(), destination.maxZ())
         );
         validateVolume(clearBounds.volume());
-        if (clearBounds.minY() < level.getMinY() || clearBounds.maxY() > level.getMaxY()) {
+        if (clearBounds.minY() < level.getMinBuildHeight() || clearBounds.maxY() > (level.getMaxBuildHeight() - 1)) {
             throw new IllegalArgumentException("The transformed selection would extend outside the build height.");
         }
         if (!level.getWorldBorder().isWithinBounds(new BlockPos(clearBounds.minX(), clearBounds.minY(), clearBounds.minZ()))
@@ -459,7 +459,7 @@ public final class RegionSelectionSchematicManager {
 
     private static String blockStateJson(BlockState state) {
         JsonObject json = new JsonObject();
-        Identifier blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         json.addProperty("block", blockId.toString());
         if (!state.getProperties().isEmpty()) {
             JsonObject properties = new JsonObject();
@@ -476,7 +476,7 @@ public final class RegionSelectionSchematicManager {
     }
 
     private static BlockState blockStateFromJson(JsonObject json) {
-        Identifier blockId = Identifier.parse(json.get("block").getAsString());
+        ResourceLocation blockId = ResourceLocation.parse(json.get("block").getAsString());
         Block block = BuiltInRegistries.BLOCK.getOptional(blockId).orElseThrow(
                 () -> new IllegalArgumentException("Unknown block in template: " + blockId));
         BlockState state = block.defaultBlockState();

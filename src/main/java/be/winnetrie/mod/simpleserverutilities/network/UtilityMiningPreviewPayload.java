@@ -10,7 +10,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Compact client preview. The server has already applied config, permissions and protection checks. */
 public record UtilityMiningPreviewPayload(
@@ -24,7 +24,7 @@ public record UtilityMiningPreviewPayload(
 ) implements CustomPacketPayload {
 
     public static final Type<UtilityMiningPreviewPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "utility_mining_preview")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "utility_mining_preview")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, UtilityMiningPreviewPayload> STREAM_CODEC =

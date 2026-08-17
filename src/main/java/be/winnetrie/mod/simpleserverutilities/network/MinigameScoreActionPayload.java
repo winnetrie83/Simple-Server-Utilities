@@ -4,13 +4,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Explicit administrator score adjustment request used by the Minigame Lobby GUI. */
 public record MinigameScoreActionPayload(String mode, String playerName, long amount, long requestId)
         implements CustomPacketPayload {
     public static final Type<MinigameScoreActionPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_score_action"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_score_action"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameScoreActionPayload> STREAM_CODEC =
             StreamCodec.of(MinigameScoreActionPayload::encode, MinigameScoreActionPayload::decode);
 

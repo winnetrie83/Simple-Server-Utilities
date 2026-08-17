@@ -74,7 +74,7 @@ public final class NpcEditorService {
                 instance.scheduleEnabled, instance.schedule, instance.patrolMode, instance.patrol,
                 instance.respawnEnabled, instance.respawnDelaySeconds, instance.respawnDimension,
                 instance.respawnX, instance.respawnY, instance.respawnZ, instance.respawnYaw, instance.respawnPitch,
-                SimpleServerUtilities.NPCS.supportedLivingEntityTypes(player.level()),
+                SimpleServerUtilities.NPCS.supportedLivingEntityTypes(player.serverLevel()),
                 SimpleServerUtilities.NPC_SERVICES.serviceIds(), shopChoices(), factionChoices(),
                 SimpleServerUtilities.NPCS.localTextureNames()));
         return true;
@@ -396,11 +396,11 @@ public final class NpcEditorService {
                 }
             }
         }
-        if (!SimpleServerUtilities.NPCS.isSupportedLivingEntityType(player.level(), payload.entityType())) {
+        if (!SimpleServerUtilities.NPCS.isSupportedLivingEntityType(player.serverLevel(), payload.entityType())) {
             return Result.fail("Use a registered living entity fallback shell, for example minecraft:villager.");
         }
         if (visualMode == NpcVisualMode.PLAYER_SKIN
-                && !SimpleServerUtilities.NPCS.isSupportedLivingEntityType(player.level(), ModNpcEntities.PLAYER_NPC_ID)) {
+                && !SimpleServerUtilities.NPCS.isSupportedLivingEntityType(player.serverLevel(), ModNpcEntities.PLAYER_NPC_ID)) {
             return Result.fail("The native SSU player NPC runtime is unavailable on this server.");
         }
         if (!validCoordinates(payload.x(), payload.y(), payload.z())) {

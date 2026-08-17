@@ -4,13 +4,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Save/capture feedback for the visual NPC shop editor. */
 public record NpcShopEditorResultPayload(boolean successful, String message, String shopId,
         boolean closeEditor, long requestId) implements CustomPacketPayload {
     public static final Type<NpcShopEditorResultPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_editor_result"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_editor_result"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcShopEditorResultPayload> STREAM_CODEC =
             StreamCodec.of(NpcShopEditorResultPayload::encode, NpcShopEditorResultPayload::decode);
 

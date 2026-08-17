@@ -16,7 +16,7 @@ import be.winnetrie.mod.simpleserverutilities.protection.ProtectionHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
@@ -33,7 +33,7 @@ public final class UtilityMiningResolver {
 
     private static final TagKey<Block> COMMON_ORES = TagKey.create(
             Registries.BLOCK,
-            Identifier.fromNamespaceAndPath("c", "ores")
+            ResourceLocation.fromNamespaceAndPath("c", "ores")
     );
 
     private static final List<OreGroup> VANILLA_ORES = List.of(
@@ -82,7 +82,7 @@ public final class UtilityMiningResolver {
                 || !PermissionService.getBoolean(player, PermissionKeys.TREECAPITATOR_USE, true)) {
             return false;
         }
-        Identifier id = BuiltInRegistries.BLOCK.getKey(originState.getBlock());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(originState.getBlock());
         return PermissionService.getBoolean(player, PermissionKeys.TREECAPITATOR_BLOCKS, true)
                 && PermissionService.getBoolean(player, PermissionKeys.treecapitatorBlock(id), true);
     }
@@ -94,7 +94,7 @@ public final class UtilityMiningResolver {
             return false;
         }
         boolean groupAllowed = PermissionService.getBoolean(player, ore.permission(), ore.defaultAllowed());
-        Identifier id = BuiltInRegistries.BLOCK.getKey(originState.getBlock());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(originState.getBlock());
         return groupAllowed && PermissionService.getBoolean(player, PermissionKeys.veinminerBlock(id), groupAllowed);
     }
 
@@ -359,13 +359,13 @@ public final class UtilityMiningResolver {
     }
 
     private static boolean canUseTreeBlock(ServerPlayer player, BlockState state) {
-        Identifier id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         return PermissionService.getBoolean(player, PermissionKeys.TREECAPITATOR_BLOCKS, true)
                 && PermissionService.getBoolean(player, PermissionKeys.treecapitatorBlock(id), true);
     }
 
     private static boolean isLog(BlockState state) {
-        Identifier id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         String key = id.toString().toLowerCase(Locale.ROOT);
         if (configuredSet(Config.TREECAPITATOR_DISABLED_LOG_BLOCKS.get()).contains(key)) return false;
         if (state.is(BlockTags.LOGS)
@@ -393,7 +393,7 @@ public final class UtilityMiningResolver {
      * while different wood species and namespaces never merge.
      */
     private static String treeFamily(BlockState state) {
-        Identifier id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         String key = id.toString().toLowerCase(Locale.ROOT);
         int separator = key.indexOf(':');
         String namespace = separator < 0 ? "minecraft" : key.substring(0, separator);
@@ -416,7 +416,7 @@ public final class UtilityMiningResolver {
     }
 
     private static OreGroup oreGroup(BlockState state) {
-        Identifier id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         String blockId = id.toString();
         if (configuredSet(Config.VEINMINER_DISABLED_ORE_BLOCKS.get()).contains(blockId)) return null;
         for (OreGroup group : VANILLA_ORES) {

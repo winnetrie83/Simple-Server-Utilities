@@ -7,12 +7,12 @@ import be.winnetrie.mod.simpleserverutilities.network.TitleManagerActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.TitleManagerDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.TitleManagerRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.settings.MinecraftColorPalette;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Player title picker and administrator title-catalogue editor. */
 public final class TitleManagerScreen extends Screen {
@@ -226,24 +226,24 @@ public final class TitleManagerScreen extends Screen {
     }
 
     private void send(TitleManagerActionPayload payload) {
-        ClientPacketDistributor.sendToServer(payload);
+        PacketDistributor.sendToServer(payload);
         notice = "Updating…";
         noticeError = false;
     }
 
     private void refresh() {
-        ClientPacketDistributor.sendToServer(new TitleManagerRequestPayload(data.adminView(), requestId++));
+        PacketDistributor.sendToServer(new TitleManagerRequestPayload(data.adminView(), requestId++));
         notice = "Refreshing…";
         noticeError = false;
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
-        g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
-        g.text(font, data.adminView() ? "Title Administration" : "Player Titles", x + 14, y + 14, TEXT, true);
-        g.text(font, data.adminView()
+        g.fill(x, y, x + W, y + H, PANEL); g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, data.adminView() ? "Title Administration" : "Player Titles", x + 14, y + 14, TEXT, true);
+        g.drawString(font, data.adminView()
                 ? "Create global titles and define how players unlock them."
                 : "Choose one unlocked title for your player profile and nameplate.", x + 14, y + 29, MUTED, false);
         int divider = data.adminView() ? x + 320 : x + 356;
@@ -253,28 +253,28 @@ public final class TitleManagerScreen extends Screen {
         if (entry != null) {
             int dx = data.adminView() ? x + 330 : x + 374;
             int dy = data.adminView() ? y + 238 : y + 70;
-            g.text(font, entry.displayName(), dx, dy, entry.color(), true);
-            g.text(font, "ID: " + entry.id(), dx, dy + 18, MUTED, false);
-            g.text(font, "Status: " + (entry.enabled() ? "Enabled" : "Disabled"), dx, dy + 34,
+            g.drawString(font, entry.displayName(), dx, dy, entry.color(), true);
+            g.drawString(font, "ID: " + entry.id(), dx, dy + 18, MUTED, false);
+            g.drawString(font, "Status: " + (entry.enabled() ? "Enabled" : "Disabled"), dx, dy + 34,
                     entry.enabled() ? GOOD : ERROR, false);
-            g.text(font, "Unlocked: " + (entry.unlocked() ? "Yes" : "No"), dx, dy + 50,
+            g.drawString(font, "Unlocked: " + (entry.unlocked() ? "Yes" : "No"), dx, dy + 50,
                     entry.unlocked() ? GOOD : WARN, false);
-            g.text(font, "Obtained: " + trim(entry.acquisition(), 42), dx, dy + 66, TEXT, false);
+            g.drawString(font, "Obtained: " + trim(entry.acquisition(), 42), dx, dy + 66, TEXT, false);
             if (!data.adminView()) {
-                g.text(font, entry.selected() ? "Currently selected" : "", dx, dy + 88, GOOD, false);
+                g.drawString(font, entry.selected() ? "Currently selected" : "", dx, dy + 88, GOOD, false);
             } else {
-                g.text(font, "Manual player grant / revoke", dx, y + 332, ACCENT, true);
+                g.drawString(font, "Manual player grant / revoke", dx, y + 332, ACCENT, true);
             }
         } else {
             int dx = data.adminView() ? x + 330 : x + 374;
-            g.text(font, "No title selected.", dx, y + 70, MUTED, false);
+            g.drawString(font, "No title selected.", dx, y + 70, MUTED, false);
         }
-        if (!notice.isBlank()) g.text(font, trim(notice, 80), x + 14, y + H - 26,
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 80), x + 14, y + H - 26,
                 noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
 
     private int left() { return (width - W) / 2; }

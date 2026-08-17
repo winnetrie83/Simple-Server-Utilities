@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-import com.mojang.blaze3d.platform.InputConstants;
 
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText;
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichTextDocument;
@@ -18,18 +17,16 @@ import be.winnetrie.mod.simpleserverutilities.network.MailComposeResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailComposeSubmitPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailRecipientSuggestionsPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MailRecipientSuggestionsRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.components.MultilineTextField;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Larger inventory-backed mail composer with multiline body and player picker. */
 public final class MailComposeScreen extends AbstractContainerScreen<MailComposeMenu> {
@@ -77,7 +74,9 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
     private final List<SuggestionBounds> suggestionBounds = new ArrayList<>();
 
     public MailComposeScreen(MailComposeMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title, SCREEN_WIDTH, SCREEN_HEIGHT);
+        super(menu, inventory, title);
+        this.imageWidth = SCREEN_WIDTH;
+        this.imageHeight = SCREEN_HEIGHT;
         this.titleLabelX = -10_000;
         this.titleLabelY = -10_000;
         this.inventoryLabelX = -10_000;
@@ -94,15 +93,10 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
         money.setEditable(menu.canSendMoney());
         recipient.setResponder(this::recipientChanged);
 
-        body = MultiLineEditBox.builder()
-                .setX(leftPos + MESSAGE_X)
-                .setY(topPos + MESSAGE_Y)
-                .setPlaceholder(Component.literal("Message"))
-                .setShowBackground(true)
-                .setShowDecorations(true)
-                .build(font, MESSAGE_WIDTH, MESSAGE_HEIGHT, Component.literal("Message"));
+        body = new MultiLineEditBox(font, leftPos + MESSAGE_X, topPos + MESSAGE_Y,
+                MESSAGE_WIDTH, MESSAGE_HEIGHT, Component.literal("Message"), Component.literal("Message"));
         body.setCharacterLimit(MailRichText.MAX_VISIBLE_CHARACTERS);
-        body.setLineLimit(MailRichText.MAX_LINES);
+        
         richDocument = new HologramRichTextDocument("", MailRichText::normalize,
                 MailRichText.MAX_STORED_CHARACTERS);
         body.setValueListener(this::onBodyChanged);
@@ -191,7 +185,7 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
             long id = nextRequestId++;
             latestSuggestionRequest = id;
             loadingPlayers = true;
-            ClientPacketDistributor.sendToServer(
+            PacketDistributor.sendToServer(
                     new MailRecipientSuggestionsRequestPayload(suggestionQuery, id)
             );
         }
@@ -221,7 +215,7 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
 
     private void send() {
         long id = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new MailComposeSubmitPayload(
+        PacketDistributor.sendToServer(new MailComposeSubmitPayload(
                 menu.containerId,
                 recipient.getValue(),
                 subject.getValue(),
@@ -324,29 +318,29 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
     private void backToMailbox() {
         if (minecraft == null || minecraft.player == null) return;
         minecraft.player.closeContainer();
-        ClientPacketDistributor.sendToServer(
+        PacketDistributor.sendToServer(
                 new MailActionPayload("open_mailbox", "", "inbox", 0, nextRequestId++)
         );
     }
 
     @Override
-    public boolean keyPressed(KeyEvent event) {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (minecraft != null
-                && minecraft.options.keyInventory.isActiveAndMatches(InputConstants.getKey(event))) {
-            if (recipient != null && recipient.isFocused()) return recipient.keyPressed(event);
-            if (subject != null && subject.isFocused()) return subject.keyPressed(event);
-            if (body != null && body.isFocused()) return body.keyPressed(event);
-            if (money != null && money.isFocused()) return money.keyPressed(event);
+                && minecraft.options.keyInventory.matches(keyCode, scanCode)) {
+            if (recipient != null && recipient.isFocused()) return recipient.keyPressed(keyCode, scanCode, modifiers);
+            if (subject != null && subject.isFocused()) return subject.keyPressed(keyCode, scanCode, modifiers);
+            if (body != null && body.isFocused()) return body.keyPressed(keyCode, scanCode, modifiers);
+            if (money != null && money.isFocused()) return money.keyPressed(keyCode, scanCode, modifiers);
             return true;
         }
-        return super.keyPressed(event);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (playersExpanded) {
             for (SuggestionBounds bound : suggestionBounds) {
-                if (bound.contains(event.x(), event.y())) {
+                if (bound.contains(mouseX, mouseY)) {
                     recipient.setValue(bound.name());
                     recipient.setCursorPosition(bound.name().length());
                     suggestionQuery = bound.name();
@@ -359,19 +353,15 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
                     return true;
                 }
             }
-            if (dropdownBounds().contains(event.x(), event.y())) {
+            if (dropdownBounds().contains(mouseX, mouseY)) {
                 return true;
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        double rawMouseX = mouseX;
-        double rawMouseY = mouseY;
-        mouseX = SsuGuiScale.logicalX(this, mouseX);
-        mouseY = SsuGuiScale.logicalY(this, mouseY);
         if (playersExpanded && dropdownBounds().contains(mouseX, mouseY)) {
             int maxScroll = Math.max(0, suggestions.size() - visibleRows());
             if (scrollY < 0) {
@@ -381,47 +371,51 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
             }
             return true;
         }
-        return super.mouseScrolled(rawMouseX, rawMouseY, scrollX, scrollY);
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override
-    public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
-        super.extractBackground(g, mouseX, mouseY, delta);
-        SsuGuiScale.fullscreenDimWhenScaled(g, this, 0xA5000000);
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float delta) {
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
 
         g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, PANEL);
-        g.outline(leftPos, topPos, imageWidth, imageHeight, BORDER);
+        g.renderOutline(leftPos, topPos, imageWidth, imageHeight, BORDER);
 
-        g.text(font, "Compose Mail", leftPos + 16, topPos + 10, TEXT, false);
-        g.text(font, "Attachments " + menu.maxAttachments() + "/9", leftPos + 116, topPos + 10,
+        g.drawString(font, "Compose Mail", leftPos + 16, topPos + 10, TEXT, false);
+        g.drawString(font, "Attachments " + menu.maxAttachments() + "/9", leftPos + 116, topPos + 10,
                 menu.canSendItems() ? TEXT : MUTED, false);
 
         drawAttachments(g);
         drawInventoryAndHotbar(g);
 
-        g.text(font, "Select message text, then apply B / I / U / S or one of the 16 colors",
+        g.drawString(font, "Select message text, then apply B / I / U / S or one of the 16 colors",
                 leftPos + 16, topPos + 212, MUTED, false);
-        g.text(font, "Balance: " + menu.formattedBalance(),
+        g.drawString(font, "Balance: " + menu.formattedBalance(),
                 leftPos + BALANCE_X, topPos + BALANCE_Y, MUTED, false);
 
         if (!notice.isBlank()) {
             var lines = font.split(Component.literal(notice), 92);
             for (int i = 0; i < Math.min(3, lines.size()); i++) {
-                g.text(font, lines.get(i), leftPos + 16, topPos + 266 + i * 10,
+                g.drawString(font, lines.get(i), leftPos + 16, topPos + 266 + i * 10,
                         noticeError ? ERROR : GOOD, false);
             }
         }
     }
 
+    @Override
+    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+        // The compose screen paints its custom panel in renderBackground().
+    }
+
     /** Draw the player picker after every normal widget, so it is always in front. */
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         rememberCurrentSelection();
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
         if (playersExpanded) drawPlayerDropdown(g, mouseX, mouseY);
     }
 
-    private void drawAttachments(GuiGraphicsExtractor g) {
+    private void drawAttachments(GuiGraphics g) {
         for (int i = 0; i < MailComposeMenu.ATTACHMENT_SLOTS; i++) {
             Slot slot = menu.slots.get(i);
             int x = leftPos + slot.x - 1;
@@ -429,26 +423,26 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
             boolean unlocked = i < menu.maxAttachments() && menu.canSendItems();
             int color = unlocked ? 0xFF758694 : 0xFF3C444B;
             g.fill(x, y, x + 18, y + 18, SUBPANEL);
-            g.outline(x, y, 18, 18, color);
+            g.renderOutline(x, y, 18, 18, color);
             if (!unlocked) drawLockedSlot(g, x, y);
         }
     }
 
-    private void drawInventoryAndHotbar(GuiGraphicsExtractor g) {
+    private void drawInventoryAndHotbar(GuiGraphics g) {
         SlotPanel inventoryPanel = slotPanel(MailComposeMenu.ATTACHMENT_SLOTS, 27);
         SlotPanel hotbarPanel = slotPanel(MailComposeMenu.ATTACHMENT_SLOTS + 27, 9);
 
-        g.text(font, "Inventory", inventoryPanel.x, inventoryPanel.y - 12, MUTED, false);
+        g.drawString(font, "Inventory", inventoryPanel.x, inventoryPanel.y - 12, MUTED, false);
         drawSlotPanel(g, inventoryPanel);
 
-        g.text(font, "Hotbar", hotbarPanel.x, hotbarPanel.y - 10, MUTED, false);
+        g.drawString(font, "Hotbar", hotbarPanel.x, hotbarPanel.y - 10, MUTED, false);
         drawSlotPanel(g, hotbarPanel);
     }
 
-    private void drawSlotPanel(GuiGraphicsExtractor g, SlotPanel panel) {
+    private void drawSlotPanel(GuiGraphics g, SlotPanel panel) {
         g.fill(panel.x - 4, panel.y - 4,
                 panel.x + panel.width + 4, panel.y + panel.height + 4, 0x5010171E);
-        g.outline(panel.x - 4, panel.y - 4,
+        g.renderOutline(panel.x - 4, panel.y - 4,
                 panel.width + 8, panel.height + 8, BORDER);
 
         for (int i = panel.startIndex; i < panel.startIndex + panel.count; i++) {
@@ -456,7 +450,7 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
             int x = leftPos + slot.x - 1;
             int y = topPos + slot.y - 1;
             g.fill(x, y, x + 18, y + 18, SUBPANEL);
-            g.outline(x, y, 18, 18, 0xFF71818F);
+            g.renderOutline(x, y, 18, 18, 0xFF71818F);
         }
     }
 
@@ -477,20 +471,20 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
         return new SlotPanel(minX, minY, maxX - minX, maxY - minY, startIndex, count);
     }
 
-    private void drawPlayerDropdown(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+    private void drawPlayerDropdown(GuiGraphics g, int mouseX, int mouseY) {
         Rect bounds = dropdownBounds();
         suggestionBounds.clear();
 
         g.fill(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, 0xFF121922);
-        g.outline(bounds.x, bounds.y, bounds.width, bounds.height, BORDER);
+        g.renderOutline(bounds.x, bounds.y, bounds.width, bounds.height, BORDER);
 
         if (loadingPlayers) {
-            g.text(font, "Loading...", bounds.x + 8, bounds.y + 8, MUTED, false);
+            g.drawString(font, "Loading...", bounds.x + 8, bounds.y + 8, MUTED, false);
             return;
         }
 
         if (suggestions.isEmpty()) {
-            g.text(font, suggestionQuery.isBlank() ? "No known players" : "No matching player",
+            g.drawString(font, suggestionQuery.isBlank() ? "No known players" : "No matching player",
                     bounds.x + 8, bounds.y + 8, MUTED, false);
             return;
         }
@@ -504,8 +498,8 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
 
             g.fill(bounds.x + 4, rowY, bounds.x + bounds.width - 10, rowY + 12,
                     hovered ? DROPDOWN_HOVER : DROPDOWN_ROW);
-            g.outline(bounds.x + 4, rowY, bounds.width - 14, 12, BORDER);
-            g.text(font, trim(name, 22), bounds.x + 8, rowY + 2, TEXT, false);
+            g.renderOutline(bounds.x + 4, rowY, bounds.width - 14, 12, BORDER);
+            g.drawString(font, trim(name, 22), bounds.x + 8, rowY + 2, TEXT, false);
             suggestionBounds.add(new SuggestionBounds(
                     name, bounds.x + 4, rowY, bounds.width - 14, 12
             ));
@@ -532,10 +526,10 @@ public final class MailComposeScreen extends AbstractContainerScreen<MailCompose
         return 10;
     }
 
-    private void drawLockedSlot(GuiGraphicsExtractor g, int x, int y) {
-        g.outline(x + 5, y + 8, 8, 7, 0xFF8E969C);
+    private void drawLockedSlot(GuiGraphics g, int x, int y) {
+        g.renderOutline(x + 5, y + 8, 8, 7, 0xFF8E969C);
         g.fill(x + 6, y + 9, x + 12, y + 14, 0xA05C646A);
-        g.outline(x + 7, y + 4, 4, 6, 0xFF8E969C);
+        g.renderOutline(x + 7, y + 4, 4, 6, 0xFF8E969C);
     }
 
     @Override

@@ -15,7 +15,7 @@ import be.winnetrie.mod.simpleserverutilities.protection.ProtectionHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
@@ -123,7 +123,7 @@ public final class CropsHarvestingEvents {
 
     private static boolean isSupportedCrop(BlockState state) {
         Block block = state.getBlock();
-        Identifier id = BuiltInRegistries.BLOCK.getKey(block);
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
         String key = id.toString();
         if (NATIVE_OR_NON_HARVESTABLE_CROPS.contains(key)
                 || configuredSet(Config.CROPS_HARVESTING_DISABLED_BLOCKS.get()).contains(key)
@@ -198,7 +198,7 @@ public final class CropsHarvestingEvents {
     }
 
     private static TagKey<Block> cropTag(String namespace, String path) {
-        return TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(namespace, path));
+        return TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath(namespace, path));
     }
 
     private record CropTarget(BlockPos pos, BlockState state) {

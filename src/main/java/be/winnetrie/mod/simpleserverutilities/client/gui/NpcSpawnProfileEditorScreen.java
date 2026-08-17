@@ -12,12 +12,12 @@ import be.winnetrie.mod.simpleserverutilities.network.NpcSpawnProfileEditorSubmi
 import be.winnetrie.mod.simpleserverutilities.npc.NpcSpawnProfile;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcSpawnSource;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcSpawnTime;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** GUI-first natural/spawner population editor. */
 public final class NpcSpawnProfileEditorScreen extends Screen {
@@ -152,7 +152,7 @@ public final class NpcSpawnProfileEditorScreen extends Screen {
     private void save() {
         capture();
         notice = "Saving..."; noticeError = false;
-        ClientPacketDistributor.sendToServer(new NpcSpawnProfileEditorSubmitPayload(originalId,
+        PacketDistributor.sendToServer(new NpcSpawnProfileEditorSubmitPayload(originalId,
                 GSON.toJson(profile), rebindSpawner, nextRequestId++));
     }
 
@@ -187,15 +187,15 @@ public final class NpcSpawnProfileEditorScreen extends Screen {
     @Override public void onClose() {
         if (minecraft == null) return;
         if (parent instanceof NpcAdminScreen admin) admin.refresh();
-        minecraft.setScreenAndShow(parent);
+        minecraft.setScreen(parent);
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
         SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
-        g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
-        g.text(font, create ? "Create NPC Spawn Profile" : "Edit NPC Spawn Profile", x + 14, y + 12, TEXT, true);
+        g.fill(x, y, x + W, y + H, PANEL); g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, create ? "Create NPC Spawn Profile" : "Edit NPC Spawn Profile", x + 14, y + 12, TEXT, true);
         label(g, "Profile ID", x + 14, y + 61); label(g, "NPC template", x + 14, y + 95);
         label(g, "Dimension", x + 14, y + 129); label(g, "Biomes (comma separated; empty = any)", x + 14, y + 163);
         label(g, "Min Y", x + 14, y + 197); label(g, "Max Y", x + 160, y + 197);
@@ -207,18 +207,18 @@ public final class NpcSpawnProfileEditorScreen extends Screen {
         label(g, "Natural chance %", x + 322, y + 61); label(g, "Cycle seconds", x + 468, y + 61);
         label(g, "Natural attempts per cycle", x + 322, y + 95);
         label(g, "Min player distance", x + 322, y + 129); label(g, "Max player distance", x + 468, y + 129);
-        g.text(font, "Spawner", x + 322, y + 184, TEXT, true);
+        g.drawString(font, "Spawner", x + 322, y + 184, TEXT, true);
         label(g, "Cooldown seconds", x + 322, y + 197);
         label(g, "Spawn radius", x + 322, y + 231); label(g, "Activation range", x + 468, y + 231);
         String anchor = profile.spawnerDimension.isBlank() ? "No spawner bound"
                 : shortDim(profile.spawnerDimension) + "  " + profile.spawnerX + ", " + profile.spawnerY + ", " + profile.spawnerZ;
-        g.text(font, "Bound: " + anchor, x + 322, y + 280, MUTED, false);
-        g.text(font, "A spawner profile uses a real vanilla Spawner block as its anchor.", x + 322, y + 296, MUTED, false);
-        if (!notice.isBlank()) g.text(font, trim(notice, 78), x + 14, y + H - 23, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        g.drawString(font, "Bound: " + anchor, x + 322, y + 280, MUTED, false);
+        g.drawString(font, "A spawner profile uses a real vanilla Spawner block as its anchor.", x + 322, y + 296, MUTED, false);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 78), x + 14, y + H - 23, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void label(GuiGraphicsExtractor g, String value, int x, int y) { g.text(font, value, x, y, MUTED, false); }
+    private void label(GuiGraphics g, String value, int x, int y) { g.drawString(font, value, x, y, MUTED, false); }
     private int px() { return (width - W) / 2; }
     private int py() { return (height - H) / 2; }
     private static String one(double value) { return String.format(Locale.ROOT, "%.1f", value); }

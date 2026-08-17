@@ -7,10 +7,11 @@ import be.winnetrie.mod.simpleserverutilities.client.map.MapLighting;
 import be.winnetrie.mod.simpleserverutilities.client.map.TerrainColorSampler;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapDataPayload;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import org.jspecify.annotations.Nullable;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
 /** Double-buffered, high-resolution terrain texture for the full world map. */
 final class WorldMapTerrainMap implements AutoCloseable {
@@ -23,7 +24,9 @@ final class WorldMapTerrainMap implements AutoCloseable {
     private static final float[] LINEAR = buildLinearTable();
 
     private @Nullable DynamicTexture publishedTexture;
+    private @Nullable ResourceLocation publishedTextureLocation;
     private @Nullable DynamicTexture buildingTexture;
+    private @Nullable ResourceLocation buildingTextureLocation;
     private int textureSize;
     private int buildRow;
     private int buildCenterChunkX = Integer.MIN_VALUE;
@@ -40,7 +43,7 @@ final class WorldMapTerrainMap implements AutoCloseable {
 
     void ensureView(WorldMapDataPayload payload, int requestedPixels) {
         ClientLevel level = Minecraft.getInstance().level;
-        String dimension = level == null ? "" : level.dimension().identifier().toString();
+        String dimension = level == null ? "" : level.dimension().location().toString();
         int requiredSize = Math.max(MIN_TEXTURE_SIZE, Math.min(MAX_TEXTURE_SIZE, requestedPixels));
         int nightBucket = level == null ? 0 : MapLighting.nightBucket(level);
 
@@ -62,8 +65,9 @@ final class WorldMapTerrainMap implements AutoCloseable {
 
         if (!forceRebuild && publishedMatches) {
             if (buildingTexture != null && !buildingMatches) {
-                closeTexture(buildingTexture);
+                closeTexture(buildingTexture, buildingTextureLocation);
                 buildingTexture = null;
+                buildingTextureLocation = null;
                 buildRow = textureSize;
             }
             return;
@@ -101,7 +105,7 @@ final class WorldMapTerrainMap implements AutoCloseable {
                         pixelZ,
                         blocksPerPixel
                 );
-                image.setPixel(pixelX, pixelZ, color == TerrainColorSampler.VOID_COLOR
+                image.setPixelRGBA(pixelX, pixelZ, color == TerrainColorSampler.VOID_COLOR
                         ? checkerColor(pixelX, pixelZ)
                         : color);
             }
@@ -204,7 +208,7 @@ final class WorldMapTerrainMap implements AutoCloseable {
     }
 
     void render(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             int left,
             int top,
             int size,
@@ -258,17 +262,23 @@ final class WorldMapTerrainMap implements AutoCloseable {
         float u1 = (float) ((intersectionMaxX - publishedMinX) / publishedWidth);
         float v1 = (float) ((intersectionMaxZ - publishedMinZ) / publishedHeight);
 
+        if (publishedTextureLocation == null) return;
+        int sourceU = Math.max(0, Math.min(textureSize - 1, Math.round(u0 * textureSize)));
+        int sourceV = Math.max(0, Math.min(textureSize - 1, Math.round(v0 * textureSize)));
+        int sourceUWidth = Math.max(1, Math.min(textureSize - sourceU, Math.round((u1 - u0) * textureSize)));
+        int sourceVHeight = Math.max(1, Math.min(textureSize - sourceV, Math.round((v1 - v0) * textureSize)));
         graphics.blit(
-                publishedTexture.getTextureView(),
-                publishedTexture.getSampler(),
+                publishedTextureLocation,
                 destinationLeft,
                 destinationTop,
-                destinationRight,
-                destinationBottom,
-                u0,
-                u1,
-                v0,
-                v1
+                destinationRight - destinationLeft,
+                destinationBottom - destinationTop,
+                sourceU,
+                sourceV,
+                sourceUWidth,
+                sourceVHeight,
+                textureSize,
+                textureSize
         );
     }
 
@@ -285,14 +295,18 @@ final class WorldMapTerrainMap implements AutoCloseable {
 
     private void beginBuild(WorldMapDataPayload payload, String dimension, int requiredSize, int nightBucket) {
         if (textureSize != requiredSize) {
-            closeTexture(publishedTexture);
-            closeTexture(buildingTexture);
+            closeTexture(publishedTexture, publishedTextureLocation);
+            closeTexture(buildingTexture, buildingTextureLocation);
             publishedTexture = null;
             buildingTexture = null;
+            publishedTextureLocation = null;
+            buildingTextureLocation = null;
             textureSize = requiredSize;
         }
         if (buildingTexture == null) {
-            buildingTexture = new DynamicTexture("SSU high resolution world map build", textureSize, textureSize, true);
+            buildingTexture = new DynamicTexture(textureSize, textureSize, true);
+            buildingTextureLocation = Minecraft.getInstance().getTextureManager()
+                    .register("ssu_world_map_build", buildingTexture);
         }
         fillUnknown(buildingTexture.getPixels());
         buildCenterChunkX = payload.centerChunkX();
@@ -306,8 +320,11 @@ final class WorldMapTerrainMap implements AutoCloseable {
 
     private void publish() {
         DynamicTexture oldPublished = publishedTexture;
+        ResourceLocation oldPublishedLocation = publishedTextureLocation;
         publishedTexture = buildingTexture;
+        publishedTextureLocation = buildingTextureLocation;
         buildingTexture = oldPublished;
+        buildingTextureLocation = oldPublishedLocation;
         publishedCenterChunkX = buildCenterChunkX;
         publishedCenterChunkZ = buildCenterChunkZ;
         publishedRadius = buildRadius;
@@ -319,7 +336,7 @@ final class WorldMapTerrainMap implements AutoCloseable {
     private static void fillUnknown(NativeImage image) {
         for (int y = 0; y < image.getHeight(); y++) {
             for (int x = 0; x < image.getWidth(); x++) {
-                image.setPixel(x, y, checkerColor(x, y));
+                image.setPixelRGBA(x, y, checkerColor(x, y));
             }
         }
     }
@@ -330,18 +347,22 @@ final class WorldMapTerrainMap implements AutoCloseable {
 
     @Override
     public void close() {
-        closeTexture(publishedTexture);
-        closeTexture(buildingTexture);
+        closeTexture(publishedTexture, publishedTextureLocation);
+        closeTexture(buildingTexture, buildingTextureLocation);
         publishedTexture = null;
         buildingTexture = null;
+        publishedTextureLocation = null;
+        buildingTextureLocation = null;
         textureSize = 0;
         buildNightBucket = -1;
         publishedNightBucket = -1;
         forceRebuild = true;
     }
 
-    private static void closeTexture(@Nullable DynamicTexture texture) {
-        if (texture != null) {
+    private static void closeTexture(@Nullable DynamicTexture texture, @Nullable ResourceLocation location) {
+        if (location != null) {
+            Minecraft.getInstance().getTextureManager().release(location);
+        } else if (texture != null) {
             texture.close();
         }
     }

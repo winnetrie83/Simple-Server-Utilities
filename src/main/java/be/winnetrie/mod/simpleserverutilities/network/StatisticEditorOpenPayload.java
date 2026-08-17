@@ -5,7 +5,7 @@ import be.winnetrie.mod.simpleserverutilities.statistics.StatisticEventType;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record StatisticEditorOpenPayload(
         boolean editing,
@@ -18,7 +18,7 @@ public record StatisticEditorOpenPayload(
         boolean enabled
 ) implements CustomPacketPayload {
     public static final Type<StatisticEditorOpenPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "statistic_editor_open"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "statistic_editor_open"));
     public static final StreamCodec<RegistryFriendlyByteBuf, StatisticEditorOpenPayload> STREAM_CODEC =
             StreamCodec.of(StatisticEditorOpenPayload::encode, StatisticEditorOpenPayload::decode);
 

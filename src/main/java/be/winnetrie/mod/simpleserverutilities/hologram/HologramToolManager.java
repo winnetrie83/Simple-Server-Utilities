@@ -42,7 +42,7 @@ public final class HologramToolManager {
         Vec3 look = player.getViewVector(1.0F).normalize();
         Vec3 position = eye.add(look.scale(1.0D));
         Anchor anchor = new Anchor(
-                player.level().dimension().identifier().toString(),
+                player.level().dimension().location().toString(),
                 position.x(), position.y(), position.z(), now
         );
         anchors.put(player.getUUID(), anchor);
@@ -54,7 +54,7 @@ public final class HologramToolManager {
     public Anchor validAnchor(ServerPlayer player) {
         Anchor anchor = anchors.get(player.getUUID());
         if (anchor == null
-                || !anchor.dimension().equals(player.level().dimension().identifier().toString())
+                || !anchor.dimension().equals(player.level().dimension().location().toString())
                 || player.level().getGameTime() - anchor.createdAtTick() > ANCHOR_TIMEOUT_TICKS) {
             anchors.remove(player.getUUID());
             return null;

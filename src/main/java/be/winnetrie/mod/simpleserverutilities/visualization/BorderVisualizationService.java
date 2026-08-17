@@ -62,7 +62,7 @@ public class BorderVisualizationService {
             return;
         }
         PlayerBorderPreferences preferences = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID());
-        String dimension = player.level().dimension().identifier().toString();
+        String dimension = player.level().dimension().location().toString();
         ChunkPos chunk = player.chunkPosition();
         long settingsRevision = SimpleServerUtilities.BORDER_SETTINGS.revision();
         PlayerSyncState previous = syncStates.get(player.getUUID());
@@ -71,8 +71,8 @@ public class BorderVisualizationService {
 
         boolean changed = force
                 || previous == null
-                || previous.chunkX() != chunk.x()
-                || previous.chunkZ() != chunk.z()
+                || previous.chunkX() != chunk.x
+                || previous.chunkZ() != chunk.z
                 || !previous.dimension().equals(dimension)
                 || previous.claimsRevision() != claimsRevision
                 || previous.regionsRevision() != regionsRevision
@@ -109,8 +109,8 @@ public class BorderVisualizationService {
 
         syncStates.put(player.getUUID(), new PlayerSyncState(
                 dimension,
-                chunk.x(),
-                chunk.z(),
+                chunk.x,
+                chunk.z,
                 claimsRevision,
                 regionsRevision,
                 settingsRevision,
@@ -224,7 +224,7 @@ public class BorderVisualizationService {
         PacketDistributor.sendToPlayer(player, new BorderVisualizationPayload(
                 BorderLayer.SELECTION,
                 true,
-                selection.getDimension().identifier().toString(),
+                selection.getDimension().location().toString(),
                 settings.getClaimVerticalRange(),
                 settings.getRegionRenderDistanceBlocks(),
                 List.of(entry)
@@ -281,9 +281,9 @@ public class BorderVisualizationService {
     private void sendClaimOverview(ServerPlayer player) {
         BorderVisualizationSettings settings = SimpleServerUtilities.BORDER_SETTINGS.settings();
         int radius = (settings.getClaimRenderDistanceBlocks() + 15) / 16;
-        int centerX = player.chunkPosition().x();
-        int centerZ = player.chunkPosition().z();
-        String dimension = player.level().dimension().identifier().toString();
+        int centerX = player.chunkPosition().x;
+        int centerZ = player.chunkPosition().z;
+        String dimension = player.level().dimension().location().toString();
         List<BorderVisualizationPayload.Entry> entries = new ArrayList<>();
 
         PlayerBorderPreferences preferences = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID());
@@ -338,7 +338,7 @@ public class BorderVisualizationService {
         double rangeSquared = range * range;
         double x = player.getX();
         double z = player.getZ();
-        String dimension = player.level().dimension().identifier().toString();
+        String dimension = player.level().dimension().location().toString();
         List<BorderVisualizationPayload.Entry> entries = new ArrayList<>();
 
         int minX = (int) Math.floor(x - range);

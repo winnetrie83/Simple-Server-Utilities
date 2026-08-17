@@ -8,7 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument;
 import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextDocument.Format;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultiLineEditBoxAccessor;
 import be.winnetrie.mod.simpleserverutilities.mixin.MultilineTextFieldAccessor;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.components.MultilineTextField;
@@ -65,13 +65,10 @@ public final class RichTextValueEditorScreen extends Screen {
     @Override
     protected void init() {
         int x = left(), y = top();
-        box = MultiLineEditBox.builder()
-                .setX(x + 16).setY(y + 54)
-                .setPlaceholder(Component.literal("Enter formatted text…"))
-                .setShowBackground(true).setShowDecorations(true)
-                .build(font, W - 32, 116, Component.literal(heading));
+        box = new MultiLineEditBox(font, x + 16, y + 54, W - 32, 116,
+                Component.literal("Enter formatted text…"), Component.literal(heading));
         box.setCharacterLimit(editorCharacterLimit);
-        box.setLineLimit(lineLimit);
+        
         box.setValue(document.plainText());
         box.setValueListener(value -> {
             rememberedStart = rememberedEnd = -1;
@@ -98,7 +95,7 @@ public final class RichTextValueEditorScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("Cancel"), button -> onClose()).bounds(x + 16, y + H - 28, 76, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Use text"), button -> {
             saver.accept(normalizer.apply(document.encode()));
-            if (minecraft != null) minecraft.setScreenAndShow(parent);
+            if (minecraft != null) minecraft.setScreen(parent);
         }).bounds(x + W - 102, y + H - 28, 86, 20).build());
 
         RichTextEditBoxRenderer.register(box, () -> document, () -> 0xFFFFFFFF,
@@ -164,16 +161,16 @@ public final class RichTextValueEditorScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         remember();
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
-        graphics.outline(x, y, W, H, BORDER);
-        graphics.text(font, heading, x + 16, y + 14, TEXT, true);
-        graphics.text(font, help, x + 16, y + 31, MUTED, false);
-        if (!notice.isBlank()) graphics.text(font, notice, x + 102, y + H - 23, 0xFFFFB86B, false);
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        graphics.renderOutline(x, y, W, H, BORDER);
+        graphics.drawString(font, heading, x + 16, y + 14, TEXT, true);
+        graphics.drawString(font, help, x + 16, y + 31, MUTED, false);
+        if (!notice.isBlank()) graphics.drawString(font, notice, x + 102, y + H - 23, 0xFFFFB86B, false);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     @Override
@@ -184,7 +181,7 @@ public final class RichTextValueEditorScreen extends Screen {
 
     @Override
     public void onClose() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     @Override

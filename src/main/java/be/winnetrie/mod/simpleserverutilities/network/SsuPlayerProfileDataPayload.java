@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Bounded admin-only player profile, player choices and effective permission page. */
 public record SsuPlayerProfileDataPayload(
@@ -28,7 +28,7 @@ public record SsuPlayerProfileDataPayload(
     private static final int MAX_PERMISSIONS = SsuPlayerProfileRequestPayload.MAX_PERMISSION_PAGE_SIZE;
 
     public static final Type<SsuPlayerProfileDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "player_profile_data")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "player_profile_data")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuPlayerProfileDataPayload> STREAM_CODEC =
             StreamCodec.of(SsuPlayerProfileDataPayload::encode, SsuPlayerProfileDataPayload::decode);

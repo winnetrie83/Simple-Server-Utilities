@@ -5,45 +5,38 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.mojang.blaze3d.vertex.QuadInstance;
+import com.mojang.blaze3d.vertex.PoseStack;
 
-import be.winnetrie.mod.simpleserverutilities.region.RegionSelectionSnapshotManager;
+import be.winnetrie.mod.simpleserverutilities.client.render.SsuDebugGizmos;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSnapshotPreviewPayload;
+import be.winnetrie.mod.simpleserverutilities.region.RegionSelectionSnapshotManager;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.color.block.BlockTintSource;
-import net.minecraft.client.renderer.block.BlockStateModelSet;
-import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
-import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
-import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.debug.DebugRenderer;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.resources.model.geometry.BakedQuad;
+import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.gizmos.Gizmos;
-import net.minecraft.gizmos.TextGizmo;
 import net.minecraft.util.RandomSource;
-import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent;
 
 /**
- * Real-model, translucent world preview shown before a selection snapshot is placed.
+ * Real-model translucent placement preview for region snapshots.
  *
- * <p>The old preview intentionally used coloured placeholder cubes. That was cheap, but it made
- * placement hard to judge. The 1.9.0-dev3.20 preview submits the actual baked block-model quads
- * through Minecraft's translucent moving-block render type. Nothing is placed in the world and
- * the preview remains client-only.</p>
+ * <p>Minecraft 26.2 supplied this geometry through SubmitCustomGeometryEvent.
+ * In 1.21.1 the classic debug-render pass already gives us a PoseStack and
+ * MultiBufferSource, so the same baked block quads are submitted directly.</p>
  */
 public final class RegionSnapshotPreviewRenderer implements DebugRenderer.SimpleDebugRenderer {
     private static final int GHOST_ALPHA = 0x66;
     private static final int FULL_BRIGHT = 0x00F000F0;
     private static final int NO_OVERLAY = 0;
 
-    private static BlockStateModelSet cachedModelSet;
+    private static Object cachedModelSource;
     private static List<String> cachedPalette = List.of();
     private static List<PreviewModel> cachedModels = List.of();
     private static RegionSnapshotPreviewClientState.Snapshot cachedSectionSnapshot;
@@ -55,62 +48,108 @@ public final class RegionSnapshotPreviewRenderer implements DebugRenderer.Simple
         this.minecraft = minecraft;
     }
 
-    /**
-     * Submits the real block models. This is kept separate from the debug-gizmo renderer because
-     * gizmos cannot preserve the snapshot's real textures/model geometry.
-     */
-    public static void onSubmitCustomGeometry(SubmitCustomGeometryEvent event) {
-        Minecraft minecraft = Minecraft.getInstance();
+    @Override
+    public void render(PoseStack poseStack, MultiBufferSource bufferSource,
+                       double camX, double camY, double camZ) {
         if (minecraft.level == null) return;
         RegionSnapshotPreviewClientState.Snapshot snapshot = RegionSnapshotPreviewClientState.snapshot();
-        if (!snapshot.active() || !snapshot.complete() || snapshot.palette().isEmpty() || snapshot.blocks().isEmpty()) return;
-        if (!minecraft.level.dimension().identifier().toString().equals(snapshot.dimension())) return;
+        if (!snapshot.active() || !minecraft.level.dimension().location().toString().equals(snapshot.dimension())) return;
 
-        ensureModels(minecraft, snapshot.palette());
-        if (cachedModels.isEmpty()) return;
-
+        SsuDebugGizmos.begin(minecraft, poseStack, bufferSource, camX, camY, camZ);
         BlockPos origin = BlockPos.of(snapshot.origin());
+
+        if (snapshot.complete() && !snapshot.palette().isEmpty() && !snapshot.blocks().isEmpty()) {
+            ensureModels(minecraft, snapshot.palette());
+            ensureSections(snapshot);
+            renderSnapshotBlocks(poseStack, bufferSource, snapshot, origin, camX, camY, camZ);
+        }
+
+        AABB bounds = new AABB(origin.getX(), origin.getY(), origin.getZ(),
+                origin.getX() + snapshot.sizeX(), origin.getY() + snapshot.sizeY(), origin.getZ() + snapshot.sizeZ());
+        String progress = snapshot.complete() ? "" : " · " + snapshot.receivedBlocks() + "/" + snapshot.totalBlocks();
+        String label = "Preview: " + snapshot.snapshotName() + " · " + snapshot.sizeX() + "×"
+                + snapshot.sizeY() + "×" + snapshot.sizeZ() + progress;
+        Vec3 center = new Vec3((bounds.minX + bounds.maxX) * 0.5, bounds.maxY + 0.7,
+                (bounds.minZ + bounds.maxZ) * 0.5);
+        SsuDebugGizmos.billboardText(label, center,
+                SsuDebugGizmos.TextStyle.forColorAndCentered(0xFF6FE7FF).withScale(0.24F));
+    }
+
+    private void renderSnapshotBlocks(PoseStack poseStack, MultiBufferSource bufferSource,
+                                      RegionSnapshotPreviewClientState.Snapshot snapshot, BlockPos origin,
+                                      double camX, double camY, double camZ) {
+        if (cachedModels.isEmpty()) return;
         int sy = Math.max(1, snapshot.sizeY());
         int sz = Math.max(1, snapshot.sizeZ());
-        Vec3 camera = event.getLevelRenderState().cameraRenderState.pos;
-        Frustum frustum = event.getLevelRenderState().cameraRenderState.cullFrustum;
-        ensureSections(snapshot);
+        var consumer = bufferSource.getBuffer(RenderType.translucentMovingBlock());
 
         for (PreviewSection section : cachedSections) {
-            int minX = origin.getX() + section.sectionX() * 16;
-            int minY = origin.getY() + section.sectionY() * 16;
-            int minZ = origin.getZ() + section.sectionZ() * 16;
-            int maxX = Math.min(origin.getX() + snapshot.sizeX(), minX + 16);
-            int maxY = Math.min(origin.getY() + snapshot.sizeY(), minY + 16);
-            int maxZ = Math.min(origin.getZ() + snapshot.sizeZ(), minZ + 16);
-            if (frustum != null && !frustum.isVisible(new AABB(minX, minY, minZ, maxX, maxY, maxZ))) continue;
-
             for (var block : section.blocks()) {
                 if (block.paletteIndex() < 0 || block.paletteIndex() >= cachedModels.size()) continue;
                 PreviewModel model = cachedModels.get(block.paletteIndex());
                 if (model == null || model.state().isAir() || model.quads().isEmpty()) continue;
+
                 int x = block.relativeIndex() / (sy * sz);
                 int remainder = block.relativeIndex() % (sy * sz);
                 int y = remainder / sz;
                 int z = remainder % sz;
                 BlockPos worldPos = origin.offset(x, y, z);
-                var poseStack = event.getPoseStack();
+
                 poseStack.pushPose();
-                poseStack.translate(worldPos.getX() - camera.x, worldPos.getY() - camera.y, worldPos.getZ() - camera.z);
-                event.getSubmitNodeCollector().submitCustomGeometry(
-                        poseStack, RenderTypes.translucentMovingBlock(),
-                        (pose, consumer) -> {
-                            for (BakedQuad quad : model.quads()) {
-                                QuadInstance instance = new QuadInstance();
-                                instance.setColor(ghostColor(minecraft, model.state(), worldPos, quad));
-                                instance.setLightCoords(FULL_BRIGHT);
-                                instance.setOverlayCoords(NO_OVERLAY);
-                                consumer.putBakedQuad(pose, quad, instance);
-                            }
-                        });
+                poseStack.translate(worldPos.getX() - camX, worldPos.getY() - camY, worldPos.getZ() - camZ);
+                for (BakedQuad quad : model.quads()) {
+                    int argb = ghostColor(minecraft, model.state(), worldPos, quad);
+                    float a = ((argb >>> 24) & 0xFF) / 255.0F;
+                    float r = ((argb >>> 16) & 0xFF) / 255.0F;
+                    float g = ((argb >>> 8) & 0xFF) / 255.0F;
+                    float b = (argb & 0xFF) / 255.0F;
+                    consumer.putBulkData(poseStack.last(), quad, r, g, b, a, FULL_BRIGHT, NO_OVERLAY);
+                }
                 poseStack.popPose();
             }
         }
+    }
+
+    private static int ghostColor(Minecraft minecraft, BlockState state, BlockPos pos, BakedQuad quad) {
+        int rgb = 0x00FFFFFF;
+        try {
+            int tintIndex = quad.getTintIndex();
+            if (tintIndex >= 0 && minecraft.level != null) {
+                int tint = minecraft.getBlockColors().getColor(state, minecraft.level, pos, tintIndex);
+                if (tint != -1) rgb = tint & 0x00FFFFFF;
+            }
+        } catch (Throwable ignored) {
+            // Third-party tint providers must never make the preview unusable.
+        }
+        return (GHOST_ALPHA << 24) | rgb;
+    }
+
+    private static void ensureModels(Minecraft minecraft, List<String> palette) {
+        Object modelSource = minecraft.getBlockRenderer().getBlockModelShaper();
+        if (cachedModelSource == modelSource && cachedPalette.equals(palette) && cachedModels.size() == palette.size()) return;
+
+        List<PreviewModel> models = new ArrayList<>(palette.size());
+        for (String raw : palette) {
+            try {
+                BlockState state = RegionSelectionSnapshotManager.blockStateFromJsonString(raw);
+                if (state.isAir()) {
+                    models.add(new PreviewModel(state, List.of()));
+                    continue;
+                }
+                BakedModel model = minecraft.getBlockRenderer().getBlockModel(state);
+                List<BakedQuad> quads = new ArrayList<>();
+                addQuads(quads, model.getQuads(state, null, RandomSource.create()));
+                for (Direction direction : Direction.values()) {
+                    addQuads(quads, model.getQuads(state, direction, RandomSource.create()));
+                }
+                models.add(new PreviewModel(state, List.copyOf(quads)));
+            } catch (Throwable ignored) {
+                models.add(new PreviewModel(Blocks.AIR.defaultBlockState(), List.of()));
+            }
+        }
+        cachedModelSource = modelSource;
+        cachedPalette = List.copyOf(palette);
+        cachedModels = List.copyOf(models);
     }
 
     private static void ensureSections(RegionSnapshotPreviewClientState.Snapshot snapshot) {
@@ -139,78 +178,8 @@ public final class RegionSnapshotPreviewRenderer implements DebugRenderer.Simple
         cachedSections = List.copyOf(sections);
     }
 
-    private static int ghostColor(Minecraft minecraft, BlockState state, BlockPos pos, BakedQuad quad) {
-        int rgb = 0x00FFFFFF;
-        try {
-            int tintIndex = quad.materialInfo().tintIndex();
-            if (tintIndex >= 0) {
-                BlockTintSource source = minecraft.getBlockColors().getTintSource(state, tintIndex);
-                if (source == null && !state.getFluidState().isEmpty()) {
-                    source = minecraft.getModelManager().getFluidStateModelSet().get(state.getFluidState()).tintSource();
-                }
-                if (source != null && minecraft.level != null) {
-                    int tint = source.colorInWorld(state, minecraft.level, pos);
-                    if (tint != -1) rgb = tint & 0x00FFFFFF;
-                }
-            }
-        } catch (Throwable ignored) {
-            // A third-party tint provider must never make the placement preview unusable.
-        }
-        return (GHOST_ALPHA << 24) | rgb;
-    }
-
-    private static void ensureModels(Minecraft minecraft, List<String> palette) {
-        BlockStateModelSet modelSet = minecraft.getModelManager().getBlockStateModelSet();
-        if (cachedModelSet == modelSet && cachedPalette.equals(palette) && cachedModels.size() == palette.size()) return;
-        List<PreviewModel> models = new ArrayList<>(palette.size());
-        for (String raw : palette) {
-            try {
-                BlockState state = RegionSelectionSnapshotManager.blockStateFromJsonString(raw);
-                if (state.isAir()) {
-                    models.add(new PreviewModel(state, List.of()));
-                    continue;
-                }
-                BlockStateModel stateModel = modelSet.get(state);
-                List<BlockStateModelPart> parts = new ArrayList<>();
-                stateModel.collectParts(RandomSource.create(), parts);
-                List<BakedQuad> quads = new ArrayList<>();
-                for (BlockStateModelPart part : parts) {
-                    addQuads(quads, part.getQuads(null));
-                    for (Direction direction : Direction.values()) addQuads(quads, part.getQuads(direction));
-                }
-                models.add(new PreviewModel(state, List.copyOf(quads)));
-            } catch (Throwable ignored) {
-                models.add(new PreviewModel(Blocks.AIR.defaultBlockState(), List.of()));
-            }
-        }
-        cachedModelSet = modelSet;
-        cachedPalette = List.copyOf(palette);
-        cachedModels = List.copyOf(models);
-    }
-
     private static void addQuads(List<BakedQuad> target, List<BakedQuad> source) {
         if (source != null && !source.isEmpty()) target.addAll(source);
-    }
-
-    /**
-     * Gizmos are deliberately limited to a small label; there is no screen-sized wash and no fake
-     * filled cuboid over the preview anymore.
-     */
-    @Override
-    public void emitGizmos(double camX, double camY, double camZ, DebugValueAccess debugValues,
-                           Frustum frustum, float partialTicks) {
-        if (minecraft.level == null) return;
-        RegionSnapshotPreviewClientState.Snapshot snapshot = RegionSnapshotPreviewClientState.snapshot();
-        if (!snapshot.active() || !minecraft.level.dimension().identifier().toString().equals(snapshot.dimension())) return;
-        BlockPos origin = BlockPos.of(snapshot.origin());
-        AABB bounds = new AABB(origin.getX(), origin.getY(), origin.getZ(),
-                origin.getX() + snapshot.sizeX(), origin.getY() + snapshot.sizeY(), origin.getZ() + snapshot.sizeZ());
-        String progress = snapshot.complete() ? "" : " · " + snapshot.receivedBlocks() + "/" + snapshot.totalBlocks();
-        String label = "Preview: " + snapshot.snapshotName() + " · " + snapshot.sizeX() + "×"
-                + snapshot.sizeY() + "×" + snapshot.sizeZ() + progress;
-        Vec3 center = new Vec3((bounds.minX + bounds.maxX) * 0.5, bounds.maxY + 0.7,
-                (bounds.minZ + bounds.maxZ) * 0.5);
-        Gizmos.billboardText(label, center, TextGizmo.Style.forColorAndCentered(0xFF6FE7FF).withScale(0.24F));
     }
 
     private record PreviewModel(BlockState state, List<BakedQuad> quads) { }

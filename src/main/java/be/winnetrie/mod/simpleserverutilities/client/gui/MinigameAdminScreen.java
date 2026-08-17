@@ -7,13 +7,13 @@ import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameLobbyRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupToolConfigurePayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameScoreActionPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Dedicated Admin Center manager. No administrative controls are exposed in the player lobby. */
 public final class MinigameAdminScreen extends Screen {
@@ -55,7 +55,7 @@ public final class MinigameAdminScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("Close"), ignored -> onClose())
                 .bounds(x + 80, y + H - 27, 50, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Setup Tool"), ignored ->
-                        ClientPacketDistributor.sendToServer(new MinigameSetupToolConfigurePayload(
+                        PacketDistributor.sendToServer(new MinigameSetupToolConfigurePayload(
                                 "give_tool", selectedId, "",
                                 "arena_bounds", 1, 0, nextRequestId++)))
                 .bounds(x + W - 92, y + 12, 80, 20).build());
@@ -108,7 +108,7 @@ public final class MinigameAdminScreen extends Screen {
     private void request(String action, String id) {
         if (awaiting) return;
         awaiting = true;
-        ClientPacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, id, nextRequestId++));
+        PacketDistributor.sendToServer(new MinigameLobbyRequestPayload(action, id, nextRequestId++));
         rebuildWidgets();
     }
 
@@ -119,13 +119,13 @@ public final class MinigameAdminScreen extends Screen {
         try { amount = Long.parseLong(draftScoreAmount == null ? "" : draftScoreAmount.trim()); }
         catch (NumberFormatException exception) { return; }
         awaiting = true;
-        ClientPacketDistributor.sendToServer(new MinigameScoreActionPayload(
+        PacketDistributor.sendToServer(new MinigameScoreActionPayload(
                 mode, draftScorePlayer.trim(), amount, nextRequestId++));
         rebuildWidgets();
     }
 
     private void edit(String id) {
-        ClientPacketDistributor.sendToServer(new MinigameEditorRequestPayload(id, nextRequestId++));
+        PacketDistributor.sendToServer(new MinigameEditorRequestPayload(id, nextRequestId++));
     }
 
     public void accept(MinigameLobbyDataPayload payload) {
@@ -140,59 +140,59 @@ public final class MinigameAdminScreen extends Screen {
 
     public void refreshFromEditor() { request("refresh_admin", ""); }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, "Admin Center > Minigames", x + 12, y + 14, TEXT, true);
-        g.text(font, "Settings, arenas and live-match control", x + 180, y + 15, MUTED, false);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Admin Center > Minigames", x + 12, y + 14, TEXT, true);
+        g.drawString(font, "Settings, arenas and live-match control", x + 180, y + 15, MUTED, false);
         g.fill(x + LEFT, y + 38, x + LEFT + 1, y + H - 34, BORDER);
         for (int i = 0; i < Math.min(ROWS, data.games().size()); i++) {
             var game = data.games().get(i);
             int ry = y + 43 + i * 24;
-            g.text(font, game.enabled() ? "●" : "○", x + 16, ry + 6, game.enabled() ? GOOD : MUTED, true);
-            g.text(font, game.runningMatches() + "r", x + LEFT - 32, ry + 6,
+            g.drawString(font, game.enabled() ? "●" : "○", x + 16, ry + 6, game.enabled() ? GOOD : MUTED, true);
+            g.drawString(font, game.runningMatches() + "r", x + LEFT - 32, ry + 6,
                     game.runningMatches() > 0 ? WARN : MUTED, false);
         }
         var game = selected();
         if (game == null) {
-            g.text(font, "No minigames configured.", x + LEFT + 12, y + 52, MUTED, false);
-            g.text(font, "Use the Setup Tool to select bounds and create Spleef, CTF or Domination.",
+            g.drawString(font, "No minigames configured.", x + LEFT + 12, y + 52, MUTED, false);
+            g.drawString(font, "Use the Setup Tool to select bounds and create Spleef, CTF or Domination.",
                     x + LEFT + 12, y + 70, MUTED, false);
         } else {
             drawGame(g, game, x + LEFT + 12, y + 46);
-            g.text(font, game.runningMatches() > 0 ? "Live score correction" : "Live score correction (no active match)",
+            g.drawString(font, game.runningMatches() > 0 ? "Live score correction" : "Live score correction (no active match)",
                     x + LEFT + 12, y + H - 67, game.runningMatches() > 0 ? ACCENT : MUTED, false);
         }
         String notice = awaiting ? "Processing…" : data.notice();
         if (!notice.isBlank()) {
             List<FormattedCharSequence> lines = font.split(Component.literal(notice), LEFT - 24);
             for (int i = 0; i < Math.min(2, lines.size()); i++)
-                g.text(font, lines.get(i), x + 12, y + H - 52 + i * 10, data.error() ? ERROR : GOOD, false);
+                g.drawString(font, lines.get(i), x + 12, y + H - 52 + i * 10, data.error() ? ERROR : GOOD, false);
         }
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void drawGame(GuiGraphicsExtractor g, MinigameLobbyDataPayload.GameEntry game, int x, int y) {
+    private void drawGame(GuiGraphics g, MinigameLobbyDataPayload.GameEntry game, int x, int y) {
         int width = W - LEFT - 24;
-        g.text(font, trim(game.displayName(), 42), x, y, TEXT, true);
-        g.text(font, game.id() + " • " + modeLabel(game.gameType()) + " • " + (game.enabled() ? "enabled" : "disabled"),
+        g.drawString(font, trim(game.displayName(), 42), x, y, TEXT, true);
+        g.drawString(font, game.id() + " • " + modeLabel(game.gameType()) + " • " + (game.enabled() ? "enabled" : "disabled"),
                 x, y + 14, game.enabled() ? GOOD : MUTED, false);
         List<FormattedCharSequence> lines = font.split(Component.literal(game.description()), width);
-        for (int i = 0; i < Math.min(3, lines.size()); i++) g.text(font, lines.get(i), x, y + 31 + i * 10, TEXT, false);
+        for (int i = 0; i < Math.min(3, lines.size()); i++) g.drawString(font, lines.get(i), x, y + 31 + i * 10, TEXT, false);
         int sy = y + 70;
-        g.text(font, "Configuration", x, sy, ACCENT, true);
-        g.text(font, game.minPlayers() + "-" + game.maxPlayers() + " players • " + game.teamCount() + " teams", x, sy + 14, TEXT, false);
-        g.text(font, game.freeArenas() + " free arena(s) • " + game.blockedArenas() + " blocked", x, sy + 27,
+        g.drawString(font, "Configuration", x, sy, ACCENT, true);
+        g.drawString(font, game.minPlayers() + "-" + game.maxPlayers() + " players • " + game.teamCount() + " teams", x, sy + 14, TEXT, false);
+        g.drawString(font, game.freeArenas() + " free arena(s) • " + game.blockedArenas() + " blocked", x, sy + 27,
                 game.blockedArenas() > 0 ? WARN : GOOD, false);
-        g.text(font, game.queuedPlayers() + " queued • " + game.runningMatches() + " running", x, sy + 40, TEXT, false);
-        g.text(font, "Edit settings opens the dedicated " + modeLabel(game.gameType()) + " editor.", x, sy + 62, MUTED, false);
-        g.text(font, "Setup Tool changes bounds, blocks, spawns, flags, nodes and snapshots in-world.", x, sy + 76, MUTED, false);
+        g.drawString(font, game.queuedPlayers() + " queued • " + game.runningMatches() + " running", x, sy + 40, TEXT, false);
+        g.drawString(font, "Edit settings opens the dedicated " + modeLabel(game.gameType()) + " editor.", x, sy + 62, MUTED, false);
+        g.drawString(font, "Setup Tool changes bounds, blocks, spawns, flags, nodes and snapshots in-world.", x, sy + 76, MUTED, false);
     }
 
     private int px() { return (width - W) / 2; }

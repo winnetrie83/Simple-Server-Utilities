@@ -44,15 +44,11 @@ import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityProcessor;
-import net.minecraft.world.entity.EntitySpawnReason;
-import net.minecraft.world.entity.EntitySpawnRequest;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.decoration.HangingEntity;
@@ -61,7 +57,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
-import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.phys.AABB;
 
 /**
@@ -401,7 +396,7 @@ public final class RegionSelectionSnapshotManager {
 
     private static void validateWorldBounds(ServerLevel level, Bounds bounds) {
         validateVolume(bounds.volume());
-        if (bounds.minY() < level.getMinY() || bounds.maxY() > level.getMaxY()) {
+        if (bounds.minY() < level.getMinBuildHeight() || bounds.maxY() > (level.getMaxBuildHeight() - 1)) {
             throw new IllegalArgumentException("The snapshot would extend outside the build height.");
         }
         if (!level.getWorldBorder().isWithinBounds(new BlockPos(bounds.minX(), bounds.minY(), bounds.minZ()))
@@ -448,7 +443,7 @@ public final class RegionSelectionSnapshotManager {
     }
 
     private static BlockState blockStateFromJson(JsonObject json) {
-        Identifier blockId = Identifier.parse(json.get("block").getAsString());
+        ResourceLocation blockId = ResourceLocation.parse(json.get("block").getAsString());
         Block block = BuiltInRegistries.BLOCK.getOptional(blockId).orElseThrow(
                 () -> new IllegalArgumentException("Unknown block in snapshot: " + blockId));
         BlockState state = block.defaultBlockState();
@@ -480,8 +475,8 @@ public final class RegionSelectionSnapshotManager {
     }
 
     private static String captureEntity(ServerLevel level, Entity entity) {
-        TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, level.registryAccess());
-        return entity.save(output) ? output.buildResult().toString() : "";
+        CompoundTag tag = new CompoundTag();
+        return entity.save(tag) ? tag.toString() : "";
     }
 
     private static List<Entity> structuralEntities(ServerLevel level, Bounds bounds) {
@@ -516,8 +511,7 @@ public final class RegionSelectionSnapshotManager {
     private static boolean restoreEntity(ServerLevel level, Bounds bounds, SnapshotEntity saved) throws Exception {
         CompoundTag tag = parseCompoundTag(saved.entitySnbt());
         tag.remove("UUID");
-        Entity entity = EntityType.loadEntityRecursive(tag, level,
-                new EntitySpawnRequest(EntitySpawnReason.LOAD, false), EntityProcessor.NOP);
+        Entity entity = EntityType.loadEntityRecursive(tag, level, loaded -> loaded);
         if (entity == null) return false;
         entity.setPos(bounds.minX() + saved.relX(), bounds.minY() + saved.relY(), bounds.minZ() + saved.relZ());
         entity.setYRot(saved.yaw());

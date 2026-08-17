@@ -4,14 +4,14 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record TitleManagerActionPayload(
         String action, String id, String displayName, int color, String unlockType,
         long requirement, String requirementValue, String targetPlayer, long requestId
 ) implements CustomPacketPayload {
     public static final Type<TitleManagerActionPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "title_manager_action"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "title_manager_action"));
     public static final StreamCodec<RegistryFriendlyByteBuf, TitleManagerActionPayload> STREAM_CODEC =
             StreamCodec.of(TitleManagerActionPayload::encode, TitleManagerActionPayload::decode);
 

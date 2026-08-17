@@ -6,7 +6,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Changes or clears one per-claim access-role permission override. */
 public record SsuClaimRolePermissionActionPayload(
@@ -18,7 +18,7 @@ public record SsuClaimRolePermissionActionPayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<SsuClaimRolePermissionActionPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "claim_role_permission_action"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "claim_role_permission_action"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuClaimRolePermissionActionPayload> STREAM_CODEC =
             StreamCodec.of(SsuClaimRolePermissionActionPayload::encode, SsuClaimRolePermissionActionPayload::decode);
 

@@ -3,7 +3,7 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramRichText;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
@@ -41,10 +41,10 @@ final class RichTextPalette {
         }
 
         @Override
-        protected void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-            extractDefaultSprite(graphics);
+        public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+            super.renderWidget(graphics, mouseX, mouseY, partialTick);
             graphics.fill(getX() + 3, getY() + 3, getRight() - 3, getBottom() - 3, swatch);
-            graphics.outline(getX() + 2, getY() + 2, getWidth() - 4, getHeight() - 4,
+            graphics.renderOutline(getX() + 2, getY() + 2, getWidth() - 4, getHeight() - 4,
                     isHoveredOrFocused() ? 0xFFFFFFFF : 0xFF20242B);
         }
     }

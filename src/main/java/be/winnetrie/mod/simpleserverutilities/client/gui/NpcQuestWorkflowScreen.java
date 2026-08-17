@@ -7,12 +7,12 @@ import java.util.Locale;
 import be.winnetrie.mod.simpleserverutilities.network.NpcQuestWorkflowOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcQuestWorkflowRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcQuestWorkflowUpdatePayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Normal admin workflow for linking quests to one NPC. No condition-graph knowledge is required. */
 public final class NpcQuestWorkflowScreen extends Screen {
@@ -37,7 +37,7 @@ public final class NpcQuestWorkflowScreen extends Screen {
         rebuildWidgets();
     }
 
-    public void refresh() { ClientPacketDistributor.sendToServer(new NpcQuestWorkflowRequestPayload(data.instanceId())); }
+    public void refresh() { PacketDistributor.sendToServer(new NpcQuestWorkflowRequestPayload(data.instanceId())); }
 
     @Override protected void init() {
         int x = left(), y = top();
@@ -119,11 +119,11 @@ public final class NpcQuestWorkflowScreen extends Screen {
 
     private void configure() {
         var e = current();
-        if (e != null && minecraft != null) minecraft.setScreenAndShow(new NpcQuestWorkflowDialogueScreen(this, e));
+        if (e != null && minecraft != null) minecraft.setScreen(new NpcQuestWorkflowDialogueScreen(this, e));
     }
 
     public void saveConfigured(NpcQuestWorkflowOpenPayload.Entry e) {
-        if (minecraft != null) minecraft.setScreenAndShow(this);
+        if (minecraft != null) minecraft.setScreen(this);
         if ("menu".equalsIgnoreCase(data.questAccessMode()) && !"none".equals(e.relation())) {
             showAccessPrompt(() -> sendSave(e, e.relation(), "npc"), () -> sendSave(e, e.relation(), "both"));
             return;
@@ -139,16 +139,16 @@ public final class NpcQuestWorkflowScreen extends Screen {
     }
 
     private void showAccessPrompt(Runnable npc, Runnable both) {
-        if (minecraft != null) minecraft.setScreenAndShow(new NpcQuestAccessPromptScreen(this, npc, both));
+        if (minecraft != null) minecraft.setScreen(new NpcQuestAccessPromptScreen(this, npc, both));
     }
 
     private void sendCreate(String access) {
-        ClientPacketDistributor.sendToServer(new NpcQuestWorkflowUpdatePayload(data.instanceId(), "create", "", "both", access,
+        PacketDistributor.sendToServer(new NpcQuestWorkflowUpdatePayload(data.instanceId(), "create", "", "both", access,
                 "", "", "", "", "", "", true, true, true, requestId++));
     }
 
     private void sendSave(NpcQuestWorkflowOpenPayload.Entry e, String relation, String access) {
-        ClientPacketDistributor.sendToServer(new NpcQuestWorkflowUpdatePayload(data.instanceId(), "save", e.questId(), relation, access,
+        PacketDistributor.sendToServer(new NpcQuestWorkflowUpdatePayload(data.instanceId(), "save", e.questId(), relation, access,
                 e.availableText(), e.acceptText(), e.activeText(), e.readyText(), e.turnInText(), e.completedText(),
                 e.showAvailable(), e.showActive(), e.showReady(), requestId++));
     }
@@ -157,21 +157,21 @@ public final class NpcQuestWorkflowScreen extends Screen {
         String next = switch (data.questAccessMode().toLowerCase(Locale.ROOT)) {
             case "menu" -> "npc"; case "npc" -> "both"; default -> "menu";
         };
-        ClientPacketDistributor.sendToServer(new NpcQuestWorkflowUpdatePayload(data.instanceId(), "access", "", "", next,
+        PacketDistributor.sendToServer(new NpcQuestWorkflowUpdatePayload(data.instanceId(), "access", "", "", next,
                 "", "", "", "", "", "", true, true, true, requestId++));
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float pt) {
+    @Override public void render(GuiGraphics g, int mx, int my, float pt) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, 0xF0161D25);
-        g.outline(x, y, W, H, 0xFF586978);
-        g.text(font, data.npcName() + " — Quests", x + 16, y + 18, 0xFFF3F5F7, true);
-        g.text(font, "Select a quest, choose Offer / Turn-in / Both, then optionally edit its dialogue.", x + 16, y + 42, 0xFFAAB5BE, false);
-        if (!data.notice().isBlank()) g.text(font, trim(data.notice(), 70), x + 94, y + H - 23, 0xFF83E39A, false);
-        super.extractRenderState(g, mx, my, pt);
+        g.renderOutline(x, y, W, H, 0xFF586978);
+        g.drawString(font, data.npcName() + " — Quests", x + 16, y + 18, 0xFFF3F5F7, true);
+        g.drawString(font, "Select a quest, choose Offer / Turn-in / Both, then optionally edit its dialogue.", x + 16, y + 42, 0xFFAAB5BE, false);
+        if (!data.notice().isBlank()) g.drawString(font, trim(data.notice(), 70), x + 94, y + H - 23, 0xFF83E39A, false);
+        super.render(g, mx, my, pt);
     }
 
     private int left() { return Math.max(4, (width - W) / 2); }

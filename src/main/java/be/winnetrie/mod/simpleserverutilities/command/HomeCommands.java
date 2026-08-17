@@ -18,7 +18,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -235,7 +235,7 @@ public class HomeCommands {
 
     private static ServerLevel getHomeLevel(ServerPlayer player, PlayerHome home) {
         try {
-            Identifier dimensionId = Identifier.parse(home.getDimension());
+            ResourceLocation dimensionId = ResourceLocation.parse(home.getDimension());
             ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimensionId);
 
             return player.level().getServer().getLevel(dimension);

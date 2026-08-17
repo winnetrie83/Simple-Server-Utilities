@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Locale;
 
 import be.winnetrie.mod.simpleserverutilities.network.NpcEditorOpenPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -79,18 +79,18 @@ public final class NpcChoicePickerScreen extends Screen {
 
     private void choose(String id) {
         parent.acceptChoice(kind, id);
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
         SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(x, y, x + W, y + H, 0xF0161D25);
-        g.outline(x, y, W, H, 0xFF586978);
-        g.text(font, title(kind), x + 12, y + 12, 0xFFF3F5F7, true);
-        g.text(font, filtered().size() + " option(s)", x + W - 90, y + 13, 0xFFAAB5BE, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        g.renderOutline(x, y, W, H, 0xFF586978);
+        g.drawString(font, title(kind), x + 12, y + 12, 0xFFF3F5F7, true);
+        g.drawString(font, filtered().size() + " option(s)", x + W - 90, y + 13, 0xFFAAB5BE, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private static String title(Kind kind) {

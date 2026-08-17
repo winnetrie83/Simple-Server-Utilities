@@ -4,7 +4,7 @@ import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 
 public final class PermissionKeys {
@@ -201,15 +201,15 @@ public final class PermissionKeys {
     public static final String VEINMINER_ORE_LAPIS = "ssu.veinminer.ore.lapis";
     public static final String VEINMINER_ORE_DIAMOND = "ssu.veinminer.ore.diamond";
 
-    public static String treecapitatorBlock(Identifier id) {
+    public static String treecapitatorBlock(ResourceLocation id) {
         return "ssu.treecapitator.block." + identifierSuffix(id);
     }
 
-    public static String veinminerBlock(Identifier id) {
+    public static String veinminerBlock(ResourceLocation id) {
         return "ssu.veinminer.block." + identifierSuffix(id);
     }
 
-    private static String identifierSuffix(Identifier id) {
+    private static String identifierSuffix(ResourceLocation id) {
         if (id == null) {
             return "unknown";
         }

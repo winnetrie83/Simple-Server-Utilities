@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.hologram.HologramType;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Complete, bounded editor state for either creating or editing a hologram. */
 public record HologramEditorOpenPayload(
@@ -38,7 +38,7 @@ public record HologramEditorOpenPayload(
         int updateIntervalTicks
 ) implements CustomPacketPayload {
     public static final Type<HologramEditorOpenPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "hologram_editor_open")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "hologram_editor_open")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, HologramEditorOpenPayload> STREAM_CODEC =
             StreamCodec.of(HologramEditorOpenPayload::encode, HologramEditorOpenPayload::decode);

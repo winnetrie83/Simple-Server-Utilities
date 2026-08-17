@@ -7,12 +7,12 @@ import be.winnetrie.mod.simpleserverutilities.client.mapmarker.MapMarkerClientSt
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerSyncPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Remote edit/delete list for all personal map markers. */
 public final class MapMarkerManagementScreen extends Screen {
@@ -67,7 +67,7 @@ public final class MapMarkerManagementScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         List<MapMarkerSyncPayload.Entry> markers = MapMarkerClientState.markers();
         int pages = Math.max(1, (markers.size() + PAGE_SIZE - 1) / PAGE_SIZE);
@@ -75,25 +75,25 @@ public final class MapMarkerManagementScreen extends Screen {
         int left = (width - panelWidth) / 2;
         int top = Math.max(24, (height - 300) / 2);
         graphics.fill(left, top, left + panelWidth, top + 286, 0xE5121720);
-        graphics.outline(left, top, panelWidth, 286, 0xFF64778D);
-        graphics.centeredText(font, title, left + panelWidth / 2, top + 13, 0xFFFFD66B);
+        graphics.renderOutline(left, top, panelWidth, 286, 0xFF64778D);
+        graphics.drawCenteredString(font, title, left + panelWidth / 2, top + 13, 0xFFFFD66B);
         int start = page * PAGE_SIZE;
         int end = Math.min(markers.size(), start + PAGE_SIZE);
         int y = top + 46;
         for (int index = start; index < end; index++) {
             MapMarkerSyncPayload.Entry marker = markers.get(index);
             graphics.fill(left + 18, y - 3, left + 34, y + 13, marker.colorArgb());
-            graphics.outline(left + 18, y - 3, 16, 16, 0xFFFFFFFF);
+            graphics.renderOutline(left + 18, y - 3, 16, 16, 0xFFFFFFFF);
             y += 27;
         }
         if (markers.isEmpty()) {
-            graphics.centeredText(font, "No personal markers yet.", left + panelWidth / 2, top + 120, 0xFFB8C4D2);
+            graphics.drawCenteredString(font, "No personal markers yet.", left + panelWidth / 2, top + 120, 0xFFB8C4D2);
         }
-        graphics.text(font, "Page " + (page + 1) + " / " + pages, left + 94, top + 260, 0xFFB8C4D2);
+        graphics.drawString(font, "Page " + (page + 1) + " / " + pages, left + 94, top + 260, 0xFFB8C4D2);
         if (!status.isBlank()) {
-            graphics.text(font, status, left + 14, top + 279, statusError ? 0xFFFF6B6B : 0xFF6BFF88);
+            graphics.drawString(font, status, left + 14, top + 279, statusError ? 0xFFFF6B6B : 0xFF6BFF88);
         }
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     public void acceptResult(MapMarkerActionResultPayload result) {
@@ -106,7 +106,7 @@ public final class MapMarkerManagementScreen extends Screen {
     }
 
     private void edit(MapMarkerSyncPayload.Entry marker) {
-        if (minecraft != null) minecraft.setScreenAndShow(new MapMarkerEditorScreen(
+        if (minecraft != null) minecraft.setScreen(new MapMarkerEditorScreen(
                 this, marker, marker.dimension(), marker.x(), marker.y(), marker.z(), false));
     }
 
@@ -118,13 +118,13 @@ public final class MapMarkerManagementScreen extends Screen {
             rebuildWidgets();
             return;
         }
-        ClientPacketDistributor.sendToServer(new MapMarkerActionPayload(
+        PacketDistributor.sendToServer(new MapMarkerActionPayload(
                 "delete", marker.id(), "", marker.dimension(), marker.x(), marker.y(), marker.z(), marker.colorArgb(), false));
         status = "Deleting…";
     }
 
     private void closeToParent() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     @Override public void onClose() { closeToParent(); }

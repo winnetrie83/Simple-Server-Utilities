@@ -312,14 +312,14 @@ public class PlayerClaimManager {
         if (chunkIndex.containsKey(key)) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_ALREADY_CLAIMED,
-                    "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                    "chunk " + chunkPos.x + ", " + chunkPos.z
             );
         }
 
-        if (claim.getChunkCount() > 0 && !claim.hasAdjacentChunk(chunkPos.x(), chunkPos.z())) {
+        if (claim.getChunkCount() > 0 && !claim.hasAdjacentChunk(chunkPos.x, chunkPos.z)) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_NOT_ADJACENT,
-                    "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                    "chunk " + chunkPos.x + ", " + chunkPos.z
             );
         }
 
@@ -356,16 +356,16 @@ public class PlayerClaimManager {
         )) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_OVERLAPS_REGION,
-                    "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                    "chunk " + chunkPos.x + ", " + chunkPos.z
             );
         }
 
         long now = System.currentTimeMillis();
 
-        if (!claim.addChunk(chunkPos.x(), chunkPos.z(), now)) {
+        if (!claim.addChunk(chunkPos.x, chunkPos.z, now)) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_ALREADY_CLAIMED,
-                    "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                    "chunk " + chunkPos.x + ", " + chunkPos.z
             );
         }
 
@@ -373,7 +373,7 @@ public class PlayerClaimManager {
         save();
         publishClaimEvent(player, ContentEventTypes.CLAIM_CHUNK_ADDED, claim, 1L,
                 Map.of("dimension", claim.getDimension(), "claim_id", claim.getId().toString(),
-                        "chunk_x", Integer.toString(chunkPos.x()), "chunk_z", Integer.toString(chunkPos.z())));
+                        "chunk_x", Integer.toString(chunkPos.x), "chunk_z", Integer.toString(chunkPos.z)));
 
         return ClaimOperationResult.success();
     }
@@ -412,14 +412,14 @@ public class PlayerClaimManager {
         if (chunkIndex.containsKey(key)) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_ALREADY_CLAIMED,
-                    "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                    "chunk " + chunkPos.x + ", " + chunkPos.z
             );
         }
 
-        if (claim.getChunkCount() > 0 && !claim.hasAdjacentChunk(chunkPos.x(), chunkPos.z())) {
+        if (claim.getChunkCount() > 0 && !claim.hasAdjacentChunk(chunkPos.x, chunkPos.z)) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_NOT_ADJACENT,
-                    "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                    "chunk " + chunkPos.x + ", " + chunkPos.z
             );
         }
 
@@ -453,16 +453,16 @@ public class PlayerClaimManager {
         )) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_OVERLAPS_REGION,
-                    "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                    "chunk " + chunkPos.x + ", " + chunkPos.z
             );
         }
 
         long now = System.currentTimeMillis();
 
-        if (!claim.addChunk(chunkPos.x(), chunkPos.z(), now)) {
+        if (!claim.addChunk(chunkPos.x, chunkPos.z, now)) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_ALREADY_CLAIMED,
-                    "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                    "chunk " + chunkPos.x + ", " + chunkPos.z
             );
         }
 
@@ -566,7 +566,7 @@ public class PlayerClaimManager {
                 if (!ClaimPolicy.canCreateClaim(player, targetContext)) {
                     return ClaimMapBatchResult.failure(ClaimOperationResult.fail(
                             ClaimOperationResult.Type.INVALID_SELECTION,
-                            "You do not have permission to claim chunk " + chunkPos.x() + ", " + chunkPos.z() + "."
+                            "You do not have permission to claim chunk " + chunkPos.x + ", " + chunkPos.z + "."
                     ));
                 }
 
@@ -580,13 +580,13 @@ public class PlayerClaimManager {
                 if (chunkIndex.containsKey(createKey(player.level(), chunkPos))) {
                     return ClaimMapBatchResult.failure(ClaimOperationResult.fail(
                             ClaimOperationResult.Type.CHUNK_ALREADY_CLAIMED,
-                            "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                            "chunk " + chunkPos.x + ", " + chunkPos.z
                     ));
                 }
                 if (overlapsRegion(player.level(), chunkPos)) {
                     return ClaimMapBatchResult.failure(ClaimOperationResult.fail(
                             ClaimOperationResult.Type.CHUNK_OVERLAPS_REGION,
-                            "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                            "chunk " + chunkPos.x + ", " + chunkPos.z
                     ));
                 }
             }
@@ -617,7 +617,7 @@ public class PlayerClaimManager {
                     ? new HashSet<>()
                     : new HashSet<>(claim.getChunks());
             for (ChunkPos chunkPos : chunks) {
-                finalShape.add(new ClaimChunk(chunkPos.x(), chunkPos.z()));
+                finalShape.add(new ClaimChunk(chunkPos.x, chunkPos.z));
             }
             if (!ClaimShapeValidator.isConnected(finalShape)) {
                 return ClaimMapBatchResult.failure(ClaimOperationResult.fail(
@@ -632,8 +632,8 @@ public class PlayerClaimManager {
                 claims.put(claim.getId(), claim);
             }
             for (ChunkPos chunkPos : chunks) {
-                claim.addChunk(chunkPos.x(), chunkPos.z(), now);
-                chunkIndex.put(createKey(dimension, chunkPos.x(), chunkPos.z()), claim.getId());
+                claim.addChunk(chunkPos.x, chunkPos.z, now);
+                chunkIndex.put(createKey(dimension, chunkPos.x, chunkPos.z), claim.getId());
             }
             if (operation == ClaimMapOperation.CREATE) {
                 SimpleServerUtilities.CLAIM_TAX.initializeClaimCycle(claim, now);
@@ -654,14 +654,14 @@ public class PlayerClaimManager {
             if (indexedClaim == null || !indexedClaim.equals(claim.getId())) {
                 return ClaimMapBatchResult.failure(ClaimOperationResult.fail(
                         ClaimOperationResult.Type.CHUNK_NOT_CLAIMED,
-                        "chunk " + chunkPos.x() + ", " + chunkPos.z() + " is not part of " + claimName
+                        "chunk " + chunkPos.x + ", " + chunkPos.z + " is not part of " + claimName
                 ));
             }
         }
 
         Set<ClaimChunk> remaining = new HashSet<>(claim.getChunks());
         for (ChunkPos chunkPos : chunks) {
-            remaining.remove(new ClaimChunk(chunkPos.x(), chunkPos.z()));
+            remaining.remove(new ClaimChunk(chunkPos.x, chunkPos.z));
         }
         if (remaining.isEmpty() && SimpleServerUtilities.CLAIM_TAX.requiresDeleteSettlement(claim)) {
             return ClaimMapBatchResult.failure(ClaimOperationResult.fail(
@@ -678,9 +678,9 @@ public class PlayerClaimManager {
         long now = System.currentTimeMillis();
         Set<ClaimChunk> removedClaimChunks = new HashSet<>();
         for (ChunkPos chunkPos : chunks) {
-            claim.removeChunk(chunkPos.x(), chunkPos.z(), now);
-            chunkIndex.remove(createKey(dimension, chunkPos.x(), chunkPos.z()));
-            removedClaimChunks.add(new ClaimChunk(chunkPos.x(), chunkPos.z()));
+            claim.removeChunk(chunkPos.x, chunkPos.z, now);
+            chunkIndex.remove(createKey(dimension, chunkPos.x, chunkPos.z));
+            removedClaimChunks.add(new ClaimChunk(chunkPos.x, chunkPos.z));
         }
         int removedHomes = SsuModuleAccess.active("homes")
                 ? SimpleServerUtilities.HOMES.deleteHomesInChunks(claim.getOwner(), dimension, removedClaimChunks)
@@ -745,7 +745,7 @@ public class PlayerClaimManager {
         if (claimId == null) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_NOT_CLAIMED,
-                    "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                    "chunk " + chunkPos.x + ", " + chunkPos.z
             );
         }
 
@@ -756,7 +756,7 @@ public class PlayerClaimManager {
 
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_NOT_CLAIMED,
-                    "claim group missing for chunk " + chunkPos.x() + ", " + chunkPos.z()
+                    "claim group missing for chunk " + chunkPos.x + ", " + chunkPos.z
             );
         }
 
@@ -779,29 +779,29 @@ public class PlayerClaimManager {
                     "Use the Claims GUI to pay the tax or forfeit claim capacity before deleting the final chunk.");
         }
 
-        if (wouldDisconnectClaim(claim, chunkPos.x(), chunkPos.z())) {
+        if (wouldDisconnectClaim(claim, chunkPos.x, chunkPos.z)) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_REMOVAL_DISCONNECTS_CLAIM,
-                    "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                    "chunk " + chunkPos.x + ", " + chunkPos.z
             );
         }
 
-        if (!claim.removeChunk(chunkPos.x(), chunkPos.z(), System.currentTimeMillis())) {
+        if (!claim.removeChunk(chunkPos.x, chunkPos.z, System.currentTimeMillis())) {
             return ClaimOperationResult.fail(
                     ClaimOperationResult.Type.CHUNK_NOT_CLAIMED,
-                    "chunk " + chunkPos.x() + ", " + chunkPos.z()
+                    "chunk " + chunkPos.x + ", " + chunkPos.z
             );
         }
 
         chunkIndex.remove(key);
         int removedHomes = SimpleServerUtilities.HOMES.deleteHomesInChunks(
                 claim.getOwner(), claim.getDimension(),
-                Set.of(new ClaimChunk(chunkPos.x(), chunkPos.z())));
+                Set.of(new ClaimChunk(chunkPos.x, chunkPos.z)));
         save();
         if (removedHomes > 0) {
             SimpleServerUtilities.LOGGER.info(
                     "Removed {} home(s) from unclaimed chunk {}, {} in claim '{}' ({})",
-                    removedHomes, chunkPos.x(), chunkPos.z(), claim.getDisplayName(), claim.getId());
+                    removedHomes, chunkPos.x, chunkPos.z, claim.getDisplayName(), claim.getId());
         }
 
         return ClaimOperationResult.success();
@@ -1340,7 +1340,7 @@ public class PlayerClaimManager {
     }
 
     private String createKey(Level level, ChunkPos chunkPos) {
-        return createKey(getDimensionId(level), chunkPos.x(), chunkPos.z());
+        return createKey(getDimensionId(level), chunkPos.x, chunkPos.z);
     }
 
     private String createKey(String dimension, int chunkX, int chunkZ) {
@@ -1348,7 +1348,7 @@ public class PlayerClaimManager {
     }
 
     private String getDimensionId(Level level) {
-        return level.dimension().identifier().toString();
+        return level.dimension().location().toString();
     }
 
     private String normalizeName(String name) {
@@ -1391,8 +1391,8 @@ public class PlayerClaimManager {
     public ClaimMapData getMapData(ServerPlayer player, int radius, String selectedClaimGroupName) {
         return getMapData(
                 player,
-                player.chunkPosition().x(),
-                player.chunkPosition().z(),
+                player.chunkPosition().x,
+                player.chunkPosition().z,
                 radius,
                 selectedClaimGroupName,
                 "",
@@ -1426,10 +1426,10 @@ public class PlayerClaimManager {
         int safeRadius = Math.max(2, Math.min(radius, 12));
         ChunkPos playerChunk = player.chunkPosition();
         int centerChunkX = constrainCenterToPlayer
-                ? clampMapCenter(requestedCenterChunkX, playerChunk.x())
+                ? clampMapCenter(requestedCenterChunkX, playerChunk.x)
                 : requestedCenterChunkX;
         int centerChunkZ = constrainCenterToPlayer
-                ? clampMapCenter(requestedCenterChunkZ, playerChunk.z())
+                ? clampMapCenter(requestedCenterChunkZ, playerChunk.z)
                 : requestedCenterChunkZ;
 
         List<String> ownedClaims = claims.values().stream()
@@ -1507,7 +1507,7 @@ public class PlayerClaimManager {
                     }
                 }
 
-                boolean currentChunk = chunkX == playerChunk.x() && chunkZ == playerChunk.z();
+                boolean currentChunk = chunkX == playerChunk.x && chunkZ == playerChunk.z;
                 boolean selectedClaimChunk = selectedClaim != null && selectedClaim.hasChunk(chunkX, chunkZ);
                 boolean canClaim = canClaimFromMap(player, selectedClaim, chunkPos, status);
                 boolean canUnclaim = selectedClaimChunk && selectedClaim.isOwner(player.getUUID());
@@ -1565,6 +1565,6 @@ public class PlayerClaimManager {
             return true;
         }
 
-        return selectedClaim.hasAdjacentChunk(chunkPos.x(), chunkPos.z());
+        return selectedClaim.hasAdjacentChunk(chunkPos.x, chunkPos.z);
     }
 }

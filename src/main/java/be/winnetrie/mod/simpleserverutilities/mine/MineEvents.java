@@ -8,7 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -24,7 +24,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockDropsEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
-import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /** Mine access, drop-rule/progress hooks plus the dedicated Mine Setup Tool workflow. */
@@ -38,7 +38,7 @@ public final class MineEvents {
         if(event.getAction()!=PlayerInteractEvent.LeftClickBlock.Action.START||!(event.getEntity() instanceof ServerPlayer player))return;
         if(!SimpleServerUtilities.MINE_SETUP_TOOLS.isTool(player,player.getMainHandItem()))return;
         if(!canAdmin(player))return;
-        String dim=player.level().dimension().identifier().toString();
+        String dim=player.level().dimension().location().toString();
         MineSetupToolManager.Selection selection=SimpleServerUtilities.MINE_SETUP_TOOLS.selection(player);
         if(selection.point1==null||selection.complete()||(!selection.dimension.isBlank()&&!selection.dimension.equals(dim))){
             selection.clear();selection.setPoint1(dim,event.getPos());
@@ -66,17 +66,17 @@ public final class MineEvents {
     }
 
     @SubscribeEvent(priority=EventPriority.HIGHEST)
-    public static void protectBreak(BreakBlockEvent event){if(!active())return;
-        if(!(event.getPlayer() instanceof ServerPlayer player))return;MineDefinition mine=SimpleServerUtilities.MINES.at(player.level(),event.getPos());if(mine==null)return;
+    public static void protectBreak(BlockEvent.BreakEvent event){if(!active())return;
+        if(!(event.getPlayer() instanceof ServerPlayer player))return;MineDefinition mine=SimpleServerUtilities.MINES.at(player.serverLevel(),event.getPos());if(mine==null)return;
         // Jail task mining is adjudicated by ModerationEvents/ModerationManager so the narrow jail-safe
         // permission path can enforce both the global and per-mine keys without unlocking other SSU features.
         if(moderated(player))return;
-        if(!canUse(player,mine)){event.setCanceled(true);player.sendOverlayMessage(Component.literal("You do not have permission to mine here."));}
+        if(!canUse(player,mine)){event.setCanceled(true);player.sendSystemMessage(Component.literal("You do not have permission to mine here."), true);}
     }
 
     @SubscribeEvent(priority=EventPriority.LOWEST)
-    public static void afterBreak(BreakBlockEvent event){if(!active())return;
-        if(event.isCanceled()||!(event.getPlayer() instanceof ServerPlayer player))return;MineDefinition mine=SimpleServerUtilities.MINES.at(player.level(),event.getPos());if(mine!=null&&canUse(player,mine))SimpleServerUtilities.MINES.blockMined(mine,player,event.getState());
+    public static void afterBreak(BlockEvent.BreakEvent event){if(!active())return;
+        if(event.isCanceled()||!(event.getPlayer() instanceof ServerPlayer player))return;MineDefinition mine=SimpleServerUtilities.MINES.at(player.serverLevel(),event.getPos());if(mine!=null&&canUse(player,mine))SimpleServerUtilities.MINES.blockMined(mine,player,event.getState());
     }
 
     /** Applies mine-local drop, XP and Fortune/Silk rules after vanilla has calculated the drop result. */
@@ -98,11 +98,11 @@ public final class MineEvents {
 
     private static void replaceWithCustomDrops(BlockDropsEvent event,MineDefinition mine){
         event.getDrops().clear();ThreadLocalRandom random=ThreadLocalRandom.current();
-        for(MineDefinition.DropEntry rule:mine.customDrops){if(rule==null||rule.itemId.isBlank()||random.nextDouble(100.0D)>=rule.chancePercent)continue;Item item;try{item=BuiltInRegistries.ITEM.getOptional(Identifier.parse(rule.itemId)).orElse(null);}catch(Exception ignored){item=null;}if(item==null)continue;int count=rule.minCount>=rule.maxCount?rule.minCount:random.nextInt(rule.minCount,rule.maxCount+1);while(count>0){ItemStack stack=new ItemStack(item);int part=Math.min(count,Math.max(1,stack.getMaxStackSize()));stack.setCount(part);event.getDrops().add(new ItemEntity(event.getLevel(),event.getPos().getX()+0.5D,event.getPos().getY()+0.5D,event.getPos().getZ()+0.5D,stack));count-=part;}}
+        for(MineDefinition.DropEntry rule:mine.customDrops){if(rule==null||rule.itemId.isBlank()||random.nextDouble(100.0D)>=rule.chancePercent)continue;Item item;try{item=BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(rule.itemId)).orElse(null);}catch(Exception ignored){item=null;}if(item==null)continue;int count=rule.minCount>=rule.maxCount?rule.minCount:random.nextInt(rule.minCount,rule.maxCount+1);while(count>0){ItemStack stack=new ItemStack(item);int part=Math.min(count,Math.max(1,stack.getMaxStackSize()));stack.setCount(part);event.getDrops().add(new ItemEntity(event.getLevel(),event.getPos().getX()+0.5D,event.getPos().getY()+0.5D,event.getPos().getZ()+0.5D,stack));count-=part;}}
     }
 
     @SubscribeEvent(priority=EventPriority.HIGHEST)
-    public static void onPlace(BlockEvent.EntityPlaceEvent event){if(!active())return;if(!(event.getEntity() instanceof ServerPlayer player)||PermissionService.isAdmin(player))return;MineDefinition mine=SimpleServerUtilities.MINES.at(player.level(),event.getPos());if(mine!=null)event.setCanceled(true);}
+    public static void onPlace(BlockEvent.EntityPlaceEvent event){if(!active())return;if(!(event.getEntity() instanceof ServerPlayer player)||PermissionService.isAdmin(player))return;MineDefinition mine=SimpleServerUtilities.MINES.at(player.serverLevel(),event.getPos());if(mine!=null)event.setCanceled(true);}
 
     @SubscribeEvent public static void onTick(ServerTickEvent.Post event){if(active())SimpleServerUtilities.MINES.tick(event.getServer());}
     @SubscribeEvent public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event){if(active()&&event.getEntity() instanceof ServerPlayer player)SimpleServerUtilities.MINE_SETUP_TOOLS.forget(player.getUUID());}

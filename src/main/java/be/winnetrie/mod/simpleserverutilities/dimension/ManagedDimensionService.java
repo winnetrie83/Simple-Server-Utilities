@@ -14,7 +14,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import be.winnetrie.mod.simpleserverutilities.teleport.TeleportSafety;
@@ -69,16 +69,16 @@ public final class ManagedDimensionService {
                 case "teleport" -> {
                     String id = payload.originalId() == null ? "" : payload.originalId().trim();
                     if (id.isBlank()) throw new IllegalArgumentException("Select a loaded dimension first.");
-                    var key = ResourceKey.create(Registries.DIMENSION, Identifier.parse(id));
+                    var key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(id));
                     var level = player.level().getServer().getLevel(key);
                     if (level == null) throw new IllegalArgumentException("That dimension is not loaded. Restart after creating or enabling it.");
-                    var spawn = level.getWorldBorderAdjustedRespawnData(level.getRespawnData()).pos();
+                    var spawn = level.getSharedSpawnPos();
                     var safe = TeleportSafety.findSafeDestination(level, spawn.getX()+0.5D, spawn.getY(), spawn.getZ()+0.5D, 32);
                     if (safe.isPresent()) {
                         var d = safe.get();
-                        player.teleportTo(level, d.x(), d.y(), d.z(), java.util.Set.of(), player.getYRot(), player.getXRot(), true);
+                        player.teleportTo(level, d.x(), d.y(), d.z(), java.util.Set.of(), player.getYRot(), player.getXRot());
                     } else {
-                        player.teleportTo(level, spawn.getX()+0.5D, spawn.getY()+1.0D, spawn.getZ()+0.5D, java.util.Set.of(), player.getYRot(), player.getXRot(), true);
+                        player.teleportTo(level, spawn.getX()+0.5D, spawn.getY()+1.0D, spawn.getZ()+0.5D, java.util.Set.of(), player.getYRot(), player.getXRot());
                     }
                     selected = id;
                     notice = "Teleported to " + id + ".";

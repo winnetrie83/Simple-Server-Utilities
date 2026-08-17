@@ -1,7 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.client.gui;
 
 import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorOpenPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -56,22 +56,22 @@ final class GenericMinigameEditorScreen extends MinigameEditorScreen {
         } catch (RuntimeException exception) { setNotice(exception.getMessage(), true); }
     }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = (width - W) / 2, y = (height - H) / 2;
-        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
-        g.text(font, "Generic Minigame Editor", x + 24, y + 22, TEXT, true);
-        g.text(font, "Generic mode has its own editor. Concrete modes such as Spleef use a dedicated tabbed editor.", x + 24, y + 43, MUTED, false);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(x, y, x + W, y + H, PANEL); g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Generic Minigame Editor", x + 24, y + 22, TEXT, true);
+        g.drawString(font, "Generic mode has its own editor. Concrete modes such as Spleef use a dedicated tabbed editor.", x + 24, y + 43, MUTED, false);
         label(g, "Internal ID", "Unique technical key used by commands and storage. Avoid changing it after release.", x + 24, y + 58);
         label(g, "Display name", "Player-facing name shown in minigame menus and messages.", x + 296, y + 58);
         label(g, "Minimum players", "Queue size required before the countdown may begin.", x + 24, y + 132);
         label(g, "Maximum players", "Maximum number of simultaneous participants.", x + 158, y + 132);
         label(g, "Countdown seconds", "Waiting time after enough players are ready.", x + 296, y + 132);
         label(g, "Match seconds", "Maximum match duration. Enter 0 for no time limit.", x + 450, y + 132);
-        if (!notice.isBlank()) g.text(font, trim(notice, 82), x + 126, y + H - 32, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 82), x + 126, y + H - 32, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void label(GuiGraphicsExtractor g, String title, String help, int x, int y) {
-        g.text(font, title, x, y, TEXT, true); g.text(font, trim(help, 38), x, y + 42, MUTED, false);
+    private void label(GuiGraphics g, String title, String help, int x, int y) {
+        g.drawString(font, title, x, y, TEXT, true); g.drawString(font, trim(help, 38), x, y + 42, MUTED, false);
     }
 }

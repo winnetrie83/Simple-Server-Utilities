@@ -244,7 +244,7 @@ public class WarpManager {
         catch (RuntimeException ignored) { return 10_000L; }
     }
 
-    private String dimensionId(ServerPlayer player) { return player.level().dimension().identifier().toString(); }
+    private String dimensionId(ServerPlayer player) { return player.level().dimension().location().toString(); }
     private String sanitizeServerName(String name) {
         // Keep the original server-warp compatibility contract: blank means "warp"
         // and existing non-space names remain addressable after the rental migration.

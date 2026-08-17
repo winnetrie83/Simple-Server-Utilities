@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.minigame.MinigameGameType;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSelectionCreatePayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSelectionCreateResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupToolOpenPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** New-game wizard reached only after the Setup Tool selected two arena corners. */
 public final class MinigameSetupCreateScreen extends Screen {
@@ -81,7 +81,7 @@ public final class MinigameSetupCreateScreen extends Screen {
             int limit = type == MinigameGameType.SPLEEF ? 16 : type == MinigameGameType.BLOCK_PARTY ? 32 : 64;
             if (min < 2 || max < min || max > limit) throw new NumberFormatException();
             awaiting = true; notice = "Creating region and verified reset snapshot…"; error = false;
-            ClientPacketDistributor.sendToServer(new MinigameSelectionCreatePayload(id.getValue(), name.getValue(),
+            PacketDistributor.sendToServer(new MinigameSelectionCreatePayload(id.getValue(), name.getValue(),
                     type.id(), min, max, nextRequestId++));
             rebuildWidgets();
         } catch (RuntimeException exception) {
@@ -94,22 +94,22 @@ public final class MinigameSetupCreateScreen extends Screen {
         awaiting = false; nextRequestId = Math.max(nextRequestId, result.requestId() + 1L);
         notice = result.message(); error = !result.successful();
         if (result.successful()) {
-            if (minecraft != null) minecraft.setScreenAndShow(parent);
+            if (minecraft != null) minecraft.setScreen(parent);
         } else rebuildWidgets();
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
-        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
-        g.text(font, "Create a managed minigame arena", x + 20, y + 14, TEXT, true);
-        g.text(font, selection.selectionVolume() + " selected blocks in " + shortDimension(selection.selectionDimension()), x + 20, y + 32, MUTED, false);
-        g.text(font, "Internal ID", x + 20, y + 47, MUTED, false); g.text(font, "Display name", x + 215, y + 47, MUTED, false);
-        g.text(font, "Minimum", x + 20, y + 95, MUTED, false); g.text(font, "Maximum", x + 120, y + 95, MUTED, false);
-        g.text(font, "The game starts disabled. Use its editor and Setup Tool before enabling it.", x + 20, y + 148, MUTED, false);
-        if (!notice.isBlank()) g.text(font, trim(notice, 62), x + 20, y + 168, error ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(x, y, x + W, y + H, PANEL); g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Create a managed minigame arena", x + 20, y + 14, TEXT, true);
+        g.drawString(font, selection.selectionVolume() + " selected blocks in " + shortDimension(selection.selectionDimension()), x + 20, y + 32, MUTED, false);
+        g.drawString(font, "Internal ID", x + 20, y + 47, MUTED, false); g.drawString(font, "Display name", x + 215, y + 47, MUTED, false);
+        g.drawString(font, "Minimum", x + 20, y + 95, MUTED, false); g.drawString(font, "Maximum", x + 120, y + 95, MUTED, false);
+        g.drawString(font, "The game starts disabled. Use its editor and Setup Tool before enabling it.", x + 20, y + 148, MUTED, false);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 62), x + 20, y + 168, error ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
     private int left() { return (width - W) / 2; } private int top() { return (height - H) / 2; }
     private static String shortDimension(String raw) { int i = raw.indexOf(':'); return i >= 0 ? raw.substring(i + 1) : raw; }

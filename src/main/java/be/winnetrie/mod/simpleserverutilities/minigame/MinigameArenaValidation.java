@@ -194,14 +194,14 @@ public final class MinigameArenaValidation {
     private static ServerLevel resolve(MinecraftServer server, String dimension) {
         if (server == null || dimension == null || dimension.isBlank()) return null;
         for (ServerLevel level : server.getAllLevels()) {
-            if (level.dimension().identifier().toString().equals(dimension)) return level;
+            if (level.dimension().location().toString().equals(dimension)) return level;
         }
         return null;
     }
 
     private static boolean boundsNearRegion(MinigameAreaBounds bounds, Region region, int padding) {
         if (bounds == null || region == null || !bounds.configured()) return false;
-        return bounds.dimension.equals(region.getDimension().identifier().toString())
+        return bounds.dimension.equals(region.getDimension().location().toString())
                 && bounds.minX >= region.getMinX() - padding && bounds.maxX <= region.getMaxX() + padding
                 && bounds.minY >= region.getMinY() - padding && bounds.maxY <= region.getMaxY() + padding
                 && bounds.minZ >= region.getMinZ() - padding && bounds.maxZ <= region.getMaxZ() + padding;

@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.network.NpcAbilityEditorResultPayl
 import be.winnetrie.mod.simpleserverutilities.network.NpcAbilityLibraryActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcAbilityLibraryDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcAbilityLibraryRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Standalone reusable NPC ability catalogue. */
 public final class NpcAbilityLibraryScreen extends Screen {
@@ -44,16 +44,16 @@ public final class NpcAbilityLibraryScreen extends Screen {
         Button next=addRenderableWidget(Button.builder(Component.literal("Next ›"),b->request(Math.min(data.pageCount()-1,data.pageIndex()+1))).bounds(x+90,y+H-46,70,20).build());next.active=data.pageIndex()+1<data.pageCount();
     }
 
-    private void request(int page){String q=search==null?data.query():search.getValue();ClientPacketDistributor.sendToServer(new NpcAbilityLibraryRequestPayload(q,page,nextRequestId++));}
+    private void request(int page){String q=search==null?data.query():search.getValue();PacketDistributor.sendToServer(new NpcAbilityLibraryRequestPayload(q,page,nextRequestId++));}
     private void refresh(){request(data.pageIndex());}
-    private void newAbility(){String id=newId==null?"new_ability":newId.getValue();ClientPacketDistributor.sendToServer(new NpcAbilityLibraryActionPayload("new","",id,data.query(),data.pageIndex(),nextRequestId++));}
-    private void edit(){if(data.entries().isEmpty())return;ClientPacketDistributor.sendToServer(new NpcAbilityLibraryActionPayload("open",selected().id(),"",data.query(),data.pageIndex(),nextRequestId++));}
-    private void delete(){if(data.entries().isEmpty())return;ClientPacketDistributor.sendToServer(new NpcAbilityLibraryActionPayload("delete",selected().id(),"",data.query(),data.pageIndex(),nextRequestId++));}
-    private void assign(){if(data.entries().isEmpty()||!(parent instanceof NpcEditorScreen editor))return;NpcAbilityLibraryDataPayload.Entry e=selected();editor.assignSharedAbility(e.id(),e.displayName());if(minecraft!=null)minecraft.setScreenAndShow(parent);}
+    private void newAbility(){String id=newId==null?"new_ability":newId.getValue();PacketDistributor.sendToServer(new NpcAbilityLibraryActionPayload("new","",id,data.query(),data.pageIndex(),nextRequestId++));}
+    private void edit(){if(data.entries().isEmpty())return;PacketDistributor.sendToServer(new NpcAbilityLibraryActionPayload("open",selected().id(),"",data.query(),data.pageIndex(),nextRequestId++));}
+    private void delete(){if(data.entries().isEmpty())return;PacketDistributor.sendToServer(new NpcAbilityLibraryActionPayload("delete",selected().id(),"",data.query(),data.pageIndex(),nextRequestId++));}
+    private void assign(){if(data.entries().isEmpty()||!(parent instanceof NpcEditorScreen editor))return;NpcAbilityLibraryDataPayload.Entry e=selected();editor.assignSharedAbility(e.id(),e.displayName());if(minecraft!=null)minecraft.setScreen(parent);}
     private NpcAbilityLibraryDataPayload.Entry selected(){return data.entries().get(Math.max(0,Math.min(selected,data.entries().size()-1)));}
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float pt){int x=left(),y=top();SsuGuiScale.fullscreenDim(g,this,0xA5000000);g.fill(x,y,x+W,y+H,PANEL);g.outline(x,y,W,H,BORDER);g.text(font,"NPC Ability Library",x+14,y+17,TEXT,true);g.text(font,parent instanceof NpcEditorScreen?"Select a shared ability and click Assign. Edit once; every assigned NPC uses the update.":"Reusable server-wide abilities. Edit once; every assigned NPC uses the update.",x+14,y+33,MUTED,false);int rowY=y+116;for(int i=0;i<data.entries().size();i++){NpcAbilityLibraryDataPayload.Entry e=data.entries().get(i);int yy=rowY+i*20;if(i==selected)g.outline(x+10,yy-2,W-20,20,0xFF8EA4B8);g.text(font,e.channel()+" · "+e.executor(),x+352,yy+5,MUTED,false);g.text(font,"Used by "+e.usageCount(),x+438,yy+5,e.usageCount()>0?GOOD:MUTED,false);}g.text(font,"Page "+(data.pageIndex()+1)+"/"+data.pageCount()+" · "+data.totalAbilities()+" abilities",x+174,y+H-40,MUTED,false);if(!notice.isBlank())g.text(font,notice,x+14,y+H-18,noticeError?ERROR:GOOD,false);super.extractRenderState(g,mx,my,pt);}
+    @Override public void render(GuiGraphics g,int mx,int my,float pt){int x=left(),y=top();SsuGuiScale.fullscreenDim(g,this,0xA5000000);g.fill(x,y,x+W,y+H,PANEL);g.renderOutline(x,y,W,H,BORDER);g.drawString(font,"NPC Ability Library",x+14,y+17,TEXT,true);g.drawString(font,parent instanceof NpcEditorScreen?"Select a shared ability and click Assign. Edit once; every assigned NPC uses the update.":"Reusable server-wide abilities. Edit once; every assigned NPC uses the update.",x+14,y+33,MUTED,false);int rowY=y+116;for(int i=0;i<data.entries().size();i++){NpcAbilityLibraryDataPayload.Entry e=data.entries().get(i);int yy=rowY+i*20;if(i==selected)g.renderOutline(x+10,yy-2,W-20,20,0xFF8EA4B8);g.drawString(font,e.channel()+" · "+e.executor(),x+352,yy+5,MUTED,false);g.drawString(font,"Used by "+e.usageCount(),x+438,yy+5,e.usageCount()>0?GOOD:MUTED,false);}g.drawString(font,"Page "+(data.pageIndex()+1)+"/"+data.pageCount()+" · "+data.totalAbilities()+" abilities",x+174,y+H-40,MUTED,false);if(!notice.isBlank())g.drawString(font,notice,x+14,y+H-18,noticeError?ERROR:GOOD,false);super.render(g,mx,my,pt);}
     private int left(){return(width-W)/2;}private int top(){return(height-H)/2;}
-    @Override public void onClose(){if(minecraft!=null)minecraft.setScreenAndShow(parent);}
+    @Override public void onClose(){if(minecraft!=null)minecraft.setScreen(parent);}
     @Override public boolean isPauseScreen(){return false;}
 }

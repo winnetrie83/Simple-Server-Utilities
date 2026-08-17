@@ -40,7 +40,7 @@ import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleContainer;
@@ -751,7 +751,7 @@ public final class AuctionHouseManager {
             return;
         }
         try {
-            Identifier identifier = Identifier.parse(raw);
+            ResourceLocation identifier = ResourceLocation.parse(raw);
             ItemStack item = BuiltInRegistries.ITEM.getOptional(identifier)
                     .map(registeredItem -> new ItemStack(registeredItem))
                     .orElse(ItemStack.EMPTY);
@@ -848,7 +848,7 @@ public final class AuctionHouseManager {
 
     private static String itemId(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return "";
-        Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         return id == null ? "" : id.toString().toLowerCase(Locale.ROOT);
     }
 
@@ -1038,7 +1038,7 @@ public final class AuctionHouseManager {
         ItemStack stack = ItemStack.EMPTY;
         String name = itemId;
         try {
-            stack = BuiltInRegistries.ITEM.getOptional(Identifier.parse(itemId))
+            stack = BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(itemId))
                     .map(registeredItem -> new ItemStack(registeredItem))
                     .orElse(ItemStack.EMPTY);
             if (!stack.isEmpty()) name = stack.getHoverName().getString();

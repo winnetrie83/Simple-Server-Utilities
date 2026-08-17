@@ -4,13 +4,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Requests the trusted-player manager for one owned claim. */
 public record SsuTrustedPlayersRequestPayload(String claim, String search, long requestId)
         implements CustomPacketPayload {
     public static final Type<SsuTrustedPlayersRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "trusted_players_request"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "trusted_players_request"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuTrustedPlayersRequestPayload> STREAM_CODEC =
             StreamCodec.of(SsuTrustedPlayersRequestPayload::encode, SsuTrustedPlayersRequestPayload::decode);
 

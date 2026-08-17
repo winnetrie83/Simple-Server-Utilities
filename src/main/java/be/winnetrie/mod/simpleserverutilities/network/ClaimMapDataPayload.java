@@ -12,7 +12,7 @@ import be.winnetrie.mod.simpleserverutilities.visualization.BorderCategory;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record ClaimMapDataPayload(
         int centerChunkX,
@@ -45,7 +45,7 @@ public record ClaimMapDataPayload(
     private static final int MAX_CLAIMS = 256;
 
     public static final Type<ClaimMapDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "claim_map_data")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "claim_map_data")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ClaimMapDataPayload> STREAM_CODEC =

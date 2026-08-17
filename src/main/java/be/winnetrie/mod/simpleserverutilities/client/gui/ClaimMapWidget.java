@@ -13,10 +13,9 @@ import java.util.function.IntConsumer;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimChunkStatus;
 import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapOperation;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapDataPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 final class ClaimMapWidget extends AbstractWidget {
@@ -96,8 +95,8 @@ final class ClaimMapWidget extends AbstractWidget {
     }
 
     @Override
-    protected void extractWidgetRenderState(
-            GuiGraphicsExtractor graphics,
+    protected void renderWidget(
+            GuiGraphics graphics,
             int mouseX,
             int mouseY,
             float partialTick
@@ -177,7 +176,7 @@ final class ClaimMapWidget extends AbstractWidget {
     }
 
     private void drawWildernessGrid(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             int startX,
             int startY,
             int cellSize
@@ -212,7 +211,7 @@ final class ClaimMapWidget extends AbstractWidget {
     }
 
     private void drawGroupFill(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             GroupRenderInfo group,
             int startX,
             int startY,
@@ -244,7 +243,7 @@ final class ClaimMapWidget extends AbstractWidget {
     }
 
     private void drawGroupOutline(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             GroupRenderInfo group,
             int startX,
             int startY,
@@ -295,7 +294,7 @@ final class ClaimMapWidget extends AbstractWidget {
     }
 
     private void drawCurrentChunk(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             int startX,
             int startY,
             int cellSize
@@ -327,7 +326,7 @@ final class ClaimMapWidget extends AbstractWidget {
                     1
             );
 
-            graphics.text(
+            graphics.drawString(
                     MinecraftAccess.font(),
                     "P",
                     left + Math.max(2, cellSize / 2 - 3),
@@ -339,15 +338,14 @@ final class ClaimMapWidget extends AbstractWidget {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (!isMouseOver(event.x(), event.y())) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (!isMouseOver(mouseX, mouseY)) {
             return false;
         }
 
-        int button = event.buttonInfo().button();
-
+        
         if (button == 0) {
-            ClaimMapDataPayload.Entry entry = entryAt(event.x(), event.y());
+            ClaimMapDataPayload.Entry entry = entryAt(mouseX, mouseY);
 
             if (entry == null || !isSelectable(entry)) {
                 return true;
@@ -365,21 +363,17 @@ final class ClaimMapWidget extends AbstractWidget {
             return true;
         }
 
-        return button == 2 && beginMiddleDrag(event.x(), event.y());
+        return button == 2 && beginMiddleDrag(mouseX, mouseY);
     }
 
     @Override
-    public boolean mouseDragged(
-            MouseButtonEvent event,
-            double deltaX,
-            double deltaY
-    ) {
-        return event.buttonInfo().button() == 2 && updateMiddleDrag(event.x(), event.y());
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        return button == 2 && updateMiddleDrag(mouseX, mouseY);
     }
 
     @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
-        return event.buttonInfo().button() == 2 && finishMiddleDrag();
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        return button == 2 && finishMiddleDrag();
     }
 
     boolean beginMiddleDrag(double mouseX, double mouseY) {
@@ -505,7 +499,7 @@ final class ClaimMapWidget extends AbstractWidget {
     }
 
     private static void outline(
-            GuiGraphicsExtractor graphics,
+            GuiGraphics graphics,
             int left,
             int top,
             int right,

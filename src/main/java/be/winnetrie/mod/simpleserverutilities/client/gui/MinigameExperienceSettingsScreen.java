@@ -4,7 +4,7 @@ import java.util.Locale;
 
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameDefinition;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameExperienceRules;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -129,7 +129,7 @@ final class MinigameExperienceSettingsScreen extends Screen {
             saveVisibleFields();
             rules.normalize();
             draft.experience = copyOf(rules);
-            if (minecraft != null) minecraft.setScreenAndShow(parent);
+            if (minecraft != null) minecraft.setScreen(parent);
         } catch (RuntimeException exception) {
             notice = message(exception);
         }
@@ -177,55 +177,55 @@ final class MinigameExperienceSettingsScreen extends Screen {
         return Component.literal(name + ": " + (enabled ? "ON" : "OFF"));
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, "Shared Minigame Experience", x + 286, y + 18, TEXT, true);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Shared Minigame Experience", x + 286, y + 18, TEXT, true);
         g.fill(x + 12, y + 42, x + W - 12, y + H - 40, SUBPANEL);
-        g.outline(x + 12, y + 42, W - 24, H - 82, BORDER);
+        g.renderOutline(x + 12, y + 42, W - 24, H - 82, BORDER);
         if (page == 0) {
-            g.text(font, "Match lifecycle", x + 20, y + 142, ACCENT, true);
-            g.text(font, "The match starts automatically when preparation time ends. Players may join until RUNNING.",
+            g.drawString(font, "Match lifecycle", x + 20, y + 142, ACCENT, true);
+            g.drawString(font, "The match starts automatically when preparation time ends. Players may join until RUNNING.",
                     x + 20, y + 158, MUTED, false);
-            g.text(font, "Rejoin grace", x + 14, y + 176, MUTED, false);
-            g.text(font, "AFK timeout", x + 138, y + 176, MUTED, false);
-            g.text(font, "AFK warning", x + 262, y + 176, MUTED, false);
-            g.text(font, "Overtime", x + 386, y + 176, MUTED, false);
-            g.text(font, "Vote window", x + 510, y + 176, MUTED, false);
-            g.text(font, "Rejoin is the disconnect return window; the AFK warning must occur before removal.",
+            g.drawString(font, "Rejoin grace", x + 14, y + 176, MUTED, false);
+            g.drawString(font, "AFK timeout", x + 138, y + 176, MUTED, false);
+            g.drawString(font, "AFK warning", x + 262, y + 176, MUTED, false);
+            g.drawString(font, "Overtime", x + 386, y + 176, MUTED, false);
+            g.drawString(font, "Vote window", x + 510, y + 176, MUTED, false);
+            g.drawString(font, "Rejoin is the disconnect return window; the AFK warning must occur before removal.",
                     x + 20, y + 222, MUTED, false);
-            g.text(font, "The final 10 preparation seconds are shown as a large synchronized countdown with sound.",
+            g.drawString(font, "The final 10 preparation seconds are shown as a large synchronized countdown with sound.",
                     x + 20, y + 240, MUTED, false);
         } else {
-            g.text(font, "Progression is cosmetic/account history only and never changes combat power.",
+            g.drawString(font, "Progression is cosmetic/account history only and never changes combat power.",
                     x + 20, y + 92, MUTED, false);
-            g.text(font, "Balance weight: 0 uses player count; 1 gives historical rating maximum influence.",
+            g.drawString(font, "Balance weight: 0 uses player count; 1 gives historical rating maximum influence.",
                     x + 20, y + 108, MUTED, false);
-            g.text(font, "Balance weight", x + 14, y + 128, MUTED, false);
-            g.text(font, "Participation XP", x + 146, y + 128, MUTED, false);
-            g.text(font, "Winner XP bonus", x + 278, y + 128, MUTED, false);
-            g.text(font, "Performance XP cap", x + 410, y + 128, MUTED, false);
-            g.text(font, "Weekly cosmetic challenges use shared player progress and these definition-specific thresholds.",
+            g.drawString(font, "Balance weight", x + 14, y + 128, MUTED, false);
+            g.drawString(font, "Participation XP", x + 146, y + 128, MUTED, false);
+            g.drawString(font, "Winner XP bonus", x + 278, y + 128, MUTED, false);
+            g.drawString(font, "Performance XP cap", x + 410, y + 128, MUTED, false);
+            g.drawString(font, "Weekly cosmetic challenges use shared player progress and these definition-specific thresholds.",
                     x + 270, y + 195, MUTED, false);
-            g.text(font, "Matches required", x + 14, y + 230, MUTED, false);
-            g.text(font, "Matches XP", x + 146, y + 230, MUTED, false);
-            g.text(font, "Wins required", x + 278, y + 230, MUTED, false);
-            g.text(font, "Wins XP", x + 410, y + 230, MUTED, false);
-            g.text(font, "Impact required", x + 14, y + 286, MUTED, false);
-            g.text(font, "Impact XP", x + 212, y + 286, MUTED, false);
-            g.text(font, "Turning weekly challenges off stops both progress and weekly XP for this minigame.",
+            g.drawString(font, "Matches required", x + 14, y + 230, MUTED, false);
+            g.drawString(font, "Matches XP", x + 146, y + 230, MUTED, false);
+            g.drawString(font, "Wins required", x + 278, y + 230, MUTED, false);
+            g.drawString(font, "Wins XP", x + 410, y + 230, MUTED, false);
+            g.drawString(font, "Impact required", x + 14, y + 286, MUTED, false);
+            g.drawString(font, "Impact XP", x + 212, y + 286, MUTED, false);
+            g.drawString(font, "Turning weekly challenges off stops both progress and weekly XP for this minigame.",
                     x + 20, y + 334, MUTED, false);
-            g.text(font, "Quest, statistics, mail and hologram integrations continue to use normal SSU events.",
+            g.drawString(font, "Quest, statistics, mail and hologram integrations continue to use normal SSU events.",
                     x + 20, y + 352, MUTED, false);
         }
-        if (!notice.isBlank()) g.text(font, notice, x + 96, y + H - 24, ERROR, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) g.drawString(font, notice, x + 96, y + H - 24, ERROR, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private static MinigameExperienceRules copyOf(MinigameExperienceRules source) {

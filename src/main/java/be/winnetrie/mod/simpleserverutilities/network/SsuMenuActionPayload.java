@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** A closed, server-validated dashboard action; it cannot carry an arbitrary command. */
 public record SsuMenuActionPayload(
@@ -15,7 +15,7 @@ public record SsuMenuActionPayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<SsuMenuActionPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "menu_action")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "menu_action")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuMenuActionPayload> STREAM_CODEC =
             StreamCodec.of(SsuMenuActionPayload::encode, SsuMenuActionPayload::decode);

@@ -15,7 +15,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -59,7 +59,7 @@ public final class NpcEvents {
     public static void onDynamicEntityJoin(EntityJoinLevelEvent event) {
         if (!event.loadedFromDisk()) return;
         Entity entity = event.getEntity();
-        if (!entity.entityTags().contains("ssu_npc_dynamic")) return;
+        if (!entity.getTags().contains("ssu_npc_dynamic")) return;
         if (SimpleServerUtilities.NPCS.isManagedEntity(entity.getUUID())) return;
         // Dynamic NPCs are intentionally not persistent placements. If one is restored from chunk
         // data after its runtime instance vanished (or after a restart/crash), discard the orphan.
@@ -69,7 +69,7 @@ public final class NpcEvents {
     @SubscribeEvent
     public static void onSpawnerPositionCheck(MobSpawnEvent.PositionCheck event) {
         if (!SsuModuleAccess.active("npcs")) return;
-        if (event.getSpawnType() != EntitySpawnReason.SPAWNER || event.getSpawner() == null) return;
+        if (event.getSpawnType() != MobSpawnType.SPAWNER || event.getSpawner() == null) return;
         if (!(event.getLevel() instanceof net.minecraft.server.level.ServerLevel level)) return;
         var owner = event.getSpawner().getOwner();
         if (owner == null) return;
@@ -276,7 +276,7 @@ public final class NpcEvents {
                 return;
             }
             NpcInstance copy = SimpleServerUtilities.NPCS.duplicateLinked(source,
-                    player.level().dimension().identifier().toString(), x, y, z, player.getYRot(), 0.0F);
+                    player.level().dimension().location().toString(), x, y, z, player.getYRot(), 0.0F);
             player.sendSystemMessage(Component.literal(copy == null
                     ? "The NPC could not be pasted."
                     : "Pasted a linked NPC copy. Template changes affect every linked placement."), true);

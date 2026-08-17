@@ -36,13 +36,13 @@ import be.winnetrie.mod.simpleserverutilities.npc.NpcScheduleEntry;
 import be.winnetrie.mod.simpleserverutilities.time.GameCalendar;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcTextureSource;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcVisualMode;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Compact multi-page NPC editor. Inventory loadouts are edited in a real container menu. */
 public final class NpcEditorScreen extends Screen {
@@ -264,7 +264,7 @@ public final class NpcEditorScreen extends Screen {
 
         if (visual == NpcVisualMode.ENTITY) {
             addRenderableWidget(Button.builder(Component.literal("Entity: " + trim(entityTypeValue, 32)), b -> {
-                savePage(); if (minecraft != null) minecraft.setScreenAndShow(new NpcModelPickerScreen(this, models, entityTypeValue));
+                savePage(); if (minecraft != null) minecraft.setScreen(new NpcModelPickerScreen(this, models, entityTypeValue));
             }).bounds(x + 12, y + 132, 486, 18).build());
             NpcTextureSource source = NpcTextureSource.parse(textureSourceValue);
             addRenderableWidget(Button.builder(Component.literal("Texture source: " + source.label()), b -> cycleTextureSource())
@@ -303,18 +303,18 @@ public final class NpcEditorScreen extends Screen {
                 .bounds(x + 12, y + 88, 220, 18).build());
         dialogueId = field(x + 240, y + 88, 130, 64, dialogueIdValue);
         Button dialogue = addRenderableWidget(Button.builder(Component.literal("Advanced dialogue"), b -> {
-            savePage(); ClientPacketDistributor.sendToServer(new NpcDialogueEditorRequestPayload(initial.originalInstanceId()));
+            savePage(); PacketDistributor.sendToServer(new NpcDialogueEditorRequestPayload(initial.originalInstanceId()));
         }).bounds(x + 378, y + 88, 120, 18).build());
         dialogue.active = initial.editing();
         Button quests = addRenderableWidget(Button.builder(Component.literal("Manage quests…"), b -> {
-            savePage(); ClientPacketDistributor.sendToServer(new NpcQuestWorkflowRequestPayload(initial.originalInstanceId()));
+            savePage(); PacketDistributor.sendToServer(new NpcQuestWorkflowRequestPayload(initial.originalInstanceId()));
         }).bounds(x + 12, y + 120, 210, 18).build());
         quests.active = initial.editing();
 
         addRenderableWidget(Button.builder(Component.literal(shopIdValue.isBlank() ? "Create NPC shop" : "Edit NPC shop"),
                 b -> openOrCreateNpcShop()).bounds(x + 12, y + 154, 210, 18).build());
         addRenderableWidget(Button.builder(Component.literal("Shared shop…"), b -> {
-            savePage(); if (minecraft != null) minecraft.setScreenAndShow(new NpcChoicePickerScreen(this,
+            savePage(); if (minecraft != null) minecraft.setScreen(new NpcChoicePickerScreen(this,
                     NpcChoicePickerScreen.Kind.SHOP, initial.availableShops(), shopIdValue));
         }).bounds(x + 230, y + 154, 130, 18).build());
         Button unlinkShop = addRenderableWidget(Button.builder(Component.literal("Unlink shop"), b -> {
@@ -401,7 +401,7 @@ public final class NpcEditorScreen extends Screen {
         reputationLoss = field(x + 165, y + 132, 155, 12, reputationLossValue);
         reputationDeniedText = field(x + 12, y + 176, 486, 256, reputationDeniedTextValue);
         addRenderableWidget(Button.builder(Component.literal("Faction: " + trim(choiceLabel(initial.availableFactions(), relationFactionValue, "None"), 23)), b -> {
-            savePage(); if (minecraft != null) minecraft.setScreenAndShow(new NpcChoicePickerScreen(this,
+            savePage(); if (minecraft != null) minecraft.setScreen(new NpcChoicePickerScreen(this,
                     NpcChoicePickerScreen.Kind.RELATION_FACTION, initial.availableFactions(), relationFactionValue));
         }).bounds(x + 12, y + 232, 180, 18).build());
         String relationAttitude = relations.isEmpty() ? NpcAttitude.NEUTRAL.id() : relations.get(relationIndex).attitude;
@@ -484,7 +484,7 @@ public final class NpcEditorScreen extends Screen {
 
     private void openAbilityLibrary() {
         savePage();
-        ClientPacketDistributor.sendToServer(new NpcAbilityLibraryRequestPayload("", 0, nextRequestId++));
+        PacketDistributor.sendToServer(new NpcAbilityLibraryRequestPayload("", 0, nextRequestId++));
     }
 
     /** Called by the standalone Ability Library when an admin assigns the selected shared ability. */
@@ -696,7 +696,7 @@ public final class NpcEditorScreen extends Screen {
             List<NpcFactionRelation> savedRelations = new ArrayList<>();
             for (NpcFactionRelation relation : relations) if (relation.copy().normalize().configured()) savedRelations.add(relation.copy().normalize());
             List<NpcEditorLootSlot> loot = initial.loot();
-            ClientPacketDistributor.sendToServer(new NpcEditorSubmitPayload(initial.originalInstanceId(), initial.originalDefinitionId(), deleteRequested,
+            PacketDistributor.sendToServer(new NpcEditorSubmitPayload(initial.originalInstanceId(), initial.originalDefinitionId(), deleteRequested,
                     definitionIdValue.trim(), displayNameValue.trim(), entityTypeValue, visualModeValue, textureSourceValue, textureValueValue.trim(), textureModelValue,
                     customModelResourceValue.trim(), customTextureResourceValue.trim(), customAnimationResourceValue.trim(),
                     idleAnimationValue.trim(), walkAnimationValue.trim(), attackAnimationValue.trim(), castAnimationValue.trim(), hurtAnimationValue.trim(), deathAnimationValue.trim(),
@@ -742,7 +742,7 @@ public final class NpcEditorScreen extends Screen {
     private void delete() { if (!deleteArmed) { deleteArmed = true; rebuildWidgets(); } else submit(true); }
     private void openLoadout(int mode) {
         if (!initial.editing()) { notice = "Create the NPC first, then reopen it to edit inventory slots."; noticeError = true; return; }
-        savePage(); ClientPacketDistributor.sendToServer(new NpcLoadoutOpenRequestPayload(initial.originalInstanceId(), mode));
+        savePage(); PacketDistributor.sendToServer(new NpcLoadoutOpenRequestPayload(initial.originalInstanceId(), mode));
     }
 
     public void acceptResult(NpcEditorResultPayload payload) {
@@ -758,14 +758,14 @@ public final class NpcEditorScreen extends Screen {
         if (minecraft != null && minecraft.player != null) minecraft.player.sendSystemMessage(Component.literal(payload.message()));
         if (pendingPatrolWorldEdit) {
             pendingPatrolWorldEdit = false;
-            ClientPacketDistributor.sendToServer(new NpcAdminActionPayload("patrol_route", initial.originalInstanceId(), nextRequestId++));
-            if (minecraft != null) minecraft.setScreenAndShow(null);
+            PacketDistributor.sendToServer(new NpcAdminActionPayload("patrol_route", initial.originalInstanceId(), nextRequestId++));
+            if (minecraft != null) minecraft.setScreen(null);
             return;
         }
         if (pendingScheduleWorldEdit) {
             pendingScheduleWorldEdit = false;
-            ClientPacketDistributor.sendToServer(new NpcAdminActionPayload("schedule_route", initial.originalInstanceId(), nextRequestId++));
-            if (minecraft != null) minecraft.setScreenAndShow(null);
+            PacketDistributor.sendToServer(new NpcAdminActionPayload("schedule_route", initial.originalInstanceId(), nextRequestId++));
+            if (minecraft != null) minecraft.setScreen(null);
             return;
         }
         if (pendingDelete) {
@@ -850,7 +850,7 @@ public final class NpcEditorScreen extends Screen {
         for (String skin : initial.availableLocalSkins()) {
             choices.add(new NpcEditorOpenPayload.Choice(skin, skin));
         }
-        minecraft.setScreenAndShow(new NpcChoicePickerScreen(this,
+        minecraft.setScreen(new NpcChoicePickerScreen(this,
                 NpcChoicePickerScreen.Kind.LOCAL_TEXTURE, choices, textureValueValue));
     }
 
@@ -880,7 +880,7 @@ public final class NpcEditorScreen extends Screen {
         }
         String proposed = automaticNpcShopId();
         shopIdValue = proposed;
-        ClientPacketDistributor.sendToServer(new NpcShopAdminActionPayload(
+        PacketDistributor.sendToServer(new NpcShopAdminActionPayload(
                 "new", "", proposed, "", 0, nextRequestId++));
         notice = "Creating the NPC-managed shop…"; noticeError = false;
     }
@@ -897,7 +897,7 @@ public final class NpcEditorScreen extends Screen {
         if (shopIdValue.isBlank()) {
             notice = "Select a linked shop first."; noticeError = true; return;
         }
-        ClientPacketDistributor.sendToServer(new NpcShopAdminActionPayload(
+        PacketDistributor.sendToServer(new NpcShopAdminActionPayload(
                 "open", shopIdValue, "", "", 0, nextRequestId++));
     }
 
@@ -905,7 +905,7 @@ public final class NpcEditorScreen extends Screen {
         savePage();
         String proposed = automaticNpcShopId();
         shopIdValue = proposed;
-        ClientPacketDistributor.sendToServer(new NpcShopAdminActionPayload(
+        PacketDistributor.sendToServer(new NpcShopAdminActionPayload(
                 "new", "", proposed, "", 0, nextRequestId++));
         notice = "New shared shop linked: " + proposed; noticeError = false;
     }
@@ -990,7 +990,7 @@ public final class NpcEditorScreen extends Screen {
     private void openBossPhaseActions() {
         try {
             saveBossPhase();
-            if (!bossPhases.isEmpty() && minecraft != null) minecraft.setScreenAndShow(new NpcBossPhaseActionsScreen(this, bossPhases.get(bossPhaseIndex)));
+            if (!bossPhases.isEmpty() && minecraft != null) minecraft.setScreen(new NpcBossPhaseActionsScreen(this, bossPhases.get(bossPhaseIndex)));
         } catch (RuntimeException exception) { notice = exception.getMessage() == null ? "Could not open phase actions." : exception.getMessage(); noticeError = true; }
     }
 
@@ -1145,7 +1145,7 @@ public final class NpcEditorScreen extends Screen {
             if (minecraft != null && minecraft.player != null) {
                 e.x = minecraft.player.getX(); e.y = minecraft.player.getY(); e.z = minecraft.player.getZ();
                 e.yaw = minecraft.player.getYRot();
-                if (minecraft.level != null) e.minuteOfDay = GameCalendar.fromClockTime(minecraft.level.getDefaultClockTime()).minuteOfDay();
+                if (minecraft.level != null) e.minuteOfDay = GameCalendar.fromClockTime(minecraft.level.getDayTime()).minuteOfDay();
             } else {
                 e.x = parseSafe(xValue, 0); e.y = parseSafe(yValue, 64); e.z = parseSafe(zValue, 0);
             }
@@ -1158,28 +1158,28 @@ public final class NpcEditorScreen extends Screen {
     private void cycleScheduleMovement() { savePage(); scheduleMovement = NpcScheduleEntry.MOVEMENT_TELEPORT.equals(scheduleMovement) ? NpcScheduleEntry.MOVEMENT_WALK : NpcScheduleEntry.MOVEMENT_TELEPORT; rebuildWidgets(); }
     private void cycleScheduleActivity() { savePage(); scheduleActivity = NpcScheduleActivity.parse(scheduleActivity).next().id(); rebuildWidgets(); }
     private void useCurrentSchedule() { if (minecraft == null || minecraft.player == null) return; if (schedule.isEmpty()) addSchedule(); scheduleXValue = number(minecraft.player.getX()); scheduleYValue = number(minecraft.player.getY()); scheduleZValue = number(minecraft.player.getZ()); scheduleYawValue = number(minecraft.player.getYRot()); rebuildWidgets(); }
-    private void useCurrentScheduleTime() { if (minecraft == null || minecraft.level == null) return; if (schedule.isEmpty()) addSchedule(); scheduleTimeValue = GameCalendar.fromClockTime(minecraft.level.getDefaultClockTime()).clockText(); rebuildWidgets(); }
+    private void useCurrentScheduleTime() { if (minecraft == null || minecraft.level == null) return; if (schedule.isEmpty()) addSchedule(); scheduleTimeValue = GameCalendar.fromClockTime(minecraft.level.getDayTime()).clockText(); rebuildWidgets(); }
     private List<NpcScheduleEntry> copiedSchedule() { List<NpcScheduleEntry> result = new ArrayList<>(); for (NpcScheduleEntry entry : schedule) result.add(entry.copy().normalize()); return result; }
 
     private void usePlacementRespawn() { savePage(); respawnDimensionValue = initial.dimension(); respawnXValue = xValue; respawnYValue = yValue; respawnZValue = zValue; respawnYawValue = yawValue; rebuildWidgets(); }
-    private void useCurrentRespawn() { if (minecraft == null || minecraft.player == null) return; savePage(); respawnDimensionValue = minecraft.player.level().dimension().identifier().toString(); respawnXValue = number(minecraft.player.getX()); respawnYValue = number(minecraft.player.getY()); respawnZValue = number(minecraft.player.getZ()); respawnYawValue = number(minecraft.player.getYRot()); rebuildWidgets(); }
+    private void useCurrentRespawn() { if (minecraft == null || minecraft.player == null) return; savePage(); respawnDimensionValue = minecraft.player.level().dimension().location().toString(); respawnXValue = number(minecraft.player.getX()); respawnYValue = number(minecraft.player.getY()); respawnZValue = number(minecraft.player.getZ()); respawnYawValue = number(minecraft.player.getYRot()); rebuildWidgets(); }
 
     @Override public void onClose() { closeToParent(initial.editing()); }
 
     private void closeToParent(boolean refreshManager) {
         if (minecraft == null) return;
-        minecraft.setScreenAndShow(parent);
+        minecraft.setScreen(parent);
         if (refreshManager && parent instanceof NpcAdminScreen manager) manager.refresh();
     }
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
-        int x = px(), y = py(); SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
-        g.text(font, initial.editing() ? "Edit NPC" : "Create NPC", x + 12, y + 12, TEXT, true);
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        int x = px(), y = py(); SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(x, y, x + W, y + H, PANEL); g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, initial.editing() ? "Edit NPC" : "Create NPC", x + 12, y + 12, TEXT, true);
         renderLabels(g, x, y);
-        if (!notice.isBlank()) g.text(font, trim(notice, 58), x + 194, y + H - 20, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 58), x + 194, y + H - 20, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void renderLabels(GuiGraphicsExtractor g, int x, int y) {
+    private void renderLabels(GuiGraphics g, int x, int y) {
         switch (page) {
             case IDENTITY -> { label(g,"Template ID",x+12,y+77);label(g,"Display name",x+250,y+77);label(g,"Role / occupation",x+12,y+121);label(g,"X",x+12,y+179);label(g,"Y",x+115,y+179);label(g,"Z",x+218,y+179);label(g,"Yaw",x+321,y+179); }
             case APPEARANCE -> {
@@ -1190,12 +1190,12 @@ public final class NpcEditorScreen extends Screen {
                     label(g,"Optional texture override",x+12,y+165);
                     NpcTextureSource source = NpcTextureSource.parse(textureSourceValue);
                     if (source.custom()) label(g, source == NpcTextureSource.LOCAL ? "Relative PNG path" : "HTTPS PNG URL", x+12,y+211);
-                    g.text(font,"Use the same UV layout as the selected vanilla mob texture.",x+258,y+181,MUTED,false);
+                    g.drawString(font,"Use the same UV layout as the selected vanilla mob texture.",x+258,y+181,MUTED,false);
                 } else {
                     label(g,"Player skin",x+12,y+121);
                     NpcTextureSource source = NpcTextureSource.parse(textureSourceValue);
                     if (source.custom()) label(g, source == NpcTextureSource.LOCAL ? "Relative 64x64 PNG path" : "HTTPS 64x64 PNG URL", x+12,y+167);
-                    g.text(font,"Uses Minecraft's player model. Player skins must be 64x64.",x+12,y+214,MUTED,false);
+                    g.drawString(font,"Uses Minecraft's player model. Player skins must be 64x64.",x+12,y+214,MUTED,false);
                 }
             }
             case INTERACTION -> {
@@ -1211,50 +1211,50 @@ public final class NpcEditorScreen extends Screen {
                 else if (behavior == NpcBehaviorMode.WANDER) { label(g,"Wander radius",x+12,y+167); label(g,"New target every (sec)",x+165,y+167); }
                 else if (behavior == NpcBehaviorMode.PATROL) { label(g,"Patrol route",x+12,y+167); }
                 label(g,"Home radius (0 = none)",x+12,y+221);
-                g.text(font,"Walking/running speed is configured under Stats. Schedules may override route movement.",x+12,y+260,MUTED,false);
-                g.text(font,"AI family: " + trim(initial.aiProfileLabel(), 42),x+12,y+276,MUTED,false);
-                g.text(font,"Runtime: " + trim(initial.aiRuntimeState(), 55),x+12,y+290,MUTED,false);
+                g.drawString(font,"Walking/running speed is configured under Stats. Schedules may override route movement.",x+12,y+260,MUTED,false);
+                g.drawString(font,"AI family: " + trim(initial.aiProfileLabel(), 42),x+12,y+276,MUTED,false);
+                g.drawString(font,"Runtime: " + trim(initial.aiRuntimeState(), 55),x+12,y+290,MUTED,false);
             }
             case MOVEMENT -> {
                 label(g,"Patrol traversal",x+12,y+77);
                 label(g,"Patrol point " + (patrol.isEmpty()?"0/0":(patrolIndex+1)+"/"+patrol.size()),x+165,y+77);
                 label(g,"X",x+12,y+137); label(g,"Y",x+115,y+137); label(g,"Z",x+218,y+137);
                 label(g,"Yaw",x+321,y+137); label(g,"Pause sec",x+424,y+137);
-                g.text(font,"Patrol routes belong to this placement; linked copies keep independent waypoints.",x+12,y+246,MUTED,false);
-                if (initial.editing()) g.text(font,"World editor: RMB block add • sneak+RMB remove • sneak+RMB air undo • RMB air finish.",x+12,y+258,MUTED,false);
+                g.drawString(font,"Patrol routes belong to this placement; linked copies keep independent waypoints.",x+12,y+246,MUTED,false);
+                if (initial.editing()) g.drawString(font,"World editor: RMB block add • sneak+RMB remove • sneak+RMB air undo • RMB air finish.",x+12,y+258,MUTED,false);
             }
             case RELATIONS -> { label(g,"Faction ID",x+12,y+77); label(g,"Faction name",x+165,y+77); label(g,"Attitude to players",x+328,y+77); label(g,"Minimum reputation",x+12,y+121); label(g,"Loss when attacked",x+165,y+121); label(g,"Denied message",x+12,y+165); label(g,"Faction relation " + (relations.isEmpty()?"0/0":(relationIndex+1)+"/"+relations.size()) + " — choose from known factions",x+12,y+221); }
-            case COMBAT -> { label(g,"Combat profile + allowed attack channels",x+12,y+77); label(g,"Self-defense reaction",x+12,y+121); label(g,"Hostile sight reaction",x+258,y+121); label(g,"Friendly-defense reaction",x+12,y+165); label(g,"Assist range",x+258,y+165); label(g,"Flee distance",x+383,y+165); label(g,"Attack cooldown (ticks)",x+12,y+219); g.text(font,"Melee/ranged use equipped weapons; Magic gates magic abilities. Any combination is allowed.",x+12,y+267,MUTED,false); g.text(font,"Patrol/schedules use Walking speed; combat chase uses Running speed.",x+12,y+279,MUTED,false); }
-            case TACTICS -> { label(g,"Threat range",x+12,y+121);label(g,"Damage ×",x+102,y+121);label(g,"Healing ×",x+192,y+121);label(g,"Decay/sec",x+282,y+121);label(g,"Switch ratio",x+384,y+121);label(g,"Pattern step "+(attackPattern.isEmpty()?"0/0":(patternIndex+1)+"/"+attackPattern.size()),x+12,y+165);if(!attackPattern.isEmpty()){label(g,"Action",x+12,y+209);label(g,"Ability",x+165,y+209);label(g,"Boss phase",x+328,y+209);label(g,"Min range",x+12,y+253);label(g,"Max range",x+132,y+253);label(g,"Min own HP %",x+252,y+253);label(g,"Max own HP %",x+372,y+253);}g.text(font,"Threat tracks damage/healing aggro; switch ratio prevents target ping-pong.",x+12,y+298,MUTED,false);}
+            case COMBAT -> { label(g,"Combat profile + allowed attack channels",x+12,y+77); label(g,"Self-defense reaction",x+12,y+121); label(g,"Hostile sight reaction",x+258,y+121); label(g,"Friendly-defense reaction",x+12,y+165); label(g,"Assist range",x+258,y+165); label(g,"Flee distance",x+383,y+165); label(g,"Attack cooldown (ticks)",x+12,y+219); g.drawString(font,"Melee/ranged use equipped weapons; Magic gates magic abilities. Any combination is allowed.",x+12,y+267,MUTED,false); g.drawString(font,"Patrol/schedules use Walking speed; combat chase uses Running speed.",x+12,y+279,MUTED,false); }
+            case TACTICS -> { label(g,"Threat range",x+12,y+121);label(g,"Damage ×",x+102,y+121);label(g,"Healing ×",x+192,y+121);label(g,"Decay/sec",x+282,y+121);label(g,"Switch ratio",x+384,y+121);label(g,"Pattern step "+(attackPattern.isEmpty()?"0/0":(patternIndex+1)+"/"+attackPattern.size()),x+12,y+165);if(!attackPattern.isEmpty()){label(g,"Action",x+12,y+209);label(g,"Ability",x+165,y+209);label(g,"Boss phase",x+328,y+209);label(g,"Min range",x+12,y+253);label(g,"Max range",x+132,y+253);label(g,"Min own HP %",x+252,y+253);label(g,"Max own HP %",x+372,y+253);}g.drawString(font,"Threat tracks damage/healing aggro; switch ratio prevents target ping-pong.",x+12,y+298,MUTED,false);}
             case ABILITIES -> {
                 label(g,"Shared Ability assignments",x+12,y+77);
-                g.text(font,"Assigned abilities: " + abilities.size() + "/" + NpcAbilityDefinition.MAX_ABILITIES,x+12,y+132,TEXT,false);
+                g.drawString(font,"Assigned abilities: " + abilities.size() + "/" + NpcAbilityDefinition.MAX_ABILITIES,x+12,y+132,TEXT,false);
                 if (!abilities.isEmpty()) {
                     NpcAbilityDefinition selectedAbility = abilities.get(Math.max(0, Math.min(abilityIndex, abilities.size()-1)));
-                    g.text(font,"Selected: " + selectedAbility.displayName + " [" + selectedAbility.id + "]",x+12,y+184,TEXT,false);
+                    g.drawString(font,"Selected: " + selectedAbility.displayName + " [" + selectedAbility.id + "]",x+12,y+184,TEXT,false);
                 }
-                g.text(font,"Abilities are server-wide. Create/edit them once in the Ability Library and assign them to any NPC.",x+12,y+218,MUTED,false);
-                g.text(font,"The Phase button is an NPC-specific restriction; editing the shared ability updates every assigned NPC.",x+12,y+232,MUTED,false);
+                g.drawString(font,"Abilities are server-wide. Create/edit them once in the Ability Library and assign them to any NPC.",x+12,y+218,MUTED,false);
+                g.drawString(font,"The Phase button is an NPC-specific restriction; editing the shared ability updates every assigned NPC.",x+12,y+232,MUTED,false);
             }
             case BOSS -> {
                 label(g,"Boss bar range",x+12,y+121); label(g,"Reset distance",x+165,y+121); label(g,"Reset after idle seconds",x+328,y+121);
                 label(g,"Boss phase " + (bossPhases.isEmpty()?"0/0":(bossPhaseIndex+1)+"/"+bossPhases.size()),x+12,y+165);
                 if(!bossPhases.isEmpty()){ label(g,"Phase ID",x+12,y+209); label(g,"Display name",x+165,y+209); label(g,"Health threshold %",x+328,y+209); label(g,"Move multiplier",x+12,y+253); label(g,"Cooldown multiplier",x+132,y+253); label(g,"Ability damage multiplier",x+252,y+253); label(g,"Entry actions",x+372,y+253); }
-                g.text(font,"Phases are evaluated from highest to lowest health threshold.",x+12,y+298,MUTED,false);
+                g.drawString(font,"Phases are evaluated from highest to lowest health threshold.",x+12,y+298,MUTED,false);
             }
             case STATS -> {
                 label(g,"Max health (blank=native)",x+12,y+77); label(g,"Magic resistance (0-0.95)",x+165,y+77); label(g,"Armor multiplier",x+328,y+77);
                 label(g,"Melee damage ×",x+12,y+131); label(g,"Ranged damage ×",x+165,y+131); label(g,"Magic damage ×",x+328,y+131);
                 label(g,"Walking speed ×",x+12,y+185); label(g,"Running speed ×",x+165,y+185); label(g,"Follow range",x+328,y+185);
                 label(g,"Knockback resistance",x+12,y+239); label(g,"Scale",x+165,y+239);
-                g.text(font,"Armor/toughness and ordinary attack power come from equipped items + their gameplay modifiers/enchantments. Running speed must be >= walking.",x+12,y+286,MUTED,false);
+                g.drawString(font,"Armor/toughness and ordinary attack power come from equipped items + their gameplay modifiers/enchantments. Running speed must be >= walking.",x+12,y+286,MUTED,false);
             }
-            case LOADOUT -> { g.text(font,"Equipped weapons/armor are real combat gear; attributes + enchantments count and durability never decreases.",x+40,y+88,MUTED,false); g.text(font,"The nine loot slots are still the NPC's only loot table; equipped gear never drops.",x+40,y+154,MUTED,false); if(!initial.editing())g.text(font,"Create this NPC first to open its real inventory editor.",x+40,y+190,ERROR,false); }
-            case SCHEDULE -> { label(g,"Schedule point " + (schedule.isEmpty()?"0/0":(scheduleIndex+1)+"/"+schedule.size()),x+165,y+77); label(g,"Time",x+12,y+125); label(g,"X",x+102,y+125); label(g,"Y",x+205,y+125); label(g,"Z",x+308,y+125); label(g,"Yaw",x+411,y+125); label(g,"Speed",x+12,y+179); g.text(font,"Arrival action runs here until the next schedule time.",x+214,y+223,MUTED,false); g.text(font,"Add uses your current position/time. Combat interrupts movement, then the schedule resumes.",x+12,y+252,MUTED,false); if(initial.editing())g.text(font,"World editor: RMB add • sneak+RMB remove • sneak+RMB air undo • RMB air finish.",x+12,y+264,MUTED,false); }
+            case LOADOUT -> { g.drawString(font,"Equipped weapons/armor are real combat gear; attributes + enchantments count and durability never decreases.",x+40,y+88,MUTED,false); g.drawString(font,"The nine loot slots are still the NPC's only loot table; equipped gear never drops.",x+40,y+154,MUTED,false); if(!initial.editing())g.drawString(font,"Create this NPC first to open its real inventory editor.",x+40,y+190,ERROR,false); }
+            case SCHEDULE -> { label(g,"Schedule point " + (schedule.isEmpty()?"0/0":(scheduleIndex+1)+"/"+schedule.size()),x+165,y+77); label(g,"Time",x+12,y+125); label(g,"X",x+102,y+125); label(g,"Y",x+205,y+125); label(g,"Z",x+308,y+125); label(g,"Yaw",x+411,y+125); label(g,"Speed",x+12,y+179); g.drawString(font,"Arrival action runs here until the next schedule time.",x+214,y+223,MUTED,false); g.drawString(font,"Add uses your current position/time. Combat interrupts movement, then the schedule resumes.",x+12,y+252,MUTED,false); if(initial.editing())g.drawString(font,"World editor: RMB add • sneak+RMB remove • sneak+RMB air undo • RMB air finish.",x+12,y+264,MUTED,false); }
             case RESPAWN -> { label(g,"Delay seconds",x+165,y+77); label(g,"Dimension",x+328,y+77); label(g,"X",x+12,y+137); label(g,"Y",x+115,y+137); label(g,"Z",x+218,y+137); label(g,"Yaw",x+321,y+137); }
         }
     }
-    private void label(GuiGraphicsExtractor g, String text, int x, int y) { g.text(font, text, x, y, MUTED, false); }
+    private void label(GuiGraphics g, String text, int x, int y) { g.drawString(font, text, x, y, MUTED, false); }
 
     private static String choiceLabel(List<NpcEditorOpenPayload.Choice> choices, String id, String fallback) {
         String safe = id == null ? "" : id;

@@ -22,7 +22,7 @@ import be.winnetrie.mod.simpleserverutilities.client.hologram.HologramImageDecod
 import be.winnetrie.mod.simpleserverutilities.hologram.HologramType;
 import be.winnetrie.mod.simpleserverutilities.network.HologramSyncPayload;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Client-only asynchronous cache for local resource and remote hologram images.
@@ -137,9 +137,9 @@ public final class HologramImageCache {
     }
 
     private static byte[] readResource(Minecraft minecraft, String source) throws IOException {
-        Identifier identifier;
+        ResourceLocation identifier;
         try {
-            identifier = Identifier.parse(source);
+            identifier = ResourceLocation.parse(source);
         } catch (Exception exception) {
             throw new IOException("Invalid internal resource identifier.", exception);
         }

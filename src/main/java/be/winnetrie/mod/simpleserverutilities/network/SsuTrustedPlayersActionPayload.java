@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Adds or removes one trusted player from one owned claim. */
 public record SsuTrustedPlayersActionPayload(
@@ -18,7 +18,7 @@ public record SsuTrustedPlayersActionPayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<SsuTrustedPlayersActionPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "trusted_players_action"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "trusted_players_action"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuTrustedPlayersActionPayload> STREAM_CODEC =
             StreamCodec.of(SsuTrustedPlayersActionPayload::encode, SsuTrustedPlayersActionPayload::decode);
 

@@ -4,13 +4,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record NpcDialogueEditorSubmitPayload(
         String instanceId, String originalDialogueId, String dialogueJson, long requestId)
         implements CustomPacketPayload {
     public static final Type<NpcDialogueEditorSubmitPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_dialogue_editor_submit"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_dialogue_editor_submit"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcDialogueEditorSubmitPayload> STREAM_CODEC =
             StreamCodec.of(NpcDialogueEditorSubmitPayload::encode, NpcDialogueEditorSubmitPayload::decode);
     public NpcDialogueEditorSubmitPayload {

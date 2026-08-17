@@ -10,7 +10,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
@@ -88,27 +88,27 @@ public final class NpcLoadoutMenu extends AbstractContainerMenu {
     }
 
     @Override
-    public void clicked(int slotIndex, int buttonNum, ContainerInput input, Player player) {
+    public void clicked(int slotIndex, int buttonNum, ClickType input, Player player) {
         if (slotIndex >= 0 && slotIndex < activeSlots) {
-            if (input == ContainerInput.PICKUP) {
+            if (input == ClickType.PICKUP) {
                 ItemStack carried = getCarried();
                 if (carried.isEmpty()) ghost.setItem(slotIndex, ItemStack.EMPTY);
                 else ghost.setItem(slotIndex, ghostCopy(carried));
                 broadcastChanges();
                 return;
             }
-            if (input == ContainerInput.QUICK_MOVE || input == ContainerInput.THROW) {
+            if (input == ClickType.QUICK_MOVE || input == ClickType.THROW) {
                 ghost.setItem(slotIndex, ItemStack.EMPTY);
                 broadcastChanges();
                 return;
             }
-            if (input == ContainerInput.SWAP && buttonNum >= 0 && buttonNum < 9) {
+            if (input == ClickType.SWAP && buttonNum >= 0 && buttonNum < 9) {
                 ghost.setItem(slotIndex, ghostCopy(playerInventory.getItem(buttonNum)));
                 broadcastChanges();
                 return;
             }
         }
-        if (input == ContainerInput.QUICK_MOVE && slotIndex >= activeSlots && slotIndex < slots.size()) {
+        if (input == ClickType.QUICK_MOVE && slotIndex >= activeSlots && slotIndex < slots.size()) {
             Slot source = slots.get(slotIndex);
             if (source != null && source.hasItem()) {
                 int target = firstEmptyGhost();

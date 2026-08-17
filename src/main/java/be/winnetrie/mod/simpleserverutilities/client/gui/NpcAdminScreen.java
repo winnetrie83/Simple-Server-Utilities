@@ -6,12 +6,12 @@ import be.winnetrie.mod.simpleserverutilities.network.NpcAdminActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcAdminEntry;
 import be.winnetrie.mod.simpleserverutilities.network.NpcAdminListPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcAdminListRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Compact remote NPC/template manager. */
 public final class NpcAdminScreen extends Screen {
@@ -49,7 +49,7 @@ public final class NpcAdminScreen extends Screen {
         //
         // Only rebuild for later network refreshes after this exact screen is already the
         // active Gui screen.  Initial construction is left to Screen#init(width, height).
-        if (minecraft != null && minecraft.gui.screen() == this) rebuildWidgets();
+        if (minecraft != null && minecraft.screen == this) rebuildWidgets();
     }
 
     @Override protected void init() {
@@ -122,50 +122,50 @@ public final class NpcAdminScreen extends Screen {
 
     private void request(int wantedPage) {
         query = search == null ? query : search.getValue().trim();
-        ClientPacketDistributor.sendToServer(new NpcAdminListRequestPayload(mode, query,
+        PacketDistributor.sendToServer(new NpcAdminListRequestPayload(mode, query,
                 Math.max(0, wantedPage), ROWS, nextRequestId++));
     }
     private void action(String action, String target) {
-        ClientPacketDistributor.sendToServer(new NpcAdminActionPayload(action, target, nextRequestId++));
+        PacketDistributor.sendToServer(new NpcAdminActionPayload(action, target, nextRequestId++));
     }
     @Override public void onClose() {
-        if (minecraft != null) minecraft.gui.setScreen(null);
+        if (minecraft != null) minecraft.setScreen(null);
     }
 
     @Override public boolean isPauseScreen() { return false; }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = px(), y = py();
         SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
-        g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
-        g.text(font, "NPC Manager", x + 12, y + 12, TEXT, true);
+        g.fill(x, y, x + W, y + H, PANEL); g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "NPC Manager", x + 12, y + 12, TEXT, true);
         String totalLabel = "templates".equals(mode) ? " templates" : "spawns".equals(mode) ? " spawn profiles" : " placements";
-        g.text(font, total + totalLabel, x + 118, y + 13, MUTED, false);
+        g.drawString(font, total + totalLabel, x + 118, y + 13, MUTED, false);
         int rowY = y + 82;
         for (int i = 0; i < entries.size() && i < ROWS; i++) {
             NpcAdminEntry entry = entries.get(i); int yy = rowY + i * 34;
             g.fill(x + 12, yy, x + W - 12, yy + 30, 0x8A0B1015);
             String status = entry.dead() ? "dead" : entry.enabled() ? "active" : "disabled";
-            g.text(font, trim(entry.name(), 30), x + 20, yy + 5, TEXT, false);
+            g.drawString(font, trim(entry.name(), 30), x + 20, yy + 5, TEXT, false);
             if ("spawns".equals(mode)) {
                 String source = entry.model();
                 String location = "spawner".equals(source)
                         ? shortDim(entry.dimension()) + " @ " + (int) entry.x() + ", " + (int) entry.y() + ", " + (int) entry.z()
                         : shortDim(entry.dimension());
-                g.text(font, trim(entry.definitionId(), 20) + " • " + source + " • " + trim(location, 24)
+                g.drawString(font, trim(entry.definitionId(), 20) + " • " + source + " • " + trim(location, 24)
                         + " • " + entry.placements() + " live • " + status, x + 20, yy + 17, MUTED, false);
             } else if (entry.template()) {
-                g.text(font, trim(entry.id(), 32) + " • " + entry.placements() + " placed", x + 20, yy + 17, MUTED, false);
+                g.drawString(font, trim(entry.id(), 32) + " • " + entry.placements() + " placed", x + 20, yy + 17, MUTED, false);
             } else {
-                g.text(font, trim(entry.definitionId(), 19) + " • " + shortDim(entry.dimension()) + " • "
+                g.drawString(font, trim(entry.definitionId(), 19) + " • " + shortDim(entry.dimension()) + " • "
                         + one(entry.x()) + ", " + one(entry.y()) + ", " + one(entry.z()) + " • " + status,
                         x + 20, yy + 17, MUTED, false);
             }
         }
-        g.text(font, "Page " + (page + 1) + "/" + pageCount, x + 82, y + H - 21, MUTED, false);
-        if (!notice.isBlank()) g.text(font, trim(notice, 60), x + 190, y + H - 21,
+        g.drawString(font, "Page " + (page + 1) + "/" + pageCount, x + 82, y + H - 21, MUTED, false);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 60), x + 190, y + H - 21,
                 noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private int px() { return (width - W) / 2; }

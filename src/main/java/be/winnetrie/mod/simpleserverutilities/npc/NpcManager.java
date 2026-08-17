@@ -32,7 +32,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -43,11 +43,8 @@ import net.minecraft.world.BossEvent;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityProcessor;
-import net.minecraft.world.entity.EntitySpawnReason;
-import net.minecraft.world.entity.EntitySpawnRequest;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
@@ -391,7 +388,7 @@ public final class NpcManager {
         if (definition == null || !definition.enabled) return null;
         NpcInstance instance = new NpcInstance();
         instance.definitionId = definitionId;
-        instance.dimension = level.dimension().identifier().toString();
+        instance.dimension = level.dimension().location().toString();
         instance.x = x; instance.y = y; instance.z = z; instance.yaw = yaw; instance.pitch = 0.0F;
         instance.respawnDimension = instance.dimension;
         instance.respawnX = x; instance.respawnY = y; instance.respawnZ = z;
@@ -622,10 +619,10 @@ public final class NpcManager {
 
     public synchronized boolean isSupportedEntityType(String rawType) {
         try {
-            Identifier id = Identifier.parse(rawType == null ? "" : rawType.trim());
+            ResourceLocation id = ResourceLocation.parse(rawType == null ? "" : rawType.trim());
             if (UNSAFE_NATIVE_TYPES.contains(id.toString())) return false;
             Optional<EntityType<?>> type = BuiltInRegistries.ENTITY_TYPE.getOptional(id);
-            return type.isPresent() && type.get() != EntityTypes.PLAYER;
+            return type.isPresent() && type.get() != EntityType.PLAYER;
         } catch (Exception ignored) {
             return false;
         }
@@ -636,9 +633,8 @@ public final class NpcManager {
         try {
             CompoundTag tag = new CompoundTag();
             tag.putString("id", rawType.trim());
-            Entity entity = EntityType.loadEntityRecursive(
-                    tag, level, new EntitySpawnRequest(EntitySpawnReason.COMMAND, false), EntityProcessor.NOP);
-            return entity instanceof LivingEntity && entity.getType() != EntityTypes.PLAYER;
+            Entity entity = EntityType.loadEntityRecursive(tag, level, loaded -> loaded);
+            return entity instanceof LivingEntity && entity.getType() != EntityType.PLAYER;
         } catch (RuntimeException ignored) {
             return false;
         }
@@ -649,7 +645,7 @@ public final class NpcManager {
         if (!supportedModelCache.isEmpty()) return supportedModelCache;
         if (level == null) return List.of("minecraft:villager");
         List<String> result = new ArrayList<>();
-        for (Identifier id : BuiltInRegistries.ENTITY_TYPE.keySet()) {
+        for (ResourceLocation id : BuiltInRegistries.ENTITY_TYPE.keySet()) {
             String value = id.toString();
             if (ModNpcEntities.PLAYER_NPC_ID.equals(value)) continue;
             if (isSupportedLivingEntityType(level, value)) result.add(value);
@@ -701,7 +697,7 @@ public final class NpcManager {
         }
         if (placement.scheduleEnabled && !placement.schedule.isEmpty()) {
             int minute = living.level() instanceof ServerLevel serverLevel
-                    ? GameCalendar.fromClockTime(serverLevel.getDefaultClockTime()).minuteOfDay() : 0;
+                    ? GameCalendar.fromClockTime(serverLevel.getDayTime()).minuteOfDay() : 0;
             int index = activeScheduleEntry.getOrDefault(instanceId, activeScheduleIndex(placement.schedule, minute));
             return "Schedule " + (Math.max(0, index) + 1) + "/" + placement.schedule.size() + " • " + path;
         }
@@ -1048,7 +1044,7 @@ public final class NpcManager {
         // Preserve all equipment/gameplay modifiers and shift only the base enough to scale the current total.
         attack.setBaseValue(oldBase + currentTotal * (multiplier - 1.0D));
         try {
-            source.doHurtTarget(level, target);
+            source.doHurtTarget(target);
             NpcCombatEquipment.repairEquipped(source);
             return true;
         } finally {
@@ -1109,7 +1105,7 @@ public final class NpcManager {
         if (!(amount > 0.0D) || target == null || !target.isAlive()) return false;
         DamageSource damageSource = new DamageSource(
                 level.registryAccess().lookupOrThrow(Registries.DAMAGE_TYPE).getOrThrow(DamageTypes.MOB_ATTACK), source);
-        return target.hurtServer(level, damageSource, (float) amount);
+        return target.hurt(damageSource, (float) amount);
     }
 
     private void tickBossEncounters(long serverTick) {
@@ -1219,7 +1215,7 @@ public final class NpcManager {
         String safe = text == null || text.isBlank() ? definition.displayName : text.trim();
         Component message = Component.literal(definition.displayName + " — " + safe);
         double rangeSqr = definition.bossBarRange * definition.bossBarRange;
-        for (ServerPlayer player : level.players()) if (player.distanceToSqr(boss) <= rangeSqr) player.sendOverlayMessage(message);
+        for (ServerPlayer player : level.players()) if (player.distanceToSqr(boss) <= rangeSqr) player.sendSystemMessage(message, true);
     }
 
     private void spawnBossAdds(UUID bossInstanceId, NpcDefinition bossDefinition, LivingEntity boss,
@@ -1274,7 +1270,7 @@ public final class NpcManager {
     private void updateBossBar(UUID instanceId, NpcDefinition definition, LivingEntity boss, ServerLevel level) {
         if (!definition.bossBarVisible) { removeBossBar(instanceId); return; }
         ServerBossEvent event = bossBars.computeIfAbsent(instanceId, id -> new ServerBossEvent(
-                id, Component.literal(definition.displayName), BossEvent.BossBarColor.RED, BossEvent.BossBarOverlay.PROGRESS));
+                Component.literal(definition.displayName), BossEvent.BossBarColor.RED, BossEvent.BossBarOverlay.PROGRESS));
         event.setName(Component.literal(definition.displayName));
         float progress = boss.getMaxHealth() <= 0.0F ? 0.0F : Math.max(0.0F, Math.min(1.0F, boss.getHealth() / boss.getMaxHealth()));
         event.setProgress(progress);
@@ -1541,7 +1537,7 @@ public final class NpcManager {
                 continue;
             }
             if (resumingFromCombat) returningScheduleInstances.add(instanceId);
-            int minute = GameCalendar.fromClockTime(level.getDefaultClockTime()).minuteOfDay();
+            int minute = GameCalendar.fromClockTime(level.getDayTime()).minuteOfDay();
             int index = activeScheduleIndex(placement.schedule, minute);
             if (index < 0) continue;
             NpcScheduleEntry entry = placement.schedule.get(index);
@@ -1549,7 +1545,7 @@ public final class NpcManager {
             boolean changed = previousIndex == null || previousIndex.intValue() != index;
             boolean recoveringSchedule = returningScheduleInstances.contains(instanceId);
             if (changed && NpcScheduleEntry.MOVEMENT_TELEPORT.equals(entry.movement) && !recoveringSchedule) {
-                living.snapTo(entry.x, entry.y, entry.z, entry.yaw, living.getXRot());
+                living.moveTo(entry.x, entry.y, entry.z, entry.yaw, living.getXRot());
                 living.setDeltaMovement(Vec3.ZERO);
             }
             boolean arrived = routePointReached(living, entry.x, entry.y, entry.z);
@@ -2009,7 +2005,7 @@ public final class NpcManager {
         }
         BlockPos position = BlockPos.containing(instance.x, instance.y, instance.z);
         Entity current = findRuntime(instance);
-        if (current != null && !current.entityTags().contains(runtimeTag(instance))) {
+        if (current != null && !current.getTags().contains(runtimeTag(instance))) {
             clearRuntimeBinding(instance);
             current = null;
         }
@@ -2067,9 +2063,8 @@ public final class NpcManager {
             CompoundTag tag = new CompoundTag();
             String runtimeEntityType = definition.runtimeEntityType();
             tag.putString("id", runtimeEntityType);
-            Entity entity = EntityType.loadEntityRecursive(
-                    tag, level, new EntitySpawnRequest(EntitySpawnReason.COMMAND, false), EntityProcessor.NOP);
-            if (!(entity instanceof LivingEntity) || entity.getType() == EntityTypes.PLAYER) return null;
+            Entity entity = EntityType.loadEntityRecursive(tag, level, loaded -> loaded);
+            if (!(entity instanceof LivingEntity) || entity.getType() == EntityType.PLAYER) return null;
             apply(entity, definition, instance, true, true);
             UUID oldRuntime = instance.runtimeUuid();
             if (oldRuntime != null) instanceByRuntimeEntity.remove(oldRuntime);
@@ -2097,7 +2092,7 @@ public final class NpcManager {
         // explicit placement ownership changes (spawn, respawn, teleport/bring/admin edit). Normal
         // combat/ambient movement returns through NpcNavigationController instead.
         if (forceMove) {
-            entity.snapTo(instance.x, instance.y, instance.z, instance.yaw, instance.pitch);
+            entity.moveTo(instance.x, instance.y, instance.z, instance.yaw, instance.pitch);
         }
         // SSU renders role, name and faction itself. Do not keep a vanilla CustomName on the
         // runtime shell: Minecraft may reveal hidden custom names while the entity is targeted,
@@ -2305,7 +2300,7 @@ public final class NpcManager {
         AABB bounds = new AABB(instance.x - 32.0D, instance.y - 32.0D, instance.z - 32.0D,
                 instance.x + 32.0D, instance.y + 32.0D, instance.z + 32.0D);
         List<Entity> matches = level.getEntitiesOfClass(Entity.class, bounds,
-                entity -> entity.entityTags().contains(tag) && !entity.isRemoved());
+                entity -> entity.getTags().contains(tag) && !entity.isRemoved());
         if (matches.isEmpty()) return null;
         Entity keep = matches.getFirst();
         for (int index = 1; index < matches.size(); index++) matches.get(index).discard();
@@ -2318,7 +2313,7 @@ public final class NpcManager {
 
     private ServerLevel level(String rawDimension) {
         try {
-            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, Identifier.parse(rawDimension));
+            ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(rawDimension));
             return server.getLevel(key);
         } catch (Exception ignored) {
             return null;
@@ -2493,7 +2488,7 @@ public final class NpcManager {
 
     private List<NpcLabelSyncPayload.Entry> buildLabelSnapshot(ServerPlayer player) {
         if (!Config.ENABLE_NPCS.get()) return List.of();
-        String dimension = player.level().dimension().identifier().toString();
+        String dimension = player.level().dimension().location().toString();
         ArrayList<NpcLabelSyncPayload.Entry> entries = new ArrayList<>();
         for (NpcInstance placement : instances.values()) {
             if (!placement.enabled || placement.dead || !dimension.equals(placement.dimension)) continue;

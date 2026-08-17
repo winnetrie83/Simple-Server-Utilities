@@ -7,13 +7,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Small live visual state for carried Capture the Flag flags. */
 public record MinigameCtfVisualPayload(boolean visible, List<Entry> carriers) implements CustomPacketPayload {
     public static final int MAX_CARRIERS = 16;
     public static final Type<MinigameCtfVisualPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_ctf_visual"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_ctf_visual"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameCtfVisualPayload> STREAM_CODEC =
             StreamCodec.of(MinigameCtfVisualPayload::encode, MinigameCtfVisualPayload::decode);
 

@@ -26,7 +26,7 @@ public final class MinigameLocation {
     }
 
     public static MinigameLocation of(ServerPlayer player) {
-        return new MinigameLocation(player.level().dimension().identifier().toString(),
+        return new MinigameLocation(player.level().dimension().location().toString(),
                 player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot());
     }
 

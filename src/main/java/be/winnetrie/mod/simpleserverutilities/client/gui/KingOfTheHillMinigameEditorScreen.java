@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import be.winnetrie.mod.simpleserverutilities.minigame.KingOfTheHillRules;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameArenaDefinition;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorOpenPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -168,45 +168,45 @@ final class KingOfTheHillMinigameEditorScreen extends MinigameEditorScreen {
     }
     private static String yes(boolean value) { return value ? "Yes" : "No"; }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = (width - W) / 2, y = (height - H) / 2;
         SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, "King of the Hill Editor", x + 16, y + 42, TEXT, true);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "King of the Hill Editor", x + 16, y + 42, TEXT, true);
         if (page == 0) {
-            g.text(font, "Configure queue, timing and the combat loadout.", x + 16, y + 56, MUTED, false);
+            g.drawString(font, "Configure queue, timing and the combat loadout.", x + 16, y + 56, MUTED, false);
             label(g, "Internal ID", x + 16, y + 74); label(g, "Display name", x + 156, y + 74); label(g, "Icon item", x + 376, y + 74);
             label(g, "Min players", x + 16, y + 136); label(g, "Max players", x + 98, y + 136);
             label(g, "Countdown (sec)", x + 180, y + 136); label(g, "Match duration (sec)", x + 272, y + 136); label(g, "Respawn (sec)", x + 384, y + 136);
         } else if (page == 1) {
             MinigameArenaDefinition a = arena();
-            g.text(font, a.rotatingHill()
+            g.drawString(font, a.rotatingHill()
                     ? "ROTATING: the active hill changes between authored hill points."
                     : "STATIC: team presence pushes a persistent control marker.", x + 16, y + 56, MUTED, false);
             label(g, "Score to win", x + 16, y + 78); label(g, "Radius", x + 102, y + 78);
             label(g, "Score every (sec)", x + 180, y + 78); label(g, "Points / tick", x + 272, y + 78); label(g, "Arena hill mode", x + 364, y + 78);
             if (a.rotatingHill()) {
                 label(g, "Rotate every (sec)", x + 16, y + 136); label(g, "Warning (sec)", x + 118, y + 136);
-                g.text(font, "Author at least 2 hill points with the Setup Tool.", x + 220, y + 154, MUTED, false);
+                g.drawString(font, "Author at least 2 hill points with the Setup Tool.", x + 220, y + 154, MUTED, false);
             } else {
                 label(g, "Neutral push (sec)", x + 16, y + 136);
-                g.text(font, "40% red • 20% neutral • 40% blue. Majority presence moves the marker.", x + 118, y + 154, MUTED, false);
+                g.drawString(font, "40% red • 20% neutral • 40% blue. Majority presence moves the marker.", x + 118, y + 154, MUTED, false);
             }
             label(g, "Weapon item", x + 16, y + 194); label(g, "Red team name", x + 276, y + 194); label(g, "Blue team name", x + 418, y + 194);
         } else {
             MinigameArenaDefinition a = arena();
-            g.text(font, "World geometry is edited with the SSU Minigame Setup Tool.", x + 16, y + 56, MUTED, false);
+            g.drawString(font, "World geometry is edited with the SSU Minigame Setup Tool.", x + 16, y + 56, MUTED, false);
             label(g, "Arena ID", x + 16, y + 82); label(g, "Arena name", x + 154, y + 82); label(g, "Arena Region", x + 360, y + 82);
-            g.text(font, "Arena " + (arenaIndex + 1) + " / " + draft.arenas.size(), x + 258, y + 150, MUTED, false);
-            g.text(font, "Mode: " + (a.rotatingHill() ? "ROTATING" : "STATIC"), x + 16, y + 184, TEXT, true);
-            if (a.rotatingHill()) g.text(font, "Hill points: " + a.hillPoints.size() + " (minimum 2)", x + 16, y + 203, TEXT, false);
-            else g.text(font, "Hill center: " + coordinate(a.hillCenter.x) + ", " + coordinate(a.hillCenter.y) + ", " + coordinate(a.hillCenter.z), x + 16, y + 203, TEXT, false);
-            g.text(font, "Team/player spawns: " + a.teamSpawns.size() + " • Reset snapshot: " + (a.resetRegionAfterMatch ? "ready" : "not ready"), x + 16, y + 222, MUTED, false);
+            g.drawString(font, "Arena " + (arenaIndex + 1) + " / " + draft.arenas.size(), x + 258, y + 150, MUTED, false);
+            g.drawString(font, "Mode: " + (a.rotatingHill() ? "ROTATING" : "STATIC"), x + 16, y + 184, TEXT, true);
+            if (a.rotatingHill()) g.drawString(font, "Hill points: " + a.hillPoints.size() + " (minimum 2)", x + 16, y + 203, TEXT, false);
+            else g.drawString(font, "Hill center: " + coordinate(a.hillCenter.x) + ", " + coordinate(a.hillCenter.y) + ", " + coordinate(a.hillCenter.z), x + 16, y + 203, TEXT, false);
+            g.drawString(font, "Team/player spawns: " + a.teamSpawns.size() + " • Reset snapshot: " + (a.resetRegionAfterMatch ? "ready" : "not ready"), x + 16, y + 222, MUTED, false);
         }
-        if (!notice.isBlank()) g.text(font, trim(notice, 72), x + 106, y + H - 24, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 72), x + 106, y + H - 24, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void label(GuiGraphicsExtractor g, String text, int x, int y) { g.text(font, text, x, y, MUTED, false); }
+    private void label(GuiGraphics g, String text, int x, int y) { g.drawString(font, text, x, y, MUTED, false); }
 }

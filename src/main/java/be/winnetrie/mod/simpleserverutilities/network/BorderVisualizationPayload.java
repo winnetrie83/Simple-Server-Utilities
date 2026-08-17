@@ -9,7 +9,7 @@ import be.winnetrie.mod.simpleserverutilities.visualization.BorderLayer;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record BorderVisualizationPayload(
         BorderLayer layer,
@@ -25,7 +25,7 @@ public record BorderVisualizationPayload(
     private static final int MAX_EDGES_PER_ENTRY = 8192;
 
     public static final Type<BorderVisualizationPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "border_visualization")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "border_visualization")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, BorderVisualizationPayload> STREAM_CODEC =

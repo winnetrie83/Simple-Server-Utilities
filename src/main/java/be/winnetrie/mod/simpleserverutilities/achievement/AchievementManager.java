@@ -45,7 +45,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
@@ -364,8 +364,8 @@ public final class AchievementManager {
                     .append(Component.literal(" earned ").withStyle(ChatFormatting.GRAY));
             if(reveal){
                 MutableComponent title=SsuRichTextComponents.parse(d.title).withStyle(style->style.withBold(true)
-                        .withClickEvent(new ClickEvent.RunCommand("/ssu achievement view "+achiever.getUUID()+" "+d.id))
-                        .withHoverEvent(new HoverEvent.ShowText(Component.literal("Open achievement and compare progress"))));
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/ssu achievement view "+achiever.getUUID()+" "+d.id))
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Open achievement and compare progress"))));
                 message.append(Component.literal("[").withStyle(ChatFormatting.GOLD)).append(title)
                         .append(Component.literal("]!").withStyle(ChatFormatting.GOLD));
             }else message.append(Component.literal("a hidden achievement!").withStyle(ChatFormatting.DARK_PURPLE,ChatFormatting.BOLD));
@@ -466,7 +466,7 @@ public final class AchievementManager {
     private static String formatDuration(long seconds){if(seconds%86400L==0)return(seconds/86400L)+" day(s)";if(seconds%3600L==0)return(seconds/3600L)+" hour(s)";if(seconds%60L==0)return(seconds/60L)+" minute(s)";return seconds+" second(s)";}
     private static void playCompletionSound(ServerPlayer player){
         if(player==null)return;
-        SoundEvent sound=BuiltInRegistries.SOUND_EVENT.getOptional(Identifier.parse("minecraft:ui.toast.challenge_complete")).orElse(null);
+        SoundEvent sound=BuiltInRegistries.SOUND_EVENT.getOptional(ResourceLocation.parse("minecraft:ui.toast.challenge_complete")).orElse(null);
         if(sound!=null)player.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound),SoundSource.PLAYERS,player.getX(),player.getY(),player.getZ(),0.9F,1.0F,player.level().getServer().getTickCount() ^ player.getUUID().getLeastSignificantBits()));
     }
     public boolean canUse(ServerPlayer p){return p!=null&&Config.ENABLE_ACHIEVEMENTS.get()&&SimpleServerUtilities.CORE.modules().isActive("achievements")&&PermissionService.getBoolean(p,PermissionKeys.ACHIEVEMENTS_USE,true);}

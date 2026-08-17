@@ -24,8 +24,7 @@ final class NpcCombatEquipment {
         ItemStack weapon = source.getMainHandItem();
         if (weapon.isEmpty()) return 1.0D;
         try {
-            return Math.max(0.0D, weapon.getAttributeModifiers().compute(
-                    Attributes.ATTACK_DAMAGE, 1.0D, EquipmentSlot.MAINHAND));
+            return Math.max(0.0D, attackDamageFromItem(weapon, EquipmentSlot.MAINHAND, 1.0D));
         } catch (RuntimeException ignored) {
             return 1.0D;
         }
@@ -54,8 +53,8 @@ final class NpcCombatEquipment {
         if (weapon.isEmpty()) return 0.0D;
         if (weapon.getItem() instanceof TridentItem || idContains(weapon, "trident")) {
             try {
-                return Math.max(1.0D, weapon.getAttributeModifiers().compute(
-                        Attributes.ATTACK_DAMAGE, 1.0D, weapon == source.getOffhandItem() ? EquipmentSlot.OFFHAND : EquipmentSlot.MAINHAND));
+                return Math.max(1.0D, attackDamageFromItem(weapon,
+                        weapon == source.getOffhandItem() ? EquipmentSlot.OFFHAND : EquipmentSlot.MAINHAND, 1.0D));
             } catch (RuntimeException ignored) {
                 return Math.max(1.0D, meleeDamage(source));
             }
@@ -73,6 +72,24 @@ final class NpcCombatEquipment {
             return damage;
         }
         return 0.0D;
+    }
+
+
+    private static double attackDamageFromItem(ItemStack stack, EquipmentSlot slot, double base) {
+        if (stack == null || stack.isEmpty()) return base;
+        final double[] add = {0.0D};
+        final double[] multiplyBase = {0.0D};
+        final double[] multiplyTotal = {1.0D};
+        stack.getAttributeModifiers().forEach(slot, (attribute, modifier) -> {
+            if (!attribute.equals(Attributes.ATTACK_DAMAGE)) return;
+            switch (modifier.operation()) {
+                case ADD_VALUE -> add[0] += modifier.amount();
+                case ADD_MULTIPLIED_BASE -> multiplyBase[0] += modifier.amount();
+                case ADD_MULTIPLIED_TOTAL -> multiplyTotal[0] *= 1.0D + modifier.amount();
+            }
+        });
+        double afterAdd = base + add[0];
+        return (afterAdd + base * multiplyBase[0]) * multiplyTotal[0];
     }
 
     static boolean rangedFlame(LivingEntity source) {

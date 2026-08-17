@@ -12,7 +12,7 @@ import be.winnetrie.mod.simpleserverutilities.core.job.SsuJob;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobLocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
@@ -157,7 +157,7 @@ public final class RegionWorldEditManager {
             String value = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
             if (value.isBlank()) continue;
             String id = value.contains(":") ? value : "minecraft:" + value;
-            Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(id)).orElseThrow(
+            Block block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(id)).orElseThrow(
                     () -> new IllegalArgumentException("Unknown source block: " + id));
             sourceBlocks.add(block);
         }
@@ -247,7 +247,7 @@ public final class RegionWorldEditManager {
             final String parsedBlockId = blockId;
             Block block = parsedBlockId.equals("minecraft:air")
                     ? Blocks.AIR
-                    : BuiltInRegistries.BLOCK.getOptional(Identifier.parse(parsedBlockId)).orElseThrow(
+                    : BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(parsedBlockId)).orElseThrow(
                             () -> new IllegalArgumentException("Unknown block: " + parsedBlockId)
                     );
             result.add(new WeightedBlock(block, weight));

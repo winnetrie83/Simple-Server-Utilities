@@ -4,13 +4,13 @@ import be.winnetrie.mod.simpleserverutilities.auction.AuctionSellMenu;
 import be.winnetrie.mod.simpleserverutilities.network.AuctionHouseActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.AuctionHouseActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.AuctionHouseRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Inventory-backed Auction House listing creator. */
 public final class AuctionSellScreen extends AbstractContainerScreen<AuctionSellMenu> {
@@ -38,7 +38,9 @@ public final class AuctionSellScreen extends AbstractContainerScreen<AuctionSell
     private boolean submitting;
 
     public AuctionSellScreen(AuctionSellMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title, SCREEN_WIDTH, SCREEN_HEIGHT);
+        super(menu, inventory, title);
+        this.imageWidth = SCREEN_WIDTH;
+        this.imageHeight = SCREEN_HEIGHT;
         titleLabelX = -10_000;
         inventoryLabelX = -10_000;
         durationHours = menu.defaultDurationHours();
@@ -88,7 +90,7 @@ public final class AuctionSellScreen extends AbstractContainerScreen<AuctionSell
         }
         long id = nextRequestId++;
         submitting = true;
-        ClientPacketDistributor.sendToServer(new AuctionHouseActionPayload("create",
+        PacketDistributor.sendToServer(new AuctionHouseActionPayload("create",
                 Integer.toString(menu.containerId), count, priceDraft, durationHours, id));
         rebuildWidgets();
     }
@@ -96,7 +98,7 @@ public final class AuctionSellScreen extends AbstractContainerScreen<AuctionSell
     private void back() {
         if (minecraft != null && minecraft.player != null) minecraft.player.closeContainer();
         long id = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new AuctionHouseRequestPayload("browse", "all", "",
+        PacketDistributor.sendToServer(new AuctionHouseRequestPayload("browse", "all", "",
                 "name_asc", 0, 8, id));
     }
 
@@ -117,49 +119,49 @@ public final class AuctionSellScreen extends AbstractContainerScreen<AuctionSell
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, PANEL);
-        g.outline(leftPos, topPos, imageWidth, imageHeight, BORDER);
+        g.renderOutline(leftPos, topPos, imageWidth, imageHeight, BORDER);
 
-        g.text(font, "Create Auction", leftPos + 14, topPos + 11, TEXT, false);
-        g.text(font, "Balance: " + menu.formattedBalance(), leftPos + 150, topPos + 11, GOOD, false);
-        g.text(font, "Active auctions: " + menu.activeAuctions() + "/" + menu.maxAuctions(),
+        g.drawString(font, "Create Auction", leftPos + 14, topPos + 11, TEXT, false);
+        g.drawString(font, "Balance: " + menu.formattedBalance(), leftPos + 150, topPos + 11, GOOD, false);
+        g.drawString(font, "Active auctions: " + menu.activeAuctions() + "/" + menu.maxAuctions(),
                 leftPos + 150, topPos + 26, MUTED, false);
 
         drawControlPanel(g);
         drawInventoryPanel(g);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void drawControlPanel(GuiGraphicsExtractor g) {
+    private void drawControlPanel(GuiGraphics g) {
         int x = leftPos + 10;
         int y = topPos + 42;
         int width = 120;
         int height = 234;
         g.fill(x, y, x + width, y + height, SUBPANEL);
-        g.outline(x, y, width, height, BORDER);
-        g.text(font, "Item to sell", x + 10, y + 10, TEXT, false);
+        g.renderOutline(x, y, width, height, BORDER);
+        g.drawString(font, "Item to sell", x + 10, y + 10, TEXT, false);
 
         int slotX = leftPos + AuctionSellMenu.OFFER_SLOT_X;
         int slotY = topPos + AuctionSellMenu.OFFER_SLOT_Y;
         g.fill(slotX - 7, slotY - 7, slotX + 23, slotY + 23, 0xFF202A33);
-        g.outline(slotX - 7, slotY - 7, 30, 30, OFFER_BORDER);
+        g.renderOutline(slotX - 7, slotY - 7, 30, 30, OFFER_BORDER);
         drawSlot(g, slotX, slotY, OFFER_BORDER);
 
-        g.text(font, "Available: " + menu.availableMatchingCount(), x + 8, topPos + 105, MUTED, false);
-        g.text(font, "Duration (hours)", x + 8, topPos + 174, MUTED, false);
-        g.text(font, "Tax: " + formatTax(menu.taxPermille()) + "%", x + 8, topPos + 214, MUTED, false);
+        g.drawString(font, "Available: " + menu.availableMatchingCount(), x + 8, topPos + 105, MUTED, false);
+        g.drawString(font, "Duration (hours)", x + 8, topPos + 174, MUTED, false);
+        g.drawString(font, "Tax: " + formatTax(menu.taxPermille()) + "%", x + 8, topPos + 214, MUTED, false);
     }
 
-    private void drawInventoryPanel(GuiGraphicsExtractor g) {
+    private void drawInventoryPanel(GuiGraphics g) {
         int x = leftPos + 140;
         int y = topPos + 42;
         int width = 218;
         int height = 234;
         g.fill(x, y, x + width, y + height, SUBPANEL);
-        g.outline(x, y, width, height, BORDER);
-        g.text(font, "Player inventory", x + 10, y + 10, TEXT, false);
+        g.renderOutline(x, y, width, height, BORDER);
+        g.drawString(font, "Player inventory", x + 10, y + 10, TEXT, false);
 
         int inventoryX = leftPos + AuctionSellMenu.PLAYER_INVENTORY_X;
         int inventoryY = topPos + AuctionSellMenu.PLAYER_INVENTORY_Y;
@@ -169,13 +171,13 @@ public final class AuctionSellScreen extends AbstractContainerScreen<AuctionSell
         drawGrid(g, inventoryX, hotbarY, 9, 1);
 
         if (!notice.isBlank()) {
-            g.text(font, trim(notice, 35), x + 10, topPos + 184, noticeError ? ERROR : GOOD, false);
+            g.drawString(font, trim(notice, 35), x + 10, topPos + 184, noticeError ? ERROR : GOOD, false);
         }
     }
 
-    private static void drawGrid(GuiGraphicsExtractor g, int x, int y, int columns, int rows) {
+    private static void drawGrid(GuiGraphics g, int x, int y, int columns, int rows) {
         g.fill(x - 3, y - 3, x + columns * 18 + 1, y + rows * 18 + 1, 0xFF1B242C);
-        g.outline(x - 3, y - 3, columns * 18 + 4, rows * 18 + 4, BORDER);
+        g.renderOutline(x - 3, y - 3, columns * 18 + 4, rows * 18 + 4, BORDER);
         for (int row = 0; row < rows; row++) {
             for (int column = 0; column < columns; column++) {
                 drawSlot(g, x + column * 18, y + row * 18, SLOT_BORDER);
@@ -183,10 +185,12 @@ public final class AuctionSellScreen extends AbstractContainerScreen<AuctionSell
         }
     }
 
-    private static void drawSlot(GuiGraphicsExtractor g, int x, int y, int border) {
+    private static void drawSlot(GuiGraphics g, int x, int y, int border) {
         g.fill(x - 1, y - 1, x + 17, y + 17, SLOT_BACKGROUND);
-        g.outline(x - 1, y - 1, 18, 18, border);
+        g.renderOutline(x - 1, y - 1, 18, 18, border);
     }
+
+    @Override protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {}
 
     @Override public boolean isPauseScreen() { return false; }
 

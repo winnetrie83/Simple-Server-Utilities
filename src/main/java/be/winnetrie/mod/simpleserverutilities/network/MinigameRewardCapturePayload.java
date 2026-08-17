@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Copies an exact server-side administrator inventory stack into one visible reward slot. */
 public record MinigameRewardCapturePayload(
@@ -17,7 +17,7 @@ public record MinigameRewardCapturePayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<MinigameRewardCapturePayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_reward_capture"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_reward_capture"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameRewardCapturePayload> STREAM_CODEC =
             StreamCodec.of(MinigameRewardCapturePayload::encode, MinigameRewardCapturePayload::decode);
 

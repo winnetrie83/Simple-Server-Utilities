@@ -8,12 +8,12 @@ import be.winnetrie.mod.simpleserverutilities.network.SsuClaimRolePermissionActi
 import be.winnetrie.mod.simpleserverutilities.network.SsuTrustedPlayersActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuTrustedPlayersDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.SsuTrustedPlayersRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Claim access manager: assignments and per-claim role permission overrides. */
 public final class TrustedPlayersScreen extends Screen {
@@ -188,14 +188,14 @@ public final class TrustedPlayersScreen extends Screen {
 
     private void requestData() {
         long requestId = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new SsuTrustedPlayersRequestPayload(
+        PacketDistributor.sendToServer(new SsuTrustedPlayersRequestPayload(
                 data.claim(), tab == Tab.ADD ? candidateSearch : "", requestId));
     }
 
     private void act(SsuTrustedPlayersDataPayload.Entry entry) {
         if (!data.canEdit()) return;
         long requestId = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new SsuTrustedPlayersActionPayload(
+        PacketDistributor.sendToServer(new SsuTrustedPlayersActionPayload(
                 data.claim(), tab == Tab.ADD ? "add" : "remove", entry.playerId(), candidateSearch, requestId));
     }
 
@@ -203,19 +203,19 @@ public final class TrustedPlayersScreen extends Screen {
         if (!data.canEdit()) return;
         long requestId = nextRequestId++;
         String action = "co_owner".equals(entry.role()) ? "role_member" : "role_co_owner";
-        ClientPacketDistributor.sendToServer(new SsuTrustedPlayersActionPayload(
+        PacketDistributor.sendToServer(new SsuTrustedPlayersActionPayload(
                 data.claim(), action, entry.playerId(), candidateSearch, requestId));
     }
 
     private void togglePermission(SsuTrustedPlayersDataPayload.RolePermissionEntry entry) {
         if (!data.canEdit()) return;
-        ClientPacketDistributor.sendToServer(new SsuClaimRolePermissionActionPayload(
+        PacketDistributor.sendToServer(new SsuClaimRolePermissionActionPayload(
                 data.claim(), selectedRole, entry.key(), Boolean.toString(!entry.allowed()), false, nextRequestId++));
     }
 
     private void resetPermission(SsuTrustedPlayersDataPayload.RolePermissionEntry entry) {
         if (!data.canEdit() || !entry.overridden()) return;
-        ClientPacketDistributor.sendToServer(new SsuClaimRolePermissionActionPayload(
+        PacketDistributor.sendToServer(new SsuClaimRolePermissionActionPayload(
                 data.claim(), selectedRole, entry.key(), "", true, nextRequestId++));
     }
 
@@ -250,14 +250,14 @@ public final class TrustedPlayersScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int x = panelX();
         int y = panelY();
         SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         graphics.fill(x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, PANEL);
-        graphics.outline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
-        graphics.text(font, data.title(), x + 14, y + 13, TEXT, true);
-        graphics.text(font, tab == Tab.PERMISSIONS
+        graphics.renderOutline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
+        graphics.drawString(font, data.title(), x + 14, y + 13, TEXT, true);
+        graphics.drawString(font, tab == Tab.PERMISSIONS
                         ? "Per-claim overrides. Default uses the server-wide Claim roles permission."
                         : data.canEdit() ? "Assign members or co-owners. Only the owner can open Claim Settings."
                         : "Only the claim owner can change access roles.",
@@ -272,23 +272,23 @@ public final class TrustedPlayersScreen extends Screen {
                 int rowY = y + 108 + (index - from) * ROW_HEIGHT;
                 graphics.fill(x + 16, rowY, x + 24, rowY + 8, entry.online() ? ONLINE : 0xFF6C7780);
             }
-            if (visible.isEmpty()) graphics.centeredText(font,
+            if (visible.isEmpty()) graphics.drawCenteredString(font,
                     tab == Tab.ADD ? "No available players match this search." : "No assigned claim roles match this filter.",
                     x + PANEL_WIDTH / 2, y + 190, MUTED);
         } else {
-            graphics.text(font, "Selected role: " + roleLabel(selectedRole), x + 366, y + 76, GOOD, false);
+            graphics.drawString(font, "Selected role: " + roleLabel(selectedRole), x + 366, y + 76, GOOD, false);
         }
 
-        graphics.text(font, "Page " + (page + 1) + " / " + pageCount(), x + 94, y + PANEL_HEIGHT - 25, MUTED, false);
-        if (!data.notice().isBlank()) graphics.text(font, trim(data.notice(), 78), x + 14, y + PANEL_HEIGHT - 48,
+        graphics.drawString(font, "Page " + (page + 1) + " / " + pageCount(), x + 94, y + PANEL_HEIGHT - 25, MUTED, false);
+        if (!data.notice().isBlank()) graphics.drawString(font, trim(data.notice(), 78), x + 14, y + PANEL_HEIGHT - 48,
                 data.error() ? ERROR : GOOD, false);
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     @Override
     public void onClose() {
         if (minecraft != null && parent != null) {
-            minecraft.setScreenAndShow(parent);
+            minecraft.setScreen(parent);
             if (parent instanceof PropertySettingsScreen settings) settings.refreshFromChild();
         } else super.onClose();
     }

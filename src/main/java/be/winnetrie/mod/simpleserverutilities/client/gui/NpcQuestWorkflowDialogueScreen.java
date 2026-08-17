@@ -1,7 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.client.gui;
 
 import be.winnetrie.mod.simpleserverutilities.network.NpcQuestWorkflowOpenPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -15,6 +15,6 @@ public final class NpcQuestWorkflowDialogueScreen extends Screen {
     private EditBox field(int x,int y,int w,int max,String value){EditBox b=new EditBox(font,x,y,w,20,Component.empty());b.setMaxLength(max);b.setValue(value==null?"":value);addRenderableWidget(b);return b;}
     private void defaults(){available.setValue("Could you help me with something?");accept.setValue("I'll help you");active.setValue("How is it going?");ready.setValue("Excellent! You did it.");turnIn.setValue("Here you go");completed.setValue("Thanks again for your help!");}
     private void save(){parent.saveConfigured(new NpcQuestWorkflowOpenPayload.Entry(initial.questId(),initial.title(),initial.relation(),available.getValue(),accept.getValue(),active.getValue(),ready.getValue(),turnIn.getValue(),completed.getValue(),showAvailable,showActive,showReady));}
-    @Override public void onClose(){if(minecraft!=null)minecraft.setScreenAndShow(parent);}
-    @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float pt){int x=left(),y=top();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+W,y+H,0xF0161D25);g.outline(x,y,W,H,0xFF586978);g.text(font,initial.title(),x+16,y+14,0xFFF3F5F7,true);label(g,"Available — NPC says",x+16,y+37);label(g,"Accept button",x+16,y+73);label(g,"In progress — NPC says",x+16,y+109);label(g,"Ready to turn in — NPC says",x+16,y+145);label(g,"Turn-in button",x+16,y+181);label(g,"Completed — NPC says",x+16,y+217);super.extractRenderState(g,mx,my,pt);}private void label(GuiGraphicsExtractor g,String s,int x,int y){g.text(font,s,x,y,0xFFAAB5BE,false);}private static String on(boolean b){return b?"ON":"OFF";}private int left(){return(width-W)/2;}private int top(){return(height-H)/2;}
+    @Override public void onClose(){if(minecraft!=null)minecraft.setScreen(parent);}
+    @Override public void render(GuiGraphics g,int mx,int my,float pt){int x=left(),y=top();SsuGuiScale.fullscreenDim(g, this, 0xA5000000);g.fill(x,y,x+W,y+H,0xF0161D25);g.renderOutline(x,y,W,H,0xFF586978);g.drawString(font,initial.title(),x+16,y+14,0xFFF3F5F7,true);label(g,"Available — NPC says",x+16,y+37);label(g,"Accept button",x+16,y+73);label(g,"In progress — NPC says",x+16,y+109);label(g,"Ready to turn in — NPC says",x+16,y+145);label(g,"Turn-in button",x+16,y+181);label(g,"Completed — NPC says",x+16,y+217);super.render(g,mx,my,pt);}private void label(GuiGraphics g,String s,int x,int y){g.drawString(font,s,x,y,0xFFAAB5BE,false);}private static String on(boolean b){return b?"ON":"OFF";}private int left(){return(width-W)/2;}private int top(){return(height-H)/2;}
 }

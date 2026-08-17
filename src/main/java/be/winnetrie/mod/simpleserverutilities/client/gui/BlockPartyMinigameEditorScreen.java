@@ -5,13 +5,13 @@ import java.util.ArrayList;
 import be.winnetrie.mod.simpleserverutilities.minigame.BlockPartyRules;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameArenaDefinition;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorOpenPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
@@ -136,18 +136,18 @@ final class BlockPartyMinigameEditorScreen extends MinigameEditorScreen {
     private static String yes(boolean value) { return value ? "Yes" : "No"; }
 
     @Override
-    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (page == 1) {
-            int mx = (int) event.x(), my = (int) event.y();
+            int mx = (int) mouseX, my = (int) mouseY;
             int paletteSlot = paletteSlotAt(mx, my);
             if (paletteSlot >= 0) {
-                if (event.buttonInfo().button() == 1) {
+                if (button == 1) {
                     if (paletteSlot < draft.blockParty.paletteBlocks.size()) {
                         String removed = draft.blockParty.paletteBlocks.remove(paletteSlot);
                         selectedPaletteSlot = -1;
                         setNotice("Removed " + removed + " from the Block Party palette.", false);
                     }
-                } else if (event.buttonInfo().button() == 0) {
+                } else if (button == 0) {
                     selectedPaletteSlot = paletteSlot;
                     setNotice(paletteSlot < draft.blockParty.paletteBlocks.size()
                             ? "Palette slot " + (paletteSlot + 1) + " selected. Click an inventory block to replace it."
@@ -155,7 +155,7 @@ final class BlockPartyMinigameEditorScreen extends MinigameEditorScreen {
                 }
                 return true;
             }
-            if (event.buttonInfo().button() == 0) {
+            if (button == 0) {
                 int inv = inventorySlotAt(mx, my);
                 if (inv >= 0) {
                     addOrReplacePalette(inv);
@@ -163,7 +163,7 @@ final class BlockPartyMinigameEditorScreen extends MinigameEditorScreen {
                 }
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private void addOrReplacePalette(int inventorySlot) {
@@ -194,69 +194,69 @@ final class BlockPartyMinigameEditorScreen extends MinigameEditorScreen {
         selectedPaletteSlot = -1;
     }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = (width - W) / 2, y = (height - H) / 2;
-        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(x, y, x + W, y + H, PANEL); g.outline(x, y, W, H, BORDER);
-        g.text(font, "Block Party Editor", x + 16, y + 42, TEXT, true);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(x, y, x + W, y + H, PANEL); g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Block Party Editor", x + 16, y + 42, TEXT, true);
         if (page == 0) {
-            g.text(font, "Free-for-all elimination mode. Every participant gets an independent player slot.", x + 16, y + 56, MUTED, false);
+            g.drawString(font, "Free-for-all elimination mode. Every participant gets an independent player slot.", x + 16, y + 56, MUTED, false);
             label(g, "Internal ID", x + 16, y + 66); label(g, "Display name", x + 178, y + 66); label(g, "Icon item", x + 422, y + 66);
             label(g, "Min players", x + 16, y + 136); label(g, "Max players", x + 116, y + 136);
             label(g, "Countdown (sec)", x + 216, y + 136); label(g, "Match duration (sec)", x + 326, y + 136);
         } else if (page == 1) {
-            g.text(font, "Build the round palette from real blocks in your inventory. Items are never consumed.", x + 16, y + 56, MUTED, false);
-            g.text(font, "Palette — max 16 blocks", x + 18, y + 78, TEXT, true);
-            g.text(font, "LMB slot = select/replace • RMB slot = remove", x + 18, y + 92, MUTED, false);
+            g.drawString(font, "Build the round palette from real blocks in your inventory. Items are never consumed.", x + 16, y + 56, MUTED, false);
+            g.drawString(font, "Palette — max 16 blocks", x + 18, y + 78, TEXT, true);
+            g.drawString(font, "LMB slot = select/replace • RMB slot = remove", x + 18, y + 92, MUTED, false);
             renderPalette(g, x + 18, y + 108, mouseX, mouseY);
-            g.text(font, "Inventory — click a block to add", x + 406, y + 78, TEXT, true);
+            g.drawString(font, "Inventory — click a block to add", x + 406, y + 78, TEXT, true);
             renderInventory(g, x + 406, y + 98, mouseX, mouseY);
             label(g, "Initial round (sec)", x + 18, y + 200); label(g, "Minimum round (sec)", x + 128, y + 200);
             label(g, "Speedup / round (sec)", x + 238, y + 200);
             label(g, "Drop duration (sec)", x + 18, y + 264); label(g, "Tile size (blocks)", x + 128, y + 264);
             label(g, "Elimination depth", x + 238, y + 264);
             int count = draft.blockParty.paletteBlocks == null ? 0 : draft.blockParty.paletteBlocks.size();
-            g.text(font, "Palette: " + count + " / " + BlockPartyRules.MAX_PALETTE + " • minimum 2", x + 406, y + 184,
+            g.drawString(font, "Palette: " + count + " / " + BlockPartyRules.MAX_PALETTE + " • minimum 2", x + 406, y + 184,
                     count >= 2 ? GOOD : WARNING, false);
         } else {
             MinigameArenaDefinition a = arena();
-            g.text(font, "Use the Minigame Setup Tool for the dance floor, lobby, spectator and player spawns.", x + 16, y + 56, MUTED, false);
+            g.drawString(font, "Use the Minigame Setup Tool for the dance floor, lobby, spectator and player spawns.", x + 16, y + 56, MUTED, false);
             label(g, "Arena ID", x + 16, y + 70); label(g, "Arena name", x + 178, y + 70); label(g, "Arena Region", x + 410, y + 70);
-            g.text(font, "Dance floor: " + (a.playFloor.configured() ? a.playFloor.compact() : "Not configured"), x + 16, y + 190, TEXT, false);
-            g.text(font, "Player spawns: " + a.teamSpawns.size() + " • Reset snapshot: " + (a.resetRegionAfterMatch ? "ready" : "not ready"), x + 16, y + 210, MUTED, false);
+            g.drawString(font, "Dance floor: " + (a.playFloor.configured() ? a.playFloor.compact() : "Not configured"), x + 16, y + 190, TEXT, false);
+            g.drawString(font, "Player spawns: " + a.teamSpawns.size() + " • Reset snapshot: " + (a.resetRegionAfterMatch ? "ready" : "not ready"), x + 16, y + 210, MUTED, false);
         }
-        if (!notice.isBlank()) g.text(font, trim(notice, 82), x + 110, y + H - 24, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 82), x + 110, y + H - 24, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void renderPalette(GuiGraphicsExtractor g, int startX, int startY, int mx, int my) {
+    private void renderPalette(GuiGraphics g, int startX, int startY, int mx, int my) {
         for (int i = 0; i < BlockPartyRules.MAX_PALETTE; i++) {
             int sx = startX + (i % 8) * SLOT, sy = startY + (i / 8) * SLOT;
             boolean hovered = inside(mx, my, sx, sy, 20, 20);
             g.fill(sx, sy, sx + 20, sy + 20, 0xFF090D12);
-            g.outline(sx, sy, 20, 20, i == selectedPaletteSlot ? ACCENT : (hovered ? GOOD : BORDER));
+            g.renderOutline(sx, sy, 20, 20, i == selectedPaletteSlot ? ACCENT : (hovered ? GOOD : BORDER));
             if (i >= draft.blockParty.paletteBlocks.size()) continue;
             ItemStack stack = blockStack(draft.blockParty.paletteBlocks.get(i));
             if (!stack.isEmpty()) {
-                g.item(stack, sx + 2, sy + 2);
-                if (hovered) g.setTooltipForNextFrame(font, stack, mx, my);
+                g.renderItem(stack, sx + 2, sy + 2);
+                if (hovered) g.renderTooltip(font, stack, mx, my);
             }
         }
     }
 
-    private void renderInventory(GuiGraphicsExtractor g, int startX, int startY, int mx, int my) {
+    private void renderInventory(GuiGraphics g, int startX, int startY, int mx, int my) {
         for (int row = 0; row < 3; row++) for (int col = 0; col < 9; col++)
             drawInventorySlot(g, 9 + row * 9 + col, startX + col * 18, startY + row * 18, mx, my);
         int hotbarY = startY + 60;
         for (int col = 0; col < 9; col++) drawInventorySlot(g, col, startX + col * 18, hotbarY, mx, my);
     }
 
-    private void drawInventorySlot(GuiGraphicsExtractor g, int slot, int x, int y, int mx, int my) {
+    private void drawInventorySlot(GuiGraphics g, int slot, int x, int y, int mx, int my) {
         boolean hovered = inside(mx, my, x, y, 18, 18);
-        g.fill(x, y, x + 18, y + 18, 0xFF090D12); g.outline(x, y, 18, 18, hovered ? GOOD : BORDER);
+        g.fill(x, y, x + 18, y + 18, 0xFF090D12); g.renderOutline(x, y, 18, 18, hovered ? GOOD : BORDER);
         ItemStack stack = inventoryItem(slot);
         if (!stack.isEmpty()) {
-            g.item(stack, x + 1, y + 1); g.itemDecorations(font, stack, x + 1, y + 1);
-            if (hovered) g.setTooltipForNextFrame(font, stack, mx, my);
+            g.renderItem(stack, x + 1, y + 1); g.renderItemDecorations(font, stack, x + 1, y + 1);
+            if (hovered) g.renderTooltip(font, stack, mx, my);
         }
     }
 
@@ -288,13 +288,13 @@ final class BlockPartyMinigameEditorScreen extends MinigameEditorScreen {
 
     private static ItemStack blockStack(String id) {
         try {
-            var block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(id)).orElse(Blocks.AIR);
+            var block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(id)).orElse(Blocks.AIR);
             ItemStack stack = new ItemStack(block.asItem());
             return stack.isEmpty() ? ItemStack.EMPTY : stack;
         } catch (RuntimeException ignored) { return ItemStack.EMPTY; }
     }
 
-    private void label(GuiGraphicsExtractor g, String value, int x, int y) { g.text(font, value, x, y, MUTED, false); }
+    private void label(GuiGraphics g, String value, int x, int y) { g.drawString(font, value, x, y, MUTED, false); }
     private static boolean inside(double px, double py, int x, int y, int width, int height) {
         return px >= x && px < x + width && py >= y && py < y + height;
     }

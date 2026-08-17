@@ -2,7 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.minigame;
 
 import java.util.Locale;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Arathi Basin-inspired two-team capture-node rules. */
 public final class DominationRules {
@@ -58,7 +58,7 @@ public final class DominationRules {
 
     private static String identifier(String raw, String fallback) {
         String value = raw == null || raw.isBlank() ? fallback : raw.trim().toLowerCase(Locale.ROOT);
-        Identifier.parse(value);
+        ResourceLocation.parse(value);
         return value;
     }
 

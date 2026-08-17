@@ -7,13 +7,13 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Bounded player-facing service menu generated from one NPC definition. */
 public record NpcFunctionMenuPayload(String instanceId, String npcName, String roleLabel, int roleColor,
                                      List<Entry> entries) implements CustomPacketPayload {
     public static final Type<NpcFunctionMenuPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_function_menu"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_function_menu"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcFunctionMenuPayload> STREAM_CODEC =
             StreamCodec.of(NpcFunctionMenuPayload::encode, NpcFunctionMenuPayload::decode);
 

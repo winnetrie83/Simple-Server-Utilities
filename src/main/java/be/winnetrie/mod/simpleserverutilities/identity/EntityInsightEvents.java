@@ -35,8 +35,8 @@ public final class EntityInsightEvents {
         if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("identity")) return;
         Entity source = event.getSource().getEntity();
         if (source instanceof Projectile projectile && projectile.getOwner() != null) source = projectile.getOwner();
-        if (source instanceof ServerPlayer && !(event.getEntity() instanceof ServerPlayer)) {
-            EntityInsightService.notePlayerHit(event.getEntity());
+        if (source instanceof ServerPlayer attacker && !(event.getEntity() instanceof ServerPlayer)) {
+            EntityInsightService.notePlayerHit(event.getEntity(), attacker);
         }
     }
 

@@ -1,7 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.minigame;
 
 import java.util.Locale;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Two-team King of the Hill objective rules. */
 public final class KingOfTheHillRules {
@@ -42,7 +42,7 @@ public final class KingOfTheHillRules {
 
     private static String identifier(String raw, String fallback) {
         String value = raw == null || raw.isBlank() ? fallback : raw.trim().toLowerCase(Locale.ROOT);
-        Identifier.parse(value);
+        ResourceLocation.parse(value);
         return value;
     }
     private static String bound(String value, int max, String fallback) {

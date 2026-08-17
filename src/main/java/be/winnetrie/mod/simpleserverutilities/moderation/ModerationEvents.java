@@ -3,7 +3,7 @@ package be.winnetrie.mod.simpleserverutilities.moderation;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.TriState;
+import net.neoforged.neoforge.common.util.TriState;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.EventPriority;
@@ -15,7 +15,7 @@ import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /** Enforces freeze/jail restrictions while retaining the explicit community-mining route. */
@@ -34,14 +34,14 @@ public final class ModerationEvents {
     @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onLeftBlock(PlayerInteractEvent.LeftClickBlock e){
         if(!(e.getEntity() instanceof ServerPlayer p))return;
         if(SimpleServerUtilities.MODERATION.frozen(p.getUUID()))e.setCanceled(true);
-        // Jailed task miners must reach BreakBlockEvent, where the attempt is validated and always cancelled.
+        // Jailed task miners must reach BlockEvent.BreakEvent, where the attempt is validated and always cancelled.
         else if(jailed(p)&&!SimpleServerUtilities.MODERATION.hasActiveTask(p.getUUID()))e.setCanceled(true);
     }
     @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onEntity(PlayerInteractEvent.EntityInteract e){if(e.getEntity() instanceof ServerPlayer p&&restricted(p)){e.setCanceled(true);e.setCancellationResult(InteractionResult.FAIL);}}
     @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onEntitySpecific(PlayerInteractEvent.EntityInteractSpecific e){if(e.getEntity() instanceof ServerPlayer p&&restricted(p)){e.setCanceled(true);e.setCancellationResult(InteractionResult.FAIL);}}
     @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onAttack(AttackEntityEvent e){if(e.getEntity() instanceof ServerPlayer p&&restricted(p))e.setCanceled(true);}
     @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onDamage(LivingIncomingDamageEvent e){if((e.getEntity() instanceof ServerPlayer target&&restricted(target))||(e.getSource().getEntity() instanceof ServerPlayer source&&restricted(source)))e.setCanceled(true);}
-    @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onBreak(BreakBlockEvent e){
+    @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onBreak(BlockEvent.BreakEvent e){
         if(!(e.getPlayer() instanceof ServerPlayer p)||!restricted(p))return;
         e.setCanceled(true);
         if(jailed(p)&&p.level() instanceof net.minecraft.server.level.ServerLevel level)SimpleServerUtilities.MODERATION.handleJailBreak(p,level,e.getPos());

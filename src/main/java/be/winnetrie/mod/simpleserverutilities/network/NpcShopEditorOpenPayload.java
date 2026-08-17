@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Complete bounded shop draft plus navigation and NPC-reference information for the visual editor. */
 public record NpcShopEditorOpenPayload(String originalShopId, String definitionJson, String selectedEntryId,
@@ -16,7 +16,7 @@ public record NpcShopEditorOpenPayload(String originalShopId, String definitionJ
     public static final int MAX_JSON = 131_072;
     public static final int MAX_USAGES = 128;
     public static final Type<NpcShopEditorOpenPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_editor_open"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_shop_editor_open"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcShopEditorOpenPayload> STREAM_CODEC =
             StreamCodec.of(NpcShopEditorOpenPayload::encode, NpcShopEditorOpenPayload::decode);
 

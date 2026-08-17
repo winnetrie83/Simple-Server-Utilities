@@ -19,16 +19,16 @@ import be.winnetrie.mod.simpleserverutilities.npcshop.NpcShopDefinition;
 import be.winnetrie.mod.simpleserverutilities.npcshop.NpcShopEntry;
 import be.winnetrie.mod.simpleserverutilities.time.GameCalendar;
 import be.winnetrie.mod.simpleserverutilities.time.GameWeekday;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Compact shared-shop editor with visual item/tag rules and independent weekday opening hours. */
 public final class NpcShopEditorScreen extends Screen {
@@ -103,7 +103,7 @@ public final class NpcShopEditorScreen extends Screen {
         awaiting = false; notice = result.message(); noticeError = !result.successful();
         if (result.successful() && result.closeEditor()) {
             if (minecraft != null) {
-                minecraft.setScreenAndShow(parent);
+                minecraft.setScreen(parent);
                 if (parent instanceof NpcShopAdminScreen manager) manager.refreshFromEditor(result.message());
             }
             return;
@@ -114,8 +114,8 @@ public final class NpcShopEditorScreen extends Screen {
     public void acceptManagerData(NpcShopAdminDataPayload payload) {
         if (payload == null || minecraft == null) return;
         if (parent instanceof NpcShopAdminScreen manager) {
-            manager.accept(payload); minecraft.setScreenAndShow(manager);
-        } else minecraft.setScreenAndShow(new NpcShopAdminScreen(payload, parent));
+            manager.accept(payload); minecraft.setScreen(manager);
+        } else minecraft.setScreen(new NpcShopAdminScreen(payload, parent));
     }
 
     private void loadDraft(String json, String selectedEntryId) {
@@ -414,7 +414,7 @@ public final class NpcShopEditorScreen extends Screen {
         NpcShopEntry entry = selected();
         if (entry == null || inventorySlot < 0 || inventorySlot >= 36) return;
         awaiting = true;
-        ClientPacketDistributor.sendToServer(new NpcShopEditorSubmitPayload(
+        PacketDistributor.sendToServer(new NpcShopEditorSubmitPayload(
                 oneItem ? "capture_inventory_one" : "capture_inventory",
                 initial.originalShopId(), draftJson(), entry.id, inventorySlot, nextRequestId++));
         setNotice(oneItem ? "Copying one item from the selected stack…"
@@ -430,7 +430,7 @@ public final class NpcShopEditorScreen extends Screen {
         if (!saveCurrentPage()) return;
         try {
             awaiting = true;
-            ClientPacketDistributor.sendToServer(new NpcShopEditorSubmitPayload(operation,
+            PacketDistributor.sendToServer(new NpcShopEditorSubmitPayload(operation,
                     initial.originalShopId(), draftJson(), selected() == null ? "" : selected().id, -1, nextRequestId++));
             setNotice(progress, false); rebuildWidgets();
         } catch (RuntimeException exception) {
@@ -438,42 +438,42 @@ public final class NpcShopEditorScreen extends Screen {
         }
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int left = left(), top = top();
-        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(left, top, left + W, top + H, PANEL); g.outline(left, top, W, H, BORDER);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(left, top, left + W, top + H, PANEL); g.renderOutline(left, top, W, H, BORDER);
         String position = initial.shopIndex() >= 0 ? (initial.shopIndex() + 1) + "/" + initial.shopCount() : "New";
-        g.text(font, "Shop Editor · " + position, left + W - 148, top + 15, TEXT, true);
+        g.drawString(font, "Shop Editor · " + position, left + W - 148, top + 15, TEXT, true);
         if (page == 0) renderGeneral(g, left, top);
         else if (page == 1) renderOffers(g, left, top, mouseX, mouseY);
         else if (page == 2) renderTradeRules(g, left, top, mouseX, mouseY);
         else if (page == 3) renderAvailability(g, left, top);
         else renderUsages(g, left, top);
-        if (!notice.isBlank()) g.text(font, trim(notice, 52), left + 158, top + 40, noticeError ? ERROR : MUTED, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 52), left + 158, top + 40, noticeError ? ERROR : MUTED, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void renderGeneral(GuiGraphicsExtractor g, int left, int top) {
+    private void renderGeneral(GuiGraphics g, int left, int top) {
         panel(g, left + 10, top + 60, W - 20, 252);
-        g.text(font, npcEmbedded ? "NPC shop" : "Shared shop identity", left + 20, top + 68, TEXT, true);
+        g.drawString(font, npcEmbedded ? "NPC shop" : "Shared shop identity", left + 20, top + 68, TEXT, true);
         if (!npcEmbedded) {
-            g.text(font, "Shop ID", left + 20, top + 81, MUTED, false);
-            g.text(font, "Display name", left + 244, top + 81, MUTED, false);
-            g.text(font, "Every linked NPC reads this one live shop definition.", left + 20, top + 172, GOOD, false);
-            g.text(font, "Linked templates: " + initial.usages().size(), left + 20, top + 218, TEXT, false);
-            g.text(font, "Use Linked NPCs to inspect placements using this shop.", left + 20, top + 244, MUTED, false);
+            g.drawString(font, "Shop ID", left + 20, top + 81, MUTED, false);
+            g.drawString(font, "Display name", left + 244, top + 81, MUTED, false);
+            g.drawString(font, "Every linked NPC reads this one live shop definition.", left + 20, top + 172, GOOD, false);
+            g.drawString(font, "Linked templates: " + initial.usages().size(), left + 20, top + 218, TEXT, false);
+            g.drawString(font, "Use Linked NPCs to inspect placements using this shop.", left + 20, top + 244, MUTED, false);
         } else {
-            g.text(font, "Display name", left + 20, top + 81, MUTED, false);
-            g.text(font, "This shop belongs to the NPC editor. Its technical ID is managed automatically.",
+            g.drawString(font, "Display name", left + 20, top + 81, MUTED, false);
+            g.drawString(font, "This shop belongs to the NPC editor. Its technical ID is managed automatically.",
                     left + 20, top + 172, GOOD, false);
-            g.text(font, "Use Offers to copy exact item stacks from your inventory without consuming them.",
+            g.drawString(font, "Use Offers to copy exact item stacks from your inventory without consuming them.",
                     left + 20, top + 218, MUTED, false);
         }
-        g.text(font, "Offers: " + draft.entries.size() + "/" + NpcShopDefinition.MAX_ENTRIES, left + 20, top + 198, TEXT, false);
+        g.drawString(font, "Offers: " + draft.entries.size() + "/" + NpcShopDefinition.MAX_ENTRIES, left + 20, top + 198, TEXT, false);
     }
 
-    private void renderOffers(GuiGraphicsExtractor g, int left, int top, int mouseX, int mouseY) {
+    private void renderOffers(GuiGraphics g, int left, int top, int mouseX, int mouseY) {
         int listLeft = left + 10, listTop = top + 60, listWidth = 218, listHeight = 210;
         panel(g, listLeft, listTop, listWidth, listHeight); rows.clear();
         int from = offerPage * OFFER_PAGE_SIZE, to = Math.min(draft.entries.size(), from + OFFER_PAGE_SIZE);
@@ -482,36 +482,36 @@ public final class NpcShopEditorScreen extends Screen {
             RowBounds row = new RowBounds(index, listLeft + 5, y, listWidth - 10, ROW_HEIGHT - 2); rows.add(row);
             NpcShopEntry entry = draft.entries.get(index); ItemStack item = item(entry);
             g.fill(row.x(), row.y(), row.x() + row.width(), row.y() + row.height(), index == selectedIndex ? SELECTED : ROW);
-            if (!item.isEmpty()) { g.item(item, row.x() + 4, row.y() + 4); if (SsuGuiGeometry.inside(mouseX, mouseY, row.x() + 3, row.y() + 2, 21, 21)) g.setTooltipForNextFrame(font, item, mouseX, mouseY); }
-            g.text(font, trim(entry.id, 16), row.x() + 27, row.y() + 4, TEXT, false);
-            g.text(font, item.isEmpty() ? "No item" : trim(item.getHoverName().getString(), 17), row.x() + 27, row.y() + 15, item.isEmpty() ? ERROR : MUTED, false);
-            g.text(font, entry.stock < 0 ? "∞" : Integer.toString(entry.stock), row.x() + row.width() - 25, row.y() + 8, MUTED, false);
+            if (!item.isEmpty()) { g.renderItem(item, row.x() + 4, row.y() + 4); if (SsuGuiGeometry.inside(mouseX, mouseY, row.x() + 3, row.y() + 2, 21, 21)) g.renderTooltip(font, item, mouseX, mouseY); }
+            g.drawString(font, trim(entry.id, 16), row.x() + 27, row.y() + 4, TEXT, false);
+            g.drawString(font, item.isEmpty() ? "No item" : trim(item.getHoverName().getString(), 17), row.x() + 27, row.y() + 15, item.isEmpty() ? ERROR : MUTED, false);
+            g.drawString(font, entry.stock < 0 ? "∞" : Integer.toString(entry.stock), row.x() + row.width() - 25, row.y() + 8, MUTED, false);
         }
-        if (draft.entries.isEmpty()) g.text(font, "No offers. Click Add.", listLeft + 18, listTop + 22, MUTED, false);
+        if (draft.entries.isEmpty()) g.drawString(font, "No offers. Click Add.", listLeft + 18, listTop + 22, MUTED, false);
         int pages = Math.max(1, (draft.entries.size() + OFFER_PAGE_SIZE - 1) / OFFER_PAGE_SIZE);
-        g.text(font, "Page " + (offerPage + 1) + "/" + pages, listLeft + 82, top + 283, MUTED, false);
+        g.drawString(font, "Page " + (offerPage + 1) + "/" + pages, listLeft + 82, top + 283, MUTED, false);
 
         int x = left + 236; panel(g, x, top + 60, 324, 210);
         NpcShopEntry entry = selected();
-        if (entry == null) { g.text(font, "Select or add an offer.", x + 10, top + 76, MUTED, false); return; }
+        if (entry == null) { g.drawString(font, "Select or add an offer.", x + 10, top + 76, MUTED, false); return; }
         ItemStack item = item(entry);
-        g.text(font, "Offer ID", x + 8, top + 74, MUTED, false); g.text(font, "Count", x + 182, top + 74, MUTED, false);
-        g.text(font, "Stock", x + 8, top + 120, MUTED, false); g.text(font, "Maximum", x + 84, top + 120, MUTED, false);
-        g.text(font, "Restock +", x + 160, top + 120, MUTED, false); g.text(font, "Minutes", x + 236, top + 120, MUTED, false);
-        g.text(font, "Inventory — LMB full stack · RMB one item", x + 8, top + 163, MUTED, false);
+        g.drawString(font, "Offer ID", x + 8, top + 74, MUTED, false); g.drawString(font, "Count", x + 182, top + 74, MUTED, false);
+        g.drawString(font, "Stock", x + 8, top + 120, MUTED, false); g.drawString(font, "Maximum", x + 84, top + 120, MUTED, false);
+        g.drawString(font, "Restock +", x + 160, top + 120, MUTED, false); g.drawString(font, "Minutes", x + 236, top + 120, MUTED, false);
+        g.drawString(font, "Inventory — LMB full stack · RMB one item", x + 8, top + 163, MUTED, false);
         renderEditorInventory(g, x + 8, top + 176, mouseX, mouseY);
         int itemSlotX = x + 186, itemSlotY = top + 176;
         boolean itemHovered = SsuGuiGeometry.inside(mouseX, mouseY, itemSlotX, itemSlotY, 20, 20);
         g.fill(itemSlotX, itemSlotY, itemSlotX + 20, itemSlotY + 20, itemHovered ? SELECTED : 0xD00B1015);
-        g.outline(itemSlotX, itemSlotY, 20, 20, itemHovered ? GOOD : BORDER);
+        g.renderOutline(itemSlotX, itemSlotY, 20, 20, itemHovered ? GOOD : BORDER);
         if (!item.isEmpty()) {
-            g.item(item, itemSlotX + 2, itemSlotY + 2); g.itemDecorations(font, item, itemSlotX + 2, itemSlotY + 2);
-            g.text(font, trim(item.getHoverName().getString(), 17), x + 212, top + 181, TEXT, false);
-            if (itemHovered) g.setTooltipForNextFrame(font, item, mouseX, mouseY);
-        } else g.text(font, "No item selected", x + 212, top + 181, ERROR, false);
+            g.renderItem(item, itemSlotX + 2, itemSlotY + 2); g.renderItemDecorations(font, item, itemSlotX + 2, itemSlotY + 2);
+            g.drawString(font, trim(item.getHoverName().getString(), 17), x + 212, top + 181, TEXT, false);
+            if (itemHovered) g.renderTooltip(font, item, mouseX, mouseY);
+        } else g.drawString(font, "No item selected", x + 212, top + 181, ERROR, false);
     }
 
-    private void renderTradeRules(GuiGraphicsExtractor g, int left, int top, int mouseX, int mouseY) {
+    private void renderTradeRules(GuiGraphics g, int left, int top, int mouseX, int mouseY) {
         panel(g, left + 10, top + 60, W - 20, 252); filterRows.clear();
         List<FilterOption> options = filteredOptions();
         int pages = Math.max(1, (options.size() + FILTER_PAGE_SIZE - 1) / FILTER_PAGE_SIZE);
@@ -522,95 +522,95 @@ public final class NpcShopEditorScreen extends Screen {
             String emptyMessage = ruleViewMode == 1
                     ? "No added " + (ruleItems ? "items" : "tags") + " in this list."
                     : ruleViewMode == 2 ? "Every matching entry is already added." : "No matching entries.";
-            g.text(font, emptyMessage, listX + 8, listY + 10, MUTED, false);
+            g.drawString(font, emptyMessage, listX + 8, listY + 10, MUTED, false);
         }
         for (int index = from; index < to; index++) {
             int local = index - from, y = listY + local * 23;
             FilterOption option = options.get(index); boolean selected = activeRuleList().contains(option.filterId());
             RowBounds row = new RowBounds(index, listX, y, listW, 20); filterRows.add(row);
             g.fill(row.x(), row.y(), row.x() + row.width(), row.y() + row.height(), selected ? SELECTED : ROW);
-            g.outline(row.x(), row.y(), row.width(), row.height(), selected ? GOOD : BORDER);
+            g.renderOutline(row.x(), row.y(), row.width(), row.height(), selected ? GOOD : BORDER);
             int textX = row.x() + 8;
-            if (!option.tag() && !option.icon().isEmpty()) { g.item(option.icon(), row.x() + 2, row.y() + 2); textX += 18; }
-            g.text(font, trim(option.label(), 37), textX, row.y() + 5, TEXT, false);
-            g.text(font, trim(option.filterId(), 34), row.x() + 300, row.y() + 5, MUTED, false);
-            g.text(font, selected ? "REMOVE" : "ADD", row.x() + row.width() - 48, row.y() + 5, selected ? WARNING : GOOD, true);
+            if (!option.tag() && !option.icon().isEmpty()) { g.renderItem(option.icon(), row.x() + 2, row.y() + 2); textX += 18; }
+            g.drawString(font, trim(option.label(), 37), textX, row.y() + 5, TEXT, false);
+            g.drawString(font, trim(option.filterId(), 34), row.x() + 300, row.y() + 5, MUTED, false);
+            g.drawString(font, selected ? "REMOVE" : "ADD", row.x() + row.width() - 48, row.y() + 5, selected ? WARNING : GOOD, true);
             if (!option.tag() && SsuGuiGeometry.inside(mouseX, mouseY, row.x(), row.y(), 22, 20) && !option.icon().isEmpty())
-                g.setTooltipForNextFrame(font, option.icon(), mouseX, mouseY);
+                g.renderTooltip(font, option.icon(), mouseX, mouseY);
         }
         long typeCount = activeRuleList().stream().filter(id -> ruleItems ? !id.startsWith("#") : id.startsWith("#")).count();
-        g.text(font, (ruleWhitelist ? "Whitelist" : "Blacklist") + " · " + typeCount + " added "
+        g.drawString(font, (ruleWhitelist ? "Whitelist" : "Blacklist") + " · " + typeCount + " added "
                 + (ruleItems ? "item(s)" : "tag(s)") + " · Page " + (filterPage + 1) + "/" + pages,
                 left + 86, top + 291, MUTED, false);
     }
 
-    private void renderAvailability(GuiGraphicsExtractor g, int left, int top) {
+    private void renderAvailability(GuiGraphics g, int left, int top) {
         panel(g, left + 10, top + 60, W - 20, 252);
         NpcShopEntry entry = selected();
-        if (entry == null) { g.text(font, "Add an offer before configuring availability.", left + 18, top + 102, MUTED, false); return; }
+        if (entry == null) { g.drawString(font, "Add an offer before configuring availability.", left + 18, top + 102, MUTED, false); return; }
         ItemStack stack = item(entry);
-        g.text(font, "Offer " + (selectedIndex + 1) + "/" + draft.entries.size() + ": " + trim(entry.id, 25), left + 174, top + 71, TEXT, true);
-        if (!stack.isEmpty()) { g.item(stack, left + 520, top + 65); g.text(font, trim(stack.getHoverName().getString(), 21), left + 370, top + 72, MUTED, false); }
-        g.text(font, "Day", left + 18, top + 88, MUTED, false); g.text(font, "Mode", left + 112, top + 88, MUTED, false);
-        g.text(font, "Start", left + 250, top + 88, MUTED, false); g.text(font, "End", left + 380, top + 88, MUTED, false);
-        g.text(font, "Each day has independent opening hours. End before start creates an overnight window.", left + 18, top + 304, GOOD, false);
+        g.drawString(font, "Offer " + (selectedIndex + 1) + "/" + draft.entries.size() + ": " + trim(entry.id, 25), left + 174, top + 71, TEXT, true);
+        if (!stack.isEmpty()) { g.renderItem(stack, left + 520, top + 65); g.drawString(font, trim(stack.getHoverName().getString(), 21), left + 370, top + 72, MUTED, false); }
+        g.drawString(font, "Day", left + 18, top + 88, MUTED, false); g.drawString(font, "Mode", left + 112, top + 88, MUTED, false);
+        g.drawString(font, "Start", left + 250, top + 88, MUTED, false); g.drawString(font, "End", left + 380, top + 88, MUTED, false);
+        g.drawString(font, "Each day has independent opening hours. End before start creates an overnight window.", left + 18, top + 304, GOOD, false);
     }
 
-    private void renderUsages(GuiGraphicsExtractor g, int left, int top) {
+    private void renderUsages(GuiGraphics g, int left, int top) {
         int listX = left + 10, listY = top + 60, listW = W - 20; panel(g, listX, listY, listW, 210);
-        g.text(font, "NPC", listX + 8, listY + 7, MUTED, false); g.text(font, "Template ID", listX + 230, listY + 7, MUTED, false);
-        g.text(font, "Placed", listX + 478, listY + 7, MUTED, false);
+        g.drawString(font, "NPC", listX + 8, listY + 7, MUTED, false); g.drawString(font, "Template ID", listX + 230, listY + 7, MUTED, false);
+        g.drawString(font, "Placed", listX + 478, listY + 7, MUTED, false);
         int from = usagePage * USAGE_PAGE_SIZE, to = Math.min(initial.usages().size(), from + USAGE_PAGE_SIZE);
         for (int index = from; index < to; index++) {
             int y = listY + 24 + (index - from) * ROW_HEIGHT; NpcShopEditorOpenPayload.Usage usage = initial.usages().get(index);
             g.fill(listX + 5, y, listX + listW - 5, y + ROW_HEIGHT - 2, ROW);
-            g.text(font, trim(usage.displayName(), 29), listX + 12, y + 7, TEXT, false);
-            g.text(font, trim(usage.definitionId(), 31), listX + 230, y + 7, MUTED, false);
-            g.text(font, Integer.toString(usage.placementCount()), listX + 496, y + 7, usage.placementCount() > 0 ? GOOD : WARNING, false);
+            g.drawString(font, trim(usage.displayName(), 29), listX + 12, y + 7, TEXT, false);
+            g.drawString(font, trim(usage.definitionId(), 31), listX + 230, y + 7, MUTED, false);
+            g.drawString(font, Integer.toString(usage.placementCount()), listX + 496, y + 7, usage.placementCount() > 0 ? GOOD : WARNING, false);
         }
-        if (initial.usages().isEmpty()) g.text(font, "No NPC template currently uses this shop.", listX + 18, listY + 44, MUTED, false);
+        if (initial.usages().isEmpty()) g.drawString(font, "No NPC template currently uses this shop.", listX + 18, listY + 44, MUTED, false);
         int pages = Math.max(1, (initial.usages().size() + USAGE_PAGE_SIZE - 1) / USAGE_PAGE_SIZE);
-        g.text(font, initial.usages().size() + " template(s) · Page " + (usagePage + 1) + "/" + pages, left + 86, top + 291, MUTED, false);
+        g.drawString(font, initial.usages().size() + " template(s) · Page " + (usagePage + 1) + "/" + pages, left + 86, top + 291, MUTED, false);
     }
 
-    @Override public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-        if (page == 1 && (event.buttonInfo().button() == 0 || event.buttonInfo().button() == 1)) {
+    @Override public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (page == 1 && (button == 0 || button == 1)) {
             if (!awaiting && selected() != null) {
-                int slot = editorInventorySlotAt((int) event.x(), (int) event.y());
+                int slot = editorInventorySlotAt((int) mouseX, (int) mouseY);
                 if (slot >= 0) {
                     if (clientInventoryItem(slot).isEmpty()) setNotice("That inventory slot is empty.", true);
-                    else captureInventory(slot, event.buttonInfo().button() == 1);
+                    else captureInventory(slot, button == 1);
                     return true;
                 }
             }
-            if (event.buttonInfo().button() == 0) {
-                for (RowBounds row : rows) if (row.contains((int) event.x(), (int) event.y())) { selectOffer(row.index()); return true; }
+            if (button == 0) {
+                for (RowBounds row : rows) if (row.contains((int) mouseX, (int) mouseY)) { selectOffer(row.index()); return true; }
             }
         }
-        if (page == 2 && event.buttonInfo().button() == 0) {
+        if (page == 2 && button == 0) {
             List<FilterOption> options = filteredOptions();
             for (RowBounds row : filterRows) {
-                if (!row.contains((int) event.x(), (int) event.y()) || row.index() < 0 || row.index() >= options.size()) continue;
+                if (!row.contains((int) mouseX, (int) mouseY) || row.index() < 0 || row.index() >= options.size()) continue;
                 String id = options.get(row.index()).filterId(); List<String> list = activeRuleList();
                 if (list.contains(id)) list.remove(id); else if (list.size() < 256) list.add(id);
                 rebuildWidgets(); return true;
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    private void renderEditorInventory(GuiGraphicsExtractor g, int startX, int startY, int mouseX, int mouseY) {
+    private void renderEditorInventory(GuiGraphics g, int startX, int startY, int mouseX, int mouseY) {
         for (int row = 0; row < 3; row++) for (int column = 0; column < 9; column++)
             drawEditorInventorySlot(g, 9 + row * 9 + column, startX + column * 18, startY + row * 18, mouseX, mouseY);
         int hotbarY = startY + 60;
         for (int column = 0; column < 9; column++) drawEditorInventorySlot(g, column, startX + column * 18, hotbarY, mouseX, mouseY);
     }
 
-    private void drawEditorInventorySlot(GuiGraphicsExtractor g, int slot, int x, int y, int mouseX, int mouseY) {
+    private void drawEditorInventorySlot(GuiGraphics g, int slot, int x, int y, int mouseX, int mouseY) {
         boolean hovered = SsuGuiGeometry.inside(mouseX, mouseY, x, y, 18, 18);
-        g.fill(x, y, x + 18, y + 18, hovered ? SELECTED : 0xD00B1015); g.outline(x, y, 18, 18, hovered ? GOOD : BORDER);
+        g.fill(x, y, x + 18, y + 18, hovered ? SELECTED : 0xD00B1015); g.renderOutline(x, y, 18, 18, hovered ? GOOD : BORDER);
         ItemStack stack = clientInventoryItem(slot);
-        if (!stack.isEmpty()) { g.item(stack, x + 1, y + 1); g.itemDecorations(font, stack, x + 1, y + 1); if (hovered) g.setTooltipForNextFrame(font, stack, mouseX, mouseY); }
+        if (!stack.isEmpty()) { g.renderItem(stack, x + 1, y + 1); g.renderItemDecorations(font, stack, x + 1, y + 1); if (hovered) g.renderTooltip(font, stack, mouseX, mouseY); }
     }
 
     private int editorInventorySlotAt(int mouseX, int mouseY) {
@@ -632,7 +632,7 @@ public final class NpcShopEditorScreen extends Screen {
     private List<FilterOption> itemOptions() {
         if (itemOptions != null) return itemOptions;
         ArrayList<FilterOption> result = new ArrayList<>();
-        for (Identifier id : BuiltInRegistries.ITEM.keySet()) {
+        for (ResourceLocation id : BuiltInRegistries.ITEM.keySet()) {
             Item item = BuiltInRegistries.ITEM.getOptional(id).orElse(null);
             if (item == null) continue;
             ItemStack stack = item.getDefaultInstance();
@@ -647,7 +647,7 @@ public final class NpcShopEditorScreen extends Screen {
         if (tagOptions != null) return tagOptions;
         ArrayList<FilterOption> result = new ArrayList<>();
         BuiltInRegistries.ITEM.getTags().forEach(tag -> {
-            Identifier location = tag.key().location();
+            ResourceLocation location = tag.getFirst().location();
             String id = "#" + location;
             result.add(new FilterOption(id, title(location.toString()), ItemStack.EMPTY, true));
         });
@@ -754,7 +754,7 @@ public final class NpcShopEditorScreen extends Screen {
         try { int value = Integer.parseInt(box == null ? "" : box.getValue().trim()); if (value < minimum || value > maximum) throw new NumberFormatException(); return value; }
         catch (NumberFormatException exception) { throw new IllegalArgumentException(label + " must be between " + minimum + " and " + maximum + "."); }
     }
-    private void panel(GuiGraphicsExtractor g, int x, int y, int width, int height) { g.fill(x, y, x + width, y + height, SUBPANEL); g.outline(x, y, width, height, BORDER); }
+    private void panel(GuiGraphics g, int x, int y, int width, int height) { g.fill(x, y, x + width, y + height, SUBPANEL); g.renderOutline(x, y, width, height, BORDER); }
     private void setNotice(String message, boolean error) { notice = message == null ? "" : message; noticeError = error; }
     private int left() { return (width - W) / 2; }
     private int top() { return (height - H) / 2; }

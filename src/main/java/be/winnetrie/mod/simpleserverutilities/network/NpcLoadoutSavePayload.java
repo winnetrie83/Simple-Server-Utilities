@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record NpcLoadoutSavePayload(int containerId, int mode, int rolls, int[] chances, long requestId)
         implements CustomPacketPayload {
     public static final Type<NpcLoadoutSavePayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_loadout_save"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_loadout_save"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcLoadoutSavePayload> STREAM_CODEC =
             StreamCodec.of(NpcLoadoutSavePayload::encode, NpcLoadoutSavePayload::decode);
     public NpcLoadoutSavePayload {

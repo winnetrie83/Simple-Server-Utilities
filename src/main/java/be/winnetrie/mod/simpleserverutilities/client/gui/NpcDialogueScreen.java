@@ -5,12 +5,12 @@ import java.util.List;
 import be.winnetrie.mod.simpleserverutilities.richtext.SsuRichTextComponents;
 import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueChoicePayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcDialogueViewPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Player-facing graph dialogue screen. Choices are filtered and authorized by the server. */
 public final class NpcDialogueScreen extends Screen {
@@ -57,14 +57,14 @@ public final class NpcDialogueScreen extends Screen {
         if (awaiting || !choice.enabled()) return;
         awaiting = true;
         rebuildWidgets();
-        ClientPacketDistributor.sendToServer(new NpcDialogueChoicePayload(data.sessionId(), choice.id(), nextRequestId++));
+        PacketDistributor.sendToServer(new NpcDialogueChoicePayload(data.sessionId(), choice.id(), nextRequestId++));
     }
 
     public void accept(NpcDialogueViewPayload payload) {
         if (payload == null || (!data.sessionId().isBlank() && !payload.sessionId().equals(data.sessionId()))) return;
         if (payload.closed()) {
             serverClosed = true;
-            if (minecraft != null) minecraft.setScreenAndShow(parent);
+            if (minecraft != null) minecraft.setScreen(parent);
             return;
         }
         data = payload;
@@ -76,26 +76,26 @@ public final class NpcDialogueScreen extends Screen {
     public void onClose() {
         if (!serverClosed && !data.sessionId().isBlank()) {
             serverClosed = true;
-            ClientPacketDistributor.sendToServer(new NpcDialogueChoicePayload(
+            PacketDistributor.sendToServer(new NpcDialogueChoicePayload(
                     data.sessionId(), "", nextRequestId++));
         }
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = panelX();
         int y = panelY();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, PANEL);
-        g.outline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
-        g.text(font, data.npcName(), x + 20, y + 14, TEXT, true);
-        g.text(font, data.speaker().isBlank() ? data.npcName() : data.speaker(), x + 20, y + 38, GOOD, false);
+        g.renderOutline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
+        g.drawString(font, data.npcName(), x + 20, y + 14, TEXT, true);
+        g.drawString(font, data.speaker().isBlank() ? data.npcName() : data.speaker(), x + 20, y + 38, GOOD, false);
         List<FormattedCharSequence> lines = font.split(SsuRichTextComponents.parse(data.text()), PANEL_WIDTH - 40);
-        for (int i = 0; i < Math.min(10, lines.size()); i++) g.text(font, lines.get(i), x + 20, y + 56 + i * 10, TEXT, false);
-        if (!data.notice().isBlank()) g.text(font, trim(data.notice(), 82), x + 20, y + 160, data.error() ? ERROR : GOOD, false);
-        else if (awaiting) g.text(font, "Processing choice…", x + 20, y + 160, MUTED, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        for (int i = 0; i < Math.min(10, lines.size()); i++) g.drawString(font, lines.get(i), x + 20, y + 56 + i * 10, TEXT, false);
+        if (!data.notice().isBlank()) g.drawString(font, trim(data.notice(), 82), x + 20, y + 160, data.error() ? ERROR : GOOD, false);
+        else if (awaiting) g.drawString(font, "Processing choice…", x + 20, y + 160, MUTED, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private int panelX() { return (width - PANEL_WIDTH) / 2; }

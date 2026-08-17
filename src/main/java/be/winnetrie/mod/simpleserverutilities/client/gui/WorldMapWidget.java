@@ -13,10 +13,9 @@ import be.winnetrie.mod.simpleserverutilities.client.mapmarker.MapMarkerClientSt
 import be.winnetrie.mod.simpleserverutilities.network.MapMarkerSyncPayload;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapDataPayload;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 /** Large interactive world-map canvas with overlays and marker context clicks. */
@@ -85,7 +84,7 @@ final class WorldMapWidget extends AbstractWidget {
         Minecraft minecraft = Minecraft.getInstance();
         int fallback = minecraft.player == null ? 64 : (int) Math.floor(minecraft.player.getY()) - 1;
         if (minecraft.level == null
-                || !payload.dimension().equals(minecraft.level.dimension().identifier().toString())) {
+                || !payload.dimension().equals(minecraft.level.dimension().location().toString())) {
             return new LocationInfo(new WorldCoordinate(worldX, fallback + 1, worldZ), "", "");
         }
         AerialMapAtlas.SurfaceInfo info =
@@ -101,7 +100,7 @@ final class WorldMapWidget extends AbstractWidget {
         if (coordinate == null) return null;
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null
-                || !payload.dimension().equals(minecraft.level.dimension().identifier().toString())) {
+                || !payload.dimension().equals(minecraft.level.dimension().location().toString())) {
             return new LocationInfo(coordinate, "", "");
         }
         AerialMapAtlas.SurfaceInfo info = AerialMapAtlas.surfaceInfoAvailable(
@@ -133,7 +132,7 @@ final class WorldMapWidget extends AbstractWidget {
     }
 
     @Override
-    protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         graphics.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), BACKGROUND);
         graphics.enableScissor(getX(), getY(), getX() + getWidth(), getY() + getHeight());
         terrainMap.render(graphics, getX() + dragOffsetX(), getY() + dragOffsetY(),
@@ -143,11 +142,11 @@ final class WorldMapWidget extends AbstractWidget {
         if (showMarkers) drawMarkers(graphics);
         drawPlayer(graphics);
         graphics.disableScissor();
-        graphics.outline(getX(), getY(), getWidth(), getHeight(), FRAME);
-        graphics.centeredText(Minecraft.getInstance().font, "N", getX() + getWidth() / 2, getY() + 4, 0xFFFFFFFF);
+        graphics.renderOutline(getX(), getY(), getWidth(), getHeight(), FRAME);
+        graphics.drawCenteredString(Minecraft.getInstance().font, "N", getX() + getWidth() / 2, getY() + 4, 0xFFFFFFFF);
     }
 
-    private void drawClaims(GuiGraphicsExtractor graphics) {
+    private void drawClaims(GuiGraphics graphics) {
         Map<ClaimChunkStatus, Set<Long>> groups = new LinkedHashMap<>();
         for (WorldMapDataPayload.ClaimOverlay claim : payload.claims()) {
             groups.computeIfAbsent(claim.status(), ignored -> new LinkedHashSet<>())
@@ -176,7 +175,7 @@ final class WorldMapWidget extends AbstractWidget {
         }
     }
 
-    private void drawRegions(GuiGraphicsExtractor graphics) {
+    private void drawRegions(GuiGraphics graphics) {
         for (WorldMapDataPayload.RegionOverlay region : payload.regions()) {
             int left = worldToScreenX(region.minX());
             int top = worldToScreenZ(region.minZ());
@@ -192,7 +191,7 @@ final class WorldMapWidget extends AbstractWidget {
         }
     }
 
-    private void drawMarkers(GuiGraphicsExtractor graphics) {
+    private void drawMarkers(GuiGraphics graphics) {
         for (MapMarkerSyncPayload.Entry marker : MapMarkerClientState.markers()) {
             if (!payload.dimension().equals(marker.dimension()) || !inside(marker.x(), marker.z())) continue;
             int x = worldToScreenX(marker.x());
@@ -203,7 +202,7 @@ final class WorldMapWidget extends AbstractWidget {
     }
 
 
-    private static void drawMarkerCircle(GuiGraphicsExtractor graphics, int x, int y, int color) {
+    private static void drawMarkerCircle(GuiGraphics graphics, int x, int y, int color) {
         // Pixel-rounded circle: dark outline, selected colour and a small white centre.
         graphics.fill(x - 1, y - 4, x + 2, y + 5, 0xE6111111);
         graphics.fill(x - 3, y - 3, x + 4, y + 4, 0xE6111111);
@@ -214,10 +213,10 @@ final class WorldMapWidget extends AbstractWidget {
         graphics.fill(x, y, x + 1, y + 1, 0xFFFFFFFF);
     }
 
-    private void drawPlayer(GuiGraphicsExtractor graphics) {
+    private void drawPlayer(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null || minecraft.level == null
-                || !minecraft.level.dimension().identifier().toString().equals(payload.dimension())) return;
+                || !minecraft.level.dimension().location().toString().equals(payload.dimension())) return;
         int playerX = (int) Math.floor(minecraft.player.getX());
         int playerZ = (int) Math.floor(minecraft.player.getZ());
         if (!inside(playerX, playerZ)) return;
@@ -228,11 +227,10 @@ final class WorldMapWidget extends AbstractWidget {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (!isMouseOver(event.x(), event.y())) return false;
-        int button = event.buttonInfo().button();
-        if (button == 1) return openContextAt(event.x(), event.y());
-        return button == 2 && beginMiddleDrag(event.x(), event.y());
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (!isMouseOver(mouseX, mouseY)) return false;
+                if (button == 1) return openContextAt(mouseX, mouseY);
+        return button == 2 && beginMiddleDrag(mouseX, mouseY);
     }
 
     boolean openContextAt(double mouseX, double mouseY) {
@@ -245,12 +243,12 @@ final class WorldMapWidget extends AbstractWidget {
         return true;
     }
 
-    @Override public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
-        return event.buttonInfo().button() == 2 && updateMiddleDrag(event.x(), event.y());
+    @Override public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        return button == 2 && updateMiddleDrag(mouseX, mouseY);
     }
 
-    @Override public boolean mouseReleased(MouseButtonEvent event) {
-        return event.buttonInfo().button() == 2 && finishMiddleDrag();
+    @Override public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        return button == 2 && finishMiddleDrag();
     }
 
     boolean beginMiddleDrag(double mouseX, double mouseY) {
@@ -338,7 +336,7 @@ final class WorldMapWidget extends AbstractWidget {
     }
 
     private static int withAlpha(int argb, int alpha) { return (alpha << 24) | (argb & 0x00FFFFFF); }
-    private static void outline(GuiGraphicsExtractor graphics, int left, int top, int right, int bottom, int color) {
+    private static void outline(GuiGraphics graphics, int left, int top, int right, int bottom, int color) {
         graphics.fill(left, top, right, top + 1, color);
         graphics.fill(left, bottom - 1, right, bottom, color);
         graphics.fill(left, top, left + 1, bottom, color);

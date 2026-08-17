@@ -80,8 +80,8 @@ public final class TeleportSafety {
         BlockPos headPos = feetPos.above();
         BlockPos floorPos = feetPos.below();
 
-        if (!level.isInsideBuildHeight(floorPos)
-                || !level.isInsideBuildHeight(headPos)
+        if (level.isOutsideBuildHeight(floorPos)
+                || level.isOutsideBuildHeight(headPos)
                 || !level.getWorldBorder().isWithinBounds(feetPos)) {
             return Optional.empty();
         }

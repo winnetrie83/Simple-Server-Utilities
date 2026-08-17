@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 public record AuctionHouseDataPayload(
@@ -35,7 +35,7 @@ public record AuctionHouseDataPayload(
 ) implements CustomPacketPayload {
     public static final int MAX_ENTRIES = 12;
     public static final Type<AuctionHouseDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "auction_house_data"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "auction_house_data"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, AuctionHouseDataPayload> STREAM_CODEC =
             StreamCodec.of(AuctionHouseDataPayload::encode, AuctionHouseDataPayload::decode);

@@ -4,14 +4,14 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Keeps the server informed about the state of the two client-side mining keybinds. */
 public record UtilityMiningActivationPayload(boolean treecapitatorHeld, boolean veinminerHeld)
         implements CustomPacketPayload {
 
     public static final Type<UtilityMiningActivationPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "utility_mining_activation")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "utility_mining_activation")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, UtilityMiningActivationPayload> STREAM_CODEC =

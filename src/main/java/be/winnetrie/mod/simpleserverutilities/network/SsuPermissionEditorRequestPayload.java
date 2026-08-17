@@ -6,7 +6,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Requests target choices and one bounded page of permission definitions. */
 public record SsuPermissionEditorRequestPayload(
@@ -22,7 +22,7 @@ public record SsuPermissionEditorRequestPayload(
 
     public static final int MAX_PAGE_SIZE = 20;
     public static final Type<SsuPermissionEditorRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "permission_editor_request")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "permission_editor_request")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuPermissionEditorRequestPayload> STREAM_CODEC =
             StreamCodec.of(SsuPermissionEditorRequestPayload::encode, SsuPermissionEditorRequestPayload::decode);

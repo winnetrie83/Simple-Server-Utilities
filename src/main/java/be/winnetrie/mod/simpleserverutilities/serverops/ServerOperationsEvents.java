@@ -7,7 +7,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
-import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
@@ -16,7 +16,7 @@ public final class ServerOperationsEvents {
     private ServerOperationsEvents() { }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void onBreak(BreakBlockEvent event) {
+    public static void onBreak(BlockEvent.BreakEvent event) {
         if (!SimpleServerUtilities.CORE.modules().isActive("server_operations")) return;
         if (event.isCanceled() || !(event.getPlayer() instanceof ServerPlayer player)) return;
         SimpleServerUtilities.SERVER_OPERATIONS.logBlockBreak(player, event.getPos(), event.getState());

@@ -19,16 +19,15 @@ import be.winnetrie.mod.simpleserverutilities.minigame.CaptureTheFlagRules;
 import be.winnetrie.mod.simpleserverutilities.minigame.MinigameFlagPoint;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameRewardCapturePayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Dedicated, compact administrator-facing Capture the Flag editor. */
 final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
@@ -157,11 +156,9 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
         name = field(left + 196, top + 58, 220, 128, "Display name", draft.displayName);
         icon = field(left + 428, top + 58, 203, 128, "Menu icon item", draft.iconItem);
         descriptionValue = draft.description == null ? "" : draft.description;
-        description = MultiLineEditBox.builder().setX(left + 14).setY(top + 116)
-                .setPlaceholder(Component.literal("Player-facing description"))
-                .setShowBackground(true).setShowDecorations(true)
-                .build(font, 617, 54, Component.literal("Description"));
-        description.setCharacterLimit(8_192); description.setLineLimit(24); description.setValue(descriptionValue);
+        description = new MultiLineEditBox(font, left + 14, top + 116, 617, 54,
+                Component.literal("Player-facing description"), Component.literal("Description"));
+        description.setCharacterLimit(8_192); description.setValue(descriptionValue);
         description.setValueListener(value -> descriptionValue = value); addRenderableWidget(description);
         minPlayers = field(left + 14, top + 208, 96, 3, "Minimum players", Integer.toString(draft.minPlayers));
         maxPlayers = field(left + 118, top + 208, 96, 3, "Maximum players", Integer.toString(draft.maxPlayers));
@@ -538,7 +535,7 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
             roles.healerSelfHealCooldownSeconds = parseInt(healerSelfCooldown, "Self-heal cooldown", 1, 600);
             roles.dpsArrowEffect = dpsArrowEffect.getValue().trim().toLowerCase(Locale.ROOT);
             if (roles.dpsArrowEffect.isBlank()) throw new IllegalArgumentException("DPS arrow effect ID cannot be empty.");
-            try { net.minecraft.resources.Identifier.parse(roles.dpsArrowEffect); }
+            try { net.minecraft.resources.ResourceLocation.parse(roles.dpsArrowEffect); }
             catch (RuntimeException exception) { throw new IllegalArgumentException("DPS arrow effect ID is invalid."); }
             roles.dpsArrowEffectAmplifier = parseInt(dpsArrowLevel, "DPS arrow effect level", 1, 10) - 1;
             roles.dpsArrowEffectDurationSeconds = parseInt(dpsArrowDuration, "DPS arrow effect duration", 1, 600);
@@ -578,7 +575,7 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
     private void saveAll() { if (saveCurrentPage()) submitDraft(); }
     private void openMatchFlow() {
         if (!saveCurrentPage()) return;
-        if (minecraft != null) minecraft.setScreenAndShow(new MinigameExperienceSettingsScreen(draft, this));
+        if (minecraft != null) minecraft.setScreen(new MinigameExperienceSettingsScreen(draft, this));
     }
 
     private void switchPage(int target) { if (target != page && saveCurrentPage()) { page = target; rebuildWidgets(); } }
@@ -702,18 +699,16 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
             return;
         }
         awaiting = true;
-        ClientPacketDistributor.sendToServer(new MinigameRewardCapturePayload(
+        PacketDistributor.sendToServer(new MinigameRewardCapturePayload(
                 initial.originalMinigameId(), GSON.toJson(draft), winnerRewards ? "winner" : "participation",
                 rewardSlot, carriedInventorySlot, addOne, nextRequestId++));
         setNotice(addOne ? "Adding one item to reward slot…" : "Copying the complete stack to reward slot…", false);
         rebuildWidgets();
     }
 
-    @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    @Override public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (page == 3) {
-            int button = event.buttonInfo().button();
-            int mouseX = (int) event.x(), mouseY = (int) event.y();
-            int rewardSlot = rewardSlotAt(mouseX, mouseY);
+            int rewardSlot = rewardSlotAt((int) mouseX, (int) mouseY);
             if (rewardSlot >= 0 && (button == 0 || button == 1)) {
                 if (carriedInventorySlot >= 0) {
                     placeCarriedStack(rewardSlot, button == 1);
@@ -726,7 +721,7 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
                 }
                 return true;
             }
-            int inventorySlot = inventorySlotAt(mouseX, mouseY);
+            int inventorySlot = inventorySlotAt((int) mouseX, (int) mouseY);
             if (inventorySlot >= 0 && (button == 0 || button == 1)) {
                 ItemStack stack = clientInventoryItem(inventorySlot);
                 if (stack.isEmpty()) {
@@ -744,12 +739,12 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
                 return true;
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int left = left(), top = top();
-        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(left, top, left + W, top + H, PANEL); g.outline(left, top, W, H, BORDER);
+        SsuGuiScale.fullscreenDim(g, this, 0xA9000000); g.fill(left, top, left + W, top + H, PANEL); g.renderOutline(left, top, W, H, BORDER);
         if (page == 0) renderGeneral(g, left, top);
         else if (page == 1) renderArena(g, left, top);
         else if (page == 2) renderSpawns(g, left, top);
@@ -757,29 +752,29 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
         else if (page == 4) renderRules(g, left, top);
         else if (page == 5) renderBoosts(g, left, top);
         else renderRoles(g, left, top);
-        if (!notice.isBlank()) g.text(font, trim(notice, 68), left + 102, top + H - 24, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 68), left + 102, top + H - 24, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
         if (page == 3 && carriedInventorySlot >= 0) renderGhostCursor(g, mouseX, mouseY);
     }
 
-    private void renderGeneral(GuiGraphicsExtractor g, int left, int top) {
+    private void renderGeneral(GuiGraphics g, int left, int top) {
         fieldInfo(g, left + 14, top + 42, "Internal ID", "Unique storage key; locked after first save.", 170);
         fieldInfo(g, left + 196, top + 42, "Display name", "Name shown to players and in reward mail.", 220);
         fieldInfo(g, left + 428, top + 42, "Menu icon", "Item ID used in the minigame menu.", 203);
-        g.text(font, "Description", left + 14, top + 100, TEXT, true);
-        g.text(font, "Explain the goal and important rules to players.", left + 104, top + 100, MUTED, false);
+        g.drawString(font, "Description", left + 14, top + 100, TEXT, true);
+        g.drawString(font, "Explain the goal and important rules to players.", left + 104, top + 100, MUTED, false);
         fieldInfo(g, left + 14, top + 192, "Minimum", "Players to start.", 96);
         fieldInfo(g, left + 118, top + 192, "Maximum", "Player limit.", 96);
         fieldInfo(g, left + 222, top + 192, "Countdown", "Lobby seconds.", 96);
         fieldInfo(g, left + 326, top + 192, "Respawn", "Delay after death.", 96);
         fieldInfo(g, left + 430, top + 192, "Match time", "0 = unlimited.", 96);
         fieldInfo(g, left + 534, top + 192, "Post-game", "Return delay.", 97);
-        g.text(font, "Capture the Flag uses two teams, highest capture score and no late joining.", left + 14, top + 304, GOOD, false);
+        g.drawString(font, "Capture the Flag uses two teams, highest capture score and no late joining.", left + 14, top + 304, GOOD, false);
     }
 
-    private void renderArena(GuiGraphicsExtractor g, int left, int top) {
+    private void renderArena(GuiGraphics g, int left, int top) {
         MinigameArenaDefinition arena = arena();
-        g.text(font, "Arena " + (arenaIndex + 1) + " / " + draft.arenas.size(), left + 292, top + 50, MUTED, false);
+        g.drawString(font, "Arena " + (arenaIndex + 1) + " / " + draft.arenas.size(), left + 292, top + 50, MUTED, false);
         fieldInfo(g, left + 14, top + 76, "Arena ID", "Unique key inside this Capture the Flag game.", 150);
         fieldInfo(g, left + 176, top + 76, "Arena name", "Readable name for administrators.", 220);
         fieldInfo(g, left + 408, top + 76, "Arena region", arena.managedRegion
@@ -790,16 +785,16 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
         locationLabels(g, left + 14, top + 242, "Spectator position", "Eliminated players appear here and must remain near the arena.");
     }
 
-    private void locationLabels(GuiGraphicsExtractor g, int x, int y, String title, String help) {
-        g.text(font, title, x, y, TEXT, true); g.text(font, help, x + 118, y, MUTED, false);
-        g.text(font, "Dimension", x, y + 16, MUTED, false); g.text(font, "X", x + 153, y + 16, MUTED, false);
-        g.text(font, "Y", x + 225, y + 16, MUTED, false); g.text(font, "Z", x + 297, y + 16, MUTED, false);
-        g.text(font, "Yaw", x + 369, y + 16, MUTED, false); g.text(font, "Pitch", x + 441, y + 16, MUTED, false);
-        g.text(font, "Yaw = horizontal facing; Pitch = looking up or down.", x, y + 52, MUTED, false);
+    private void locationLabels(GuiGraphics g, int x, int y, String title, String help) {
+        g.drawString(font, title, x, y, TEXT, true); g.drawString(font, help, x + 118, y, MUTED, false);
+        g.drawString(font, "Dimension", x, y + 16, MUTED, false); g.drawString(font, "X", x + 153, y + 16, MUTED, false);
+        g.drawString(font, "Y", x + 225, y + 16, MUTED, false); g.drawString(font, "Z", x + 297, y + 16, MUTED, false);
+        g.drawString(font, "Yaw", x + 369, y + 16, MUTED, false); g.drawString(font, "Pitch", x + 441, y + 16, MUTED, false);
+        g.drawString(font, "Yaw = horizontal facing; Pitch = looking up or down.", x, y + 52, MUTED, false);
     }
 
-    private void renderSpawns(GuiGraphicsExtractor g, int left, int top) {
-        g.text(font, "Team spawn " + (spawnIndex + 1) + " / " + arena().teamSpawns.size(), left + 490, top + 54, TEXT, true);
+    private void renderSpawns(GuiGraphics g, int left, int top) {
+        g.drawString(font, "Team spawn " + (spawnIndex + 1) + " / " + arena().teamSpawns.size(), left + 490, top + 54, TEXT, true);
         wrapped(g, "Assign each spawn to the Red or Blue team. SSU balances players between the two teams and cycles through that team's spawns.",
                 left + 14, top + 84, 605, GOOD, 2);
         fieldInfo(g, left + 14, top + 116, "Dimension", "World containing this spawn.", 180);
@@ -810,19 +805,19 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
         fieldInfo(g, left + 552, top + 116, "Pitch", "Look angle.", 79);
         long red = arena().teamSpawns.stream().filter(value -> value.team == 1).count();
         long blue = arena().teamSpawns.stream().filter(value -> value.team == 2).count();
-        g.text(font, draft.captureTheFlag.team1Name + " spawns: " + red + " · "
+        g.drawString(font, draft.captureTheFlag.team1Name + " spawns: " + red + " · "
                 + draft.captureTheFlag.team2Name + " spawns: " + blue, left + 14, top + 232,
                 red > 0 && blue > 0 ? GOOD : WARNING, false);
-        g.text(font, "Place team spawns inside the arena and away from the opposing flag base.", left + 14, top + 254, MUTED, false);
+        g.drawString(font, "Place team spawns inside the arena and away from the opposing flag base.", left + 14, top + 254, MUTED, false);
     }
 
-    private void renderRewards(GuiGraphicsExtractor g, int left, int top, int mouseX, int mouseY) {
+    private void renderRewards(GuiGraphics g, int left, int top, int mouseX, int mouseY) {
         fieldInfo(g, left + 216, top + 32, "Money reward", "Delivered through reward mail.", 120);
         wrapped(g, winnerRewards ? "Only the winner receives this package." : "Every restored participant receives this package.",
                 left + 348, top + 54, 283, GOOD, 2);
-        g.text(font, "Mail item slots", left + 14, top + 88, TEXT, true);
+        g.drawString(font, "Mail item slots", left + 14, top + 88, TEXT, true);
         renderRewardSlots(g, left + 14, top + 108, mouseX, mouseY);
-        g.text(font, "Your inventory", left + 128, top + 88, TEXT, true);
+        g.drawString(font, "Your inventory", left + 128, top + 88, TEXT, true);
         renderInventory(g, left + 128, top + 108, mouseX, mouseY);
         wrapped(g, "Click an inventory stack to hold a ghost copy. Then left-click a mail slot to copy the full stack, or right-click to add one item.",
                 left + 322, top + 88, 309, MUTED, 4);
@@ -831,28 +826,28 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
         ItemStack held = heldStack();
         String heldLabel = held.isEmpty() ? "Held copy: none"
                 : "Held copy: " + held.getHoverName().getString() + " ×" + held.getCount();
-        g.text(font, trim(heldLabel, 48), left + 322, top + 182, held.isEmpty() ? MUTED : GOOD, false);
+        g.drawString(font, trim(heldLabel, 48), left + 322, top + 182, held.isEmpty() ? MUTED : GOOD, false);
 
         ContentAction current = action();
         String position = current == null ? "No direct reward selected" : "Direct reward " + (actionIndex() + 1) + " / " + rewards().directActions.size();
-        g.text(font, position, left + 370, top + 224, MUTED, false);
-        g.text(font, "Direct action type", left + 14, top + 250, TEXT, true);
-        g.text(font, "Action parameters", left + 216, top + 250, TEXT, true);
-        g.text(font, "Applied immediately.", left + 14, top + 288, MUTED, false);
-        g.text(font, "Use key=value pairs separated by semicolons.", left + 216, top + 288, MUTED, false);
+        g.drawString(font, position, left + 370, top + 224, MUTED, false);
+        g.drawString(font, "Direct action type", left + 14, top + 250, TEXT, true);
+        g.drawString(font, "Action parameters", left + 216, top + 250, TEXT, true);
+        g.drawString(font, "Applied immediately.", left + 14, top + 288, MUTED, false);
+        g.drawString(font, "Use key=value pairs separated by semicolons.", left + 216, top + 288, MUTED, false);
         wrapped(g, actionHelp(new ContentAction(selectedActionType, Map.of())), left + 14, top + 302, 617, MUTED, 1);
     }
 
-    private void renderRules(GuiGraphicsExtractor g, int left, int top) {
+    private void renderRules(GuiGraphics g, int left, int top) {
         fieldInfo(g, left + 184, top + 32, "Team name", "Name shown in the HUD and winner title.", 150);
         fieldInfo(g, left + 344, top + 32, "Physical flag", "Banner block placed at this team's base.", 182);
         fieldInfo(g, left + 536, top + 32, "Glow color", "Six-digit RGB hex.", 95);
-        g.text(font, "Flag base position", left + 14, top + 92, TEXT, true);
+        g.drawString(font, "Flag base position", left + 14, top + 92, TEXT, true);
         wrapped(g, "Right-click the enemy banner. After the cast, the carrier gets the real flag on their back and a team-colored glow.",
                 left + 122, top + 88, 509, MUTED, 2);
-        g.text(font, "Dimension", left + 14, top + 106, MUTED, false); g.text(font, "X", left + 167, top + 106, MUTED, false);
-        g.text(font, "Y", left + 239, top + 106, MUTED, false); g.text(font, "Z", left + 311, top + 106, MUTED, false);
-        g.text(font, "Yaw", left + 383, top + 106, MUTED, false); g.text(font, "Pitch", left + 455, top + 106, MUTED, false);
+        g.drawString(font, "Dimension", left + 14, top + 106, MUTED, false); g.drawString(font, "X", left + 167, top + 106, MUTED, false);
+        g.drawString(font, "Y", left + 239, top + 106, MUTED, false); g.drawString(font, "Z", left + 311, top + 106, MUTED, false);
+        g.drawString(font, "Yaw", left + 383, top + 106, MUTED, false); g.drawString(font, "Pitch", left + 455, top + 106, MUTED, false);
         fieldInfo(g, left + 14, top + 188, "Captures to win", "Team score required.", 100);
         fieldInfo(g, left + 124, top + 188, "Score radius", "Distance around own base.", 100);
         fieldInfo(g, left + 234, top + 188, "Flag take cast", "Still seconds before pickup.", 112);
@@ -865,114 +860,114 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
                 left + 14, top + 302, 617, MUTED, 1);
     }
 
-    private void renderBoosts(GuiGraphicsExtractor g, int left, int top) {
-        g.text(font, "Max active", left + 14, top + 74, TEXT, true);
-        g.text(font, "Initial delay", left + 120, top + 74, TEXT, true);
-        g.text(font, "Respawn min", left + 226, top + 74, TEXT, true);
-        g.text(font, "Respawn max", left + 332, top + 74, TEXT, true);
-        g.text(font, "Min spacing", left + 438, top + 74, TEXT, true);
+    private void renderBoosts(GuiGraphics g, int left, int top) {
+        g.drawString(font, "Max active", left + 14, top + 74, TEXT, true);
+        g.drawString(font, "Initial delay", left + 120, top + 74, TEXT, true);
+        g.drawString(font, "Respawn min", left + 226, top + 74, TEXT, true);
+        g.drawString(font, "Respawn max", left + 332, top + 74, TEXT, true);
+        g.drawString(font, "Min spacing", left + 438, top + 74, TEXT, true);
 
-        g.text(font, "Allowed boost", left + 14, top + 132, TEXT, true);
-        g.text(font, "Duration", left + 166, top + 132, TEXT, true);
-        g.text(font, "Mist RGB", left + 254, top + 132, TEXT, true);
-        g.text(font, "Heal/sec | armor", left + 352, top + 132, TEXT, true);
+        g.drawString(font, "Allowed boost", left + 14, top + 132, TEXT, true);
+        g.drawString(font, "Duration", left + 166, top + 132, TEXT, true);
+        g.drawString(font, "Mist RGB", left + 254, top + 132, TEXT, true);
+        g.drawString(font, "Heal/sec | armor", left + 352, top + 132, TEXT, true);
 
-        g.text(font, "2 health points equal 1 heart. RGB values use six digits, for example 40C4FF.",
+        g.drawString(font, "2 health points equal 1 heart. RGB values use six digits, for example 40C4FF.",
                 left + 14, top + 282, MUTED, false);
     }
 
 
-    private void renderRoles(GuiGraphicsExtractor g, int left, int top) {
+    private void renderRoles(GuiGraphics g, int left, int top) {
         if (rolePage == 0) {
-            g.text(font, "Role", left + 14, top + 90, TEXT, true);
-            g.text(font, "Minimum / team", left + 100, top + 90, TEXT, true);
-            g.text(font, "Maximum / team", left + 180, top + 90, TEXT, true);
-            g.text(font, "Max health", left + 260, top + 90, TEXT, true);
-            g.text(font, "Armor", left + 360, top + 90, TEXT, true);
-            g.text(font, "Toughness", left + 460, top + 90, TEXT, true);
-            g.text(font, "DPS", left + 14, top + 114, GOOD, true);
-            g.text(font, "Tank", left + 14, top + 170, 0xFFFFC857, true);
-            g.text(font, "Healer", left + 14, top + 226, 0xFF7FE3A1, true);
+            g.drawString(font, "Role", left + 14, top + 90, TEXT, true);
+            g.drawString(font, "Minimum / team", left + 100, top + 90, TEXT, true);
+            g.drawString(font, "Maximum / team", left + 180, top + 90, TEXT, true);
+            g.drawString(font, "Max health", left + 260, top + 90, TEXT, true);
+            g.drawString(font, "Armor", left + 360, top + 90, TEXT, true);
+            g.drawString(font, "Toughness", left + 460, top + 90, TEXT, true);
+            g.drawString(font, "DPS", left + 14, top + 114, GOOD, true);
+            g.drawString(font, "Tank", left + 14, top + 170, 0xFFFFC857, true);
+            g.drawString(font, "Healer", left + 14, top + 226, 0xFF7FE3A1, true);
             wrapped(g, "Players choose a preferred role before joining. SSU first satisfies each team's minimums, then respects preferences while staying within the maxima; a preference is never guaranteed.",
                     left + 14, top + 266, 617, GOOD, 3);
             wrapped(g, "Every role wears team-colored cosmetic leather. These base health, armor and toughness values provide the real combat statistics; two health points equal one heart.",
                     left + 14, top + 298, 617, MUTED, 2);
         } else {
-            g.text(font, "Tank defensive field", left + 14, top + 84, TEXT, true);
-            g.text(font, "Radius", left + 14, top + 96, MUTED, false);
-            g.text(font, "Slow duration", left + 124, top + 96, MUTED, false);
-            g.text(font, "Cooldown", left + 234, top + 96, MUTED, false);
-            g.text(font, "Knockback", left + 344, top + 96, MUTED, false);
+            g.drawString(font, "Tank defensive field", left + 14, top + 84, TEXT, true);
+            g.drawString(font, "Radius", left + 14, top + 96, MUTED, false);
+            g.drawString(font, "Slow duration", left + 124, top + 96, MUTED, false);
+            g.drawString(font, "Cooldown", left + 234, top + 96, MUTED, false);
+            g.drawString(font, "Knockback", left + 344, top + 96, MUTED, false);
             wrapped(g, "Slows and pushes enemy players away inside the configured AOE radius. Knockback 0 disables the push. Activating without a target still consumes the cooldown.", left + 454, top + 86, 170, GOOD, 4);
 
-            g.text(font, "Healer abilities", left + 14, top + 142, TEXT, true);
-            g.text(font, "Single heal", left + 14, top + 160, MUTED, false);
-            g.text(font, "Single CD", left + 114, top + 160, MUTED, false);
-            g.text(font, "AOE heal", left + 214, top + 160, MUTED, false);
-            g.text(font, "AOE radius", left + 314, top + 160, MUTED, false);
-            g.text(font, "AOE CD", left + 414, top + 160, MUTED, false);
-            g.text(font, "Self CD", left + 514, top + 160, MUTED, false);
+            g.drawString(font, "Healer abilities", left + 14, top + 142, TEXT, true);
+            g.drawString(font, "Single heal", left + 14, top + 160, MUTED, false);
+            g.drawString(font, "Single CD", left + 114, top + 160, MUTED, false);
+            g.drawString(font, "AOE heal", left + 214, top + 160, MUTED, false);
+            g.drawString(font, "AOE radius", left + 314, top + 160, MUTED, false);
+            g.drawString(font, "AOE CD", left + 414, top + 160, MUTED, false);
+            g.drawString(font, "Self CD", left + 514, top + 160, MUTED, false);
             wrapped(g, "The straight single-target beam reaches eight blocks. AOE heals allies inside its configured radius, including the caster, and must remain weaker. Every ability may be fired without a valid target and still consumes its cooldown.",
                     left + 14, top + 204, 570, GOOD, 3);
 
-            g.text(font, "DPS infinite arrow", left + 14, top + 226, TEXT, true);
-            g.text(font, "Effect ID", left + 14, top + 238, MUTED, false);
-            g.text(font, "Level", left + 274, top + 238, MUTED, false);
-            g.text(font, "Duration (s)", left + 384, top + 238, MUTED, false);
+            g.drawString(font, "DPS infinite arrow", left + 14, top + 226, TEXT, true);
+            g.drawString(font, "Effect ID", left + 14, top + 238, MUTED, false);
+            g.drawString(font, "Level", left + 274, top + 238, MUTED, false);
+            g.drawString(font, "Duration (s)", left + 384, top + 238, MUTED, false);
             wrapped(g, "Default: minecraft:poison, level 1. The special arrow is replenished automatically after it is fired.",
                     left + 14, top + 278, 570, MUTED, 2);
         }
     }
 
-    private void renderRewardSlots(GuiGraphicsExtractor g, int startX, int startY, int mouseX, int mouseY) {
+    private void renderRewardSlots(GuiGraphics g, int startX, int startY, int mouseX, int mouseY) {
         for (int slot = 0; slot < MinigameRewardSet.MAX_ITEM_STACKS; slot++) {
             int x = startX + (slot % 3) * 34, y = startY + (slot / 3) * 34;
             boolean hovered = SsuGuiGeometry.inside(mouseX, mouseY, x, y, 30, 30);
             g.fill(x, y, x + 30, y + 30, hovered ? 0xE03C5364 : 0xD00B1015);
-            g.outline(x, y, 30, 30, hovered ? GOOD : BORDER);
+            g.renderOutline(x, y, 30, 30, hovered ? GOOD : BORDER);
             ItemStack stack = rewardItem(slot);
             if (!stack.isEmpty()) {
-                g.item(stack, x + 7, y + 7); g.itemDecorations(font, stack, x + 7, y + 7);
-                if (hovered) g.setTooltipForNextFrame(font, stack, mouseX, mouseY);
-            } else g.text(font, Integer.toString(slot + 1), x + 12, y + 11, MUTED, false);
+                g.renderItem(stack, x + 7, y + 7); g.renderItemDecorations(font, stack, x + 7, y + 7);
+                if (hovered) g.renderTooltip(font, stack, mouseX, mouseY);
+            } else g.drawString(font, Integer.toString(slot + 1), x + 12, y + 11, MUTED, false);
         }
     }
 
-    private void renderInventory(GuiGraphicsExtractor g, int startX, int startY, int mouseX, int mouseY) {
+    private void renderInventory(GuiGraphics g, int startX, int startY, int mouseX, int mouseY) {
         for (int row = 0; row < 3; row++) for (int column = 0; column < 9; column++)
             drawInventorySlot(g, 9 + row * 9 + column, startX + column * 20, startY + row * 20, mouseX, mouseY);
         int hotbarY = startY + 66;
         for (int column = 0; column < 9; column++) drawInventorySlot(g, column, startX + column * 20, hotbarY, mouseX, mouseY);
     }
 
-    private void drawInventorySlot(GuiGraphicsExtractor g, int slot, int x, int y, int mouseX, int mouseY) {
+    private void drawInventorySlot(GuiGraphics g, int slot, int x, int y, int mouseX, int mouseY) {
         boolean hovered = SsuGuiGeometry.inside(mouseX, mouseY, x, y, 18, 18);
         boolean carried = slot == carriedInventorySlot;
         g.fill(x, y, x + 18, y + 18, hovered || carried ? 0xE03C5364 : 0xD00B1015);
-        g.outline(x, y, 18, 18, hovered || carried ? GOOD : BORDER);
+        g.renderOutline(x, y, 18, 18, hovered || carried ? GOOD : BORDER);
         ItemStack stack = clientInventoryItem(slot);
         if (!stack.isEmpty()) {
-            g.item(stack, x + 1, y + 1); g.itemDecorations(font, stack, x + 1, y + 1);
-            if (hovered) g.setTooltipForNextFrame(font, stack, mouseX, mouseY);
+            g.renderItem(stack, x + 1, y + 1); g.renderItemDecorations(font, stack, x + 1, y + 1);
+            if (hovered) g.renderTooltip(font, stack, mouseX, mouseY);
         }
     }
 
-    private void renderGhostCursor(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+    private void renderGhostCursor(GuiGraphics g, int mouseX, int mouseY) {
         ItemStack stack = heldStack();
         if (stack.isEmpty()) return;
-        g.item(stack, mouseX - 8, mouseY - 8);
-        g.itemDecorations(font, stack, mouseX - 8, mouseY - 8);
+        g.renderItem(stack, mouseX - 8, mouseY - 8);
+        g.renderItemDecorations(font, stack, mouseX - 8, mouseY - 8);
     }
 
-    private void fieldInfo(GuiGraphicsExtractor g, int x, int y, String title, String help, int width) {
-        g.text(font, title, x, y, TEXT, true);
+    private void fieldInfo(GuiGraphics g, int x, int y, String title, String help, int width) {
+        g.drawString(font, title, x, y, TEXT, true);
         wrapped(g, help, x, y + 38, width, MUTED, 2);
     }
 
-    private void wrapped(GuiGraphicsExtractor g, String text, int x, int y, int width, int color, int maxLines) {
+    private void wrapped(GuiGraphics g, String text, int x, int y, int width, int color, int maxLines) {
         List<FormattedCharSequence> lines = font.split(Component.literal(text == null ? "" : text), Math.max(20, width));
         for (int index = 0; index < Math.min(maxLines, lines.size()); index++) {
-            g.text(font, lines.get(index), x, y + index * 10, color, false);
+            g.drawString(font, lines.get(index), x, y + index * 10, color, false);
         }
     }
 
@@ -1012,7 +1007,7 @@ final class CaptureTheFlagMinigameEditorScreen extends MinigameEditorScreen {
 
     private void fillCurrent(EditBox dimension, EditBox x, EditBox y, EditBox z, EditBox yaw, EditBox pitch) {
         if (minecraft == null || minecraft.player == null) return;
-        dimension.setValue(minecraft.player.level().dimension().identifier().toString());
+        dimension.setValue(minecraft.player.level().dimension().location().toString());
         x.setValue(coordinate(minecraft.player.getX())); y.setValue(coordinate(minecraft.player.getY()));
         z.setValue(coordinate(minecraft.player.getZ())); yaw.setValue(angle(minecraft.player.getYRot()));
         pitch.setValue(angle(minecraft.player.getXRot()));

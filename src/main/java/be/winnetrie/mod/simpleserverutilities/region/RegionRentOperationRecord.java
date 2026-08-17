@@ -59,7 +59,7 @@ public final class RegionRentOperationRecord {
         record.action = action;
         record.status = Status.PREPARED;
         record.regionName = region.getName();
-        record.dimension = region.getDimension().identifier().toString();
+        record.dimension = region.getDimension().location().toString();
         record.renterId = renterId;
         record.renterName = safe(renterName);
         record.ownerRecipientId = ownerRecipientId;

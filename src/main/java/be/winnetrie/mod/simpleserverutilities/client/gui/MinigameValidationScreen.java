@@ -2,11 +2,11 @@ package be.winnetrie.mod.simpleserverutilities.client.gui;
 
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSetupToolConfigurePayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameValidationPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Scrollable green/orange/red arena validation report with issue teleport buttons. */
 public final class MinigameValidationScreen extends Screen {
@@ -48,24 +48,24 @@ public final class MinigameValidationScreen extends Screen {
     }
 
     private void teleport(int issueIndex) {
-        ClientPacketDistributor.sendToServer(new MinigameSetupToolConfigurePayload(
+        PacketDistributor.sendToServer(new MinigameSetupToolConfigurePayload(
                 "teleport_issue", data.minigameId(), data.arenaId(), "", 1, issueIndex, requestId++));
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, "Arena Validation", x + 14, y + 14, TEXT, true);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Arena Validation", x + 14, y + 14, TEXT, true);
         long errors = data.issues().stream().filter(issue -> "error".equals(issue.severity())).count();
         long warnings = data.issues().stream().filter(issue -> "warning".equals(issue.severity())).count();
-        g.text(font, errors + " error(s) • " + warnings + " warning(s)", x + 158, y + 15,
+        g.drawString(font, errors + " error(s) • " + warnings + " warning(s)", x + 158, y + 15,
                 errors > 0 ? ERROR : warnings > 0 ? WARN : GOOD, false);
-        g.text(font, "Errors block readiness; warnings are advisory and do not prevent a test match.",
+        g.drawString(font, "Errors block readiness; warnings are advisory and do not prevent a test match.",
                 x + 14, y + 31, MUTED, false);
         int shown = Math.min(12, Math.max(0, data.issues().size() - scroll));
         for (int row = 0; row < shown; row++) {
@@ -73,10 +73,10 @@ public final class MinigameValidationScreen extends Screen {
             int ry = y + 58 + row * 22;
             int color = "error".equals(issue.severity()) ? ERROR : "warning".equals(issue.severity()) ? WARN : GOOD;
             String marker = "error".equals(issue.severity()) ? "✖" : "warning".equals(issue.severity()) ? "!" : "✔";
-            g.text(font, marker, x + 16, ry + 5, color, true);
-            g.text(font, trim(issue.message(), 78), x + 34, ry + 5, TEXT, false);
+            g.drawString(font, marker, x + 16, ry + 5, color, true);
+            g.drawString(font, trim(issue.message(), 78), x + 34, ry + 5, TEXT, false);
         }
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private int left() { return (width - W) / 2; }

@@ -98,7 +98,7 @@ public class PermissionContext {
             this.player = player;
 
             if (player != null) {
-                this.dimension = player.level().dimension().identifier().toString();
+                this.dimension = player.level().dimension().location().toString();
             }
         }
 
@@ -134,7 +134,7 @@ public class PermissionContext {
             }
 
             Level level = player.level();
-            this.dimension = level.dimension().identifier().toString();
+            this.dimension = level.dimension().location().toString();
             this.region = SsuModuleAccess.active("regions")
                     ? SimpleServerUtilities.REGIONS.getAt(level.dimension(), position)
                     : null;

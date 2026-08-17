@@ -13,12 +13,12 @@ import com.google.gson.JsonObject;
 import be.winnetrie.mod.simpleserverutilities.jail.JailDefinition;
 import be.winnetrie.mod.simpleserverutilities.network.PlayerManagementActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.PlayerManagementDataPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Clear sentencing workflow. Physical Jail setup remains in Jail Administration. */
 public final class JailPunishmentScreen extends Screen {
@@ -83,7 +83,7 @@ public final class JailPunishmentScreen extends Screen {
             return;
         }
         parent.accept(next);
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     @Override
@@ -105,7 +105,7 @@ public final class JailPunishmentScreen extends Screen {
 
         addRenderableWidget(Button.builder(Component.literal(reason.isBlank() ? "Write reason" : "Edit reason"), button -> {
             stashFields();
-            minecraft.setScreenAndShow(new RichTextValueEditorScreen(
+            minecraft.setScreen(new RichTextValueEditorScreen(
                     this,
                     "Punishment reason",
                     "Shown to the prisoner and retained in moderation history.",
@@ -115,7 +115,7 @@ public final class JailPunishmentScreen extends Screen {
 
         Button task = addRenderableWidget(Button.builder(Component.literal("Configure task"), button -> {
             stashFields();
-            minecraft.setScreenAndShow(new JailTaskEditorScreen(this, requirements, tools, (required, issuedTools) -> {
+            minecraft.setScreen(new JailTaskEditorScreen(this, requirements, tools, (required, issuedTools) -> {
                 requirements = new LinkedHashMap<>(required);
                 tools = new ArrayList<>(issuedTools);
             }));
@@ -147,7 +147,7 @@ public final class JailPunishmentScreen extends Screen {
         }
         long duration = parsePositive(timeHoursValue) * 3600L;
         long deadline = parsePositive(deadlineHoursValue) * 3600L;
-        ClientPacketDistributor.sendToServer(new PlayerManagementActionPayload(
+        PacketDistributor.sendToServer(new PlayerManagementActionPayload(
                 "jail",
                 data.target(),
                 reason,
@@ -180,25 +180,25 @@ public final class JailPunishmentScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int x = left();
         int y = top();
         SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
-        graphics.outline(x, y, W, H, BORDER);
-        graphics.text(font, "Punishment — " + data.target(), x + 18, y + 16, TEXT, true);
-        graphics.text(font, "Choose a physical Jail and a punishment path. Prisoner choices become permanent once selected.", x + 18, y + 34, MUTED, false);
+        graphics.renderOutline(x, y, W, H, BORDER);
+        graphics.drawString(font, "Punishment — " + data.target(), x + 18, y + 16, TEXT, true);
+        graphics.drawString(font, "Choose a physical Jail and a punishment path. Prisoner choices become permanent once selected.", x + 18, y + 34, MUTED, false);
 
-        graphics.text(font, "Reason", x + 18, y + 80, MUTED, false);
-        graphics.text(font, reason.isBlank() ? "A reason is required." : trim(strip(reason), 58), x + 302, y + 97, reason.isBlank() ? WARNING : MUTED, false);
-        graphics.text(font, "Time sentence (hours)", x + 18, y + 135, MUTED, false);
-        graphics.text(font, "Task deadline (hours)", x + 112, y + 135, MUTED, false);
-        graphics.text(font, "Buyout", x + 206, y + 135, MUTED, false);
-        graphics.text(font, "Share period (days)", x + 328, y + 135, MUTED, false);
+        graphics.drawString(font, "Reason", x + 18, y + 80, MUTED, false);
+        graphics.drawString(font, reason.isBlank() ? "A reason is required." : trim(strip(reason), 58), x + 302, y + 97, reason.isBlank() ? WARNING : MUTED, false);
+        graphics.drawString(font, "Time sentence (hours)", x + 18, y + 135, MUTED, false);
+        graphics.drawString(font, "Task deadline (hours)", x + 112, y + 135, MUTED, false);
+        graphics.drawString(font, "Buyout", x + 206, y + 135, MUTED, false);
+        graphics.drawString(font, "Share period (days)", x + 328, y + 135, MUTED, false);
 
         JailDefinition jail = currentJail();
         if (jail != null) {
-            graphics.text(font, "Jail cells: " + jail.cells.size() + "  •  Task Area: " + (jail.workBoundsSet ? "set" : "missing"), x + 18, y + 178, MUTED, false);
+            graphics.drawString(font, "Jail cells: " + jail.cells.size() + "  •  Task Area: " + (jail.workBoundsSet ? "set" : "missing"), x + 18, y + 178, MUTED, false);
         }
 
         int cursor = y + 199;
@@ -210,7 +210,7 @@ public final class JailPunishmentScreen extends Screen {
         cursor = drawWrapped(graphics, modeText, x + 18, cursor, W - 36, TEXT, 2) + 4;
 
         if (!mode().equals("TIME_ONLY")) {
-            graphics.text(font, "Task: " + requirements.size() + " required block type(s) • " + tools.size() + " issued tool(s)", x + 18, cursor,
+            graphics.drawString(font, "Task: " + requirements.size() + " required block type(s) • " + tools.size() + " issued tool(s)", x + 18, cursor,
                     requirements.isEmpty() ? WARNING : GOOD, false);
             cursor += 18;
             cursor = drawWrapped(graphics,
@@ -225,13 +225,13 @@ public final class JailPunishmentScreen extends Screen {
         if (!localNotice.isBlank()) {
             drawWrapped(graphics, localNotice, x + 18, y + H - 52, W - 36, WARNING, 2);
         }
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
-    private int drawWrapped(GuiGraphicsExtractor graphics, String text, int x, int y, int maxWidth, int color, int maxLines) {
+    private int drawWrapped(GuiGraphics graphics, String text, int x, int y, int maxWidth, int color, int maxLines) {
         var lines = font.split(Component.literal(text), maxWidth);
         int count = Math.min(maxLines, lines.size());
-        for (int i = 0; i < count; i++) graphics.text(font, lines.get(i), x, y + i * 11, color, false);
+        for (int i = 0; i < count; i++) graphics.drawString(font, lines.get(i), x, y + i * 11, color, false);
         return y + count * 11;
     }
 
@@ -281,7 +281,7 @@ public final class JailPunishmentScreen extends Screen {
     @Override
     public void onClose() {
         stashFields();
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     @Override

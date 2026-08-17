@@ -9,7 +9,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -88,7 +88,7 @@ public final class SupportPlayerPickerScreen extends Screen {
 
     private void choose(Target target) {
         selection.accept(target.id, target.name);
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     private void applyFilter() {
@@ -105,21 +105,21 @@ public final class SupportPlayerPickerScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(graphics, this, 0xA5000000);
         graphics.fill(x, y, x + W, y + H, PANEL);
-        graphics.outline(x, y, W, H, BORDER);
-        graphics.text(font, "Choose player to report", x + 16, y + 16, TEXT, true);
-        graphics.text(font, filtered.isEmpty() ? "No matching known players." : "Online players are marked with ●.",
+        graphics.renderOutline(x, y, W, H, BORDER);
+        graphics.drawString(font, "Choose player to report", x + 16, y + 16, TEXT, true);
+        graphics.drawString(font, filtered.isEmpty() ? "No matching known players." : "Online players are marked with ●.",
                 x + 16, y + 30, MUTED, false);
-        graphics.centeredText(font, "Page " + (page + 1) + " / " + pages(), x + W / 2, y + H - 43, MUTED);
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        graphics.drawCenteredString(font, "Page " + (page + 1) + " / " + pages(), x + W / 2, y + H - 43, MUTED);
+        super.render(graphics, mouseX, mouseY, partialTick);
     }
 
     @Override
     public void onClose() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     @Override

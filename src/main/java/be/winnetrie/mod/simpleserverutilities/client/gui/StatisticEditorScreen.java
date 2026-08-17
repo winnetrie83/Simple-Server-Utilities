@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.network.StatisticEditorOpenPayload
 import be.winnetrie.mod.simpleserverutilities.network.StatisticEditorResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.StatisticEditorSubmitPayload;
 import be.winnetrie.mod.simpleserverutilities.statistics.StatisticEventType;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Create/edit screen for an indexed custom player statistic definition. */
 public final class StatisticEditorScreen extends Screen {
@@ -118,7 +118,7 @@ public final class StatisticEditorScreen extends Screen {
             return;
         }
         long requestId = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new StatisticEditorSubmitPayload(
+        PacketDistributor.sendToServer(new StatisticEditorSubmitPayload(
                 initial.originalId(), rawId, rawName, eventType, rawTarget, unit.getValue(), enabled, requestId));
         notice = "Saving…";
         noticeError = false;
@@ -134,31 +134,31 @@ public final class StatisticEditorScreen extends Screen {
         }
         if (minecraft != null && minecraft.player != null) minecraft.player.sendSystemMessage(Component.literal(payload.message()));
         if (parent instanceof SsuDashboardScreen dashboard) dashboard.refreshRemotePage();
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     @Override
     public void onClose() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = panelX();
         int y = panelY();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, PANEL);
-        g.outline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
-        g.text(font, initial.editing() ? "Edit Custom Player Statistic" : "Create Custom Player Statistic", x + 16, y + 14, TEXT, true);
-        g.text(font, "ID", x + 16, y + 36, MUTED, false);
-        g.text(font, "Display name", x + 242, y + 36, MUTED, false);
-        g.text(font, "Event and tracking state", x + 16, y + 84, MUTED, false);
-        g.text(font, eventType.targetSupported() ? "Target filter (* = all)" : "Target filter (not used by this event)", x + 16, y + 136, MUTED, false);
-        g.text(font, "Unit", x + 332, y + 136, MUTED, false);
-        g.text(font, "Damage values are stored with 0.01 precision; all other event types use whole counts.", x + 16, y + 182, MUTED, false);
-        g.text(font, "Floating Text: objective ssu:<id>, or tokens {{stat:<id>}} and {{rank:<id>}}.", x + 16, y + 194, MUTED, false);
-        if (!notice.isBlank()) g.text(font, trim(notice, 68), x + 112, y + 226, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        g.renderOutline(x, y, PANEL_WIDTH, PANEL_HEIGHT, BORDER);
+        g.drawString(font, initial.editing() ? "Edit Custom Player Statistic" : "Create Custom Player Statistic", x + 16, y + 14, TEXT, true);
+        g.drawString(font, "ID", x + 16, y + 36, MUTED, false);
+        g.drawString(font, "Display name", x + 242, y + 36, MUTED, false);
+        g.drawString(font, "Event and tracking state", x + 16, y + 84, MUTED, false);
+        g.drawString(font, eventType.targetSupported() ? "Target filter (* = all)" : "Target filter (not used by this event)", x + 16, y + 136, MUTED, false);
+        g.drawString(font, "Unit", x + 332, y + 136, MUTED, false);
+        g.drawString(font, "Damage values are stored with 0.01 precision; all other event types use whole counts.", x + 16, y + 182, MUTED, false);
+        g.drawString(font, "Floating Text: objective ssu:<id>, or tokens {{stat:<id>}} and {{rank:<id>}}.", x + 16, y + 194, MUTED, false);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 68), x + 112, y + 226, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private int panelX() { return (width - PANEL_WIDTH) / 2; }

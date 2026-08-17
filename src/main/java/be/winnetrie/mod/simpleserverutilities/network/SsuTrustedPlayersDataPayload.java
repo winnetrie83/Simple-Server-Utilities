@@ -8,7 +8,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Server-authoritative trusted-player list and filtered add candidates for one claim. */
 public record SsuTrustedPlayersDataPayload(
@@ -28,7 +28,7 @@ public record SsuTrustedPlayersDataPayload(
     private static final int MAX_CANDIDATES = 100;
 
     public static final Type<SsuTrustedPlayersDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "trusted_players_data"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "trusted_players_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuTrustedPlayersDataPayload> STREAM_CODEC =
             StreamCodec.of(SsuTrustedPlayersDataPayload::encode, SsuTrustedPlayersDataPayload::decode);
 

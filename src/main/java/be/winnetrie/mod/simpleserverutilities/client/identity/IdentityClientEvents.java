@@ -14,7 +14,7 @@ public final class IdentityClientEvents {
     }
 
     @SubscribeEvent
-    public static void onNameTag(RenderNameTagEvent.CanRender event) {
+    public static void onNameTag(RenderNameTagEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
         var entry = PlayerIdentityClientState.get(player.getId());
         if (entry == null) return;

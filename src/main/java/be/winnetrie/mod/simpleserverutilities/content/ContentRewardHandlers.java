@@ -20,7 +20,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import be.winnetrie.mod.simpleserverutilities.permission.PlayerPermissionData;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
@@ -146,7 +146,7 @@ public final class ContentRewardHandlers {
         } else {
             rawItem = required(rawItem, "item");
             try {
-                template = BuiltInRegistries.ITEM.getOptional(Identifier.parse(rawItem))
+                template = BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(rawItem))
                         .map(registeredItem -> new ItemStack(registeredItem)).orElse(ItemStack.EMPTY);
             } catch (RuntimeException exception) {
                 throw new IllegalArgumentException("Invalid reward item: " + rawItem);

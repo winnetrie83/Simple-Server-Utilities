@@ -36,7 +36,7 @@ import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -122,16 +122,16 @@ public final class MineManager {
     }
 
     public synchronized void setSpawn(String id,ServerPlayer player,boolean exit){
-        MineDefinition d=definitions.get(MineDefinition.normalizeId(id));if(d==null)throw new IllegalArgumentException("Mine not found.");String dim=player.level().dimension().identifier().toString();if(exit){d.exitDimension=dim;d.exitX=player.getX();d.exitY=player.getY();d.exitZ=player.getZ();d.exitSet=true;}else{d.spawnDimension=dim;d.spawnX=player.getX();d.spawnY=player.getY();d.spawnZ=player.getZ();d.spawnSet=true;}saveDefinition(d);syncStatusHologram(d);
+        MineDefinition d=definitions.get(MineDefinition.normalizeId(id));if(d==null)throw new IllegalArgumentException("Mine not found.");String dim=player.level().dimension().location().toString();if(exit){d.exitDimension=dim;d.exitX=player.getX();d.exitY=player.getY();d.exitZ=player.getZ();d.exitSet=true;}else{d.spawnDimension=dim;d.spawnX=player.getX();d.spawnY=player.getY();d.spawnZ=player.getZ();d.spawnSet=true;}saveDefinition(d);syncStatusHologram(d);
     }
 
     public synchronized void setHologramPosition(String id,ServerPlayer player){
-        MineDefinition d=definitions.get(MineDefinition.normalizeId(id));if(d==null)throw new IllegalArgumentException("Mine not found.");d.hologramDimension=player.level().dimension().identifier().toString();d.hologramX=player.getX();d.hologramY=player.getY()+2.25D;d.hologramZ=player.getZ();d.hologramSet=true;d.statusHologramEnabled=true;saveDefinition(d);syncStatusHologram(d);
+        MineDefinition d=definitions.get(MineDefinition.normalizeId(id));if(d==null)throw new IllegalArgumentException("Mine not found.");d.hologramDimension=player.level().dimension().location().toString();d.hologramX=player.getX();d.hologramY=player.getY()+2.25D;d.hologramZ=player.getZ();d.hologramSet=true;d.statusHologramEnabled=true;saveDefinition(d);syncStatusHologram(d);
     }
 
     public synchronized void removeHologram(String id){MineDefinition d=definitions.get(MineDefinition.normalizeId(id));if(d==null)throw new IllegalArgumentException("Mine not found.");d.statusHologramEnabled=false;d.hologramSet=false;d.hologramDimension="";d.hologramX=0D;d.hologramY=0D;d.hologramZ=0D;if(SsuModuleAccess.active("holograms"))SimpleServerUtilities.HOLOGRAMS.delete(statusHologramId(d.id));saveDefinition(d);}
 
-    public synchronized MineDefinition at(ServerLevel level,BlockPos pos){String dim=level.dimension().identifier().toString();for(MineDefinition d:definitions.values())if(hasValidParent(d)&&d.contains(dim,pos.getX(),pos.getY(),pos.getZ()))return d;return null;}
+    public synchronized MineDefinition at(ServerLevel level,BlockPos pos){String dim=level.dimension().location().toString();for(MineDefinition d:definitions.values())if(hasValidParent(d)&&d.contains(dim,pos.getX(),pos.getY(),pos.getZ()))return d;return null;}
     public synchronized boolean canMine(ServerPlayer player,MineDefinition d){return d!=null&&hasValidParent(d)&&(PermissionService.isAdmin(player)||(PermissionService.getBoolean(player,PermissionKeys.MINES_USE,true)&&(d.permissionKey.isBlank()||PermissionService.getBoolean(player,d.permissionKey,false))));}
     public synchronized long resetDueAt(String rawId){MineDefinition d=definitions.get(MineDefinition.normalizeId(rawId));if(d==null)return 0L;long due=effectiveResetDueAt(d);return due==Long.MAX_VALUE?0L:due;}
 
@@ -163,7 +163,7 @@ public final class MineManager {
     }
 
     public void teleportToMine(MinecraftServer server,ServerPlayer player,String rawId){
-        MineDefinition d=definition(rawId);if(d==null||!d.enabled)throw new IllegalArgumentException("Mine is unavailable.");if(!canMine(player,d))throw new IllegalArgumentException("You do not have access to that mine.");if(!d.spawnSet)throw new IllegalArgumentException("This mine has no teleport spawn yet.");ServerLevel level=level(server,d.spawnDimension);if(level==null)throw new IllegalArgumentException("Mine spawn dimension is not loaded.");player.teleportTo(level,d.spawnX,d.spawnY,d.spawnZ,Set.of(),player.getYRot(),player.getXRot(),true);synchronized(this){MineDefinition live=definitions.get(d.id);if(live!=null){live.totalUses=saturatingAdd(live.totalUses,1L);dirty=true;}}}
+        MineDefinition d=definition(rawId);if(d==null||!d.enabled)throw new IllegalArgumentException("Mine is unavailable.");if(!canMine(player,d))throw new IllegalArgumentException("You do not have access to that mine.");if(!d.spawnSet)throw new IllegalArgumentException("This mine has no teleport spawn yet.");ServerLevel level=level(server,d.spawnDimension);if(level==null)throw new IllegalArgumentException("Mine spawn dimension is not loaded.");player.teleportTo(level, d.spawnX, d.spawnY, d.spawnZ, Set.of(), player.getYRot(), player.getXRot());synchronized(this){MineDefinition live=definitions.get(d.id);if(live!=null){live.totalUses=saturatingAdd(live.totalUses,1L);dirty=true;}}}
 
     public synchronized String statusToken(String rawId,String rawKey){
         MineDefinition d=definitions.get(MineDefinition.normalizeId(rawId));if(d==null)return "-";String key=rawKey==null?"":rawKey.toLowerCase(Locale.ROOT);return switch(key){
@@ -186,27 +186,27 @@ public final class MineManager {
                 p.connection.send(new ClientboundSetTitlesAnimationPacket(3,20,5));
                 p.connection.send(new ClientboundSetTitleTextPacket(Component.literal("Mine reset")));
                 p.connection.send(new ClientboundSetSubtitleTextPacket(message));
-            }else if("CHAT".equals(d.warningMode))p.sendSystemMessage(message);else p.sendOverlayMessage(message);
-            if(d.warningSound){SoundEvent sound=BuiltInRegistries.SOUND_EVENT.getOptional(Identifier.parse("minecraft:item.goat_horn.sound.5")).orElse(null);if(sound!=null)p.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound),SoundSource.PLAYERS,p.getX(),p.getY(),p.getZ(),0.75F,1.15F,p.level().getServer().getTickCount() ^ p.getUUID().getLeastSignificantBits()));}
+            }else if("CHAT".equals(d.warningMode))p.sendSystemMessage(message);else p.sendSystemMessage(message, true);
+            if(d.warningSound){SoundEvent sound=BuiltInRegistries.SOUND_EVENT.getOptional(ResourceLocation.parse("minecraft:item.goat_horn.sound.5")).orElse(null);if(sound!=null)p.connection.send(new ClientboundSoundPacket(BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound),SoundSource.PLAYERS,p.getX(),p.getY(),p.getZ(),0.75F,1.15F,p.level().getServer().getTickCount() ^ p.getUUID().getLeastSignificantBits()));}
         }
     }
 
-    private List<ServerPlayer> playersInside(MinecraftServer server,MineDefinition d){ArrayList<ServerPlayer> out=new ArrayList<>();for(ServerPlayer p:server.getPlayerList().getPlayers()){if(!p.level().dimension().identifier().toString().equals(d.dimension))continue;BlockPos pos=p.blockPosition();if(d.contains(d.dimension,pos.getX(),pos.getY(),pos.getZ()))out.add(p);}return out;}
-    private void teleportOut(MinecraftServer server,MineDefinition d,ServerPlayer player){String dim=d.exitSet?d.exitDimension:d.spawnDimension;double x=d.exitSet?d.exitX:d.spawnX,y=d.exitSet?d.exitY:d.spawnY,z=d.exitSet?d.exitZ:d.spawnZ;if((d.exitSet||d.spawnSet)&&level(server,dim)!=null){ServerLevel target=level(server,dim);player.teleportTo(target,x,y,z,Set.of(),player.getYRot(),player.getXRot(),true);}else{ServerLevel overworld=server.overworld();BlockPos spawn=overworld.getWorldBorderAdjustedRespawnData(overworld.getRespawnData()).pos();player.teleportTo(overworld,spawn.getX()+0.5D,spawn.getY()+1D,spawn.getZ()+0.5D,Set.of(),player.getYRot(),player.getXRot(),true);}}
-    private static ServerLevel level(MinecraftServer server,String dimension){try{return server.getLevel(ResourceKey.create(Registries.DIMENSION,Identifier.parse(dimension)));}catch(Exception ignored){return null;}}
+    private List<ServerPlayer> playersInside(MinecraftServer server,MineDefinition d){ArrayList<ServerPlayer> out=new ArrayList<>();for(ServerPlayer p:server.getPlayerList().getPlayers()){if(!p.level().dimension().location().toString().equals(d.dimension))continue;BlockPos pos=p.blockPosition();if(d.contains(d.dimension,pos.getX(),pos.getY(),pos.getZ()))out.add(p);}return out;}
+    private void teleportOut(MinecraftServer server,MineDefinition d,ServerPlayer player){String dim=d.exitSet?d.exitDimension:d.spawnDimension;double x=d.exitSet?d.exitX:d.spawnX,y=d.exitSet?d.exitY:d.spawnY,z=d.exitSet?d.exitZ:d.spawnZ;if((d.exitSet||d.spawnSet)&&level(server,dim)!=null){ServerLevel target=level(server,dim);player.teleportTo(target, x, y, z, Set.of(), player.getYRot(), player.getXRot());}else{ServerLevel overworld=server.overworld();BlockPos spawn=overworld.getSharedSpawnPos();player.teleportTo(overworld, spawn.getX()+0.5D, spawn.getY()+1D, spawn.getZ()+0.5D, Set.of(), player.getYRot(), player.getXRot());}}
+    private static ServerLevel level(MinecraftServer server,String dimension){try{return server.getLevel(ResourceKey.create(Registries.DIMENSION,ResourceLocation.parse(dimension)));}catch(Exception ignored){return null;}}
 
     private static boolean hasValidParent(MineDefinition d){
         if(d==null||!d.boundsSet)return false;return findContainingRegion(d.dimension,d.minX,d.minY,d.minZ,d.maxX,d.maxY,d.maxZ)!=null;
     }
 
-    private static Region findContainingRegion(String dimension,int minX,int minY,int minZ,int maxX,int maxY,int maxZ){return SimpleServerUtilities.REGIONS.getAll().stream().filter(r->r.getDimension().identifier().toString().equals(dimension)).filter(r->minX>=r.getMinX()&&maxX<=r.getMaxX()&&minY>=r.getMinY()&&maxY<=r.getMaxY()&&minZ>=r.getMinZ()&&maxZ<=r.getMaxZ()).min(Comparator.comparingLong(Region::getVolume).thenComparing(Region::getName,String.CASE_INSENSITIVE_ORDER)).orElse(null);}
+    private static Region findContainingRegion(String dimension,int minX,int minY,int minZ,int maxX,int maxY,int maxZ){return SimpleServerUtilities.REGIONS.getAll().stream().filter(r->r.getDimension().location().toString().equals(dimension)).filter(r->minX>=r.getMinX()&&maxX<=r.getMaxX()&&minY>=r.getMinY()&&maxY<=r.getMaxY()&&minZ>=r.getMinZ()&&maxZ<=r.getMaxZ()).min(Comparator.comparingLong(Region::getVolume).thenComparing(Region::getName,String.CASE_INSENSITIVE_ORDER)).orElse(null);}
 
     private static void validatePalette(List<MineDefinition.PaletteEntry> palette){
         if(palette==null||palette.isEmpty())throw new IllegalArgumentException("A mine palette needs at least one block.");
-        for(MineDefinition.PaletteEntry entry:palette){Identifier id;try{id=Identifier.parse(entry.blockId);}catch(Exception ex){throw new IllegalArgumentException("Invalid palette block: "+entry.blockId);}if(BuiltInRegistries.BLOCK.getOptional(id).isEmpty())throw new IllegalArgumentException("Unknown palette block: "+entry.blockId);}
+        for(MineDefinition.PaletteEntry entry:palette){ResourceLocation id;try{id=ResourceLocation.parse(entry.blockId);}catch(Exception ex){throw new IllegalArgumentException("Invalid palette block: "+entry.blockId);}if(BuiltInRegistries.BLOCK.getOptional(id).isEmpty())throw new IllegalArgumentException("Unknown palette block: "+entry.blockId);}
     }
     private static void validateCustomDrops(List<MineDefinition.DropEntry> drops){
-        if(drops==null)return;for(MineDefinition.DropEntry entry:drops){if(entry==null||entry.itemId.isBlank())continue;Identifier id;try{id=Identifier.parse(entry.itemId);}catch(Exception ex){throw new IllegalArgumentException("Invalid custom drop item: "+entry.itemId);}if(BuiltInRegistries.ITEM.getOptional(id).isEmpty())throw new IllegalArgumentException("Unknown custom drop item: "+entry.itemId);}
+        if(drops==null)return;for(MineDefinition.DropEntry entry:drops){if(entry==null||entry.itemId.isBlank())continue;ResourceLocation id;try{id=ResourceLocation.parse(entry.itemId);}catch(Exception ex){throw new IllegalArgumentException("Invalid custom drop item: "+entry.itemId);}if(BuiltInRegistries.ITEM.getOptional(id).isEmpty())throw new IllegalArgumentException("Unknown custom drop item: "+entry.itemId);}
     }
 
     private static void preserveStatistics(MineDefinition from,MineDefinition to){
@@ -246,7 +246,7 @@ public final class MineManager {
 
     private static final class MineResetJob implements SsuJob {
         private final MineDefinition mine;private long index;private final long total;private boolean complete;private final List<BlockState> states=new ArrayList<>();private final int totalWeight;
-        private MineResetJob(MineDefinition mine){this.mine=mine;this.total=mine.volume();int weight=0;for(MineDefinition.PaletteEntry e:mine.palette){Block block;try{block=BuiltInRegistries.BLOCK.getOptional(Identifier.parse(e.blockId)).orElse(Blocks.STONE);}catch(Exception ex){block=Blocks.STONE;}states.add(block.defaultBlockState());weight+=Math.max(1,e.weight);}totalWeight=Math.max(1,weight);}
+        private MineResetJob(MineDefinition mine){this.mine=mine;this.total=mine.volume();int weight=0;for(MineDefinition.PaletteEntry e:mine.palette){Block block;try{block=BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(e.blockId)).orElse(Blocks.STONE);}catch(Exception ex){block=Blocks.STONE;}states.add(block.defaultBlockState());weight+=Math.max(1,e.weight);}totalWeight=Math.max(1,weight);}
         @Override public String description(){return "Reset mine "+mine.id;}@Override public String ownerModule(){return "mines";}@Override public Set<String> resourceLocks(){return Set.of("mine:"+mine.id);}
         @Override public int runStep(MinecraftServer server,int budget){ServerLevel level=MineManager.level(server,mine.dimension);if(level==null)throw new IllegalStateException("Mine dimension is not loaded.");int used=0;while(used<budget&&index<total){long dx=(long)mine.maxX-mine.minX+1L,dz=(long)mine.maxZ-mine.minZ+1L;long layer=dx*dz;long yOff=index/layer;long rem=index%layer;int zOff=(int)(rem/dx);int xOff=(int)(rem%dx);BlockPos pos=new BlockPos(mine.minX+xOff,mine.minY+(int)yOff,mine.minZ+zOff);level.setBlock(pos,choose(),2);index++;used++;}complete=index>=total;return used;}
         private BlockState choose(){int roll=ThreadLocalRandom.current().nextInt(totalWeight);int cursor=0;for(int i=0;i<mine.palette.size()&&i<states.size();i++){cursor+=Math.max(1,mine.palette.get(i).weight);if(roll<cursor)return states.get(i);}return states.isEmpty()?Blocks.STONE.defaultBlockState():states.get(0);}

@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Quest editor submit. requestedAccessMode is blank unless the editor explicitly changes quest access. */
 public record QuestEditorSubmitPayload(
@@ -14,7 +14,7 @@ public record QuestEditorSubmitPayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<QuestEditorSubmitPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "quest_editor_submit"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "quest_editor_submit"));
     public static final StreamCodec<RegistryFriendlyByteBuf, QuestEditorSubmitPayload> STREAM_CODEC =
             StreamCodec.of(QuestEditorSubmitPayload::encode, QuestEditorSubmitPayload::decode);
 

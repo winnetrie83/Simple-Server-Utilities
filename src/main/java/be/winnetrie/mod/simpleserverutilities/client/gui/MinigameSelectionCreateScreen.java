@@ -4,12 +4,12 @@ import be.winnetrie.mod.simpleserverutilities.minigame.MinigameGameType;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSelectionCreatePayload;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameSelectionCreateResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionToolOpenPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Small first-step wizard. Detailed settings remain in the normal Minigame Editor. */
 public final class MinigameSelectionCreateScreen extends Screen {
@@ -76,7 +76,7 @@ public final class MinigameSelectionCreateScreen extends Screen {
         awaiting = true;
         notice = "Creating managed region and capturing arena snapshot…";
         noticeError = false;
-        ClientPacketDistributor.sendToServer(new MinigameSelectionCreatePayload(
+        PacketDistributor.sendToServer(new MinigameSelectionCreatePayload(
                 idBox.getValue(), nameBox.getValue(), gameType.id(), min, max, requestId++));
         rebuildWidgets();
     }
@@ -124,18 +124,18 @@ public final class MinigameSelectionCreateScreen extends Screen {
         if (!result.successful()) rebuildWidgets();
     }
 
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int x = left(), y = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA5000000);
         g.fill(x, y, x + W, y + H, PANEL);
-        g.outline(x, y, W, H, BORDER);
-        g.text(font, "Create Minigame Arena", x + 24, y + 16, TEXT, true);
-        g.text(font, "The active selection becomes a managed arena with a verified reset snapshot.", x + 24, y + 34, MUTED, false);
-        g.text(font, selection.volume() + " selected blocks · detailed settings follow after creation.", x + 24, y + 48, MUTED, false);
+        g.renderOutline(x, y, W, H, BORDER);
+        g.drawString(font, "Create Minigame Arena", x + 24, y + 16, TEXT, true);
+        g.drawString(font, "The active selection becomes a managed arena with a verified reset snapshot.", x + 24, y + 34, MUTED, false);
+        g.drawString(font, selection.volume() + " selected blocks · detailed settings follow after creation.", x + 24, y + 48, MUTED, false);
         String setup = switch (gameType) {
             case SPLEEF -> "Spleef starts disabled. Review lobby, spectator and player spawns before enabling it.";
             case CAPTURE_THE_FLAG -> "Capture the Flag starts disabled. Review team spawns, both physical flags and scoring settings.";
@@ -144,9 +144,9 @@ public final class MinigameSelectionCreateScreen extends Screen {
             case BLOCK_PARTY -> "Block Party starts disabled. Review player spawns, dance floor and round timings.";
             default -> "Review all generated arena settings before enabling the minigame.";
         };
-        g.text(font, setup, x + 24, y + 154, MUTED, false);
-        if (!notice.isBlank()) g.text(font, trim(notice, 72), x + 24, y + 188, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        g.drawString(font, setup, x + 24, y + 154, MUTED, false);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 72), x + 24, y + 188, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private int left() { return (width - W) / 2; }

@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record AuctionHouseRequestPayload(
         String mode,
@@ -16,7 +16,7 @@ public record AuctionHouseRequestPayload(
         long requestId
 ) implements CustomPacketPayload {
     public static final Type<AuctionHouseRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "auction_house_request"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "auction_house_request"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, AuctionHouseRequestPayload> STREAM_CODEC =
             StreamCodec.of((b, p) -> {

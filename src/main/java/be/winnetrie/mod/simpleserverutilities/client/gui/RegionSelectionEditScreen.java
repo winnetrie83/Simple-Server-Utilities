@@ -9,7 +9,7 @@ import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionToolOpenPay
 import be.winnetrie.mod.simpleserverutilities.network.RegionSetupActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSetupOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSetupRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -18,7 +18,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Dedicated World Edit GUI using the shared Region two-point selection infrastructure. */
 public final class RegionSelectionEditScreen extends Screen {
@@ -204,13 +204,13 @@ public final class RegionSelectionEditScreen extends Screen {
         String name = snapshotName.trim();
         if (!validName(name)) { setNotice("Use 1-64 letters, numbers, dots, underscores or dashes.", true); return; }
         requestedSnapshotContext = true;
-        ClientPacketDistributor.sendToServer(new RegionSetupActionPayload("save_selection_snapshot", "", name, nextRequestId++));
+        PacketDistributor.sendToServer(new RegionSetupActionPayload("save_selection_snapshot", "", name, nextRequestId++));
         setNotice("Full snapshot capture requested…", false);
     }
 
     private void previewSnapshot() {
         if (selectedSnapshot.isBlank()) return;
-        ClientPacketDistributor.sendToServer(new RegionSetupActionPayload("preview_snapshot", "", selectedSnapshot, nextRequestId++));
+        PacketDistributor.sendToServer(new RegionSetupActionPayload("preview_snapshot", "", selectedSnapshot, nextRequestId++));
         setNotice("Loading ghost preview…", false);
     }
 
@@ -219,7 +219,7 @@ public final class RegionSelectionEditScreen extends Screen {
     private void requestSnapshotContext(boolean force) {
         if (requestedSnapshotContext && !force) return;
         requestedSnapshotContext = true;
-        ClientPacketDistributor.sendToServer(new RegionSetupRequestPayload("selection", "", nextRequestId++));
+        PacketDistributor.sendToServer(new RegionSetupRequestPayload("selection", "", nextRequestId++));
     }
 
     public void acceptSetupContext(RegionSetupOpenPayload payload) {
@@ -234,25 +234,25 @@ public final class RegionSelectionEditScreen extends Screen {
         if (payload == null) return;
         nextRequestId = Math.max(nextRequestId, payload.requestId() + 1L);
         clipboardAvailable = payload.clipboardAvailable(); setNotice(payload.message(), !payload.successful());
-        if (payload.selectionCleared()) { if (minecraft != null) minecraft.setScreenAndShow(null); return; }
+        if (payload.selectionCleared()) { if (minecraft != null) minecraft.setScreen(null); return; }
         rebuildWidgets();
     }
 
     private void send(String operation, String name, List<Integer> slots, List<Integer> percentages) {
         long requestId = nextRequestId++;
-        ClientPacketDistributor.sendToServer(new RegionSelectionActionPayload(operation, name, slots, percentages, requestId));
+        PacketDistributor.sendToServer(new RegionSelectionActionPayload(operation, name, slots, percentages, requestId));
         setNotice("Request sent…", false);
     }
 
-    @Override public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-        int mx = (int)event.x(), my = (int)event.y();
-        if (page == 1 && event.buttonInfo().button() == 0) {
+    @Override public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        int mx = (int)mouseX, my = (int)mouseY;
+        if (page == 1 && button == 0) {
             int slot = inventorySlotAt(mx, my, 1); if (slot >= 0) { addFill(slot); return true; }
         }
-        if (page == 2 && event.buttonInfo().button() == 0) {
+        if (page == 2 && button == 0) {
             int slot = inventorySlotAt(mx, my, 2); if (slot >= 0) { addReplace(slot); return true; }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private void addFill(int slot) {
@@ -300,95 +300,95 @@ public final class RegionSelectionEditScreen extends Screen {
         targetPage = Math.max(0, Math.min(targetPage, Math.max(0, (replaceTargets.size() - 1) / ROWS)));
     }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int left = left(), top = top();
-        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(left, top, left + W, top + H, PANEL); g.outline(left, top, W, H, BORDER);
-        g.text(font, "World Edit Tool", left + 16, top + 13, TEXT, true);
+        SsuGuiScale.fullscreenDim(g, this, 0xA5000000); g.fill(left, top, left + W, top + H, PANEL); g.renderOutline(left, top, W, H, BORDER);
+        g.drawString(font, "World Edit Tool", left + 16, top + 13, TEXT, true);
         BlockPos p1 = BlockPos.of(selection.point1()), p2 = BlockPos.of(selection.point2());
-        g.text(font, compact(p1) + " → " + compact(p2) + " · " + selection.volume() + " blocks · " + shortDim(selection.dimension()), left + 16, top + 30, MUTED, false);
+        g.drawString(font, compact(p1) + " → " + compact(p2) + " · " + selection.volume() + " blocks · " + shortDim(selection.dimension()), left + 16, top + 30, MUTED, false);
         if (page == 0) renderClipboard(g, left, top);
         else if (page == 1) renderFill(g, left, top, mouseX, mouseY);
         else if (page == 2) renderReplace(g, left, top, mouseX, mouseY);
         else if (page == 3) renderSnapshots(g, left, top);
         else renderTransform(g, left, top);
-        if (!notice.isBlank()) g.text(font, trim(notice, 84), left + 16, top + H - 48, noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 84), left + 16, top + H - 48, noticeError ? ERROR : GOOD, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void renderClipboard(GuiGraphicsExtractor g, int left, int top) {
+    private void renderClipboard(GuiGraphics g, int left, int top) {
         panel(g, left + 20, top + 88, 460, 178);
-        g.text(font, "Clipboard & history", left + 32, top + 78, TEXT, true);
-        g.text(font, "Copy/paste uses the temporary server clipboard. Cut, paste, fill, clear, replace and transforms create bounded undo history.", left + 32, top + 246, MUTED, false);
-        g.text(font, clipboardAvailable ? "Clipboard: ready" : "Clipboard: empty", left + 500, top + 104, clipboardAvailable ? GOOD : WARNING, false);
-        g.text(font, "Water, lava and air edits are performed as safe batched jobs.", left + 500, top + 126, MUTED, false);
+        g.drawString(font, "Clipboard & history", left + 32, top + 78, TEXT, true);
+        g.drawString(font, "Copy/paste uses the temporary server clipboard. Cut, paste, fill, clear, replace and transforms create bounded undo history.", left + 32, top + 246, MUTED, false);
+        g.drawString(font, clipboardAvailable ? "Clipboard: ready" : "Clipboard: empty", left + 500, top + 104, clipboardAvailable ? GOOD : WARNING, false);
+        g.drawString(font, "Water, lava and air edits are performed as safe batched jobs.", left + 500, top + 126, MUTED, false);
     }
 
-    private void renderFill(GuiGraphicsExtractor g, int left, int top, int mx, int my) {
+    private void renderFill(GuiGraphics g, int left, int top, int mx, int my) {
         panel(g, left + 16, top + 84, 330, 258); panel(g, left + 360, top + 84, 304, 160);
-        g.text(font, "Weighted fill palette — up to " + MAX_FILL + " entries", left + 26, top + 91, TEXT, true);
-        g.text(font, "Click inventory blocks to add. Unused % becomes air.", left + 26, top + 105, MUTED, false);
+        g.drawString(font, "Weighted fill palette — up to " + MAX_FILL + " entries", left + 26, top + 91, TEXT, true);
+        g.drawString(font, "Click inventory blocks to add. Unused % becomes air.", left + 26, top + 105, MUTED, false);
         int from = fillPage * ROWS, to = Math.min(fillMix.size(), from + ROWS), listY = top + 126;
         for (int i = from; i < to; i++) drawMixRow(g, fillMix.get(i), left + 24, listY + (i - from) * 32, mx, my, true);
         int total = fillMix.stream().mapToInt(v -> v.percentage).sum();
-        g.text(font, "Total " + total + "% · Air " + Math.max(0, 100 - total) + "% · " + fillMix.size() + "/" + MAX_FILL, left + 390, top + 218, total <= 100 ? GOOD : ERROR, false);
-        g.text(font, "Inventory", left + 372, top + 91, TEXT, true); renderInventory(g, left + 374, top + 112, mx, my, 1);
+        g.drawString(font, "Total " + total + "% · Air " + Math.max(0, 100 - total) + "% · " + fillMix.size() + "/" + MAX_FILL, left + 390, top + 218, total <= 100 ? GOOD : ERROR, false);
+        g.drawString(font, "Inventory", left + 372, top + 91, TEXT, true); renderInventory(g, left + 374, top + 112, mx, my, 1);
     }
 
-    private void renderReplace(GuiGraphicsExtractor g, int left, int top, int mx, int my) {
+    private void renderReplace(GuiGraphics g, int left, int top, int mx, int my) {
         panel(g, left + 16, top + 84, 210, 258); panel(g, left + 234, top + 84, 218, 258); panel(g, left + 460, top + 118, 204, 160);
-        g.text(font, "Source blocks", left + 26, top + 92, TEXT, true); g.text(font, "Replaced only when matched", left + 26, top + 106, MUTED, false);
+        g.drawString(font, "Source blocks", left + 26, top + 92, TEXT, true); g.drawString(font, "Replaced only when matched", left + 26, top + 106, MUTED, false);
         int sf = sourcePage * ROWS, st = Math.min(replaceSources.size(), sf + ROWS);
         for (int i = sf; i < st; i++) drawSimpleRow(g, replaceSources.get(i), left + 24, top + 124 + (i - sf) * 30, mx, my);
-        g.text(font, "Replacement palette", left + 244, top + 92, TEXT, true); g.text(font, "Targets must total exactly 100%", left + 244, top + 106, MUTED, false);
+        g.drawString(font, "Replacement palette", left + 244, top + 92, TEXT, true); g.drawString(font, "Targets must total exactly 100%", left + 244, top + 106, MUTED, false);
         int tf = targetPage * ROWS, tt = Math.min(replaceTargets.size(), tf + ROWS);
         for (int i = tf; i < tt; i++) drawMixRow(g, replaceTargets.get(i), left + 242, top + 124 + (i - tf) * 30, mx, my, false);
-        g.text(font, "Inventory", left + 472, top + 126, TEXT, true); renderInventory(g, left + 474, top + 146, mx, my, 2);
+        g.drawString(font, "Inventory", left + 472, top + 126, TEXT, true); renderInventory(g, left + 474, top + 146, mx, my, 2);
         int total = replaceTargets.stream().mapToInt(v -> v.percentage).sum();
-        g.text(font, "Targets: " + total + "%", left + 504, top + 302, total == 100 ? GOOD : WARNING, false);
+        g.drawString(font, "Targets: " + total + "%", left + 504, top + 302, total == 100 ? GOOD : WARNING, false);
     }
 
-    private void renderSnapshots(GuiGraphicsExtractor g, int left, int top) {
+    private void renderSnapshots(GuiGraphics g, int left, int top) {
         panel(g, left + 16, top + 120, 310, 220);
         panel(g, left + 340, top + 120, 300, 168);
-        g.text(font, "Portable full snapshots", left + 26, top + 126, TEXT, true);
-        g.text(font, "Preserves blocks, inventories/block entities,", left + 350, top + 128, MUTED, false);
-        g.text(font, "and structural entities.", left + 350, top + 141, MUTED, false);
-        g.text(font, "Preview renders the real snapshot as a translucent", left + 350, top + 158, MUTED, false);
-        g.text(font, "ghost before anything is placed.", left + 350, top + 171, MUTED, false);
-        g.text(font, selectedSnapshot.isBlank() ? "Selected: none" : "Selected: " + trim(selectedSnapshot, 30),
+        g.drawString(font, "Portable full snapshots", left + 26, top + 126, TEXT, true);
+        g.drawString(font, "Preserves blocks, inventories/block entities,", left + 350, top + 128, MUTED, false);
+        g.drawString(font, "and structural entities.", left + 350, top + 141, MUTED, false);
+        g.drawString(font, "Preview renders the real snapshot as a translucent", left + 350, top + 158, MUTED, false);
+        g.drawString(font, "ghost before anything is placed.", left + 350, top + 171, MUTED, false);
+        g.drawString(font, selectedSnapshot.isBlank() ? "Selected: none" : "Selected: " + trim(selectedSnapshot, 30),
                 left + 350, top + 254, selectedSnapshot.isBlank() ? MUTED : GOOD, false);
     }
 
-    private void renderTransform(GuiGraphicsExtractor g, int left, int top) {
+    private void renderTransform(GuiGraphics g, int left, int top) {
         panel(g, left + 16, top + 84, 520, 210);
-        g.text(font, "Rotate / mirror / flip current selection", left + 26, top + 92, TEXT, true);
-        g.text(font, "The current minimum corner remains the transform anchor. Undo history is captured first.", left + 26, top + 108, MUTED, false);
-        g.text(font, "Move / offset selection", left + 26, top + 226, TEXT, true);
-        g.text(font, "X", left + 26, top + 240, MUTED, false); g.text(font, "Y", left + 118, top + 240, MUTED, false); g.text(font, "Z", left + 210, top + 240, MUTED, false);
+        g.drawString(font, "Rotate / mirror / flip current selection", left + 26, top + 92, TEXT, true);
+        g.drawString(font, "The current minimum corner remains the transform anchor. Undo history is captured first.", left + 26, top + 108, MUTED, false);
+        g.drawString(font, "Move / offset selection", left + 26, top + 226, TEXT, true);
+        g.drawString(font, "X", left + 26, top + 240, MUTED, false); g.drawString(font, "Y", left + 118, top + 240, MUTED, false); g.drawString(font, "Z", left + 210, top + 240, MUTED, false);
     }
 
-    private void drawMixRow(GuiGraphicsExtractor g, MixEntry entry, int x, int y, int mx, int my, boolean wide) {
+    private void drawMixRow(GuiGraphics g, MixEntry entry, int x, int y, int mx, int my, boolean wide) {
         ItemStack stack = inventoryItem(entry.inventorySlot); int width = wide ? 210 : 126;
-        g.fill(x, y, x + width, y + 24, SUB_PANEL); g.outline(x, y, width, 24, BORDER);
-        if (!stack.isEmpty()) { g.item(stack, x + 4, y + 4); g.text(font, trim(stack.getHoverName().getString(), wide ? 20 : 10), x + 26, y + 8, TEXT, false);
-            if (inside(mx, my, x, y, 24, 24)) g.setTooltipForNextFrame(font, stack, mx, my); }
-        g.text(font, entry.percentage + "%", x + width - 34, y + 8, MUTED, false);
+        g.fill(x, y, x + width, y + 24, SUB_PANEL); g.renderOutline(x, y, width, 24, BORDER);
+        if (!stack.isEmpty()) { g.renderItem(stack, x + 4, y + 4); g.drawString(font, trim(stack.getHoverName().getString(), wide ? 20 : 10), x + 26, y + 8, TEXT, false);
+            if (inside(mx, my, x, y, 24, 24)) g.renderTooltip(font, stack, mx, my); }
+        g.drawString(font, entry.percentage + "%", x + width - 34, y + 8, MUTED, false);
     }
 
-    private void drawSimpleRow(GuiGraphicsExtractor g, int slot, int x, int y, int mx, int my) {
-        ItemStack stack = inventoryItem(slot); g.fill(x, y, x + 174, y + 22, SUB_PANEL); g.outline(x, y, 174, 22, BORDER);
-        if (!stack.isEmpty()) { g.item(stack, x + 3, y + 3); g.text(font, trim(stack.getHoverName().getString(), 17), x + 25, y + 7, TEXT, false);
-            if (inside(mx, my, x, y, 22, 22)) g.setTooltipForNextFrame(font, stack, mx, my); }
+    private void drawSimpleRow(GuiGraphics g, int slot, int x, int y, int mx, int my) {
+        ItemStack stack = inventoryItem(slot); g.fill(x, y, x + 174, y + 22, SUB_PANEL); g.renderOutline(x, y, 174, 22, BORDER);
+        if (!stack.isEmpty()) { g.renderItem(stack, x + 3, y + 3); g.drawString(font, trim(stack.getHoverName().getString(), 17), x + 25, y + 7, TEXT, false);
+            if (inside(mx, my, x, y, 22, 22)) g.renderTooltip(font, stack, mx, my); }
     }
 
-    private void renderInventory(GuiGraphicsExtractor g, int sx, int sy, int mx, int my, int context) {
+    private void renderInventory(GuiGraphics g, int sx, int sy, int mx, int my, int context) {
         for (int row = 0; row < 3; row++) for (int col = 0; col < 9; col++) drawInventorySlot(g, 9 + row * 9 + col, sx + col * 18, sy + row * 18, mx, my);
         int hotbarY = sy + 60; for (int col = 0; col < 9; col++) drawInventorySlot(g, col, sx + col * 18, hotbarY, mx, my);
     }
 
-    private void drawInventorySlot(GuiGraphicsExtractor g, int slot, int x, int y, int mx, int my) {
-        boolean hover = inside(mx, my, x, y, 18, 18); g.fill(x, y, x + 18, y + 18, 0xD00B1015); g.outline(x, y, 18, 18, hover ? GOOD : BORDER);
-        ItemStack stack = inventoryItem(slot); if (!stack.isEmpty()) { g.item(stack, x + 1, y + 1); g.itemDecorations(font, stack, x + 1, y + 1); if (hover) g.setTooltipForNextFrame(font, stack, mx, my); }
+    private void drawInventorySlot(GuiGraphics g, int slot, int x, int y, int mx, int my) {
+        boolean hover = inside(mx, my, x, y, 18, 18); g.fill(x, y, x + 18, y + 18, 0xD00B1015); g.renderOutline(x, y, 18, 18, hover ? GOOD : BORDER);
+        ItemStack stack = inventoryItem(slot); if (!stack.isEmpty()) { g.renderItem(stack, x + 1, y + 1); g.renderItemDecorations(font, stack, x + 1, y + 1); if (hover) g.renderTooltip(font, stack, mx, my); }
     }
 
     private int inventorySlotAt(int mx, int my, int context) {
@@ -403,7 +403,7 @@ public final class RegionSelectionEditScreen extends Screen {
         ItemStack stack = minecraft.player.getInventory().getItem(slot); return stack == null ? ItemStack.EMPTY : stack;
     }
 
-    private void panel(GuiGraphicsExtractor g, int x, int y, int w, int h) { g.fill(x, y, x + w, y + h, SUB_PANEL); g.outline(x, y, w, h, BORDER); }
+    private void panel(GuiGraphics g, int x, int y, int w, int h) { g.fill(x, y, x + w, y + h, SUB_PANEL); g.renderOutline(x, y, w, h, BORDER); }
     private int left() { return (width - W) / 2; } private int top() { return (height - H) / 2; }
     private static int parsePct(String v) { try { return Math.max(0, Math.min(100, Integer.parseInt(v.trim()))); } catch (RuntimeException ignored) { return 0; } }
     private static boolean validName(String v) { return v != null && v.matches("[A-Za-z0-9._-]{1,64}") && !v.equals(".") && !v.equals(".."); }
@@ -411,7 +411,7 @@ public final class RegionSelectionEditScreen extends Screen {
     private static String compact(BlockPos p) { return p.getX() + "," + p.getY() + "," + p.getZ(); }
     private static String shortDim(String value) { int i = value == null ? -1 : value.indexOf(':'); return i >= 0 ? value.substring(i + 1) : value; }
     private static String trim(String v, int max) { String s = v == null ? "" : v; return s.length() <= max ? s : s.substring(0, Math.max(0, max - 1)) + "…"; }
-    @Override public void onClose() { if (minecraft != null) minecraft.setScreenAndShow(parent); }
+    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
     @Override public boolean isPauseScreen() { return false; }
 
     private static final class MixEntry {

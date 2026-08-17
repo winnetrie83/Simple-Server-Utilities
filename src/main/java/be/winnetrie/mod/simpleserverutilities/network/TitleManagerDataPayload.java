@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record TitleManagerDataPayload(
         boolean adminView, String selectedTitleId, List<Entry> titles,
@@ -15,7 +15,7 @@ public record TitleManagerDataPayload(
 ) implements CustomPacketPayload {
     private static final int MAX_TITLES = 512;
     public static final Type<TitleManagerDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "title_manager_data"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "title_manager_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf, TitleManagerDataPayload> STREAM_CODEC =
             StreamCodec.of(TitleManagerDataPayload::encode, TitleManagerDataPayload::decode);
 

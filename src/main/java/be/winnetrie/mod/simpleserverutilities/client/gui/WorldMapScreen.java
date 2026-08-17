@@ -10,13 +10,12 @@ import be.winnetrie.mod.simpleserverutilities.network.MapMarkerSyncPayload;
 import be.winnetrie.mod.simpleserverutilities.network.PlayerUiSettingUpdatePayload;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.WorldMapRequestPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Full-screen explored world map with compact professional controls and marker context actions. */
 public final class WorldMapScreen extends Screen {
@@ -145,32 +144,32 @@ public final class WorldMapScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         SsuGuiScale.fullscreenDimWhenScaled(graphics, this, 0xA5000000);
         int shellLeft = mapLeft - TOOLBAR_WIDTH - 6;
         graphics.fill(shellLeft, MARGIN, infoLeft + INFO_WIDTH, height - MARGIN, PANEL);
-        graphics.outline(shellLeft, MARGIN, infoLeft + INFO_WIDTH - shellLeft, height - MARGIN * 2, FRAME);
+        graphics.renderOutline(shellLeft, MARGIN, infoLeft + INFO_WIDTH - shellLeft, height - MARGIN * 2, FRAME);
         graphics.fill(shellLeft, MARGIN, infoLeft + INFO_WIDTH, MARGIN + TOP_BAR - 2, PANEL_ALT);
         graphics.fill(shellLeft + 3, mapTop, mapLeft - 3, mapTop + mapSize, PANEL_ALT);
         graphics.fill(infoLeft, mapTop, infoLeft + INFO_WIDTH, mapTop + mapSize, PANEL_ALT);
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
 
         renderContextFrame(graphics);
 
-        graphics.text(font, "WORLD MAP", shellLeft + 8, MARGIN + 8, ACCENT);
-        graphics.text(font, payload.dimension(), shellLeft + 78, MARGIN + 8, MUTED);
+        graphics.drawString(font, "WORLD MAP", shellLeft + 8, MARGIN + 8, ACCENT);
+        graphics.drawString(font, payload.dimension(), shellLeft + 78, MARGIN + 8, MUTED);
         String scale = (payload.radius() * 2 + 1) * 16 + " × " + (payload.radius() * 2 + 1) * 16 + " blocks";
-        graphics.text(font, scale, infoLeft + 8, MARGIN + 8, MUTED);
+        graphics.drawString(font, scale, infoLeft + 8, MARGIN + 8, MUTED);
 
         renderInfoPanel(graphics, mouseX, mouseY);
         renderBottomStatus(graphics, mouseX, mouseY);
 
         if (!payload.allowed()) {
-            graphics.centeredText(font, "World map permission denied", mapLeft + mapSize / 2, mapTop + mapSize / 2, 0xFFFF6B6B);
+            graphics.drawCenteredString(font, "World map permission denied", mapLeft + mapSize / 2, mapTop + mapSize / 2, 0xFFFF6B6B);
         }
     }
 
-    private void renderContextFrame(GuiGraphicsExtractor graphics) {
+    private void renderContextFrame(GuiGraphics graphics) {
         if (context == null) {
             return;
         }
@@ -197,55 +196,55 @@ public final class WorldMapScreen extends Screen {
         if (context.marker() != null) {
             graphics.fill(buttonLeft + 60, buttonTop, buttonLeft + 64, buttonTop + 20, panelColor);
         }
-        graphics.outline(frameLeft, frameTop, frameWidth, frameHeight, 0xFF9FB0C3);
-        graphics.outline(frameLeft + 2, frameTop + 2, frameWidth - 4, frameHeight - 4, 0xFF34475A);
+        graphics.renderOutline(frameLeft, frameTop, frameWidth, frameHeight, 0xFF9FB0C3);
+        graphics.renderOutline(frameLeft + 2, frameTop + 2, frameWidth - 4, frameHeight - 4, 0xFF34475A);
     }
 
-    private void renderInfoPanel(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+    private void renderInfoPanel(GuiGraphics graphics, int mouseX, int mouseY) {
         int x = infoLeft + 9;
         int y = mapTop + 10;
-        graphics.text(font, "LAYERS", x, y, ACCENT); y += 17;
+        graphics.drawString(font, "LAYERS", x, y, ACCENT); y += 17;
         drawLayer(graphics, x, y, showClaims, payload.ownClaimColor(), "Claims"); y += 15;
         drawLayer(graphics, x, y, showRegions, payload.regionColor(), "Server regions"); y += 15;
         drawLayer(graphics, x, y, true, 0xFFFFD54F, "Player"); y += 25;
 
-        graphics.text(font, "LOCATION", x, y, ACCENT); y += 17;
+        graphics.drawString(font, "LOCATION", x, y, ACCENT); y += 17;
         WorldMapWidget.LocationInfo location = mapWidget == null ? null : mapWidget.locationAt(mouseX, mouseY);
         if (context != null && mapWidget != null) location = mapWidget.locationFor(context.coordinate());
         WorldMapWidget.WorldCoordinate coordinate = location == null ? null : location.coordinate();
         if (coordinate == null) {
-            graphics.text(font, "Move over the map", x, y, MUTED);
+            graphics.drawString(font, "Move over the map", x, y, MUTED);
         } else {
-            graphics.text(font, "X  " + coordinate.x(), x, y, 0xFFE6EAF0); y += 13;
-            graphics.text(font, "Y  " + coordinate.y(), x, y, 0xFFE6EAF0); y += 13;
-            graphics.text(font, "Z  " + coordinate.z(), x, y, 0xFFE6EAF0); y += 13;
-            graphics.text(font, fittedLocationLine("Biome  ", location.biomeId()), x, y, 0xFFE6EAF0); y += 13;
-            graphics.text(font, fittedLocationLine("Block  ", location.blockId()), x, y, 0xFFE6EAF0);
+            graphics.drawString(font, "X  " + coordinate.x(), x, y, 0xFFE6EAF0); y += 13;
+            graphics.drawString(font, "Y  " + coordinate.y(), x, y, 0xFFE6EAF0); y += 13;
+            graphics.drawString(font, "Z  " + coordinate.z(), x, y, 0xFFE6EAF0); y += 13;
+            graphics.drawString(font, fittedLocationLine("Biome  ", location.biomeId()), x, y, 0xFFE6EAF0); y += 13;
+            graphics.drawString(font, fittedLocationLine("Block  ", location.blockId()), x, y, 0xFFE6EAF0);
         }
         y += 25;
 
         MapMarkerSyncPayload.Entry selected = context == null ? null : context.marker();
-        graphics.text(font, selected == null ? "MARKERS" : "SELECTED MARKER", x, y, ACCENT); y += 17;
+        graphics.drawString(font, selected == null ? "MARKERS" : "SELECTED MARKER", x, y, ACCENT); y += 17;
         if (selected == null) {
-            graphics.text(font, MapMarkerClientState.markers().size() + " personal markers", x, y, MUTED); y += 14;
-            graphics.text(font, "Right-click to create", x, y, MUTED);
+            graphics.drawString(font, MapMarkerClientState.markers().size() + " personal markers", x, y, MUTED); y += 14;
+            graphics.drawString(font, "Right-click to create", x, y, MUTED);
         } else {
-            graphics.text(font, selected.name(), x, y, 0xFFFFFFFF); y += 14;
+            graphics.drawString(font, selected.name(), x, y, 0xFFFFFFFF); y += 14;
             graphics.fill(x, y, x + 12, y + 12, selected.colorArgb());
-            graphics.outline(x, y, 12, 12, 0xFFFFFFFF); y += 18;
-            graphics.text(font, selected.x() + ", " + selected.y() + ", " + selected.z(), x, y, MUTED);
+            graphics.renderOutline(x, y, 12, 12, 0xFFFFFFFF); y += 18;
+            graphics.drawString(font, selected.x() + ", " + selected.y() + ", " + selected.z(), x, y, MUTED);
         }
         y += 30;
         int progress = terrainMap.progressPercent();
         if (progress < 100) {
-            graphics.text(font, "Terrain " + progress + "%", x, y, ACCENT);
+            graphics.drawString(font, "Terrain " + progress + "%", x, y, ACCENT);
         }
         if (!status.isBlank()) {
-            graphics.text(font, status, x, mapTop + mapSize - 18, statusError ? 0xFFFF6B6B : 0xFF6BFF88);
+            graphics.drawString(font, status, x, mapTop + mapSize - 18, statusError ? 0xFFFF6B6B : 0xFF6BFF88);
         }
     }
 
-    private void renderBottomStatus(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+    private void renderBottomStatus(GuiGraphics graphics, int mouseX, int mouseY) {
         WorldMapWidget.LocationInfo location = mapWidget == null ? null : mapWidget.locationAt(mouseX, mouseY);
         String statusLine;
         if (location == null) {
@@ -257,7 +256,7 @@ public final class WorldMapScreen extends Screen {
                     + "   •   " + displayRegistryName(location.blockId());
             statusLine = font.plainSubstrByWidth(statusLine, Math.max(80, mapSize - 70));
         }
-        graphics.centeredText(font, statusLine, mapLeft + mapSize / 2, height - MARGIN - 17, 0xFFCED7E2);
+        graphics.drawCenteredString(font, statusLine, mapLeft + mapSize / 2, height - MARGIN - 17, 0xFFCED7E2);
     }
 
     private String fittedLocationLine(String prefix, String registryId) {
@@ -281,10 +280,10 @@ public final class WorldMapScreen extends Screen {
         return result.isEmpty() ? "Unknown" : result.toString();
     }
 
-    private void drawLayer(GuiGraphicsExtractor graphics, int x, int y, boolean enabled, int color, String label) {
+    private void drawLayer(GuiGraphics graphics, int x, int y, boolean enabled, int color, String label) {
         graphics.fill(x, y + 1, x + 10, y + 11, enabled ? color : 0xFF3C4652);
-        graphics.outline(x, y + 1, 10, 10, enabled ? 0xFFFFFFFF : 0xFF6E7883);
-        graphics.text(font, label, x + 16, y + 2, enabled ? 0xFFE6EAF0 : MUTED);
+        graphics.renderOutline(x, y + 1, 10, 10, enabled ? 0xFFFFFFFF : 0xFF6E7883);
+        graphics.drawString(font, label, x + 16, y + 2, enabled ? 0xFFE6EAF0 : MUTED);
     }
 
     private void openContext(WorldMapWidget.ContextClick clicked) {
@@ -303,13 +302,13 @@ public final class WorldMapScreen extends Screen {
     private void createMarker() {
         if (context == null || minecraft == null) return;
         WorldMapWidget.WorldCoordinate coordinate = context.coordinate();
-        minecraft.setScreenAndShow(new MapMarkerEditorScreen(
+        minecraft.setScreen(new MapMarkerEditorScreen(
                 this, null, payload.dimension(), coordinate.x(), coordinate.y(), coordinate.z(), true));
     }
 
     private void editMarker(MapMarkerSyncPayload.Entry marker) {
         if (minecraft != null) {
-            minecraft.setScreenAndShow(new MapMarkerEditorScreen(
+            minecraft.setScreen(new MapMarkerEditorScreen(
                     this, marker, marker.dimension(), marker.x(), marker.y(), marker.z(), false));
         }
     }
@@ -322,14 +321,14 @@ public final class WorldMapScreen extends Screen {
             rebuildWidgets();
             return;
         }
-        ClientPacketDistributor.sendToServer(new MapMarkerActionPayload(
+        PacketDistributor.sendToServer(new MapMarkerActionPayload(
                 "delete", marker.id(), marker.name(), marker.dimension(), marker.x(), marker.y(), marker.z(),
                 marker.colorArgb(), false));
         status = "Deleting marker…";
     }
 
     private void openMarkerManager() {
-        if (minecraft != null) minecraft.setScreenAndShow(new MapMarkerManagementScreen(this));
+        if (minecraft != null) minecraft.setScreen(new MapMarkerManagementScreen(this));
     }
 
     private void pan(int dx, int dz) {
@@ -338,7 +337,7 @@ public final class WorldMapScreen extends Screen {
 
     private void recenter() {
         if (minecraft.player != null) {
-            requestMap(minecraft.player.chunkPosition().x(), minecraft.player.chunkPosition().z(), payload.radius());
+            requestMap(minecraft.player.chunkPosition().x, minecraft.player.chunkPosition().z, payload.radius());
         }
     }
 
@@ -379,7 +378,7 @@ public final class WorldMapScreen extends Screen {
     }
 
     private void saveMapSetting(String key, boolean value) {
-        ClientPacketDistributor.sendToServer(new PlayerUiSettingUpdatePayload(key, Boolean.toString(value)));
+        PacketDistributor.sendToServer(new PlayerUiSettingUpdatePayload(key, Boolean.toString(value)));
     }
 
     private void requestMap(int centerChunkX, int centerChunkZ, int radius) {
@@ -389,17 +388,17 @@ public final class WorldMapScreen extends Screen {
                 showClaims, showRegions, payload.claims(), payload.regions());
         context = null;
         rebuildWidgets();
-        ClientPacketDistributor.sendToServer(new WorldMapRequestPayload(centerChunkX, centerChunkZ, radius));
+        PacketDistributor.sendToServer(new WorldMapRequestPayload(centerChunkX, centerChunkZ, radius));
     }
 
     private void openClaimMap() {
         int claimRadius = Math.max(2, Math.min(12, payload.radius()));
-        ClientPacketDistributor.sendToServer(new ClaimMapRequestPayload(
+        PacketDistributor.sendToServer(new ClaimMapRequestPayload(
                 payload.centerChunkX(), payload.centerChunkZ(), claimRadius, "", false));
     }
 
     private void backToMenu() {
-        if (minecraft.player != null) minecraft.player.connection.sendUnattendedCommand("ssu menu", null);
+        if (minecraft.player != null) minecraft.player.connection.sendCommand("ssu menu");
     }
 
     @Override
@@ -415,22 +414,21 @@ public final class WorldMapScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        int button = event.buttonInfo().button();
-
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        
         // Treat the marker context menu as a modal overlay. Its buttons are drawn over
         // the map widget, so resolve their hitboxes here before the normal child-widget
         // dispatch can give the underlying map focus or consume the click.
         if (button == 0 && context != null) {
-            return handleContextMenuClick(event.x(), event.y());
+            return handleContextMenuClick(mouseX, mouseY);
         }
-        if (button == 1 && mapWidget != null && mapWidget.openContextAt(event.x(), event.y())) {
+        if (button == 1 && mapWidget != null && mapWidget.openContextAt(mouseX, mouseY)) {
             return true;
         }
-        if (button == 2 && mapWidget != null && mapWidget.beginMiddleDrag(event.x(), event.y())) {
+        if (button == 2 && mapWidget != null && mapWidget.beginMiddleDrag(mouseX, mouseY)) {
             return true;
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private boolean handleContextMenuClick(double mouseX, double mouseY) {
@@ -474,19 +472,19 @@ public final class WorldMapScreen extends Screen {
         return Math.max(mapTop + 8, Math.min(mapTop + mapSize - 52, context.screenY() + 5));
     }
 @Override
-    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
         if (mapWidget != null && mapWidget.isMiddleDragging()) {
-            return mapWidget.updateMiddleDrag(event.x(), event.y());
+            return mapWidget.updateMiddleDrag(mouseX, mouseY);
         }
-        return super.mouseDragged(event, deltaX, deltaY);
+        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
     }
 
     @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
-        if (event.buttonInfo().button() == 2 && mapWidget != null && mapWidget.isMiddleDragging()) {
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 2 && mapWidget != null && mapWidget.isMiddleDragging()) {
             return mapWidget.finishMiddleDrag();
         }
-        return super.mouseReleased(event);
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override

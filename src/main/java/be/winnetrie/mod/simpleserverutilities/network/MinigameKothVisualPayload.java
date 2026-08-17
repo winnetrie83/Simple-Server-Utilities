@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Translucent in-world King of the Hill dome state used in setup and live matches. */
 public record MinigameKothVisualPayload(
@@ -18,7 +18,7 @@ public record MinigameKothVisualPayload(
         String label
 ) implements CustomPacketPayload {
     public static final Type<MinigameKothVisualPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_koth_visual"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "minigame_koth_visual"));
     public static final StreamCodec<RegistryFriendlyByteBuf, MinigameKothVisualPayload> STREAM_CODEC =
             StreamCodec.of(MinigameKothVisualPayload::encode, MinigameKothVisualPayload::decode);
 

@@ -9,7 +9,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
@@ -44,9 +44,9 @@ public final class KitEditorMenu extends AbstractContainerMenu {
     }
 
     @Override
-    public void clicked(int slot, int button, ContainerInput input, Player player) {
+    public void clicked(int slot, int button, ClickType input, Player player) {
         if (slot >= 0 && slot < KIT_SLOTS) {
-            if (input == ContainerInput.PICKUP) {
+            if (input == ClickType.PICKUP) {
                 ItemStack carried = getCarried();
                 ItemStack current = ghost.getItem(slot);
                 if (carried.isEmpty()) {
@@ -73,18 +73,18 @@ public final class KitEditorMenu extends AbstractContainerMenu {
                 broadcastChanges();
                 return;
             }
-            if (input == ContainerInput.QUICK_MOVE || input == ContainerInput.THROW) {
+            if (input == ClickType.QUICK_MOVE || input == ClickType.THROW) {
                 ghost.setItem(slot, ItemStack.EMPTY);
                 broadcastChanges();
                 return;
             }
-            if (input == ContainerInput.SWAP && button >= 0 && button < 9) {
+            if (input == ClickType.SWAP && button >= 0 && button < 9) {
                 ghost.setItem(slot, playerInventory.getItem(button).copy());
                 broadcastChanges();
                 return;
             }
         }
-        if (input == ContainerInput.QUICK_MOVE && slot >= KIT_SLOTS && slot < slots.size()) {
+        if (input == ClickType.QUICK_MOVE && slot >= KIT_SLOTS && slot < slots.size()) {
             Slot source = slots.get(slot);
             if (source.hasItem()) for (int i = 0; i < KIT_SLOTS; i++) if (ghost.getItem(i).isEmpty()) {
                 ghost.setItem(i, source.getItem().copy());

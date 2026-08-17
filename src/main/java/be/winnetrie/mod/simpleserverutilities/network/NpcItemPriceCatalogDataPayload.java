@@ -7,14 +7,14 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record NpcItemPriceCatalogDataPayload(String query, int pageIndex, int pageCount, int totalItems,
         String currencySymbol, int decimalPlaces, List<Entry> entries, String notice, boolean error, long requestId)
         implements CustomPacketPayload {
     public static final int PAGE_SIZE = 12;
     public static final Type<NpcItemPriceCatalogDataPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_item_price_catalog_data"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_item_price_catalog_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcItemPriceCatalogDataPayload> STREAM_CODEC =
             StreamCodec.of(NpcItemPriceCatalogDataPayload::encode, NpcItemPriceCatalogDataPayload::decode);
 

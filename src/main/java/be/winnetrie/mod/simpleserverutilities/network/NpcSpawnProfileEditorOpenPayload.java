@@ -7,12 +7,12 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record NpcSpawnProfileEditorOpenPayload(boolean create, String originalId, String profileJson,
         List<String> templateIds, String notice, boolean error, long requestId) implements CustomPacketPayload {
     public static final Type<NpcSpawnProfileEditorOpenPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_spawn_profile_editor_open"));
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "npc_spawn_profile_editor_open"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NpcSpawnProfileEditorOpenPayload> STREAM_CODEC =
             StreamCodec.of(NpcSpawnProfileEditorOpenPayload::encode, NpcSpawnProfileEditorOpenPayload::decode);
 

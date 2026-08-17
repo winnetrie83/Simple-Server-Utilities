@@ -6,13 +6,13 @@ import java.util.Locale;
 import be.winnetrie.mod.simpleserverutilities.network.NpcLoadoutResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcLoadoutSavePayload;
 import be.winnetrie.mod.simpleserverutilities.npc.NpcLoadoutMenu;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Compact real-inventory editor for combat equipment and the NPC's only loot table. */
 public final class NpcLoadoutScreen extends AbstractContainerScreen<NpcLoadoutMenu> {
@@ -35,7 +35,9 @@ public final class NpcLoadoutScreen extends AbstractContainerScreen<NpcLoadoutMe
     private boolean saving;
 
     public NpcLoadoutScreen(NpcLoadoutMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title, WIDTH, HEIGHT);
+        super(menu, inventory, title);
+        this.imageWidth = WIDTH;
+        this.imageHeight = HEIGHT;
         titleLabelX = -10_000;
         inventoryLabelX = -10_000;
     }
@@ -79,7 +81,7 @@ public final class NpcLoadoutScreen extends AbstractContainerScreen<NpcLoadoutMe
             notice = exception.getMessage(); noticeError = true; return;
         }
         saving = true;
-        ClientPacketDistributor.sendToServer(new NpcLoadoutSavePayload(
+        PacketDistributor.sendToServer(new NpcLoadoutSavePayload(
                 menu.containerId, menu.mode(), rolls, chances, nextRequestId++));
         rebuildWidgets();
     }
@@ -100,36 +102,36 @@ public final class NpcLoadoutScreen extends AbstractContainerScreen<NpcLoadoutMe
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, PANEL);
-        g.outline(leftPos, topPos, imageWidth, imageHeight, BORDER);
-        g.text(font, menu.mode() == NpcLoadoutMenu.MODE_LOOT ? "NPC Loot Table" : "NPC Combat Equipment",
+        g.renderOutline(leftPos, topPos, imageWidth, imageHeight, BORDER);
+        g.drawString(font, menu.mode() == NpcLoadoutMenu.MODE_LOOT ? "NPC Loot Table" : "NPC Combat Equipment",
                 leftPos + 14, topPos + 11, TEXT, false);
         if (menu.mode() == NpcLoadoutMenu.MODE_LOOT) {
-            g.text(font, "Each filled slot rolls independently", leftPos + 14, topPos + 28, MUTED, false);
-            g.text(font, "Chance %", leftPos + 14, topPos + 99, MUTED, false);
-            g.text(font, "Rolls", leftPos + 14, topPos + 110, MUTED, false);
+            g.drawString(font, "Each filled slot rolls independently", leftPos + 14, topPos + 28, MUTED, false);
+            g.drawString(font, "Chance %", leftPos + 14, topPos + 99, MUTED, false);
+            g.drawString(font, "Rolls", leftPos + 14, topPos + 110, MUTED, false);
             for (int i = 0; i < 9; i++) drawSlot(g, leftPos + 16 + i * 36, topPos + 54);
         } else {
-            g.text(font, "Main, offhand, head, chest, legs and feet — gameplay stats + enchants", leftPos + 14, topPos + 28, MUTED, false);
+            g.drawString(font, "Main, offhand, head, chest, legs and feet — gameplay stats + enchants", leftPos + 14, topPos + 28, MUTED, false);
             String[] labels = {"Main", "Off", "Head", "Chest", "Legs", "Feet"};
             for (int i = 0; i < 6; i++) {
                 int x = leftPos + 42 + i * 46;
                 drawSlot(g, x, topPos + 54);
-                g.text(font, labels[i], x - 3, topPos + 78, MUTED, false);
+                g.drawString(font, labels[i], x - 3, topPos + 78, MUTED, false);
             }
         }
         drawInventory(g);
-        if (!notice.isBlank()) g.text(font, trim(notice, 54), leftPos + 102, topPos + HEIGHT - 20,
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 54), leftPos + 102, topPos + HEIGHT - 20,
                 noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void drawInventory(GuiGraphicsExtractor g) {
+    private void drawInventory(GuiGraphics g) {
         int x = leftPos + NpcLoadoutMenu.PLAYER_INVENTORY_X;
         int y = topPos + NpcLoadoutMenu.PLAYER_INVENTORY_Y;
-        g.text(font, "Player inventory", x, y - 13, MUTED, false);
+        g.drawString(font, "Player inventory", x, y - 13, MUTED, false);
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) drawSlot(g, x + column * 18, y + row * 18);
         }
@@ -137,9 +139,9 @@ public final class NpcLoadoutScreen extends AbstractContainerScreen<NpcLoadoutMe
                 topPos + NpcLoadoutMenu.PLAYER_HOTBAR_Y);
     }
 
-    private static void drawSlot(GuiGraphicsExtractor g, int x, int y) {
+    private static void drawSlot(GuiGraphics g, int x, int y) {
         g.fill(x - 1, y - 1, x + 17, y + 17, SLOT);
-        g.outline(x - 1, y - 1, 18, 18, SLOT_BORDER);
+        g.renderOutline(x - 1, y - 1, 18, 18, SLOT_BORDER);
     }
 
     private static int parseChance(String raw) {
@@ -172,6 +174,8 @@ public final class NpcLoadoutScreen extends AbstractContainerScreen<NpcLoadoutMe
         if (value == null) return "";
         return value.length() <= maximum ? value : value.substring(0, maximum - 1) + "…";
     }
+
+    @Override protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {}
 
     @Override public boolean isPauseScreen() { return false; }
 }

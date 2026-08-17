@@ -19,7 +19,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.util.TriState;
+import net.neoforged.neoforge.common.util.TriState;
 import net.minecraft.world.level.block.SignBlock;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.bus.api.EventPriority;
@@ -33,7 +33,7 @@ import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
-import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 
 public class RegionInteractionEvents {
 
@@ -257,7 +257,7 @@ public class RegionInteractionEvents {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onPreviewBreak(BreakBlockEvent event) {
+    public static void onPreviewBreak(BlockEvent.BreakEvent event) {
         if (event.getPlayer() instanceof ServerPlayer player && RegionSetupToolService.hasActivePreview(player)) event.setCanceled(true);
     }
 
@@ -395,11 +395,11 @@ public class RegionInteractionEvents {
 
         Component accept = Component.literal("[ACCEPT]")
                 .withStyle(style -> style.withColor(ChatFormatting.GREEN)
-                        .withClickEvent(new ClickEvent.RunCommand("/regions rentaccept " + region.getName())));
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/regions rentaccept " + region.getName())));
 
         Component decline = Component.literal(" [DECLINE]")
                 .withStyle(style -> style.withColor(ChatFormatting.RED)
-                        .withClickEvent(new ClickEvent.RunCommand("/regions rentdecline " + region.getName())));
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/regions rentdecline " + region.getName())));
 
         player.sendSystemMessage(Component.literal("").append(accept).append(decline));
     }

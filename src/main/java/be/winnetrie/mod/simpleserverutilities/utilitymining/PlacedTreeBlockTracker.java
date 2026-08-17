@@ -96,7 +96,7 @@ public final class PlacedTreeBlockTracker {
     }
 
     private static String dimension(ServerLevel level) {
-        return level.dimension().identifier().toString();
+        return level.dimension().location().toString();
     }
 
     private static final class SaveData {

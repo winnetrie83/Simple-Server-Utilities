@@ -84,7 +84,7 @@ import be.winnetrie.mod.simpleserverutilities.warp.Warp;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -676,7 +676,7 @@ public final class SsuMenuService {
             setting.set("");
         } else {
             final String block;
-            try { block = Identifier.parse(rawBlock).toString().toLowerCase(Locale.ROOT); }
+            try { block = ResourceLocation.parse(rawBlock).toString().toLowerCase(Locale.ROOT); }
             catch (Exception exception) { return ActionResult.fail("Enter a valid block id such as minecraft:oak_log.", "utility_mining_admin"); }
             LinkedHashSet<String> values = parseConfigList(setting.get());
             if ("add".equals(op)) values.add(block);
@@ -966,8 +966,7 @@ public final class SsuMenuService {
             return ActionResult.fail("No safe standing position was found near that hologram.", "holograms");
         }
         var destination = safe.get();
-        player.teleportTo(level, destination.x(), destination.y(), destination.z(),
-                Set.of(), player.getYRot(), player.getXRot(), true);
+        player.teleportTo(level, destination.x(), destination.y(), destination.z(), Set.of(), player.getYRot(), player.getXRot());
         return ActionResult.ok("Teleported to hologram '" + value.id + "'.", "holograms");
     }
 
@@ -1276,7 +1275,7 @@ public final class SsuMenuService {
                 .filter(region -> !SimpleServerUtilities.MINIGAMES.isManagedArenaRegion(region.getName()))
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         all.sort(Comparator.comparing(Region::getName, String.CASE_INSENSITIVE_ORDER));
-        all = filter(all, request.query(), region -> region.getName() + " " + region.getDimension().identifier());
+        all = filter(all, request.query(), region -> region.getName() + " " + region.getDimension().location());
         List<SsuMenuPageDataPayload.RegionEntry> entries = page(all, request).stream()
                 .map(region -> regionEntry(player, region, true)).toList();
         List<SsuMenuPageDataPayload.PermissionEntry> settings = List.of(new SsuMenuPageDataPayload.PermissionEntry(
@@ -2091,7 +2090,7 @@ public final class SsuMenuService {
         String balance = SimpleServerUtilities.ECONOMY.findAccount(selectedId)
                 .map(account -> MoneyFormat.format(account.getBalanceMinor(), SimpleServerUtilities.ECONOMY.settings()))
                 .orElse("No economy account");
-        String dimension = online == null ? "Offline" : online.level().dimension().identifier().toString();
+        String dimension = online == null ? "Offline" : online.level().dimension().location().toString();
         String position = online == null ? "-" : blockPos(online.blockPosition());
         String healthAndFood = online == null ? "Offline"
                 : String.format(Locale.ROOT, "%.1f / %.1f HP | food %d",
@@ -2174,7 +2173,7 @@ public final class SsuMenuService {
             return ActionResult.fail("Hologram administration denied.", "holograms");
         HologramDefinition definition = SimpleServerUtilities.HOLOGRAMS.get(id);
         if (definition == null) return ActionResult.fail("Hologram not found.", "holograms");
-        definition.dimension = player.level().dimension().identifier().toString();
+        definition.dimension = player.level().dimension().location().toString();
         definition.x = player.getX(); definition.y = player.getY() + 1.8D; definition.z = player.getZ();
         return SimpleServerUtilities.HOLOGRAMS.put(definition)
                 ? ActionResult.shellPage("Hologram moved to your current position.", "holograms")
@@ -3248,7 +3247,7 @@ public final class SsuMenuService {
         String message = target.getName().getString() + " • " + key + " • personal "
                 + (personal == null ? "<none>" : personal) + " • effective "
                 + (effective == null ? "<unset>" : effective) + " • "
-                + target.level().dimension().identifier();
+                + target.level().dimension().location();
         return ActionResult.ok(message, "");
     }
 
@@ -3456,7 +3455,7 @@ public final class SsuMenuService {
 
     private static String validDimensionId(String raw) {
         if (raw == null || raw.isBlank()) return null;
-        try { return Identifier.parse(raw.trim()).toString(); }
+        try { return ResourceLocation.parse(raw.trim()).toString(); }
         catch (Exception exception) { return null; }
     }
 
@@ -3572,7 +3571,7 @@ public final class SsuMenuService {
     private SsuMenuPageDataPayload.RegionEntry regionEntry(ServerPlayer player, Region region,
             boolean administrator) {
         var rent = region.getRentData(); boolean own = player.getUUID().equals(rent.getRenter());
-        return new SsuMenuPageDataPayload.RegionEntry(region.getName(), region.getDimension().identifier().toString(),
+        return new SsuMenuPageDataPayload.RegionEntry(region.getName(), region.getDimension().location().toString(),
                 region.getBoundsText(), region.isBorderVisible(), rent.isRented(), rent.isRentable(), own,
                 MoneyFormat.format(rent.getPriceMinor(SimpleServerUtilities.ECONOMY.settings()), SimpleServerUtilities.ECONOMY.settings()),
                 rent.isPermanent() ? "permanent" : rent.getPeriodDays() + " day(s)", administrator || own ? rent.getDisplayRenterName() : "",
@@ -3751,7 +3750,7 @@ public final class SsuMenuService {
         try{return UUID.fromString(reference.trim());}catch(IllegalArgumentException ignored){}
         ServerPlayer online=server.getPlayerList().getPlayerByName(reference);
         if(online!=null)return online.getUUID();return SimpleServerUtilities.PERMISSIONS.findKnownPlayerId(reference);}
-    private static ServerLevel level(MinecraftServer server,String raw){try{return server.getLevel(ResourceKey.create(Registries.DIMENSION,Identifier.parse(raw)));}
+    private static ServerLevel level(MinecraftServer server,String raw){try{return server.getLevel(ResourceKey.create(Registries.DIMENSION,ResourceLocation.parse(raw)));}
         catch(Exception e){return null;}}
     private static boolean isAdministrator(ServerPlayer player){return PermissionService.isAdmin(player)
             || PermissionService.getBoolean(player,PermissionKeys.ADMIN_MENU,false);}

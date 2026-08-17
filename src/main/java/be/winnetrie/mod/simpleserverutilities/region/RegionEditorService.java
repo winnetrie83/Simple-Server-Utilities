@@ -22,7 +22,7 @@ public final class RegionEditorService {
         RegionSelection selection = RegionCommands.getSelectionManager().getSelection(player);
         if (!selection.isComplete()) return false;
         PacketDistributor.sendToPlayer(player, new RegionEditorOpenPayload(
-                selection.getDimension().identifier().toString(),
+                selection.getDimension().location().toString(),
                 selection.getPoint1().asLong(),
                 selection.getPoint2().asLong()
         ));

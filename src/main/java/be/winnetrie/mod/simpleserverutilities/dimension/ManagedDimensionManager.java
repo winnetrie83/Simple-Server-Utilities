@@ -29,7 +29,7 @@ import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -121,7 +121,7 @@ public final class ManagedDimensionManager {
         if (definitions.containsKey(submitted.id)) {
             throw new IllegalArgumentException("A managed dimension with that ID already exists.");
         }
-        ResourceKey<Level> resourceKey = ResourceKey.create(Registries.DIMENSION, Identifier.parse(submitted.resourceId()));
+        ResourceKey<Level> resourceKey = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(submitted.resourceId()));
         if (server != null && server.getLevel(resourceKey) != null) {
             throw new IllegalArgumentException("That dimension ID is already loaded by Minecraft or another datapack.");
         }
@@ -173,9 +173,9 @@ public final class ManagedDimensionManager {
     public synchronized String displayName(String dimensionId) {
         if (dimensionId == null) return "";
         String normalized = dimensionId.trim().toLowerCase(Locale.ROOT);
-        if (normalized.equals(Level.OVERWORLD.identifier().toString())) return "Overworld";
-        if (normalized.equals(Level.NETHER.identifier().toString())) return "Nether";
-        if (normalized.equals(Level.END.identifier().toString())) return "The End";
+        if (normalized.equals(Level.OVERWORLD.location().toString())) return "Overworld";
+        if (normalized.equals(Level.NETHER.location().toString())) return "Nether";
+        if (normalized.equals(Level.END.location().toString())) return "The End";
         if (normalized.startsWith("simpleserverutilities:")) {
             ManagedDimensionDefinition definition = definitions.get(normalized.substring("simpleserverutilities:".length()));
             if (definition != null) return definition.displayName;
@@ -185,21 +185,21 @@ public final class ManagedDimensionManager {
 
     public synchronized List<DimensionInfo> dimensionInfos() {
         Map<String, DimensionInfo> result = new HashMap<>();
-        result.put(Level.OVERWORLD.identifier().toString(), new DimensionInfo(
-                Level.OVERWORLD.identifier().toString(), "Overworld", "VANILLA", true, true, false));
-        result.put(Level.NETHER.identifier().toString(), new DimensionInfo(
-                Level.NETHER.identifier().toString(), "Nether", "VANILLA", true, true, false));
-        result.put(Level.END.identifier().toString(), new DimensionInfo(
-                Level.END.identifier().toString(), "The End", "VANILLA", true, true, false));
+        result.put(Level.OVERWORLD.location().toString(), new DimensionInfo(
+                Level.OVERWORLD.location().toString(), "Overworld", "VANILLA", true, true, false));
+        result.put(Level.NETHER.location().toString(), new DimensionInfo(
+                Level.NETHER.location().toString(), "Nether", "VANILLA", true, true, false));
+        result.put(Level.END.location().toString(), new DimensionInfo(
+                Level.END.location().toString(), "The End", "VANILLA", true, true, false));
         if (server != null) {
             for (ServerLevel level : server.getAllLevels()) {
-                String id = level.dimension().identifier().toString();
+                String id = level.dimension().location().toString();
                 result.putIfAbsent(id, new DimensionInfo(id, displayName(id), "EXTERNAL", true, false, false));
             }
         }
         for (ManagedDimensionDefinition definition : definitions.values()) {
             String id = definition.resourceId();
-            boolean loaded = server != null && server.getLevel(ResourceKey.create(Registries.DIMENSION, Identifier.parse(id))) != null;
+            boolean loaded = server != null && server.getLevel(ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(id))) != null;
             result.put(id, new DimensionInfo(id, definition.displayName, definition.presetValue().name(),
                     loaded, false, true));
         }
@@ -474,9 +474,9 @@ public final class ManagedDimensionManager {
         boolean changed = false;
         for (ManagedDimensionDefinition definition : definitions.values()) {
             if (!definition.enabled || !definition.isEmptyPreset() || definition.platformInitialized) continue;
-            ServerLevel level = server.getLevel(ResourceKey.create(Registries.DIMENSION, Identifier.parse(definition.resourceId())));
+            ServerLevel level = server.getLevel(ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(definition.resourceId())));
             if (level == null) continue;
-            Optional<Block> block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(definition.platformBlock));
+            Optional<Block> block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(definition.platformBlock));
             if (block.isEmpty()) {
                 SimpleServerUtilities.LOGGER.warn("Cannot initialize platform for {}: unknown block {}",
                         definition.resourceId(), definition.platformBlock);

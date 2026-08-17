@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.TriState;
+import net.neoforged.neoforge.common.util.TriState;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -23,7 +23,7 @@ import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
-import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /** Runtime adapters for queue cleanup, match rules, deaths and crash recovery. */
@@ -37,7 +37,7 @@ public final class MinigameEvents {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onBlockBreak(BreakBlockEvent event) {
+    public static void onBlockBreak(BlockEvent.BreakEvent event) {
         if (!active() || !(event.getPlayer() instanceof ServerPlayer player)) return;
         SimpleServerUtilities.MINIGAMES.recordActivity(player);
         if (interruptCastAction(player, "tried to break a block")) {
@@ -294,7 +294,7 @@ public final class MinigameEvents {
     public static void onDamageApplied(LivingDamageEvent.Post event) {
         if (!active() || !(event.getEntity() instanceof ServerPlayer victim)) return;
         ServerPlayer attacker = attackingPlayer(event.getSource().getEntity());
-        SimpleServerUtilities.MINIGAMES.recordCombatDamage(attacker, victim, event.getInflictedDamage());
+        SimpleServerUtilities.MINIGAMES.recordCombatDamage(attacker, victim, event.getNewDamage());
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)

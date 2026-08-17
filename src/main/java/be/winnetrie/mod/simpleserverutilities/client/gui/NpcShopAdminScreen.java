@@ -7,12 +7,12 @@ import be.winnetrie.mod.simpleserverutilities.network.NpcShopAdminActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcShopAdminDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcShopAdminRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcShopEditorResultPayload;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Central Admin Center shop manager with search, creation, editing and guarded deletion. */
 public final class NpcShopAdminScreen extends Screen {
@@ -29,6 +29,9 @@ public final class NpcShopAdminScreen extends Screen {
     private EditBox createBox;
     private Button editButton;
     private Button deleteButton;
+    private int lastClickedRow = -1;
+    private long lastRowClickMillis;
+
     private String notice = "";
     private boolean noticeError;
     private String deletePendingId = "";
@@ -104,20 +107,20 @@ public final class NpcShopAdminScreen extends Screen {
 
     private void request(int page) {
         String query = searchBox == null ? data.query() : searchBox.getValue();
-        ClientPacketDistributor.sendToServer(new NpcShopAdminRequestPayload(query, Math.max(0, page), nextRequestId++));
+        PacketDistributor.sendToServer(new NpcShopAdminRequestPayload(query, Math.max(0, page), nextRequestId++));
     }
 
     private void create() {
         String id = createBox == null ? "" : createBox.getValue().trim();
         if (id.isBlank()) { setNotice("Enter a new shop ID first.", true); return; }
-        ClientPacketDistributor.sendToServer(new NpcShopAdminActionPayload("new", "", id,
+        PacketDistributor.sendToServer(new NpcShopAdminActionPayload("new", "", id,
                 searchBox == null ? data.query() : searchBox.getValue(), data.pageIndex(), nextRequestId++));
     }
 
     private void edit() {
         NpcShopAdminDataPayload.Entry entry = selected();
         if (entry == null) return;
-        ClientPacketDistributor.sendToServer(new NpcShopAdminActionPayload("open", entry.id(), "",
+        PacketDistributor.sendToServer(new NpcShopAdminActionPayload("open", entry.id(), "",
                 data.query(), data.pageIndex(), nextRequestId++));
     }
 
@@ -133,26 +136,26 @@ public final class NpcShopAdminScreen extends Screen {
             setNotice("Click Delete again to permanently remove '" + entry.id() + "'.", true);
             return;
         }
-        ClientPacketDistributor.sendToServer(new NpcShopAdminActionPayload("delete", entry.id(), "",
+        PacketDistributor.sendToServer(new NpcShopAdminActionPayload("delete", entry.id(), "",
                 data.query(), data.pageIndex(), nextRequestId++));
         deletePendingId = "";
     }
 
     @Override public void onClose() {
-        if (minecraft != null) minecraft.setScreenAndShow(parent);
+        if (minecraft != null) minecraft.setScreen(parent);
     }
 
-    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         int left = left(), top = top();
         SsuGuiScale.fullscreenDim(g, this, 0xA9000000);
         g.fill(left, top, left + W, top + H, PANEL);
-        g.outline(left, top, W, H, BORDER);
-        g.text(font, "Shop Manager", left + 16, top + 13, TEXT, true);
-        g.text(font, data.totalShops() + " shared shop(s)", left + W - 150, top + 14, MUTED, false);
+        g.renderOutline(left, top, W, H, BORDER);
+        g.drawString(font, "Shop Manager", left + 16, top + 13, TEXT, true);
+        g.drawString(font, data.totalShops() + " shared shop(s)", left + W - 150, top + 14, MUTED, false);
 
         int listTop = top + 68, listBottom = top + H - 72;
         g.fill(left + 12, listTop, left + W - 12, listBottom, SUBPANEL);
-        g.outline(left + 12, listTop, W - 24, listBottom - listTop, BORDER);
+        g.renderOutline(left + 12, listTop, W - 24, listBottom - listTop, BORDER);
         rows.clear();
         for (int index = 0; index < data.entries().size(); index++) {
             int y = listTop + 5 + index * ROW_HEIGHT;
@@ -161,31 +164,35 @@ public final class NpcShopAdminScreen extends Screen {
             NpcShopAdminDataPayload.Entry entry = data.entries().get(index);
             g.fill(row.x(), row.y(), row.x() + row.width(), row.y() + row.height(),
                     index == selectedIndex ? SELECTED : ROW);
-            g.text(font, trim(entry.displayName(), 26), row.x() + 8, row.y() + 5, TEXT, false);
-            g.text(font, trim(entry.id(), 22), row.x() + 186, row.y() + 5, MUTED, false);
-            g.text(font, entry.offerCount() + " offers", row.x() + 342, row.y() + 5, MUTED, false);
+            g.drawString(font, trim(entry.displayName(), 26), row.x() + 8, row.y() + 5, TEXT, false);
+            g.drawString(font, trim(entry.id(), 22), row.x() + 186, row.y() + 5, MUTED, false);
+            g.drawString(font, entry.offerCount() + " offers", row.x() + 342, row.y() + 5, MUTED, false);
             String usage = entry.npcDefinitionCount() + " tpl · " + entry.npcPlacementCount() + " NPC";
-            g.text(font, usage, row.x() + 418, row.y() + 5,
+            g.drawString(font, usage, row.x() + 418, row.y() + 5,
                     entry.npcDefinitionCount() > 0 ? GOOD : MUTED, false);
-            g.text(font, entry.enabled() ? "Enabled" : "Disabled", row.x() + row.width() - 62, row.y() + 5,
+            g.drawString(font, entry.enabled() ? "Enabled" : "Disabled", row.x() + row.width() - 62, row.y() + 5,
                     entry.enabled() ? GOOD : ERROR, false);
         }
-        if (data.entries().isEmpty()) g.text(font, "No shops match this search.", left + 28, listTop + 24, MUTED, false);
-        g.text(font, "Page " + (data.pageIndex() + 1) + "/" + data.pageCount(), left + 86, top + H - 26, MUTED, false);
-        if (!notice.isBlank()) g.text(font, trim(notice, 82), left + 292, top + H - 25,
+        if (data.entries().isEmpty()) g.drawString(font, "No shops match this search.", left + 28, listTop + 24, MUTED, false);
+        g.drawString(font, "Page " + (data.pageIndex() + 1) + "/" + data.pageCount(), left + 86, top + H - 26, MUTED, false);
+        if (!notice.isBlank()) g.drawString(font, trim(notice, 82), left + 292, top + H - 25,
                 noticeError ? ERROR : GOOD, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    @Override public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+    @Override public boolean mouseClicked(double mouseX, double mouseY, int button) {
         for (RowBounds row : rows) {
-            if (row.contains((int) event.x(), (int) event.y())) {
+            if (row.contains((int) mouseX, (int) mouseY)) {
+                long now = System.currentTimeMillis();
+                boolean doubleClick = row.index() == lastClickedRow && now - lastRowClickMillis <= 300L;
+                lastClickedRow = row.index();
+                lastRowClickMillis = now;
                 selectedIndex = row.index(); deletePendingId = ""; notice = ""; updateButtons();
                 if (doubleClick) edit();
                 return true;
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private void updateButtons() {

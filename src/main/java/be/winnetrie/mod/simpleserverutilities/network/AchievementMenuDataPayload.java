@@ -7,7 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Bounded achievement browser payload. Reward entries are structured so the client can render real item icons. */
 public record AchievementMenuDataPayload(
@@ -15,7 +15,7 @@ public record AchievementMenuDataPayload(
         String filter, String selectedId, String notice, boolean error, long requestId,
         int page, int totalPages, int totalAchievements, List<Entry> achievements) implements CustomPacketPayload {
     public static final int MAX_ENTRIES = 12;
-    public static final Type<AchievementMenuDataPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "achievement_menu_data"));
+    public static final Type<AchievementMenuDataPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "achievement_menu_data"));
     public static final StreamCodec<RegistryFriendlyByteBuf, AchievementMenuDataPayload> STREAM_CODEC = StreamCodec.of(AchievementMenuDataPayload::encode, AchievementMenuDataPayload::decode);
 
     public AchievementMenuDataPayload {

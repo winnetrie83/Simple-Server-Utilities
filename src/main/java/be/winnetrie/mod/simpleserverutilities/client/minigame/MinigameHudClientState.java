@@ -7,7 +7,7 @@ import java.util.Locale;
 import be.winnetrie.mod.simpleserverutilities.network.MinigameHudPayload;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 
 /** Right-aligned scoreboard visible only while the server marks a player in a match. */
 public final class MinigameHudClientState {
@@ -46,9 +46,9 @@ public final class MinigameHudClientState {
         lines = List.of();
     }
 
-    public static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
+    public static void render(GuiGraphics graphics, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (!serverVisible || displayMode == 2 || minecraft.player == null || minecraft.gui.screen() != null) return;
+        if (!serverVisible || displayMode == 2 || minecraft.player == null || minecraft.screen != null) return;
         KothData koth = parseKoth(lines);
         if (koth != null) {
             renderKoth(graphics, minecraft, koth);
@@ -61,36 +61,36 @@ public final class MinigameHudClientState {
         int x = minecraft.getWindow().getGuiScaledWidth() - width - 10;
         int y = 38;
         graphics.fill(x, y, x + width, y + height, 0xC9161D25);
-        graphics.outline(x, y, width, height, 0xFF586978);
-        graphics.text(minecraft.font, title, x + 10, y + 8, 0xFFFFD65A, true);
+        graphics.renderOutline(x, y, width, height, 0xFF586978);
+        graphics.drawString(minecraft.font, title, x + 10, y + 8, 0xFFFFD65A, true);
         for (int i = 0; i < visibleLines.size(); i++) {
-            graphics.text(minecraft.font, visibleLines.get(i), x + 10, y + 23 + i * 13, 0xFFF3F5F7, false);
+            graphics.drawString(minecraft.font, visibleLines.get(i), x + 10, y + 23 + i * 13, 0xFFF3F5F7, false);
         }
     }
 
-    private static void renderKoth(GuiGraphicsExtractor g, Minecraft minecraft, KothData d) {
+    private static void renderKoth(GuiGraphics g, Minecraft minecraft, KothData d) {
         int width = 196;
         int height = d.rotating ? 82 : 100;
         int x = minecraft.getWindow().getGuiScaledWidth() - width - 10;
         int y = 38;
         g.fill(x, y, x + width, y + height, 0xD6161D25);
-        g.outline(x, y, width, height, 0xFF586978);
-        g.text(minecraft.font, trim(title, 22), x + 9, y + 7, 0xFFFFD65A, true);
+        g.renderOutline(x, y, width, height, 0xFF586978);
+        g.drawString(minecraft.font, trim(title, 22), x + 9, y + 7, 0xFFFFD65A, true);
         String timer = findPrefix(lines, "Time:");
-        if (!timer.isBlank()) g.text(minecraft.font, timer.substring(5).trim(), x + width - minecraft.font.width(timer.substring(5).trim()) - 9, y + 7, 0xFF7FC8FF, true);
+        if (!timer.isBlank()) g.drawString(minecraft.font, timer.substring(5).trim(), x + width - minecraft.font.width(timer.substring(5).trim()) - 9, y + 7, 0xFF7FC8FF, true);
 
         String scores = d.redName + " " + d.redScore + "/" + d.target + "  •  " + d.blueScore + "/" + d.target + " " + d.blueName;
-        g.centeredText(minecraft.font, trim(scores, 34), x + width / 2, y + 23, 0xFFF3F5F7);
+        g.drawCenteredString(minecraft.font, trim(scores, 34), x + width / 2, y + 23, 0xFFF3F5F7);
         int red = 0xFF000000 | d.redColor, blue = 0xFF000000 | d.blueColor;
         g.fill(x + 9, y + 36, x + 15, y + 42, red);
         g.fill(x + width - 15, y + 36, x + width - 9, y + 42, blue);
         String presence = d.redPresent + " on hill   " + d.bluePresent + " on hill";
-        g.centeredText(minecraft.font, presence, x + width / 2, y + 35, 0xFFAAB5BE);
+        g.drawCenteredString(minecraft.font, presence, x + width / 2, y + 35, 0xFFAAB5BE);
 
         if (d.rotating) {
             String state = d.owner == 1 ? d.redName + " scoring" : d.owner == 2 ? d.blueName + " scoring" : "Contested / neutral";
-            g.centeredText(minecraft.font, trim(state, 30), x + width / 2, y + 50, d.owner == 1 ? red : d.owner == 2 ? blue : 0xFFF3F5F7);
-            g.centeredText(minecraft.font, "Hill " + (d.pointIndex + 1) + "/" + d.pointCount + " • moves in " + d.rotateSeconds + "s",
+            g.drawCenteredString(minecraft.font, trim(state, 30), x + width / 2, y + 50, d.owner == 1 ? red : d.owner == 2 ? blue : 0xFFF3F5F7);
+            g.drawCenteredString(minecraft.font, "Hill " + (d.pointIndex + 1) + "/" + d.pointCount + " • moves in " + d.rotateSeconds + "s",
                     x + width / 2, y + 64, 0xFFFFD36A);
         } else {
             int bx = x + 14, by = y + 53, bw = width - 28, bh = 9;
@@ -99,17 +99,17 @@ public final class MinigameHudClientState {
             g.fill(bx, by, redEnd, by + bh, 0xCC000000 | d.redColor);
             g.fill(redEnd, by, whiteEnd, by + bh, 0xCCEDEDED);
             g.fill(whiteEnd, by, bx + bw, by + bh, 0xCC000000 | d.blueColor);
-            g.outline(bx, by, bw, bh, 0xFFF3F5F7);
+            g.renderOutline(bx, by, bw, bh, 0xFFF3F5F7);
             int ballX = bx + (int)Math.round((d.control + 1.0D) * 0.5D * bw);
             ballX = Math.max(bx + 2, Math.min(bx + bw - 3, ballX));
             g.fill(ballX - 2, by - 3, ballX + 3, by + bh + 3, 0xFFFFD700);
             String arrow = d.direction < 0 ? "←" : d.direction > 0 ? "→" : "•";
-            g.centeredText(minecraft.font, arrow, ballX, by + bh + 5, 0xFFFFD700);
+            g.drawCenteredString(minecraft.font, arrow, ballX, by + bh + 5, 0xFFFFD700);
             String state = d.owner == 1 ? d.redName + " scoring" : d.owner == 2 ? d.blueName + " scoring" : "Neutral zone";
-            g.centeredText(minecraft.font, trim(state, 30), x + width / 2, y + 78,
+            g.drawCenteredString(minecraft.font, trim(state, 30), x + width / 2, y + 78,
                     d.owner == 1 ? red : d.owner == 2 ? blue : 0xFFF3F5F7);
         }
-        g.centeredText(minecraft.font, d.inside ? "YOU ARE INSIDE THE HILL" : "Outside hill range",
+        g.drawCenteredString(minecraft.font, d.inside ? "YOU ARE INSIDE THE HILL" : "Outside hill range",
                 x + width / 2, y + height - 12, d.inside ? 0xFF83E39A : 0xFFAAB5BE);
     }
 

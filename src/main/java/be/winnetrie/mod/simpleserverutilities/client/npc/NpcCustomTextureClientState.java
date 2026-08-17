@@ -11,7 +11,7 @@ import be.winnetrie.mod.simpleserverutilities.npc.NpcDefinition;
 import be.winnetrie.mod.simpleserverutilities.network.NpcTextureSyncPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Client cache of server-authoritative SSU NPC textures. */
 public final class NpcCustomTextureClientState {
@@ -40,7 +40,7 @@ public final class NpcCustomTextureClientState {
             if (current != null && current.hash.equals(entry.hash()) && current.model.equals(normalizedModel)) continue;
             try {
                 String definitionPath = NpcDefinition.sanitizeId(entry.definitionId());
-                Identifier textureId = Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID,
+                ResourceLocation textureId = ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID,
                         "npc_texture/" + definitionPath + "/"
                                 + entry.hash().toLowerCase(java.util.Locale.ROOT));
 
@@ -61,7 +61,7 @@ public final class NpcCustomTextureClientState {
                             entry.definitionId(), width, height);
                     continue;
                 }
-                DynamicTexture texture = new DynamicTexture(() -> "SSU NPC " + entry.definitionId(), image);
+                DynamicTexture texture = new DynamicTexture(image);
                 minecraft.getTextureManager().register(textureId, texture);
 
                 // Player-model textures are validated server-side as 64x64 PNGs. Entity-model
@@ -93,7 +93,7 @@ public final class NpcCustomTextureClientState {
     }
 
     /** Returns the dynamically registered texture for any managed NPC render family. */
-    public static Identifier textureForEntity(int entityId) {
+    public static ResourceLocation textureForEntity(int entityId) {
         String definitionId = NpcLabelClientState.definitionIdForEntity(entityId);
         if (definitionId == null || definitionId.isBlank()) return null;
         TextureEntry entry = BY_DEFINITION.get(definitionId);
@@ -108,5 +108,5 @@ public final class NpcCustomTextureClientState {
         BY_DEFINITION.clear();
     }
 
-    private record TextureEntry(String hash, String model, Identifier textureId) {}
+    private record TextureEntry(String hash, String model, ResourceLocation textureId) {}
 }

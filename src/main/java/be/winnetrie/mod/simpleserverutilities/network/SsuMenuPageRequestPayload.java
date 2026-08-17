@@ -4,7 +4,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Requests one bounded dashboard page. */
 public record SsuMenuPageRequestPayload(
@@ -17,7 +17,7 @@ public record SsuMenuPageRequestPayload(
 
     public static final int MAX_PAGE_SIZE = 50;
     public static final Type<SsuMenuPageRequestPayload> TYPE = new Type<>(
-            Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID, "menu_page_request")
+            ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID, "menu_page_request")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, SsuMenuPageRequestPayload> STREAM_CODEC =
             StreamCodec.of(SsuMenuPageRequestPayload::encode, SsuMenuPageRequestPayload::decode);

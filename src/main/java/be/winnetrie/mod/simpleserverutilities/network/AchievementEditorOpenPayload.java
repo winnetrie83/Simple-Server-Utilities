@@ -4,11 +4,11 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Opens the guided achievement editor and provides currency formatting for friendly money rewards. */
 public record AchievementEditorOpenPayload(String originalAchievementId,String achievementJson,String currencySymbol,int currencyDecimalPlaces,long requestId) implements CustomPacketPayload {
-    public static final Type<AchievementEditorOpenPayload> TYPE=new Type<>(Identifier.fromNamespaceAndPath(SimpleServerUtilities.MODID,"achievement_editor_open"));
+    public static final Type<AchievementEditorOpenPayload> TYPE=new Type<>(ResourceLocation.fromNamespaceAndPath(SimpleServerUtilities.MODID,"achievement_editor_open"));
     public static final StreamCodec<RegistryFriendlyByteBuf,AchievementEditorOpenPayload> STREAM_CODEC=StreamCodec.of(AchievementEditorOpenPayload::encode,AchievementEditorOpenPayload::decode);
     public AchievementEditorOpenPayload{
         originalAchievementId=PayloadBounds.string(originalAchievementId,64);

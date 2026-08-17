@@ -2,7 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.minigame;
 
 import java.util.Locale;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /** Server-authoritative rules for the two-team Capture the Flag mode. */
 public final class CaptureTheFlagRules {
@@ -47,7 +47,7 @@ public final class CaptureTheFlagRules {
 
     private static String identifier(String value, String fallback) {
         String safe = value == null || value.isBlank() ? fallback : value.trim().toLowerCase(Locale.ROOT);
-        Identifier.parse(safe);
+        ResourceLocation.parse(safe);
         return safe;
     }
 
