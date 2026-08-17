@@ -28,7 +28,9 @@ public final class NpcModule implements SsuModule {
 
     @Override public String id() { return "npcs"; }
     @Override public boolean isEnabled() { return Config.ENABLE_NPCS.get(); }
-    @Override public Set<String> dependencies() { return Set.of("content_core", "storage", "permissions"); }
+    @Override public Set<String> requiredDependencies() { return Set.of("content_core", "storage"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("permissions"); }
+    @Override public Set<String> integrationDependencies() { return Set.of("quests", "minigames", "dungeons", "warps", "mail", "auction_house", "npc_shops", "teleport"); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

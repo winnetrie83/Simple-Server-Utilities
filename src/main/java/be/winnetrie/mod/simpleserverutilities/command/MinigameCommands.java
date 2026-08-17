@@ -48,22 +48,26 @@ public final class MinigameCommands {
     }
 
     private static int open(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source); if (player == null) return 0;
         SimpleServerUtilities.MINIGAMES.open(player); return 1;
     }
 
     private static int join(CommandSourceStack source, String id) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source); if (player == null) return 0;
         try { player.sendSystemMessage(Component.literal(SimpleServerUtilities.MINIGAMES.joinQueue(player, id))); return 1; }
         catch (RuntimeException exception) { source.sendFailure(Component.literal(message(exception))); return 0; }
     }
 
     private static int leave(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source); if (player == null) return 0;
         player.sendSystemMessage(Component.literal(SimpleServerUtilities.MINIGAMES.leave(player, true))); return 1;
     }
 
     private static int status(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) { source.sendFailure(Component.literal("Minigame administrator permission is required.")); return 0; }
         var snapshot = SimpleServerUtilities.MINIGAMES.snapshot();
         source.sendSystemMessage(Component.literal("SSU Minigames: definitions=" + snapshot.definitions()
@@ -74,6 +78,7 @@ public final class MinigameCommands {
     }
 
     private static int edit(CommandSourceStack source, String id) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source); if (player == null) return 0;
         if (!PermissionService.getBoolean(player, PermissionKeys.MINIGAMES_ADMIN, false)) {
             source.sendFailure(Component.literal("Minigame administrator permission is required.")); return 0;
@@ -82,12 +87,14 @@ public final class MinigameCommands {
     }
 
     private static int forceStart(CommandSourceStack source, String id) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) { source.sendFailure(Component.literal("Minigame administrator permission is required.")); return 0; }
         try { source.sendSystemMessage(Component.literal(SimpleServerUtilities.MINIGAMES.forceStart(id))); return 1; }
         catch (RuntimeException exception) { source.sendFailure(Component.literal(message(exception))); return 0; }
     }
 
     private static int finish(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source); if (player == null) return 0;
         if (!PermissionService.getBoolean(player, PermissionKeys.MINIGAMES_ADMIN, false)) {
             source.sendFailure(Component.literal("Minigame administrator permission is required.")); return 0;
@@ -97,12 +104,14 @@ public final class MinigameCommands {
     }
 
     private static int releaseArena(CommandSourceStack source, String target) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) { source.sendFailure(Component.literal("Minigame administrator permission is required.")); return 0; }
         source.sendSystemMessage(Component.literal(SimpleServerUtilities.MINIGAMES.releaseBlockedArena(target)));
         return 1;
     }
 
     private static int score(CommandSourceStack source, String playerName, int amount, boolean set) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) { source.sendFailure(Component.literal("Minigame administrator permission is required.")); return 0; }
         ServerPlayer target = source.getServer().getPlayerList().getPlayerByName(playerName);
         if (target == null) { source.sendFailure(Component.literal("That player is not online.")); return 0; }
@@ -126,5 +135,11 @@ public final class MinigameCommands {
 
     private static String message(RuntimeException exception) {
         return exception.getMessage() == null ? "The minigame operation failed safely." : exception.getMessage();
+    }
+
+    private static boolean requireModule(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("minigames")) return true;
+        source.sendFailure(Component.literal("Minigames is disabled or blocked by a required dependency."));
+        return false;
     }
 }

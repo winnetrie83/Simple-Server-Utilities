@@ -4,6 +4,7 @@ import java.util.Locale;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.NameAndId;
@@ -66,7 +67,7 @@ public class PermissionService {
         if (isJailed(player)) {
             return false;
         }
-        if (!Config.ENABLE_PERMISSION_SYSTEM.get()) {
+        if (!permissionsActive()) {
             return fallback;
         }
 
@@ -87,7 +88,7 @@ public class PermissionService {
      * a task that happens to be inside a Mine. Jail restrictions still gate every other action.
      */
     public static boolean getBooleanForJailGameplay(ServerPlayer player, String permission, boolean fallback) {
-        if (!Config.ENABLE_PERMISSION_SYSTEM.get()) return fallback;
+        if (!permissionsActive()) return fallback;
         String resolvedValue = temporaryValue(player, permission);
         if (resolvedValue == null) resolvedValue = SimpleServerUtilities.PERMISSIONS.resolveValue(player, permission, PermissionContext.global(player));
         if (resolvedValue != null) {
@@ -101,12 +102,13 @@ public class PermissionService {
         if (isJailed(player)) {
             return false;
         }
-        if (!Config.ENABLE_PERMISSION_SYSTEM.get()) {
-            return fallback;
-        }
-
+        // Operator bypass is a vanilla/core capability and must keep feature
+        // administration usable even when the optional SSU permission module is off.
         if (isAdmin(player)) {
             return true;
+        }
+        if (!permissionsActive()) {
+            return fallback;
         }
 
         String resolvedValue = temporaryValue(player, permission);
@@ -128,7 +130,7 @@ public class PermissionService {
     }
 
     public static int getInt(ServerPlayer player, String permission, int fallback, PermissionContext context) {
-        if (!Config.ENABLE_PERMISSION_SYSTEM.get()) {
+        if (!permissionsActive()) {
             return fallback;
         }
 
@@ -151,7 +153,7 @@ public class PermissionService {
     }
 
     public static String getString(ServerPlayer player, String permission, String fallback, PermissionContext context) {
-        if (!Config.ENABLE_PERMISSION_SYSTEM.get()) {
+        if (!permissionsActive()) {
             return fallback;
         }
 
@@ -180,8 +182,13 @@ public class PermissionService {
     }
 
     private static boolean isJailed(ServerPlayer player) {
-        return player != null && SimpleServerUtilities.MODERATION != null
+        return player != null && SsuModuleAccess.active("moderation")
+                && SimpleServerUtilities.MODERATION != null
                 && SimpleServerUtilities.MODERATION.jailed(player.getUUID());
+    }
+
+    private static boolean permissionsActive() {
+        return Config.ENABLE_PERMISSION_SYSTEM.get() && SsuModuleAccess.active("permissions");
     }
 
     public static boolean getBuiltInDefault(String permission) {

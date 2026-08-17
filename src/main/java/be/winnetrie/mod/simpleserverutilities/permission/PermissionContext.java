@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.permission;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.region.Region;
 import net.minecraft.core.BlockPos;
@@ -134,10 +135,14 @@ public class PermissionContext {
 
             Level level = player.level();
             this.dimension = level.dimension().identifier().toString();
-            this.region = SimpleServerUtilities.REGIONS.getAt(level.dimension(), position);
+            this.region = SsuModuleAccess.active("regions")
+                    ? SimpleServerUtilities.REGIONS.getAt(level.dimension(), position)
+                    : null;
 
             ChunkPos chunkPos = new ChunkPos(position.getX() >> 4, position.getZ() >> 4);
-            this.playerClaim = SimpleServerUtilities.PLAYER_CLAIMS.getClaim(level, chunkPos);
+            this.playerClaim = SsuModuleAccess.active("claims")
+                    ? SimpleServerUtilities.PLAYER_CLAIMS.getClaim(level, chunkPos)
+                    : null;
             this.claimRole = resolveClaimRole(player, playerClaim);
 
             return this;

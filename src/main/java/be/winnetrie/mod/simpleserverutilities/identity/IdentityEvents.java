@@ -17,6 +17,7 @@ public final class IdentityEvents {
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!SimpleServerUtilities.CORE.modules().isActive("identity")) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         SimpleServerUtilities.IDENTITY.ensurePlayer(player);
         SimpleServerUtilities.IDENTITY.syncAll();
@@ -24,11 +25,13 @@ public final class IdentityEvents {
 
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (!SimpleServerUtilities.CORE.modules().isActive("identity")) return;
         if (event.getEntity() instanceof ServerPlayer) SimpleServerUtilities.IDENTITY.syncAll();
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onChat(ServerChatEvent event) {
+        if (!SimpleServerUtilities.CORE.modules().isActive("identity")) return;
         ServerPlayer player = event.getPlayer();
         if (player == null || event.isCanceled()) return;
         MinecraftServer server = player.level().getServer();
@@ -44,6 +47,7 @@ public final class IdentityEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        if (!SimpleServerUtilities.CORE.modules().isActive("identity")) return;
         if (++syncTicker >= 100) {
             syncTicker = 0;
             SimpleServerUtilities.IDENTITY.syncAll();

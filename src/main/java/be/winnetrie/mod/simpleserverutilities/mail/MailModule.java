@@ -17,14 +17,10 @@ public final class MailModule implements SsuModule {
 
     @Override public String id() { return "mail"; }
 
-    @Override
-    public boolean isEnabled() {
-        return Config.ENABLE_MAIL.get();
-    }
+    @Override public boolean isEnabled() { return Config.ENABLE_MAIL.get(); }
 
-    @Override public Set<String> dependencies() {
-        return Set.of("storage", "transactions", "economy", "permissions");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage", "transactions", "economy"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("permissions"); }
 
     @Override public void initialize(SsuServiceRegistry services) {
         services.register(MailManager.class, manager);

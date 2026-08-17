@@ -25,15 +25,10 @@ public final class ClaimModule implements SsuModule {
         return "claims";
     }
 
-    @Override
-    public boolean isEnabled() {
-        return Config.ENABLE_PLAYER_CLAIMS.get();
-    }
+    @Override public boolean isEnabled() { return Config.ENABLE_PLAYER_CLAIMS.get(); }
 
-    @Override
-    public Set<String> dependencies() {
-        return Set.of("storage");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("permissions", "economy", "homes", "mail", "regions", "visualization"); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

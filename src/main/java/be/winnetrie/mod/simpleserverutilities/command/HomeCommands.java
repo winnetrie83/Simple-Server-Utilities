@@ -12,6 +12,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportPolicy;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportType;
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.home.PlayerHome;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -30,7 +31,7 @@ public class HomeCommands {
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("homes")
-                .requires(source -> Config.ENABLE_HOMES.get() && source.getEntity() instanceof ServerPlayer)
+                .requires(source -> SsuModuleAccess.active("homes") && source.getEntity() instanceof ServerPlayer)
 
                 // /homes
                 .executes(context -> listHomes(context.getSource()))
@@ -87,6 +88,7 @@ public class HomeCommands {
     }
 
     private static int setHome(CommandSourceStack source, String homeName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(player.getUUID())) {
@@ -112,7 +114,12 @@ public class HomeCommands {
     }
 
     private static int teleportHome(CommandSourceStack source, String homeName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!SsuModuleAccess.active("teleport")) {
+            player.sendSystemMessage(Component.literal("The Teleport module is disabled."));
+            return 0;
+        }
 
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
 
@@ -152,6 +159,7 @@ public class HomeCommands {
     }
 
     private static int listHomes(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
@@ -186,6 +194,7 @@ public class HomeCommands {
     }
 
     private static int deleteHome(CommandSourceStack source, String homeName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
@@ -207,6 +216,7 @@ public class HomeCommands {
     }
 
     private static int help(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         player.sendSystemMessage(Component.literal("Homes commands:"));
@@ -239,7 +249,12 @@ public class HomeCommands {
     }
 
     private static int cancelTeleport(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!SsuModuleAccess.active("teleport")) {
+            player.sendSystemMessage(Component.literal("The Teleport module is disabled."));
+            return 0;
+        }
 
         boolean cancelled = SimpleServerUtilities.TELEPORTS.cancel(player);
 
@@ -250,5 +265,11 @@ public class HomeCommands {
 
         player.sendSystemMessage(Component.literal("Pending teleport cancelled."));
         return 1;
+    }
+
+    private static boolean requireModule(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("homes")) return true;
+        source.sendFailure(Component.literal("Homes is disabled or blocked by a required dependency."));
+        return false;
     }
 }

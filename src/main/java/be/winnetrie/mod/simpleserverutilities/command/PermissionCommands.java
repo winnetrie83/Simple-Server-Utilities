@@ -10,6 +10,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionCatalog;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
@@ -35,7 +36,7 @@ public class PermissionCommands {
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("permissions")
-                .requires(source -> source.getEntity() instanceof ServerPlayer player
+                .requires(source -> SsuModuleAccess.active("permissions") && source.getEntity() instanceof ServerPlayer player
                         && PermissionService.has(player, PermissionKeys.PERMISSIONS_ADMIN))
                 .executes(context -> help(context.getSource()))
 
@@ -176,6 +177,7 @@ public class PermissionCommands {
     }
 
     private static int reload(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         if (!SimpleServerUtilities.STORAGE.flush(Duration.ofSeconds(5))) {
             player.sendSystemMessage(Component.literal("Permission writes are still pending; reload was cancelled."));
@@ -187,6 +189,7 @@ public class PermissionCommands {
     }
 
     private static int save(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         SimpleServerUtilities.PERMISSIONS.save();
         if (!SimpleServerUtilities.STORAGE.flush(Duration.ofSeconds(5))) {
@@ -198,12 +201,14 @@ public class PermissionCommands {
     }
 
     private static int ranks(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         player.sendSystemMessage(Component.literal("Ranks: " + String.join(", ", SimpleServerUtilities.PERMISSIONS.getRankNames())));
         return 1;
     }
 
     private static int rankInfo(CommandSourceStack source, String rankName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         PermissionRank rank = SimpleServerUtilities.PERMISSIONS.getRank(rankName);
 
@@ -220,6 +225,7 @@ public class PermissionCommands {
     }
 
     private static int rankPriority(CommandSourceStack source, String rankName, int priority) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         SimpleServerUtilities.PERMISSIONS.setRankPriority(rankName, priority);
         player.sendSystemMessage(Component.literal("Priority for rank '" + rankName + "' set to " + priority + "."));
@@ -227,6 +233,7 @@ public class PermissionCommands {
     }
 
     private static int rankSet(CommandSourceStack source, String rankName, String key, String value) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         warnIfUnknownKey(player, key);
         SimpleServerUtilities.PERMISSIONS.setRankPermission(rankName, key, value);
@@ -235,6 +242,7 @@ public class PermissionCommands {
     }
 
     private static int rankUnset(CommandSourceStack source, String rankName, String key) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         boolean existed = SimpleServerUtilities.PERMISSIONS.removeRankPermission(rankName, key);
 
@@ -248,6 +256,7 @@ public class PermissionCommands {
     }
 
     private static int playerInfo(CommandSourceStack source, String playerName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer executor = (ServerPlayer) source.getEntity();
         Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
 
@@ -272,6 +281,7 @@ public class PermissionCommands {
     }
 
     private static int playerAddRank(CommandSourceStack source, String playerName, String rankName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer executor = (ServerPlayer) source.getEntity();
         Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
 
@@ -286,6 +296,7 @@ public class PermissionCommands {
     }
 
     private static int playerRemoveRank(CommandSourceStack source, String playerName, String rankName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer executor = (ServerPlayer) source.getEntity();
         Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
 
@@ -306,6 +317,7 @@ public class PermissionCommands {
     }
 
     private static int playerSet(CommandSourceStack source, String playerName, String key, String value) {
+        if (!requireModule(source)) return 0;
         ServerPlayer executor = (ServerPlayer) source.getEntity();
         warnIfUnknownKey(executor, key);
         Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
@@ -321,6 +333,7 @@ public class PermissionCommands {
     }
 
     private static int playerUnset(CommandSourceStack source, String playerName, String key) {
+        if (!requireModule(source)) return 0;
         ServerPlayer executor = (ServerPlayer) source.getEntity();
         Optional<UUID> targetUuid = findPlayerUuid(executor, playerName);
 
@@ -341,6 +354,7 @@ public class PermissionCommands {
     }
 
     private static int claimContextSet(CommandSourceStack source, String role, String key, String value) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         warnIfUnknownKey(player, key);
         SimpleServerUtilities.PERMISSIONS.setPlayerClaimContextPermission(role, key, value);
@@ -349,6 +363,7 @@ public class PermissionCommands {
     }
 
     private static int claimContextUnset(CommandSourceStack source, String role, String key) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         boolean existed = SimpleServerUtilities.PERMISSIONS.removePlayerClaimContextPermission(role, key);
 
@@ -362,6 +377,7 @@ public class PermissionCommands {
     }
 
     private static int check(CommandSourceStack source, String key) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
         boolean value = PermissionService.getBoolean(player, key, false, context);
@@ -410,6 +426,7 @@ public class PermissionCommands {
     }
 
     private static int help(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         player.sendSystemMessage(Component.literal("Permission commands:"));
@@ -435,6 +452,7 @@ public class PermissionCommands {
     }
 
     private static int rankInherit(CommandSourceStack source, String rankName, String parentRankName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         boolean success = SimpleServerUtilities.PERMISSIONS.addRankInheritance(rankName, parentRankName);
@@ -453,6 +471,7 @@ public class PermissionCommands {
     }
 
     private static int rankUninherit(CommandSourceStack source, String rankName, String parentRankName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         boolean success = SimpleServerUtilities.PERMISSIONS.removeRankInheritance(rankName, parentRankName);
@@ -481,6 +500,7 @@ public class PermissionCommands {
     }
 
     private static int keys(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         player.sendSystemMessage(Component.literal("Known permission keys:"));
@@ -490,5 +510,11 @@ public class PermissionCommands {
         }
 
         return 1;
+    }
+
+    private static boolean requireModule(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("permissions")) return true;
+        source.sendFailure(Component.literal("Permissions is disabled or blocked by a required dependency."));
+        return false;
     }
 }

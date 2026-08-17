@@ -11,6 +11,7 @@ public final class MapMarkerEvents {
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities.CORE.modules().isActive("map_markers")) return;
         if (event.getEntity() instanceof ServerPlayer player) {
             MapMarkerService.sync(player);
         }

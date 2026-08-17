@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -29,7 +29,7 @@ public final class ClaimPresenceEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (!Config.ENABLE_PLAYER_CLAIMS.get()) {
+        if (!SsuModuleAccess.active("claims")) {
             LAST_CLAIM.clear();
             return;
         }

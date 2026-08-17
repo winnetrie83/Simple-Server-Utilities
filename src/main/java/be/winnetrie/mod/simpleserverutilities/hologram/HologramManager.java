@@ -21,6 +21,7 @@ import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.network.HologramSyncPayload;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
@@ -466,7 +467,9 @@ public final class HologramManager {
         Matcher matcher = MINE_TOKEN_PATTERN.matcher(input == null ? "" : input);
         StringBuffer result = new StringBuffer();
         while (matcher.find()) {
-            String value = SimpleServerUtilities.MINES.statusToken(matcher.group(1), matcher.group(2));
+            String value = SsuModuleAccess.active("mines")
+                    ? SimpleServerUtilities.MINES.statusToken(matcher.group(1), matcher.group(2))
+                    : "-";
             matcher.appendReplacement(result, Matcher.quoteReplacement(value == null ? "" : value));
         }
         matcher.appendTail(result);

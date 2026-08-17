@@ -7,6 +7,61 @@ public class Config {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
     private static final ModConfigSpec.Builder CLIENT_BUILDER = new ModConfigSpec.Builder();
 
+    // Core infrastructure (storage, transactions, jobs, content core, UI preferences and
+    // the dashboard shell) is intentionally always available. The switches below
+    // control user-facing feature modules; hard dependants are resolved automatically.
+    public static final ModConfigSpec.BooleanValue ENABLE_ECONOMY = BUILDER
+            .comment("Enable the built-in SSU digital economy provider. Features with a hard economy dependency are suspended automatically while disabled.")
+            .define("enableEconomy", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_TELEPORT = BUILDER
+            .comment("Enable the shared SSU delayed/cooldown teleport engine.")
+            .define("enableTeleport", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_SPAWN = BUILDER
+            .comment("Enable SSU server-spawn management. Teleport is an optional travel integration; respawn fallback remains standalone.")
+            .define("enableSpawn", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_DIMENSIONS = BUILDER
+            .comment("Enable managed-dimension administration.")
+            .define("enableDimensions", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_VISUALIZATION = BUILDER
+            .comment("Enable SSU border/area visualization. Claims and Regions are optional integrations.")
+            .define("enableVisualization", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_MAP_MARKERS = BUILDER
+            .comment("Enable personal SSU map markers.")
+            .define("enableMapMarkers", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_IDENTITY = BUILDER
+            .comment("Enable player titles, identity selections and related presentation features.")
+            .define("enableIdentity", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_MINES = BUILDER
+            .comment("Enable managed Mine regions. Requires the Regions module.")
+            .define("enableMines", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_JAILS = BUILDER
+            .comment("Enable physical Jail facilities. Requires Regions and Moderation; Economy is optional for buyout sentences.")
+            .define("enableJails", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_MODERATION = BUILDER
+            .comment("Enable SSU moderation records and enforcement. Jail, Economy, Mail and Spawn are optional integrations.")
+            .define("enableModeration", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_KITS = BUILDER
+            .comment("Enable server kits. Economy is optional and is required only for priced kits.")
+            .define("enableKits", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_ONBOARDING = BUILDER
+            .comment("Enable the first-join onboarding flow. Requires the Spawn module.")
+            .define("enableOnboarding", true);
+
+    public static final ModConfigSpec.BooleanValue ENABLE_SERVER_OPERATIONS = BUILDER
+            .comment("Enable Server Operations administration and monitoring.")
+            .define("enableServerOperations", true);
+
     public static final ModConfigSpec.BooleanValue ENABLE_PLAYER_CLAIMS = BUILDER
             .comment("Enable player chunk claims.")
             .define("enablePlayerClaims", true);
@@ -145,27 +200,31 @@ public class Config {
             .define("allowRemoteHologramImages", true);
 
     public static final ModConfigSpec.BooleanValue ENABLE_MAIL = BUILDER
-            .comment("Enable the durable player mail system.")
+            .comment("Enable the durable player mail system. Economy is a required dependency for transactional mail flows.")
             .define("enableMail", true);
 
     public static final ModConfigSpec.BooleanValue ENABLE_AUCTION_HOUSE = BUILDER
-            .comment("Enable the server-authoritative Auction House module.")
+            .comment("Enable the server-authoritative Auction House module. Requires Economy and Mail; it is suspended automatically when either is unavailable.")
             .define("enableAuctionHouse", true);
 
     public static final ModConfigSpec.BooleanValue ENABLE_NPCS = BUILDER
             .comment("Enable the independent SSU NPC foundation: persistent vanilla-model NPC templates, placements, interaction and admin tools.")
             .define("enableNpcs", false);
 
+    public static final ModConfigSpec.BooleanValue ENABLE_NPC_SHOPS = BUILDER
+            .comment("Enable NPC fixed-price shops. Requires both NPC Core and Economy.")
+            .define("enableNpcShops", true);
+
     public static final ModConfigSpec.IntValue NPC_SHOP_BUYBACK_MINUTES = BUILDER
             .comment("Minutes a player's latest nine NPC shop sales remain available in the buy-back tab.")
             .defineInRange("npcShopBuybackMinutes", 5, 1, 1440);
 
     public static final ModConfigSpec.BooleanValue ENABLE_QUESTS = BUILDER
-            .comment("Enable the upcoming SSU quest module independently of the NPC module.")
+            .comment("Enable the SSU quest module independently of the NPC module; NPC quest-giver integration is optional.")
             .define("enableQuests", false);
 
     public static final ModConfigSpec.BooleanValue ENABLE_MINIGAMES = BUILDER
-            .comment("Enable the upcoming SSU minigame framework.")
+            .comment("Enable the SSU minigame framework. Regions and Jobs are required; NPC/Quest/Economy integrations are optional where supported.")
             .define("enableMinigames", false);
 
     public static final ModConfigSpec.BooleanValue ENABLE_DUNGEONS = BUILDER

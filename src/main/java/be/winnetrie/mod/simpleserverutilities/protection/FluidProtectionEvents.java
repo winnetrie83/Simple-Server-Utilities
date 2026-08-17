@@ -22,6 +22,7 @@ public class FluidProtectionEvents {
 
     @SubscribeEvent
     public static void onFluidPlaceBlock(FluidPlaceBlockEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         if (!(event.getLevel() instanceof Level level)) {
             return;
         }

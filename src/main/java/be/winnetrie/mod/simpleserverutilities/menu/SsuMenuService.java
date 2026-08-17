@@ -25,6 +25,7 @@ import be.winnetrie.mod.simpleserverutilities.claim.map.ClaimMapService;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.blockinfo.BlockInformationService;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobLocks;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyAccount;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyResult;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyTransactionRecord;
@@ -100,12 +101,18 @@ public final class SsuMenuService {
 
     public void open(ServerPlayer player) {
         if (jailGate(player)) return;
-        PlayerBorderPreferences preferences = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID());
+        boolean visualizationActive = SsuModuleAccess.active("visualization");
+        boolean permissionsActive = SsuModuleAccess.active("permissions");
+        boolean claimsActive = SsuModuleAccess.active("claims");
+        boolean regionsActive = SsuModuleAccess.active("regions");
+        PlayerBorderPreferences preferences = visualizationActive
+                ? SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID())
+                : new PlayerBorderPreferences(player.getUUID());
         var uiPreferences = SimpleServerUtilities.UI_PREFERENCES.ensurePlayer(player);
         boolean administrator = isAdministrator(player);
 
-        List<PlayerClaim> playerClaims = ownedClaims(player);
-        List<Region> visibleRegions = visibleRegions(player, administrator);
+        List<PlayerClaim> playerClaims = claimsActive ? ownedClaims(player) : List.of();
+        List<Region> visibleRegions = regionsActive ? visibleRegions(player, administrator) : List.of();
         int claimedChunks = playerClaims.stream().mapToInt(PlayerClaim::getChunkCount).sum();
         int activeRentals = (int) visibleRegions.stream().filter(r -> player.getUUID().equals(r.getRentData().getRenter())).count();
 
@@ -114,7 +121,7 @@ public final class SsuMenuService {
         var coreSummary = new SsuMenuSnapshotPayload.CoreSummary(
                 performance.permissionChecks(),
                 (int) Math.round(performance.permissionCacheHitRate() * 1000.0D),
-                SimpleServerUtilities.PERMISSIONS.cachedResolutionCount(),
+                permissionsActive ? SimpleServerUtilities.PERMISSIONS.cachedResolutionCount() : 0,
                 performance.regionLookups(),
                 performance.averageRegionCandidates(),
                 regionIndex.cells(),
@@ -123,18 +130,18 @@ public final class SsuMenuService {
                 claimedChunks,
                 visibleRegions.size(),
                 activeRentals,
-                PermissionService.getBoolean(player, PermissionKeys.HOMES_USE, true)
+                SsuModuleAccess.active("homes") && PermissionService.getBoolean(player, PermissionKeys.HOMES_USE, true)
                         ? SimpleServerUtilities.HOMES.countHomes(player.getUUID()) : 0,
-                PermissionService.getBoolean(player, PermissionKeys.HOMES_USE, true)
+                SsuModuleAccess.active("homes") && PermissionService.getBoolean(player, PermissionKeys.HOMES_USE, true)
                         ? HomePolicy.getMaxHomes(player) : 0,
-                PermissionService.getBoolean(player, PermissionKeys.WARPS_USE, true)
+                SsuModuleAccess.active("warps") && PermissionService.getBoolean(player, PermissionKeys.WARPS_USE, true)
                         ? SimpleServerUtilities.WARPS.countWarps() : 0
         );
 
-        var selectedTitle = SimpleServerUtilities.IDENTITY.selectedTitle(player);
+        var selectedTitle = SsuModuleAccess.active("identity") ? SimpleServerUtilities.IDENTITY.selectedTitle(player) : Optional.<be.winnetrie.mod.simpleserverutilities.identity.PlayerTitleDefinition>empty();
         PacketDistributor.sendToPlayer(player, new SsuMenuSnapshotPayload(
                 player.getName().getString(),
-                SimpleServerUtilities.PERMISSIONS.getPrimaryRankName(player.getUUID()),
+                permissionsActive ? SimpleServerUtilities.PERMISSIONS.getPrimaryRankName(player.getUUID()) : "",
                 selectedTitle.map(value -> value.displayName).orElse(""),
                 selectedTitle.map(value -> value.color).orElse(0xFFFFFFFF),
                 PermissionService.getBoolean(player, PermissionKeys.SETTINGS_USE, true),
@@ -177,7 +184,7 @@ public final class SsuMenuService {
                 ),
                 administrator,
                 Config.ENABLE_CROPS_HARVESTING.get(),
-                SimpleServerUtilities.AUCTION_HOUSE.dashboardVisible(player),
+                SsuModuleAccess.active("auction_house") && SimpleServerUtilities.AUCTION_HOUSE.dashboardVisible(player),
                 new SsuMenuSnapshotPayload.ModuleSettingsSummary(
                         Config.ENABLE_PLAYER_CLAIMS.get(),
                         Config.ENABLE_HOMES.get(),
@@ -202,7 +209,15 @@ public final class SsuMenuService {
                         Config.ALLOW_REMOTE_HOLOGRAM_IMAGES.get(),
                         Config.HOLOGRAM_RENDER_DISTANCE.get(),
                         SimpleServerUtilities.BORDER_SETTINGS.settings().getClaimRenderDistanceBlocks(),
-                        SimpleServerUtilities.BORDER_SETTINGS.settings().getRegionRenderDistanceBlocks()
+                        SimpleServerUtilities.BORDER_SETTINGS.settings().getRegionRenderDistanceBlocks(),
+                        SimpleServerUtilities.CORE.modules().states().stream()
+                                .map(state -> new SsuMenuSnapshotPayload.ModuleStateSummary(
+                                        state.id(), state.coreInfrastructure(), state.configuredEnabled(), state.active(),
+                                        state.disabledReason(),
+                                        state.requiredDependencies().stream().sorted().toList(),
+                                        state.optionalDependencies().stream().sorted().toList(),
+                                        state.integrationDependencies().stream().sorted().toList()))
+                                .toList()
                 ),
                 new SsuMenuSnapshotPayload.AdminAccessSummary(
                         canPermissionAdmin(player),
@@ -212,9 +227,9 @@ public final class SsuMenuService {
                 ),
                 preferences.isClaimBordersVisible(), preferences.isShowOtherClaims(), preferences.isRegionBordersVisible(),
                 preferences.isMinigameGameBorderVisible(), preferences.isMinigameSpectatorBorderVisible(),
-                Config.ENABLE_PLAYER_CLAIMS.get()
+                visualizationActive && claimsActive
                         && PermissionService.getBooleanWithoutOperatorBypass(player, PermissionKeys.BORDER_CLAIMS_VIEW, true),
-                Config.ENABLE_ADMIN_REGIONS.get()
+                visualizationActive && regionsActive
                         && PermissionService.getBooleanWithoutOperatorBypass(player, PermissionKeys.BORDER_REGIONS_VIEW, true),
                 SimpleServerUtilities.JOBS.size(), SimpleServerUtilities.STORAGE.statistics().pending(),
                 coreSummary, buildEconomySummary(player, administrator),
@@ -226,6 +241,12 @@ public final class SsuMenuService {
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (jailGate(player)) return;
         String page = payload.page();
+        String unavailable = pageUnavailableReason(page);
+        if (unavailable != null) {
+            PacketDistributor.sendToPlayer(player, SsuMenuPageDataPayload.empty(page, payload.pageIndex(), payload.pageSize(),
+                    payload.requestId(), unavailable, true));
+            return;
+        }
         SsuMenuPageDataPayload response;
         try {
             response = switch (page) {
@@ -267,6 +288,11 @@ public final class SsuMenuService {
     public void handlePermissionEditorRequest(SsuPermissionEditorRequestPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (jailGate(player)) return;
+        if (!SsuModuleAccess.active("permissions")) {
+            PacketDistributor.sendToPlayer(player, SsuPermissionEditorDataPayload.empty(payload.mode(), payload.requestId(),
+                    "The Permissions module is disabled.", true));
+            return;
+        }
         SsuPermissionEditorDataPayload response;
         try {
             response = permissionEditorData(player, payload);
@@ -310,10 +336,10 @@ public final class SsuMenuService {
         }
         PacketDistributor.sendToPlayer(player, new SsuMenuActionResultPayload(
                 payload.requestId(), result.success(), result.message(), result.refreshPage()));
-        if (result.success() && affectsPlayerIdentity(payload.action())) {
+        if (result.success() && SsuModuleAccess.active("identity") && affectsPlayerIdentity(payload.action())) {
             SimpleServerUtilities.IDENTITY.syncAll();
         }
-        if (result.success() && isAdministrator(player) && auditDashboardAction(payload.action())) {
+        if (result.success() && SsuModuleAccess.active("server_operations") && isAdministrator(player) && auditDashboardAction(payload.action())) {
             SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "dashboard." + payload.action(), payload.target(),
                     "secondary=" + payload.secondary() + ", value=" + payload.value());
         }
@@ -322,10 +348,71 @@ public final class SsuMenuService {
 
 
     private static boolean jailGate(ServerPlayer player) {
-        if (player == null || !SimpleServerUtilities.MODERATION.jailed(player.getUUID())) return false;
+        if (player == null || !SsuModuleAccess.active("moderation") || !SsuModuleAccess.active("jails")
+                || !SimpleServerUtilities.MODERATION.jailed(player.getUUID())) return false;
         be.winnetrie.mod.simpleserverutilities.moderation.ModerationService.sendJail(player, "Jail restrictions are active.", false);
         return true;
     }
+
+    private static String requireActive(String... moduleIds) {
+        for (String id : moduleIds) {
+            if (!SsuModuleAccess.active(id)) return moduleLabel(id) + " is disabled or suspended by a required dependency.";
+        }
+        return null;
+    }
+
+    private static String pageUnavailableReason(String page) {
+        if (page == null) return null;
+        return switch (page) {
+            case "claims", "admin_claims" -> requireActive("claims");
+            case "homes" -> requireActive("homes");
+            case "player_warps" -> requireActive("warps");
+            case "regions", "region_admin", "rent_operations" -> requireActive("regions");
+            case "wallet_transactions", "transactions", "accounts" -> requireActive("economy");
+            case "auction_tax" -> requireActive("auction_house");
+            case "claim_tax" -> firstReason(requireActive("claims"), requireActive("economy"));
+            case "warp_rental" -> firstReason(requireActive("warps"), requireActive("economy"));
+            case "permissions", "ranks" -> requireActive("permissions");
+            case "utility_mining_admin" -> requireActive("utility_mining");
+            case "holograms" -> requireActive("holograms");
+            case "statistics" -> requireActive("statistics");
+            default -> null;
+        };
+    }
+
+    private static String actionUnavailableReason(String action, String target) {
+        if (action == null) return null;
+        if (action.startsWith("admin_claim_") || action.startsWith("claim_show") || action.startsWith("claim_hide")
+                || action.startsWith("claim_visibility") || action.equals("claim_map")) return requireActive("claims");
+        if (action.startsWith("home_") || action.equals("teleport_home")) return requireActive("homes");
+        if (action.startsWith("player_warp_") || action.equals("warp_set") || action.equals("warp_delete") || action.equals("teleport_warp")) return requireActive("warps");
+        if (action.equals("warp_rental_settings")) return firstReason(requireActive("warps"), requireActive("economy"));
+        if (action.equals("pay") || action.startsWith("economy_")) return requireActive("economy");
+        if (action.equals("auction_open") || action.equals("auction_tax_set")) return requireActive("auction_house");
+        if (action.startsWith("claim_tax_")) return firstReason(requireActive("claims"), requireActive("economy"));
+        if (action.startsWith("region_") || action.equals("regions_hide")) {
+            String region = requireActive("regions");
+            if (region != null) return region;
+            if (action.equals("region_rent") || action.equals("region_extend") || action.equals("region_unrent")
+                    || action.equals("region_renting_toggle") || action.equals("region_rent_refund") || action.equals("region_admin_add_time"))
+                return requireActive("economy");
+        }
+        if (action.equals("teleport_cancel")) return requireActive("teleport");
+        if (action.equals("teleport_spawn") || action.startsWith("spawn_")) return requireActive("spawn");
+        if (action.startsWith("permission_") || action.startsWith("rank_")) return requireActive("permissions");
+        if (action.startsWith("utility_mining_")) return requireActive("utility_mining");
+        if (action.startsWith("hologram_")) return requireActive("holograms");
+        if (action.startsWith("statistic_")) return requireActive("statistics");
+        if (action.equals("maintenance_hologram_refresh")) return requireActive("holograms");
+        if (action.equals("maintenance_npc_refresh")) return requireActive("npcs");
+        if (action.equals("render_distance")) {
+            if ("holograms".equalsIgnoreCase(target)) return requireActive("holograms");
+            if ("claim_borders".equalsIgnoreCase(target) || "region_borders".equalsIgnoreCase(target)) return requireActive("visualization");
+        }
+        return null;
+    }
+
+    private static String firstReason(String first, String second) { return first != null ? first : second; }
 
     private static boolean auditDashboardAction(String action) {
         if (action == null || action.isBlank()) return false;
@@ -353,6 +440,8 @@ public final class SsuMenuService {
     }
 
     private ActionResult performAction(ServerPlayer player, SsuMenuActionPayload payload) {
+        String unavailable = actionUnavailableReason(payload.action(), payload.target());
+        if (unavailable != null) return ActionResult.fail(unavailable, "");
         return switch (payload.action()) {
             case "refresh_shell" -> ActionResult.shell("Dashboard refreshed.");
             case "auction_open" -> auctionOpen(player, payload.requestId());
@@ -479,11 +568,13 @@ public final class SsuMenuService {
     }
 
     private ActionResult maintenanceBorderRefresh(ServerPlayer player) {
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.syncOverview(player, true);
+        if (!SsuModuleAccess.active("visualization")) return ActionResult.fail("Visualization is disabled.", "maintenance");
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.syncOverview(player, true);
         return ActionResult.ok("Your border visualization was rebuilt from current server settings.", "maintenance");
     }
 
     private ActionResult maintenanceBorderColor(ServerPlayer player, String rawCategory, String rawHex) {
+        if (!SsuModuleAccess.active("visualization")) return ActionResult.fail("Visualization is disabled.", "maintenance");
         if (!PermissionService.getBoolean(player, PermissionKeys.VISUALIZATION_ADMIN, false))
             return ActionResult.fail("Border color administration denied.", "maintenance");
         BorderCategory category = BorderCategory.parse(rawCategory);
@@ -491,29 +582,32 @@ public final class SsuMenuService {
         Integer rgb = parseRgb(rawHex);
         if (rgb == null) return ActionResult.fail("Use a six-digit RGB color such as #42F56C.", "maintenance");
         SimpleServerUtilities.BORDER_SETTINGS.setColor(category, rgb);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
         return ActionResult.shellPage("Border color updated.", "maintenance");
     }
 
     private ActionResult maintenanceBorderReset(ServerPlayer player, String rawCategory) {
+        if (!SsuModuleAccess.active("visualization")) return ActionResult.fail("Visualization is disabled.", "maintenance");
         if (!PermissionService.getBoolean(player, PermissionKeys.VISUALIZATION_ADMIN, false))
             return ActionResult.fail("Border color administration denied.", "maintenance");
         BorderCategory category = BorderCategory.parse(rawCategory);
         if (category == null) return ActionResult.fail("Unknown border category.", "maintenance");
         SimpleServerUtilities.BORDER_SETTINGS.resetColor(category);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
         return ActionResult.shellPage("Border color reset to its default.", "maintenance");
     }
 
     private ActionResult maintenanceBorderResetAll(ServerPlayer player) {
+        if (!SsuModuleAccess.active("visualization")) return ActionResult.fail("Visualization is disabled.", "maintenance");
         if (!PermissionService.getBoolean(player, PermissionKeys.VISUALIZATION_ADMIN, false))
             return ActionResult.fail("Border color administration denied.", "maintenance");
         SimpleServerUtilities.BORDER_SETTINGS.resetColors();
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
         return ActionResult.shellPage("All border colors reset to their defaults.", "maintenance");
     }
 
     private ActionResult maintenanceHologramRefresh(ServerPlayer player) {
+        if (!SsuModuleAccess.active("holograms")) return ActionResult.fail("Holograms is disabled.", "maintenance");
         if (!PermissionService.getBoolean(player, PermissionKeys.HOLOGRAMS_ADMIN, false))
             return ActionResult.fail("Hologram administration denied.", "maintenance");
         SimpleServerUtilities.HOLOGRAMS.syncAll();
@@ -521,6 +615,7 @@ public final class SsuMenuService {
     }
 
     private ActionResult maintenanceNpcRefresh(ServerPlayer player) {
+        if (!SsuModuleAccess.active("npcs")) return ActionResult.fail("NPCs is disabled.", "maintenance");
         if (!PermissionService.getBoolean(player, PermissionKeys.NPCS_ADMIN, false))
             return ActionResult.fail("NPC administration denied.", "maintenance");
         SimpleServerUtilities.NPCS.refreshAll();
@@ -622,12 +717,30 @@ public final class SsuMenuService {
         catch (IllegalArgumentException exception) { return ActionResult.fail("Invalid module state.", ""); }
 
         String module = rawModule == null ? "" : rawModule.trim().toLowerCase(Locale.ROOT);
+        Set<String> activeBefore = SimpleServerUtilities.CORE.modules().states().stream()
+                .filter(be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleRegistry.ModuleState::active)
+                .map(be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleRegistry.ModuleState::id)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         boolean utilityWasActive = SimpleServerUtilities.CORE.modules().isActive("utility_mining");
         boolean treecapitatorWasEnabled = Config.ENABLE_TREECAPITATOR.get();
         if ("permissions".equals(module) && !enabled && !PermissionService.isAdmin(player)) {
             return ActionResult.fail("Only a server operator can disable the permission system.", "");
         }
         switch (module) {
+            case "economy" -> setAndSave(Config.ENABLE_ECONOMY, enabled);
+            case "teleport" -> setAndSave(Config.ENABLE_TELEPORT, enabled);
+            case "spawn" -> setAndSave(Config.ENABLE_SPAWN, enabled);
+            case "dimensions" -> setAndSave(Config.ENABLE_DIMENSIONS, enabled);
+            case "visualization" -> setAndSave(Config.ENABLE_VISUALIZATION, enabled);
+            case "map_markers" -> setAndSave(Config.ENABLE_MAP_MARKERS, enabled);
+            case "identity" -> setAndSave(Config.ENABLE_IDENTITY, enabled);
+            case "mines" -> setAndSave(Config.ENABLE_MINES, enabled);
+            case "jails" -> setAndSave(Config.ENABLE_JAILS, enabled);
+            case "moderation" -> setAndSave(Config.ENABLE_MODERATION, enabled);
+            case "kits" -> setAndSave(Config.ENABLE_KITS, enabled);
+            case "onboarding" -> setAndSave(Config.ENABLE_ONBOARDING, enabled);
+            case "server_operations" -> setAndSave(Config.ENABLE_SERVER_OPERATIONS, enabled);
+            case "npc_shops" -> setAndSave(Config.ENABLE_NPC_SHOPS, enabled);
             case "claims" -> setAndSave(Config.ENABLE_PLAYER_CLAIMS, enabled);
             case "homes" -> setAndSave(Config.ENABLE_HOMES, enabled);
             case "warps" -> setAndSave(Config.ENABLE_WARPS, enabled);
@@ -638,6 +751,7 @@ public final class SsuMenuService {
             case "holograms" -> setAndSave(Config.ENABLE_HOLOGRAMS, enabled);
             case "block_information" -> setAndSave(Config.ENABLE_BLOCK_INFORMATION, enabled);
             case "statistics" -> setAndSave(Config.ENABLE_CUSTOM_STATISTICS, enabled);
+            case "community_statistics" -> setAndSave(Config.ENABLE_COMMUNITY_STATISTICS, enabled);
             case "achievements" -> setAndSave(Config.ENABLE_ACHIEVEMENTS, enabled);
             case "mail" -> setAndSave(Config.ENABLE_MAIL, enabled);
             case "auction_house" -> setAndSave(Config.ENABLE_AUCTION_HOUSE, enabled);
@@ -666,10 +780,32 @@ public final class SsuMenuService {
             SimpleServerUtilities.UTILITY_MINING.clearClients(server);
             SimpleServerUtilities.UTILITY_MINING.clear();
         }
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(server);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(server);
+        else SimpleServerUtilities.BORDER_VISUALIZATIONS.clearAllClients(server);
         if ("block_information".equals(module)) BlockInformationService.syncAll(server);
-        SimpleServerUtilities.HOLOGRAMS.syncAll();
-        return ActionResult.shell(moduleLabel(module) + " is now " + (enabled ? "enabled" : "disabled") + ".");
+        if (SsuModuleAccess.active("holograms")) SimpleServerUtilities.HOLOGRAMS.syncAll();
+
+        Set<String> activeAfter = SimpleServerUtilities.CORE.modules().states().stream()
+                .filter(be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleRegistry.ModuleState::active)
+                .map(be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleRegistry.ModuleState::id)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        LinkedHashSet<String> cascadedOff = new LinkedHashSet<>(activeBefore);
+        cascadedOff.removeAll(activeAfter);
+        cascadedOff.remove(moduleStateId(module));
+        LinkedHashSet<String> cascadedOn = new LinkedHashSet<>(activeAfter);
+        cascadedOn.removeAll(activeBefore);
+        cascadedOn.remove(moduleStateId(module));
+
+        String stateId = moduleStateId(module);
+        if (enabled && stateId != null && !SimpleServerUtilities.CORE.modules().isActive(stateId)) {
+            return ActionResult.shell(moduleLabel(module) + " is configured ON but inactive: "
+                    + SimpleServerUtilities.CORE.modules().disabledReason(stateId));
+        }
+        StringBuilder notice = new StringBuilder(moduleLabel(module)).append(" is now ")
+                .append(enabled ? "enabled" : "disabled").append('.');
+        if (!cascadedOff.isEmpty()) notice.append(" Suspended: ").append(cascadedOff.stream().map(SsuMenuService::moduleLabel).toList()).append('.');
+        if (!cascadedOn.isEmpty()) notice.append(" Restored: ").append(cascadedOn.stream().map(SsuMenuService::moduleLabel).toList()).append('.');
+        return ActionResult.shell(notice.toString());
     }
 
     private ActionResult renderDistance(ServerPlayer player, String rawTarget, String rawValue) {
@@ -682,19 +818,22 @@ public final class SsuMenuService {
         int applied;
         switch (target) {
             case "holograms" -> {
+                if (!SsuModuleAccess.active("holograms")) return ActionResult.fail("Holograms is disabled.", "");
                 applied = Math.max(8, Math.min(512, requested));
                 setAndSave(Config.HOLOGRAM_RENDER_DISTANCE, applied);
                 SimpleServerUtilities.HOLOGRAMS.syncAll();
             }
             case "claim_borders" -> {
+                if (!SsuModuleAccess.active("visualization")) return ActionResult.fail("Visualization is disabled.", "");
                 applied = Math.max(16, Math.min(512, requested));
                 SimpleServerUtilities.BORDER_SETTINGS.setClaimRenderDistanceBlocks(applied);
-                SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
+                if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
             }
             case "region_borders" -> {
+                if (!SsuModuleAccess.active("visualization")) return ActionResult.fail("Visualization is disabled.", "");
                 applied = Math.max(16, Math.min(512, requested));
                 SimpleServerUtilities.BORDER_SETTINGS.setRegionRenderDistanceBlocks(applied);
-                SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
+                if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
             }
             default -> { return ActionResult.fail("Unknown render-distance setting.", ""); }
         }
@@ -708,7 +847,7 @@ public final class SsuMenuService {
             return ActionResult.fail("Quest access mode must be menu, npc, or both.", "");
         }
         QuestAccessMode requested = QuestAccessMode.parse(normalized);
-        if (requested == QuestAccessMode.NPC && !Config.ENABLE_NPCS.get()) {
+        if (requested == QuestAccessMode.NPC && !SsuModuleAccess.active("npcs")) {
             return ActionResult.fail("NPC quest access cannot be selected while the NPC module is disabled.", "");
         }
         setAndSave(Config.QUEST_ACCESS_MODE, requested.serializedName());
@@ -737,8 +876,31 @@ public final class SsuMenuService {
         value.save();
     }
 
+    private static String moduleStateId(String key) {
+        return switch (key) {
+            case "treecapitator", "veinminer" -> "utility_mining";
+            case "crop_harvesting", "remote_hologram_images" -> null;
+            default -> key;
+        };
+    }
+
     private static String moduleLabel(String key) {
         return switch (key) {
+            case "economy" -> "Economy";
+            case "teleport" -> "Teleport Engine";
+            case "spawn" -> "Server Spawn";
+            case "dimensions" -> "Dimensions";
+            case "visualization" -> "Visualization";
+            case "map_markers" -> "Map Markers";
+            case "identity" -> "Identity & Titles";
+            case "mines" -> "Mines";
+            case "jails" -> "Jails";
+            case "moderation" -> "Moderation";
+            case "kits" -> "Kits";
+            case "onboarding" -> "Onboarding";
+            case "server_operations" -> "Server Operations";
+            case "npc_shops" -> "NPC Shops";
+            case "utility_mining" -> "Utility Mining";
             case "claims" -> "Player Claims";
             case "homes" -> "Homes";
             case "warps" -> "Warps";
@@ -749,6 +911,7 @@ public final class SsuMenuService {
             case "holograms" -> "Floating Text & Holograms";
             case "block_information" -> "Block Information";
             case "statistics" -> "Player Statistics";
+            case "community_statistics" -> "Community Statistics";
             case "achievements" -> "Achievements";
             case "mail" -> "Mail";
             case "auction_house" -> "Auction House";
@@ -854,7 +1017,7 @@ public final class SsuMenuService {
                 yield ActionResult.ok("Jail Setup Tool added. Left-click corner 1, right-click a block for corner 2; right-click air opens Jails.", "");
             }
             case "npc" -> {
-                if (!Config.ENABLE_NPCS.get()
+                if (!SsuModuleAccess.active("npcs")
                         || !PermissionService.getBoolean(player, PermissionKeys.NPCS_ADMIN, false)) {
                     yield ActionResult.fail("The NPC module is disabled or you lack its admin permission.", "");
                 }
@@ -862,7 +1025,7 @@ public final class SsuMenuService {
                 yield ActionResult.ok("NPC Tool added. Right-click to create/edit; sneak-right-click to copy and paste.", "");
             }
             case "abilities" -> {
-                if (!Config.ENABLE_NPCS.get()
+                if (!SsuModuleAccess.active("npcs")
                         || !PermissionService.getBoolean(player, PermissionKeys.NPCS_ADMIN, false)) {
                     yield ActionResult.fail("The NPC module is disabled or you lack its admin permission.", "");
                 }
@@ -870,7 +1033,7 @@ public final class SsuMenuService {
                 yield ActionResult.ok("Opening Ability Library.", "");
             }
             case "shops" -> {
-                if (!Config.ENABLE_NPCS.get()
+                if (!SsuModuleAccess.active("npc_shops")
                         || !PermissionService.getBoolean(player, PermissionKeys.NPC_SHOPS_ADMIN, false)) {
                     yield ActionResult.fail("The NPC shop module is disabled or you lack its admin permission.", "");
                 }
@@ -878,7 +1041,7 @@ public final class SsuMenuService {
                 yield ActionResult.ok("Opening Shop Manager.", "");
             }
             case "item_prices" -> {
-                if (!Config.ENABLE_NPCS.get()
+                if (!SsuModuleAccess.active("npc_shops")
                         || !PermissionService.getBoolean(player, PermissionKeys.NPC_SHOPS_ADMIN, false)) {
                     yield ActionResult.fail("The NPC shop module is disabled or you lack its admin permission.", "");
                 }
@@ -1133,7 +1296,7 @@ public final class SsuMenuService {
     }
 
     private SsuMenuPageDataPayload knownPlayersPage(ServerPlayer player, SsuMenuPageRequestPayload request) {
-        if (!SimpleServerUtilities.ECONOMY.isEnabled()
+        if (!SsuModuleAccess.active("economy") || !SimpleServerUtilities.ECONOMY.isEnabled()
                 || !PermissionService.getBoolean(player, PermissionKeys.ECONOMY_USE, true)
                 || !PermissionService.getBoolean(player, PermissionKeys.ECONOMY_PAY, true)) return denied(request);
         List<SsuMenuPageDataPayload.AccountEntry> all = filter(knownPlayerEntries(player), request.query(),
@@ -2037,19 +2200,19 @@ public final class SsuMenuService {
     private ActionResult statisticReset(ServerPlayer player, String id) {
         if (!StatisticEditorService.canAdmin(player)) return ActionResult.fail("Statistic administration is not allowed.", "statistics");
         if (!SimpleServerUtilities.STATISTICS.reset(id)) return ActionResult.fail("Statistic not found.", "statistics");
-        SimpleServerUtilities.HOLOGRAMS.syncAll();
+        if (SsuModuleAccess.active("holograms")) SimpleServerUtilities.HOLOGRAMS.syncAll();
         return ActionResult.ok("Statistic values reset for every player.", "statistics");
     }
 
     private ActionResult statisticDelete(ServerPlayer player, String id) {
         if (!StatisticEditorService.canAdmin(player)) return ActionResult.fail("Statistic administration is not allowed.", "statistics");
         if (!SimpleServerUtilities.STATISTICS.delete(id)) return ActionResult.fail("Statistic not found.", "statistics");
-        SimpleServerUtilities.HOLOGRAMS.syncAll();
+        if (SsuModuleAccess.active("holograms")) SimpleServerUtilities.HOLOGRAMS.syncAll();
         return ActionResult.ok("Statistic deleted.", "statistics");
     }
 
     private ActionResult pay(ServerPlayer player, String targetName, String rawAmount) {
-        if (!SimpleServerUtilities.ECONOMY.isEnabled()
+        if (!SsuModuleAccess.active("economy") || !SimpleServerUtilities.ECONOMY.isEnabled()
                 || !PermissionService.getBoolean(player, PermissionKeys.ECONOMY_USE, true)
                 || !PermissionService.getBoolean(player, PermissionKeys.ECONOMY_PAY, true)) {
             return ActionResult.fail("You cannot make payments.", "transactions");
@@ -2224,7 +2387,7 @@ public final class SsuMenuService {
             }
             SimpleServerUtilities.BORDER_SETTINGS.setMinigameSpectatorBorderVisible(player.getUUID(), visible);
         } else return ActionResult.fail("Unknown border layer.", "");
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.syncOverview(player, true);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.syncOverview(player, true);
         SimpleServerUtilities.MINIGAMES.syncRuntimeBorders(player);
         be.winnetrie.mod.simpleserverutilities.minigame.MinigameSetupToolService.refreshVisuals(player);
         return ActionResult.shell("Border visibility updated.");
@@ -2240,12 +2403,12 @@ public final class SsuMenuService {
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), claimName);
         if (claim == null || !PermissionService.getBoolean(player, PermissionKeys.CLAIMS_VISUALIZE, true))
             return ActionResult.fail("Claim not found or visualization denied.", "claims");
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showClaim(player, claim);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showClaim(player, claim);
         return ActionResult.ok("Showing claim '" + claim.getDisplayName() + "'.", "claims");
     }
 
     private ActionResult claimHide(ServerPlayer player) {
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player);
         return ActionResult.ok("All individually selected claim borders are hidden.", "claims");
     }
 
@@ -2257,7 +2420,7 @@ public final class SsuMenuService {
         final boolean visible;
         try { visible = strictBoolean(rawValue); }
         catch (IllegalArgumentException exception) { return ActionResult.fail(exception.getMessage(), "claims"); }
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.setClaimVisible(player, claim, visible);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.setClaimVisible(player, claim, visible);
         boolean enabled = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID()).isClaimBordersVisible();
         String message = visible
                 ? enabled ? "Claim border is now shown."
@@ -2276,9 +2439,9 @@ public final class SsuMenuService {
         try { show = strictBoolean(value); }
         catch (IllegalArgumentException e) { return ActionResult.fail(e.getMessage(), "regions"); }
         if (show) {
-            SimpleServerUtilities.BORDER_VISUALIZATIONS.showRegion(player, region);
+            if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showRegion(player, region);
         } else {
-            SimpleServerUtilities.BORDER_VISUALIZATIONS.hideRegion(player, region.getName());
+            if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideRegion(player, region.getName());
         }
         return ActionResult.ok(show
                 ? "Region border enabled for players."
@@ -2289,7 +2452,7 @@ public final class SsuMenuService {
         if (!Config.ENABLE_ADMIN_REGIONS.get() || !isAdministrator(player)) {
             return ActionResult.fail("Server-region administration is required.", "regions");
         }
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.hideRegion(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideRegion(player);
         return ActionResult.ok("All server-region borders disabled for players.", "regions");
     }
 
@@ -2401,8 +2564,8 @@ public final class SsuMenuService {
             notice += " Warning: the old snapshot could not be archived; save a new snapshot before resetting.";
         }
         RegionCommands.getSelectionManager().clear(player);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownRegion(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownRegion(player);
         return ActionResult.shellPage(notice, "region_admin");
     }
 
@@ -2418,7 +2581,7 @@ public final class SsuMenuService {
             return ActionResult.fail("Region was not deleted because its snapshot could not be archived safely.", "region_admin");
         }
         boolean removed = SimpleServerUtilities.REGIONS.delete(name);
-        if (removed) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
+        if (removed && SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
         return removed ? ActionResult.shellPage("Region deleted.", "region_admin")
                 : ActionResult.fail("Region could not be deleted.", "region_admin");
     }
@@ -2479,7 +2642,7 @@ public final class SsuMenuService {
         if (!RegionPolicy.canUseSelectionTool(player)) return ActionResult.fail("Region selection permission is required.", "region_admin");
         if (point == 1) RegionCommands.getSelectionManager().setPoint1(player, player.blockPosition());
         else RegionCommands.getSelectionManager().setPoint2(player, player.blockPosition());
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, RegionCommands.getSelectionManager().getSelection(player));
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, RegionCommands.getSelectionManager().getSelection(player));
         return ActionResult.ok("Selection point " + point + " set to your current block position.", "region_admin");
     }
 
@@ -2496,14 +2659,14 @@ public final class SsuMenuService {
         catch (NumberFormatException exception) { return ActionResult.fail("Coordinates must be whole numbers.", "region_admin"); }
         if (point == 1) RegionCommands.getSelectionManager().setPoint1(player, pos);
         else RegionCommands.getSelectionManager().setPoint2(player, pos);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, RegionCommands.getSelectionManager().getSelection(player));
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, RegionCommands.getSelectionManager().getSelection(player));
         return ActionResult.ok("Selection point " + point + " set to " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + ".", "region_admin");
     }
 
     private ActionResult regionSelectionClear(ServerPlayer player) {
         if (!RegionPolicy.canUseSelectionTool(player)) return ActionResult.fail("Region selection permission is required.", "region_admin");
         RegionCommands.getSelectionManager().clear(player);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
         return ActionResult.ok("Region selection cleared.", "region_admin");
     }
 
@@ -2712,7 +2875,7 @@ public final class SsuMenuService {
             return ActionResult.fail("This player's claims are locked by a claim-tax settlement or safety halt.", "admin_claims");
         }
         boolean removed = SimpleServerUtilities.PLAYER_CLAIMS.deleteClaimGroup(claim.getOwner(), claim.getName(), true);
-        if (removed) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
+        if (removed && SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(player.level().getServer());
         return removed ? ActionResult.shellPage("Claim and its linked homes were deleted administratively.", "admin_claims")
                 : ActionResult.fail("Claim could not be deleted.", "admin_claims");
     }
@@ -3096,7 +3259,7 @@ public final class SsuMenuService {
             return ActionResult.fail("Player or rank not found.", "permissions");
         SimpleServerUtilities.PERMISSIONS.assignPlayerRank(target, rankName);
         SimpleServerUtilities.PERMISSIONS.save();
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
         BlockInformationService.syncAll(actor.level().getServer());
         return ActionResult.ok("Assigned rank '" + rankName + "'.", "permissions");
     }
@@ -3108,7 +3271,7 @@ public final class SsuMenuService {
             return ActionResult.fail("Player or rank not found.", "permissions");
         }
         SimpleServerUtilities.PERMISSIONS.addPlayerRank(target, rankName);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
         BlockInformationService.syncAll(actor.level().getServer());
         return ActionResult.ok("Added rank '" + rankName + "'. Existing ranks were kept.", "permissions");
     }
@@ -3120,7 +3283,7 @@ public final class SsuMenuService {
             return ActionResult.fail("Player or rank not found.", "permissions");
         }
         boolean removed = SimpleServerUtilities.PERMISSIONS.removePlayerRank(target, rankName);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
         BlockInformationService.syncAll(actor.level().getServer());
         return removed ? ActionResult.ok("Removed rank '" + rankName + "'.", "permissions")
                 : ActionResult.ok("That player did not have rank '" + rankName + "'.", "permissions");
@@ -3139,7 +3302,7 @@ public final class SsuMenuService {
         try { normalized = PermissionCatalog.normalizeValue(key, value); }
         catch (IllegalArgumentException exception) { return ActionResult.fail(exception.getMessage(), "permissions"); }
         SimpleServerUtilities.PERMISSIONS.setPlayerClaimContextPermission(role, key, normalized);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
         return ActionResult.ok("Claim role permission updated.", "permissions");
     }
 
@@ -3153,7 +3316,7 @@ public final class SsuMenuService {
             return ActionResult.fail("Owner always has full claim control and cannot be restricted.", "permissions");
         }
         boolean removed = SimpleServerUtilities.PERMISSIONS.removePlayerClaimContextPermission(role, key);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
         return ActionResult.ok(removed ? "Claim role permission reset to its default."
                 : "Claim role permission was already using its default.", "permissions");
     }
@@ -3170,7 +3333,7 @@ public final class SsuMenuService {
         }
         SimpleServerUtilities.PERMISSIONS.setPlayerPermission(target, key, normalized);
         SimpleServerUtilities.PERMISSIONS.save();
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
         BlockInformationService.syncAll(actor.level().getServer());
         return ActionResult.ok("Personal permission updated.", "permissions");
     }
@@ -3181,7 +3344,7 @@ public final class SsuMenuService {
         if (target == null || key.isBlank()) return ActionResult.fail("Player and permission are required.", "permissions");
         boolean removed = SimpleServerUtilities.PERMISSIONS.removePlayerPermission(target, key);
         SimpleServerUtilities.PERMISSIONS.save();
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
         BlockInformationService.syncAll(actor.level().getServer());
         return removed ? ActionResult.ok("Personal permission reset to inherited.", "permissions")
                 : ActionResult.ok("Permission was already inherited.", "permissions");
@@ -3200,7 +3363,7 @@ public final class SsuMenuService {
         }
         SimpleServerUtilities.PERMISSIONS.setRankPermission(rankName, key, normalized);
         SimpleServerUtilities.PERMISSIONS.save();
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
         BlockInformationService.syncAll(actor.level().getServer());
         return ActionResult.ok("Rank permission updated.", "permissions");
     }
@@ -3212,7 +3375,7 @@ public final class SsuMenuService {
         }
         boolean removed = SimpleServerUtilities.PERMISSIONS.removeRankPermission(rankName, key);
         SimpleServerUtilities.PERMISSIONS.save();
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
         BlockInformationService.syncAll(actor.level().getServer());
         return removed ? ActionResult.ok("Rank permission reset to inherited.", "permissions")
                 : ActionResult.ok("Permission was already inherited.", "permissions");
@@ -3299,7 +3462,7 @@ public final class SsuMenuService {
 
     private static void refreshPermissionDependants(MinecraftServer server) {
         SimpleServerUtilities.PERMISSIONS.invalidateResolutionCache();
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(server);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(server);
         BlockInformationService.syncAll(server);
     }
 
@@ -3320,7 +3483,7 @@ public final class SsuMenuService {
         region.setPermissionOverride(normalizedKey, normalizedValue);
         SimpleServerUtilities.REGIONS.save();
         SimpleServerUtilities.PERMISSIONS.invalidateResolutionCache();
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
         BlockInformationService.syncAll(actor.level().getServer());
         return ActionResult.ok("Region permission updated.", "region_permissions");
     }
@@ -3337,7 +3500,7 @@ public final class SsuMenuService {
         region.removePermissionOverride(normalizedKey);
         SimpleServerUtilities.REGIONS.save();
         SimpleServerUtilities.PERMISSIONS.invalidateResolutionCache();
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(actor.level().getServer());
         BlockInformationService.syncAll(actor.level().getServer());
         return ActionResult.ok(existed ? "Region permission reset to player/rank fallback."
                 : "Permission already used the player/rank fallback.", "region_permissions");
@@ -3362,7 +3525,7 @@ public final class SsuMenuService {
     private SsuMenuSnapshotPayload.EconomySummary buildEconomySummary(ServerPlayer player, boolean administrator) {
         boolean canUse = PermissionService.getBoolean(player, PermissionKeys.ECONOMY_USE, true);
         boolean canAdmin = administrator && PermissionService.getBoolean(player, PermissionKeys.ECONOMY_ADMIN, false);
-        boolean enabled = SimpleServerUtilities.ECONOMY.isEnabled() && (canUse || canAdmin);
+        boolean enabled = SsuModuleAccess.active("economy") && SimpleServerUtilities.ECONOMY.isEnabled() && (canUse || canAdmin);
         boolean canViewBalance = canUse && PermissionService.getBoolean(player, PermissionKeys.ECONOMY_BALANCE, true);
         boolean canPay = canUse && enabled && PermissionService.getBoolean(player, PermissionKeys.ECONOMY_PAY, true);
         if (!enabled) {
@@ -3382,21 +3545,23 @@ public final class SsuMenuService {
                 canAdmin,
                 canAdmin ? statistics.accounts() : 0,
                 canAdmin ? MoneyFormat.format(statistics.totalSupplyMinor(), settings) : "",
-                SimpleServerUtilities.REGIONS.rentEconomySettings().getPlayerCancelRefundPercent(),
-                SimpleServerUtilities.REGIONS.rentEconomySettings().getAdminCancelRefundPercent(),
-                SimpleServerUtilities.REGION_RENT_JOURNAL.pendingCount(),
+                SsuModuleAccess.active("regions") ? SimpleServerUtilities.REGIONS.rentEconomySettings().getPlayerCancelRefundPercent() : 0,
+                SsuModuleAccess.active("regions") ? SimpleServerUtilities.REGIONS.rentEconomySettings().getAdminCancelRefundPercent() : 0,
+                SsuModuleAccess.active("regions") ? SimpleServerUtilities.REGION_RENT_JOURNAL.pendingCount() : 0,
                 settings.getRecentHistoryLimit(),
                 List.of()
         );
     }
 
     private List<PlayerClaim> ownedClaims(ServerPlayer player) {
+        if (!SsuModuleAccess.active("claims")) return List.of();
         if (!PermissionService.getBoolean(player, PermissionKeys.CLAIMS_USE, true)) return List.of();
         return SimpleServerUtilities.PLAYER_CLAIMS.getClaims().stream().filter(claim -> claim.isOwner(player.getUUID()))
                 .sorted(Comparator.comparing(PlayerClaim::getDisplayName, String.CASE_INSENSITIVE_ORDER)).toList();
     }
 
     private List<Region> visibleRegions(ServerPlayer player, boolean administrator) {
+        if (!SsuModuleAccess.active("regions")) return List.of();
         return SimpleServerUtilities.REGIONS.getAll().stream().filter(region -> administrator
                         || region.isManager(player.getUUID())
                         || region.getRentData().isRentable()

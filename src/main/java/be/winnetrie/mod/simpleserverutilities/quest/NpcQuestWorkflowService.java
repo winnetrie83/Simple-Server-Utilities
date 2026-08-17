@@ -8,6 +8,7 @@ import java.util.Locale;
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.content.QuestAccessMode;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.NpcQuestWorkflowOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcQuestWorkflowRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcQuestWorkflowUpdatePayload;
@@ -29,12 +30,20 @@ public final class NpcQuestWorkflowService {
     public static void handleRequest(NpcQuestWorkflowRequestPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (!canAdmin(player)) return;
+        if (!SsuModuleAccess.active("npcs")) {
+            player.sendSystemMessage(Component.literal("NPCs is disabled; NPC quest workflow is unavailable."), true);
+            return;
+        }
         sendOpen(player, payload.instanceId(), "");
     }
 
     public static void handleUpdate(NpcQuestWorkflowUpdatePayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (!canAdmin(player)) return;
+        if (!SsuModuleAccess.active("npcs")) {
+            player.sendSystemMessage(Component.literal("NPCs is disabled; NPC quest workflow is unavailable."), true);
+            return;
+        }
         NpcInstance instance = SimpleServerUtilities.NPCS.instance(payload.instanceId());
         NpcDefinition npc = SimpleServerUtilities.NPCS.definitionFor(instance);
         if (instance == null || npc == null) { player.sendSystemMessage(Component.literal("The NPC no longer exists."), true); return; }
@@ -54,7 +63,8 @@ public final class NpcQuestWorkflowService {
             }
             if ("access".equals(action)) {
                 String mode = normalizeAccess(payload.requestedAccessMode());
-                if ("npc".equals(mode) && !Config.ENABLE_NPCS.get()) throw new IllegalArgumentException("NPC quest access requires the NPC module.");
+                if (("npc".equals(mode) || "both".equals(mode)) && !SsuModuleAccess.active("npcs"))
+                    throw new IllegalArgumentException("NPC quest access requires the active NPC module.");
                 Config.QUEST_ACCESS_MODE.set(mode); Config.QUEST_ACCESS_MODE.save();
                 sendOpen(player, instance.id, "Quest access changed to " + accessLabel(mode) + ".");
                 return;
@@ -125,6 +135,7 @@ public final class NpcQuestWorkflowService {
     private static String accessLabel(String mode){return switch(mode){case "npc"->"NPCs only";case "both"->"Both";default->"Quest Menu only";};}
 
     public static List<QuestEditorOpenPayload.NpcChoice> npcChoices() {
+        if (!SsuModuleAccess.active("npcs")) return List.of();
         ArrayList<QuestEditorOpenPayload.NpcChoice> result = new ArrayList<>();
         for (NpcInstance instance : SimpleServerUtilities.NPCS.instances()) {
             NpcDefinition definition = SimpleServerUtilities.NPCS.definitionFor(instance);
@@ -148,7 +159,7 @@ public final class NpcQuestWorkflowService {
     }
 
     private static boolean canAdmin(ServerPlayer player) {
-        return player != null && Config.ENABLE_NPCS.get() && Config.ENABLE_QUESTS.get()
+        return player != null && SsuModuleAccess.active("npcs") && SsuModuleAccess.active("quests")
                 && NpcEditorService.canAdmin(player)
                 && PermissionService.getBoolean(player, PermissionKeys.QUESTS_ADMIN, false);
     }

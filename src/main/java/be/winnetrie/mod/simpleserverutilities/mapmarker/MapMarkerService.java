@@ -24,6 +24,10 @@ public final class MapMarkerService {
 
     public static void handleAction(MapMarkerActionPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)) return;
+        if (!SimpleServerUtilities.CORE.modules().isActive("map_markers")) {
+            PacketDistributor.sendToPlayer(player, new MapMarkerActionResultPayload(false, "Map Markers are disabled."));
+            return;
+        }
         SimpleServerUtilities.MAP_MARKERS.ensurePlayer(player);
 
         MapMarkerManager.Result result;
@@ -47,6 +51,10 @@ public final class MapMarkerService {
     }
 
     public static void sync(ServerPlayer player) {
+        if (!SimpleServerUtilities.CORE.modules().isActive("map_markers")) {
+            PacketDistributor.sendToPlayer(player, new MapMarkerSyncPayload(false, false, false, false, 0, java.util.List.of()));
+            return;
+        }
         SimpleServerUtilities.MAP_MARKERS.ensurePlayer(player);
         var preferences = SimpleServerUtilities.UI_PREFERENCES.ensurePlayer(player);
         var entries = SimpleServerUtilities.MAP_MARKERS.markers(player.getUUID()).stream()

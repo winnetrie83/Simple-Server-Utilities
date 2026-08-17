@@ -21,6 +21,7 @@ import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.server.MinecraftServer;
@@ -172,7 +173,7 @@ public class PlayerHomeManager {
     public boolean setHome(ServerPlayer player, String rawName) {
         String name = sanitizeName(rawName);
         UUID owner = player.getUUID();
-        if (SimpleServerUtilities.CLAIM_TAX.isMutationLocked(owner)) return false;
+        if (SsuModuleAccess.active("claims") && SimpleServerUtilities.CLAIM_TAX.isMutationLocked(owner)) return false;
 
         Map<String, PlayerHome> ownerHomes = ensureOwnerLoaded(owner);
         String normalizedName = normalizeName(name);

@@ -1,6 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.warp;
 
-import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -13,7 +13,7 @@ public final class WarpRentalEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (!Config.ENABLE_WARPS.get()) { nextTick = 0L; return; }
+        if (!SsuModuleAccess.active("warps") || !SsuModuleAccess.active("economy")) { nextTick = 0L; return; }
         long tick = event.getServer().getTickCount();
         if (tick + INTERVAL_TICKS < nextTick) nextTick = 0L;
         if (tick < nextTick) return;

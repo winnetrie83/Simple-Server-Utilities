@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.hologram;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.region.RegionSelectionToolManager;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -15,7 +16,7 @@ public final class AdminToolService {
     }
 
     public static boolean giveRegionTool(ServerPlayer player) {
-        if (!Config.ENABLE_ADMIN_REGIONS.get()) return false;
+        if (!SsuModuleAccess.active("regions")) return false;
         ItemStack stack = new ItemStack(Items.WOODEN_AXE);
         stack.set(DataComponents.ITEM_NAME, Component.literal(RegionSelectionToolManager.SSU_ADMIN_TOOL_NAME));
         SimpleServerUtilities.REGION_SELECTION_TOOLS.bind(player, stack);
@@ -25,7 +26,7 @@ public final class AdminToolService {
 
 
     public static boolean giveWorldEditTool(ServerPlayer player) {
-        if (!Config.ENABLE_ADMIN_REGIONS.get()) return false;
+        if (!SsuModuleAccess.active("regions")) return false;
         ItemStack stack = new ItemStack(Items.GOLDEN_AXE);
         stack.set(DataComponents.ITEM_NAME, Component.literal(RegionSelectionToolManager.SSU_WORLD_EDIT_TOOL_NAME));
         if (!player.getInventory().add(stack)) player.drop(stack, false);
@@ -33,7 +34,7 @@ public final class AdminToolService {
     }
 
     public static boolean giveHologramTool(ServerPlayer player) {
-        if (!Config.ENABLE_HOLOGRAMS.get()) return false;
+        if (!SsuModuleAccess.active("holograms")) return false;
         SimpleServerUtilities.HOLOGRAM_TOOLS.giveTool(player);
         return true;
     }

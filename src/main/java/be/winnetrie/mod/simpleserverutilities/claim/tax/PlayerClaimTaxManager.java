@@ -17,6 +17,7 @@ import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyAccount;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyResult;
@@ -260,7 +261,7 @@ public final class PlayerClaimTaxManager {
     }
 
     public synchronized PlayerClaimTaxSettings settings() { return settings; }
-    public synchronized boolean isEnabled() { return settings.isEnabled() && settings.getRateMinorPerChunk() > 0L; }
+    public synchronized boolean isEnabled() { return SsuModuleAccess.active("claims") && SsuModuleAccess.active("economy") && settings.isEnabled() && settings.getRateMinorPerChunk() > 0L; }
 
     public synchronized boolean requiresDeleteSettlement(PlayerClaim claim) {
         return claim != null && isEnabled() && claim.getTaxPeakChunks() > 0
@@ -367,7 +368,7 @@ public final class PlayerClaimTaxManager {
     }
 
     public synchronized void maintenanceTick() {
-        if (server == null || !Config.ENABLE_PLAYER_CLAIMS.get()) return;
+        if (server == null || !SsuModuleAccess.active("claims") || !SsuModuleAccess.active("economy")) return;
         deliverPendingResultMails();
         if (safetyHalted) return;
         recoverSettlements();
@@ -400,7 +401,7 @@ public final class PlayerClaimTaxManager {
         if (claim == null || claim.getTaxReminderSentForDueAt() == claim.getTaxDueAt()) return false;
         long lead = Math.max(Duration.ofMinutes(1).toMillis(), claim.getTaxReminderLeadMillisSnapshot());
         if (now < claim.getTaxDueAt() - lead) return false;
-        if (!Config.ENABLE_MAIL.get()) return false;
+        if (!SsuModuleAccess.active("mail")) return false;
 
         // If the server missed the reminder window, create a fresh full warning
         // window rather than enforcing a destructive consequence immediately.
@@ -470,8 +471,9 @@ public final class PlayerClaimTaxManager {
             }
         }
         if (dueIds.isEmpty()) return;
-        if (!SimpleServerUtilities.HOMES.ensureStorageReady(server)) {
-            SimpleServerUtilities.LOGGER.error("Claim-tax settlement for {} was postponed because home storage is unavailable.", owner);
+        boolean homesActive = SsuModuleAccess.active("homes");
+        if (homesActive && !SimpleServerUtilities.HOMES.ensureStorageReady(server)) {
+            SimpleServerUtilities.LOGGER.error("Claim-tax settlement for {} was postponed because active Home storage is unavailable.", owner);
             return;
         }
 
@@ -481,7 +483,7 @@ public final class PlayerClaimTaxManager {
         List<PlayerClaimTaxSettlement.ClaimRemovalSnapshot> snapshots = allOwnedClaims.stream()
                 .map(claim -> PlayerClaimTaxSettlement.ClaimRemovalSnapshot.capture(
                         claim, dueSet.contains(claim.getId()) ? claimTax(claim) : 0L, dueSet.contains(claim.getId()),
-                        SimpleServerUtilities.HOMES.homeNamesInClaim(owner, claim)))
+                        homesActive ? SimpleServerUtilities.HOMES.homeNamesInClaim(owner, claim) : List.of()))
                 .toList();
         PlayerClaimTaxSettlement settlement = PlayerClaimTaxSettlement.create(UUID.randomUUID(), owner,
                 PlayerClaimTaxSettlement.Kind.AUTOMATIC_DUE_BATCH, amount, penalty, null, dueIds, allClaims, snapshots);
@@ -497,8 +499,9 @@ public final class PlayerClaimTaxManager {
         UUID owner = player.getUUID();
         if (safetyHalted) return TaxActionResult.fail("Claim tax is in safety halt. Contact an administrator; nothing was changed.");
         if (ledger.activeForOwner(owner) != null) return TaxActionResult.fail("A claim-tax settlement is already in progress.");
-        if (!SimpleServerUtilities.HOMES.ensureStorageReady(server)) {
-            return TaxActionResult.fail("Home storage is unavailable; nothing was changed.");
+        boolean homesActive = SsuModuleAccess.active("homes");
+        if (homesActive && !SimpleServerUtilities.HOMES.ensureStorageReady(server)) {
+            return TaxActionResult.fail("Active Home storage is unavailable; nothing was changed.");
         }
         PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(owner, claimName);
         if (claim == null) return TaxActionResult.fail("Claim not found.");
@@ -518,7 +521,7 @@ public final class PlayerClaimTaxManager {
         int penalty = kind == PlayerClaimTaxSettlement.Kind.VOLUNTARY_FORFEIT_DELETE ? quote.peakChunks() : 0;
         PlayerClaimTaxSettlement.ClaimRemovalSnapshot snapshot =
                 PlayerClaimTaxSettlement.ClaimRemovalSnapshot.capture(claim, quote.amountMinor(), true,
-                        SimpleServerUtilities.HOMES.homeNamesInClaim(owner, claim));
+                        homesActive ? SimpleServerUtilities.HOMES.homeNamesInClaim(owner, claim) : List.of());
         PlayerClaimTaxSettlement settlement = PlayerClaimTaxSettlement.create(UUID.randomUUID(), owner, kind,
                 amount, penalty, claim.getId(), List.of(claim.getId()), List.of(claim.getId()), List.of(snapshot));
         ledger.put(settlement);
@@ -558,7 +561,7 @@ public final class PlayerClaimTaxManager {
                 } else if (SimpleServerUtilities.ECONOMY.isCommittedIdempotencyKey(settlement.economyIdempotencyKey())) {
                     settlement.setStatus(PlayerClaimTaxSettlement.Status.PAYMENT_COMMITTED);
                     if (!saveLedgerSync()) return;
-                } else if (!SimpleServerUtilities.ECONOMY.settings().isEnabled()) {
+                } else if (!SimpleServerUtilities.ECONOMY.isEnabled()) {
                     settlement.markRetry("Economy is unavailable; no claim or capacity was changed.");
                     saveLedgerSync();
                     return;
@@ -621,8 +624,11 @@ public final class PlayerClaimTaxManager {
             }
 
             if (settlement.status() == PlayerClaimTaxSettlement.Status.CLAIMS_REMOVING) {
-                if (!SimpleServerUtilities.HOMES.ensureStorageReady(server)) {
-                    settlement.markRetry("Home storage is unavailable; no settlement step was advanced.");
+                boolean needsHomes = settlement.claimSnapshots().stream()
+                        .anyMatch(snapshot -> !snapshot.linkedHomeNames().isEmpty());
+                boolean homesActive = SsuModuleAccess.active("homes");
+                if (needsHomes && (!homesActive || !SimpleServerUtilities.HOMES.ensureStorageReady(server))) {
+                    settlement.markRetry("This settlement captured linked homes; Home must be active and available before destructive cleanup can continue.");
                     saveLedgerSync();
                     return;
                 }
@@ -641,8 +647,10 @@ public final class PlayerClaimTaxManager {
                     // Always repeat snapshot-based home cleanup before verifying
                     // deletion. This remains possible even if the claim file was
                     // already removed immediately before a hard crash.
-                    for (String homeName : snapshot.linkedHomeNames()) {
-                        SimpleServerUtilities.HOMES.deleteHome(owner, homeName);
+                    if (homesActive) {
+                        for (String homeName : snapshot.linkedHomeNames()) {
+                            SimpleServerUtilities.HOMES.deleteHome(owner, homeName);
+                        }
                     }
 
                     PlayerClaim claim = SimpleServerUtilities.PLAYER_CLAIMS.getClaimById(claimId);
@@ -669,8 +677,8 @@ public final class PlayerClaimTaxManager {
                     // a false success or falsely mark this claim as removed.
                     SimpleServerUtilities.STORAGE.flush(CRITICAL_FLUSH_TIMEOUT);
                     if (!SimpleServerUtilities.PLAYER_CLAIMS.isClaimDeletionDurable(claimId)
-                            || !SimpleServerUtilities.HOMES.isOwnerStorageDurable(owner)) {
-                        settlement.markRetry("Claim or linked-home deletion is not durable yet; the settlement will retry.");
+                            || (homesActive && !SimpleServerUtilities.HOMES.isOwnerStorageDurable(owner))) {
+                        settlement.markRetry("Claim or active linked-home deletion is not durable yet; the settlement will retry.");
                         saveLedgerSync();
                         return;
                     }
@@ -680,7 +688,9 @@ public final class PlayerClaimTaxManager {
                 }
                 settlement.setStatus(PlayerClaimTaxSettlement.Status.CLAIMS_REMOVED);
                 if (!saveLedgerSync()) return;
-                if (server != null) SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(server);
+                if (server != null && SsuModuleAccess.active("visualization")) {
+                    SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(server);
+                }
             }
 
             if (settlement.status() == PlayerClaimTaxSettlement.Status.CLAIMS_REMOVED) {
@@ -734,7 +744,7 @@ public final class PlayerClaimTaxManager {
     }
 
     private void deliverPendingResultMails() {
-        if (!Config.ENABLE_MAIL.get()) return;
+        if (!SsuModuleAccess.active("mail") || !SsuModuleAccess.active("economy")) return;
         for (PlayerClaimTaxSettlement settlement : ledger.all()) {
             if (!settlement.isTerminal() || settlement.resultMailSent()) continue;
             String subject;
@@ -784,8 +794,11 @@ public final class PlayerClaimTaxManager {
             ServerPlayer online = server.getPlayerList().getPlayer(owner);
             if (online != null) return online.getName().getString();
         }
-        return SimpleServerUtilities.ECONOMY.findPlayerAccount(owner)
-                .map(EconomyAccount::getLastKnownName).filter(name -> !name.isBlank()).orElse(owner.toString());
+        if (SsuModuleAccess.active("economy")) {
+            return SimpleServerUtilities.ECONOMY.findPlayerAccount(owner)
+                    .map(EconomyAccount::getLastKnownName).filter(name -> !name.isBlank()).orElse(owner.toString());
+        }
+        return owner.toString();
     }
 
     public synchronized Map<String, Double> dimensionMultipliers() { return settings.getDimensionMultipliers(); }

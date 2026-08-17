@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.command.RegionCommands;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionActionResultPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSelectionClientTemplatePayload;
@@ -59,6 +60,7 @@ public final class RegionSelectionToolService {
     }
 
     public static void handleAction(RegionSelectionActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("regions")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         String operation = payload.operation().toLowerCase(Locale.ROOT);
         try {
@@ -94,6 +96,7 @@ public final class RegionSelectionToolService {
     }
 
     public static void handleClientTemplateUpload(RegionSelectionClientTemplateUploadPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("regions")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (!canEdit(player)) {
             result(player, false, "Region editing permission is required.", payload.requestId(), false);
@@ -226,7 +229,7 @@ public final class RegionSelectionToolService {
         RegionSelection updated = RegionCommands.getSelectionManager().getSelection(player);
         updated.setPoint1(level.dimension(), new BlockPos(destination.minX(), destination.minY(), destination.minZ()));
         updated.setPoint2(level.dimension(), new BlockPos(destination.maxX(), destination.maxY(), destination.maxZ()));
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, updated);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, updated);
         result(player, true, label + " paste scheduled as job " + jobId + ".", requestId, false);
     }
 
@@ -310,7 +313,7 @@ public final class RegionSelectionToolService {
         RegionSelection updated = selection(player);
         updated.setPoint1(level.dimension(), new BlockPos(destination.minX(), destination.minY(), destination.minZ()));
         updated.setPoint2(level.dimension(), new BlockPos(destination.maxX(), destination.maxY(), destination.maxZ()));
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, updated);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, updated);
         result(player, true, label + " scheduled as job " + jobId + ". The old footprint is cleared safely.", requestId, false);
     }
 
@@ -559,7 +562,7 @@ public final class RegionSelectionToolService {
         RegionSelection updated = RegionCommands.getSelectionManager().getSelection(player);
         updated.setPoint1(level.dimension(), new BlockPos(destination.minX(), destination.minY(), destination.minZ()));
         updated.setPoint2(level.dimension(), new BlockPos(destination.maxX(), destination.maxY(), destination.maxZ()));
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, updated);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, updated);
         result(player, true, label + " placement scheduled as job " + jobId + ".", requestId, false);
     }
 
@@ -705,7 +708,7 @@ public final class RegionSelectionToolService {
         RegionSelection selected = RegionCommands.getSelectionManager().getSelection(player);
         selected.setPoint1(dimension, new BlockPos(bounds.minX(), bounds.minY(), bounds.minZ()));
         selected.setPoint2(dimension, new BlockPos(bounds.maxX(), bounds.maxY(), bounds.maxZ()));
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, selected);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, selected);
     }
 
     private static RegionSelectionSchematicManager.Bounds union(RegionSelectionSchematicManager.Bounds a,
@@ -731,7 +734,7 @@ public final class RegionSelectionToolService {
     private static void clearSelection(ServerPlayer player, long requestId) {
         if (!RegionPolicy.canUseSelectionTool(player)) throw new IllegalArgumentException("Region selection permission is required.");
         RegionCommands.getSelectionManager().clear(player);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
         result(player, true, "Region selection cleared.", requestId, true);
     }
 

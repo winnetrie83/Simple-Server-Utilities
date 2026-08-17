@@ -7,6 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.content.ContentAccessPolicy;
 import be.winnetrie.mod.simpleserverutilities.content.ContentEvent;
 import be.winnetrie.mod.simpleserverutilities.content.ContentEventTypes;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -37,6 +38,7 @@ public final class NpcEvents {
 
     @SubscribeEvent
     public static void onTick(ServerTickEvent.Post event) {
+        if (!SsuModuleAccess.active("npcs")) return;
         long npcTimer = SimpleServerUtilities.PERFORMANCE.startTimer();
         try {
             SimpleServerUtilities.NPCS.tick(event.getServer());
@@ -66,6 +68,7 @@ public final class NpcEvents {
 
     @SubscribeEvent
     public static void onSpawnerPositionCheck(MobSpawnEvent.PositionCheck event) {
+        if (!SsuModuleAccess.active("npcs")) return;
         if (event.getSpawnType() != EntitySpawnReason.SPAWNER || event.getSpawner() == null) return;
         if (!(event.getLevel() instanceof net.minecraft.server.level.ServerLevel level)) return;
         var owner = event.getSpawner().getOwner();
@@ -78,6 +81,7 @@ public final class NpcEvents {
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!SsuModuleAccess.active("npcs")) return;
         if (event.getEntity() instanceof ServerPlayer player) {
             SimpleServerUtilities.NPCS.syncLabels(player);
         }
@@ -85,6 +89,7 @@ public final class NpcEvents {
 
     @SubscribeEvent
     public static void onDimensionChange(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (!SsuModuleAccess.active("npcs")) return;
         if (event.getEntity() instanceof ServerPlayer player) {
             SimpleServerUtilities.NPCS.syncLabels(player);
         }
@@ -92,6 +97,7 @@ public final class NpcEvents {
 
     @SubscribeEvent
     public static void onRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (!SsuModuleAccess.active("npcs")) return;
         if (event.getEntity() instanceof ServerPlayer player) {
             SimpleServerUtilities.NPCS.syncLabels(player);
         }
@@ -136,7 +142,7 @@ public final class NpcEvents {
             return InteractionResult.SUCCESS;
         }
 
-        if (!Config.ENABLE_NPCS.get() || !ContentAccessPolicy.canInteractWithNpc(player)) {
+        if (!SsuModuleAccess.active("npcs") || !ContentAccessPolicy.canInteractWithNpc(player)) {
             player.sendSystemMessage(Component.literal("You do not have permission to interact with NPCs."), true);
             return InteractionResult.FAIL;
         }
@@ -168,7 +174,8 @@ public final class NpcEvents {
                         ? InteractionResult.SUCCESS : InteractionResult.FAIL;
             }
             case DIALOGUE -> {
-                if (be.winnetrie.mod.simpleserverutilities.quest.QuestNpcBridge.hasSimpleLinks(SimpleServerUtilities.QUESTS, instance.id)) {
+                if (SsuModuleAccess.active("quests")
+                        && be.winnetrie.mod.simpleserverutilities.quest.QuestNpcBridge.hasSimpleLinks(SimpleServerUtilities.QUESTS, instance.id)) {
                     if (!ContentAccessPolicy.canUseNpcDialogue(player)) {
                         player.sendSystemMessage(Component.literal("You do not have permission to use NPC dialogue."), true);
                         return InteractionResult.FAIL;

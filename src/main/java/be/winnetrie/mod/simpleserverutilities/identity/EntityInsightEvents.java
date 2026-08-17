@@ -17,6 +17,7 @@ public final class EntityInsightEvents {
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("identity")) return;
         if (event.getEntity() instanceof ServerPlayer player) {
             EntityInsightService.clearViewer(player.getUUID());
             EntityInsightService.sync(player);
@@ -25,11 +26,13 @@ public final class EntityInsightEvents {
 
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("identity")) return;
         if (event.getEntity() instanceof ServerPlayer player) EntityInsightService.clearViewer(player.getUUID());
     }
 
     @SubscribeEvent
     public static void onDamage(LivingDamageEvent.Post event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("identity")) return;
         Entity source = event.getSource().getEntity();
         if (source instanceof Projectile projectile && projectile.getOwner() != null) source = projectile.getOwner();
         if (source instanceof ServerPlayer && !(event.getEntity() instanceof ServerPlayer)) {
@@ -39,6 +42,7 @@ public final class EntityInsightEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("identity")) return;
         if (++cleanupCounter >= 200) {
             cleanupCounter = 0;
             EntityInsightService.cleanupRecentHits();

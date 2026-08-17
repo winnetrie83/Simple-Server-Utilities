@@ -8,6 +8,7 @@ import java.util.Set;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJob;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobLocks;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -43,7 +44,7 @@ public final class RegionResetScheduler {
     private static synchronized Result trigger(MinecraftServer server, Region region, ServerPlayer actor, boolean manual) {
         String key = region.getName().toLowerCase(Locale.ROOT);
         if (ACTIVE.contains(key)) return Result.fail("A reset is already running for this region.");
-        if (SimpleServerUtilities.MINIGAMES.isManagedArenaRegion(region.getName())) {
+        if (SsuModuleAccess.active("minigames") && SimpleServerUtilities.MINIGAMES.isManagedArenaRegion(region.getName())) {
             return Result.fail("Minigame-owned regions must be reset by the minigame system.");
         }
         String lock = SsuJobLocks.region(region.getDimension(), region.getName());

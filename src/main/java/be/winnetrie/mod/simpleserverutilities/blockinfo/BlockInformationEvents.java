@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.blockinfo;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -30,6 +31,7 @@ public final class BlockInformationEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        if (!SsuModuleAccess.active("block_information")) return;
         long timer = SimpleServerUtilities.PERFORMANCE.startTimer();
         try {
             BlockInformationService.tick(event.getServer());

@@ -231,6 +231,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
     private SettingsCategory settingsCategory = SettingsCategory.GENERAL;
     private int adminToolScroll;
     private int adminModuleScroll;
+    private int moduleSettingsScroll;
     private boolean requestInitialRemotePage;
 
     public SsuDashboardScreen(SsuMenuSnapshotPayload snapshot) {
@@ -421,32 +422,51 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         addModuleGrid(l, economicsModules());
     }
 
+    private boolean moduleActive(String id, boolean fallback) {
+        var state = snapshot.moduleSettings().state(id);
+        return state == null ? fallback : state.active();
+    }
+
     private List<Module> homeModules(Layout l) {
-        java.util.ArrayList<Module> modules = new java.util.ArrayList<>(List.of(
-                new Module("Claims & Land", "Your connected land claims, claim settings, homes and map tools.", ICON_CLAIM, Page.CLAIMS, snapshot.moduleSettings().claims()),
-                new Module("Travel", "All available homes, warps and server destinations.", ICON_TRAVEL, Page.TRAVEL, true),
-                new Module("My Warps", "Rent, place and control the visibility of your personal warps.", ICON_PORTAL, Page.MY_WARPS, snapshot.moduleSettings().warps()),
-                new Module("Wallet", "Balance, payments and your transaction history.", ICON_WALLET, Page.WALLET, snapshot.economy().enabled()),
-                new Module("Mail", "Inbox, sent mail, items and money attachments.", ICON_MAIL, Page.MAIL, snapshot.moduleSettings().mail()),
-                new Module("Kits", "View and claim kits available to your permissions.", ICON_KITS, Page.KITS, true),
-                new Module("Mines", "View resettable server mines available to your permissions.", ICON_MINES, Page.MINES, true),
-                new Module("Support", "Create and follow help, bug and player-report tickets.", ICON_TICKET, Page.SUPPORT, true)
-        ));
+        java.util.ArrayList<Module> modules = new java.util.ArrayList<>();
+        // Player-facing dashboards only advertise features that are effectively active.
+        // Administrators still see every module and its ON/OFF/BLOCKED state in Module Settings.
+        if (moduleActive("claims", snapshot.moduleSettings().claims())) {
+            modules.add(new Module("Claims & Land", "Your connected land claims, claim settings, homes and map tools.", ICON_CLAIM, Page.CLAIMS, true));
+        }
+        modules.add(new Module("Travel", "All available homes, warps and server destinations.", ICON_TRAVEL, Page.TRAVEL, true));
+        if (moduleActive("warps", snapshot.moduleSettings().warps())) {
+            modules.add(new Module("My Warps", "Rent, place and control the visibility of your personal warps.", ICON_PORTAL, Page.MY_WARPS, true));
+        }
+        if (moduleActive("economy", snapshot.economy().enabled())) {
+            modules.add(new Module("Wallet", "Balance, payments and your transaction history.", ICON_WALLET, Page.WALLET, snapshot.economy().enabled()));
+        }
+        if (moduleActive("mail", snapshot.moduleSettings().mail())) {
+            modules.add(new Module("Mail", "Inbox, sent mail, items and money attachments.", ICON_MAIL, Page.MAIL, true));
+        }
+        if (moduleActive("kits", true)) {
+            modules.add(new Module("Kits", "View and claim kits available to your permissions.", ICON_KITS, Page.KITS, true));
+        }
+        if (moduleActive("mines", true)) {
+            modules.add(new Module("Mines", "View resettable server mines available to your permissions.", ICON_MINES, Page.MINES, true));
+        }
+        modules.add(new Module("Support", "Create and follow help, bug and player-report tickets.", ICON_TICKET, Page.SUPPORT, true));
         if (snapshot.auctionHouseDashboardVisible()) {
             modules.add(new Module("Auction House", "Browse, buy and sell player-listed items.", ICON_MARKET, Page.AUCTION_HOUSE, true));
         }
-        if (snapshot.moduleSettings().quests()
-                && "menu".equalsIgnoreCase(snapshot.moduleSettings().effectiveQuestAccessMode())) {
+        if (moduleActive("quests", snapshot.moduleSettings().quests())
+                && ("menu".equalsIgnoreCase(snapshot.moduleSettings().effectiveQuestAccessMode())
+                    || "both".equalsIgnoreCase(snapshot.moduleSettings().effectiveQuestAccessMode()))) {
             modules.add(new Module("Questbook", "Available, active and completed quests.", ICON_QUESTBOOK, Page.QUESTS, true));
         }
-        if (snapshot.moduleSettings().achievements()) {
+        if (moduleActive("achievements", snapshot.moduleSettings().achievements())) {
             modules.add(new Module("Achievements", "Browse earned and unearned achievements and compare progress.", ICON_ACHIEVEMENTS, Page.ACHIEVEMENTS, true));
         }
         modules.add(new Module("Cosmetics", "Cosmetic unlocks and customization. Coming soon.", ICON_COSMETICS, Page.COSMETICS, true));
-        if (snapshot.moduleSettings().minigames()) {
+        if (moduleActive("minigames", snapshot.moduleSettings().minigames())) {
             modules.add(new Module("Minigames", "Queues, arenas and active matches.", ICON_MINIGAMES, Page.MINIGAMES, true));
         }
-        if (snapshot.moduleSettings().dungeons()) {
+        if (moduleActive("dungeons", snapshot.moduleSettings().dungeons())) {
             modules.add(new Module("Dungeons", "Parties, stages, checkpoints and customized dungeon runs.", ICON_SHIELD, Page.DUNGEONS, true));
         }
         // Compact layouts have no portrait sidebar, so Profile remains available as a normal tile there.
@@ -460,33 +480,34 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         return List.of(
                 new Module("Player info", "Inspect online and offline player profiles.", ICON_PLAYERS, Page.PLAYER_INFO, snapshot.administrator()),
                 new Module("Player claims", "Inspect, teleport to and safely remove player claims.", ICON_CLAIM, Page.ADMIN_CLAIMS,
-                        snapshot.administrator() && snapshot.moduleSettings().claims()),
+                        snapshot.administrator() && moduleActive("claims", snapshot.moduleSettings().claims())),
                 new Module("Travel management", "Create, move, delete and test server warps and spawn.", ICON_PORTAL, Page.TRAVEL_ADMIN,
-                        snapshot.administrator()),
+                        snapshot.administrator() && (moduleActive("warps", snapshot.moduleSettings().warps()) || moduleActive("spawn", true))),
                 new Module("Permissions", "Edit global and per-dimension rank/player permissions.", ICON_PLAYERS, Page.PERMISSIONS, snapshot.adminAccess().permissions()),
                 new Module("Ranks", "Create, rename, default and safely remove permission ranks.", ICON_PLAYERS, Page.RANKS, snapshot.adminAccess().permissions()),
-                new Module("Dimensions", "Create and configure custom server dimensions.", ICON_PORTAL, Page.DIMENSIONS, snapshot.administrator()),
-                new Module("Onboarding & spawns", "Configure server/lobby spawn, rules and first-join flow.", ICON_PORTAL, Page.ONBOARDING_ADMIN, snapshot.administrator()),
-                new Module("Kit administration", "Create compact permission-aware player kits.", ICON_MARKET, Page.KIT_ADMIN, snapshot.administrator()),
-                new Module("Mine administration", "Create and manage dedicated resettable mining areas.", ICON_SETTINGS, Page.MINE_ADMIN, snapshot.administrator()),
-                new Module("Jail administration", "Create nested jail facilities, work areas and solitude cells.", ICON_SHIELD, Page.JAIL_ADMIN, snapshot.administrator()),
-                new Module("Server operations", "Backups, scheduler, maintenance, moderation, reports, health and world management.", ICON_SETTINGS, Page.SERVER_OPERATIONS, snapshot.administrator()),
+                new Module("Dimensions", "Create and configure custom server dimensions.", ICON_PORTAL, Page.DIMENSIONS, snapshot.administrator() && moduleActive("dimensions", true)),
+                new Module("Onboarding & spawns", "Configure server/lobby spawn, rules and first-join flow.", ICON_PORTAL, Page.ONBOARDING_ADMIN, snapshot.administrator() && moduleActive("onboarding", true)),
+                new Module("Kit administration", "Create compact permission-aware player kits.", ICON_MARKET, Page.KIT_ADMIN, snapshot.administrator() && moduleActive("kits", true)),
+                new Module("Mine administration", "Create and manage dedicated resettable mining areas.", ICON_SETTINGS, Page.MINE_ADMIN, snapshot.administrator() && moduleActive("mines", true)),
+                new Module("Jail administration", "Create nested jail facilities, work areas and solitude cells.", ICON_SHIELD, Page.JAIL_ADMIN, snapshot.administrator() && moduleActive("jails", true)),
+                new Module("Server operations", "Backups, scheduler, maintenance, moderation, reports, health and world management.", ICON_SETTINGS, Page.SERVER_OPERATIONS, snapshot.administrator() && moduleActive("server_operations", true)),
                 new Module("Economics", "Accounts, transactions, taxes and economy journals.", ICON_MARKET, Page.ECONOMICS,
                         snapshot.economy().canAdmin()),
                 new Module("Active jobs", "View progress and cancel server jobs.", ICON_SETTINGS, Page.JOBS, snapshot.adminAccess().core()),
                 new Module("Core status", "Storage, indexes and migrated modules.", ICON_SETTINGS, Page.CORE, snapshot.adminAccess().core()),
                 new Module("Module settings", "Enable modules and configure world render distances.", ICON_SETTINGS, Page.MODULE_SETTINGS, snapshot.administrator()),
-                new Module("Utility Mining", "Configure Treecapitator and Veinminer block rules.", ICON_SETTINGS, Page.UTILITY_MINING_ADMIN, snapshot.administrator()),
+                new Module("Utility Mining", "Configure Treecapitator and Veinminer block rules.", ICON_SETTINGS, Page.UTILITY_MINING_ADMIN,
+                        snapshot.administrator() && moduleActive("utility_mining", snapshot.moduleSettings().treecapitator() || snapshot.moduleSettings().veinminer())),
                 new Module("Minigames", "Configure game modes, arenas, rewards and live matches.", ICON_MINIGAMES, Page.MINIGAME_ADMIN,
-                        snapshot.administrator() && snapshot.moduleSettings().minigames()),
+                        snapshot.administrator() && moduleActive("minigames", snapshot.moduleSettings().minigames())),
                 new Module("Admin tools", "Get purpose-built world editing and setup tools.", ICON_SETTINGS, Page.ADMIN_TOOLS, snapshot.administrator()),
                 new Module("Holograms", "Edit, teleport to and delete floating text from anywhere.", ICON_SETTINGS, Page.HOLOGRAMS,
-                        snapshot.administrator() && snapshot.moduleSettings().holograms()),
+                        snapshot.administrator() && moduleActive("holograms", snapshot.moduleSettings().holograms())),
                 new Module("Statistics", "Create event counters and publish personal values or leaderboards.", ICON_PLAYERS, Page.STATISTICS,
-                        snapshot.administrator() && snapshot.moduleSettings().statistics()),
+                        snapshot.administrator() && moduleActive("statistics", snapshot.moduleSettings().statistics())),
                 new Module("Achievements", "Create, edit, inspect and reset custom achievements.", ICON_ACHIEVEMENTS, Page.ACHIEVEMENTS_ADMIN,
-                        snapshot.administrator() && snapshot.moduleSettings().achievements()),
-                new Module("Regions", "Open server-region details, visibility and settings.", ICON_SHIELD, Page.REGIONS, snapshot.moduleSettings().regions()),
+                        snapshot.administrator() && moduleActive("achievements", snapshot.moduleSettings().achievements())),
+                new Module("Regions", "Open server-region details, visibility and settings.", ICON_SHIELD, Page.REGIONS, moduleActive("regions", snapshot.moduleSettings().regions())),
                 new Module("Maintenance", "Reload SSU, refresh runtime content and manage visualization defaults.", ICON_SETTINGS, Page.MAINTENANCE,
                         snapshot.administrator())
         );
@@ -542,15 +563,15 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
                             || "dungeon".equals(tool.id()) || "shops".equals(tool.id()) || "item_prices".equals(tool.id()) || "abilities".equals(tool.id()))
                             ? "Open Editor" : "Get Tool"), ignored -> action("admin_tool_get", tool.id(), "", ""))
                     .bounds(l.contentRight() - 84, y + 10, 84, 20).build();
-            getTool.active = !((("region".equals(tool.id()) || "world_edit".equals(tool.id())) && !snapshot.moduleSettings().regions())
-                    || ("hologram".equals(tool.id()) && !snapshot.moduleSettings().holograms())
-                    || ("npc".equals(tool.id()) && !snapshot.moduleSettings().npcs())
-                    || ("abilities".equals(tool.id()) && !snapshot.moduleSettings().npcs())
-                    || ("shops".equals(tool.id()) && !snapshot.moduleSettings().npcs())
-                    || ("item_prices".equals(tool.id()) && !snapshot.moduleSettings().npcs())
-                    || ("quest".equals(tool.id()) && !snapshot.moduleSettings().quests())
-                    || ("minigame".equals(tool.id()) && !snapshot.moduleSettings().minigames())
-                    || ("dungeon".equals(tool.id()) && !snapshot.moduleSettings().dungeons()));
+            getTool.active = !((("region".equals(tool.id()) || "world_edit".equals(tool.id())) && !moduleActive("regions", snapshot.moduleSettings().regions()))
+                    || ("hologram".equals(tool.id()) && !moduleActive("holograms", snapshot.moduleSettings().holograms()))
+                    || ("npc".equals(tool.id()) && !moduleActive("npcs", snapshot.moduleSettings().npcs()))
+                    || ("abilities".equals(tool.id()) && !moduleActive("npcs", snapshot.moduleSettings().npcs()))
+                    || ("shops".equals(tool.id()) && !moduleActive("npc_shops", true))
+                    || ("item_prices".equals(tool.id()) && !moduleActive("npc_shops", true))
+                    || ("quest".equals(tool.id()) && !moduleActive("quests", snapshot.moduleSettings().quests()))
+                    || ("minigame".equals(tool.id()) && !moduleActive("minigames", snapshot.moduleSettings().minigames()))
+                    || ("dungeon".equals(tool.id()) && !moduleActive("dungeons", snapshot.moduleSettings().dungeons())));
             addRenderableWidget(getTool);
         }
         Button up = addRenderableWidget(Button.builder(Component.literal("▲"), ignored -> {
@@ -565,7 +586,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         int footerY = l.footerY() - 24;
         Button manageHolograms = Button.builder(Component.literal("Manage holograms"), ignored -> openPage(Page.HOLOGRAMS))
                 .bounds(l.contentX(), footerY, 132, 20).build();
-        manageHolograms.active = snapshot.moduleSettings().holograms();
+        manageHolograms.active = moduleActive("holograms", snapshot.moduleSettings().holograms());
         addRenderableWidget(manageHolograms);
         addRenderableWidget(Button.builder(Component.literal("Module settings"), ignored -> openPage(Page.MODULE_SETTINGS))
                 .bounds(l.contentRight() - 132, footerY, 132, 20).build());
@@ -578,43 +599,51 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
 
     private void addModuleSettingsButtons(Layout l) {
         var settings = snapshot.moduleSettings();
-        List<ModuleSwitch> switches = List.of(
-                new ModuleSwitch("Player Claims", "claims", settings.claims()),
-                new ModuleSwitch("Homes", "homes", settings.homes()),
-                new ModuleSwitch("Warps", "warps", settings.warps()),
-                new ModuleSwitch("Server Regions", "regions", settings.regions()),
-                new ModuleSwitch("Treecapitator", "treecapitator", settings.treecapitator()),
-                new ModuleSwitch("Veinminer", "veinminer", settings.veinminer()),
-                new ModuleSwitch("Crop Harvesting", "crop_harvesting", settings.cropHarvesting()),
-                new ModuleSwitch("Floating Text / Media", "holograms", settings.holograms()),
-                new ModuleSwitch("Block Information", "block_information", settings.blockInformation()),
-                new ModuleSwitch("Player Statistics", "statistics", settings.statistics()),
-                new ModuleSwitch("Achievements", "achievements", settings.achievements()),
-                new ModuleSwitch("Mail", "mail", settings.mail()),
-                new ModuleSwitch("Auction House", "auction_house", settings.auctionHouse()),
-                new ModuleSwitch("NPC Core", "npcs", settings.npcs()),
-                new ModuleSwitch("Quest Core", "quests", settings.quests()),
-                new ModuleSwitch("Minigame Core", "minigames", settings.minigames()),
-                new ModuleSwitch("Dungeon Core", "dungeons", settings.dungeons()),
-                new ModuleSwitch("Permissions", "permissions", settings.permissions()),
-                new ModuleSwitch("Remote Images", "remote_hologram_images", settings.remoteHologramImages())
-        );
-        int columns = l.contentWidth() >= 470 ? 3 : 2;
+        List<ModuleSwitch> switches = moduleSwitches(settings);
+        int columns = moduleSettingsColumns(l);
         int gap = 6;
         int buttonWidth = (l.contentWidth() - gap * (columns - 1)) / columns;
-        int top = l.contentTop() + 22;
+        int top = l.contentTop() + 34;
         int rowStep = 21;
-        for (int i = 0; i < switches.size(); i++) {
-            ModuleSwitch value = switches.get(i);
-            int x = l.contentX() + (i % columns) * (buttonWidth + gap);
-            int y = top + (i / columns) * rowStep;
-            addRenderableWidget(Button.builder(Component.literal(value.label() + ": " + onOff(value.enabled())), ignored ->
-                            action("module_toggle", value.key(), "", Boolean.toString(!value.enabled())))
-                    .bounds(x, y, buttonWidth, 18).build());
+        int visibleRows = moduleSettingsVisibleRows(l);
+        int totalRows = (switches.size() + columns - 1) / columns;
+        int maximum = Math.max(0, totalRows - visibleRows);
+        moduleSettingsScroll = Math.max(0, Math.min(maximum, moduleSettingsScroll));
+
+        for (int localRow = 0; localRow < visibleRows; localRow++) {
+            int sourceRow = moduleSettingsScroll + localRow;
+            for (int col = 0; col < columns; col++) {
+                int i = sourceRow * columns + col;
+                if (i >= switches.size()) break;
+                ModuleSwitch value = switches.get(i);
+                int x = l.contentX() + col * (buttonWidth + gap);
+                int y = top + localRow * rowStep;
+                String status = value.active() ? "ON" : value.configured() ? "BLOCKED" : "OFF";
+                Button button = Button.builder(Component.literal(value.label() + ": " + status), ignored ->
+                                action("module_toggle", value.key(), "", Boolean.toString(!value.configured())))
+                        .bounds(x, y, buttonWidth, 18).build();
+                addRenderableWidget(button);
+                java.util.ArrayList<Component> tip = new java.util.ArrayList<>();
+                if (value.configured() && !value.active() && !value.reason().isBlank()) tip.add(Component.literal(value.reason()));
+                if (!value.required().isEmpty()) tip.add(Component.literal("Requires: " + String.join(", ", value.required())));
+                if (!value.optional().isEmpty()) tip.add(Component.literal("Optional: " + String.join(", ", value.optional())));
+                if (!value.integrations().isEmpty()) tip.add(Component.literal("Integrations: " + String.join(", ", value.integrations())));
+                if (!tip.isEmpty()) settingsTooltips.add(new SettingsTooltip(new Rect(x, y, buttonWidth, 18), List.copyOf(tip)));
+            }
         }
 
-        int rows = (switches.size() + columns - 1) / columns;
-        int questModeY = top + rows * rowStep + 3;
+        if (maximum > 0) {
+            Button up = addRenderableWidget(Button.builder(Component.literal("▲"), ignored -> {
+                moduleSettingsScroll = Math.max(0, moduleSettingsScroll - 1); rebuildWidgets();
+            }).bounds(l.contentRight() - 44, l.contentTop(), 20, 18).build());
+            up.active = moduleSettingsScroll > 0;
+            Button down = addRenderableWidget(Button.builder(Component.literal("▼"), ignored -> {
+                moduleSettingsScroll = Math.min(maximum, moduleSettingsScroll + 1); rebuildWidgets();
+            }).bounds(l.contentRight() - 22, l.contentTop(), 20, 18).build());
+            down.active = moduleSettingsScroll < maximum;
+        }
+
+        int questModeY = moduleSettingsOptionsTop(l);
         String configuredRaw = settings.questAccessMode() == null ? "menu" : settings.questAccessMode().toLowerCase(java.util.Locale.ROOT);
         String configuredMode = switch (configuredRaw) { case "npc" -> "NPCs"; case "both" -> "Both"; default -> "SSU Menu"; };
         String effectiveRaw = settings.effectiveQuestAccessMode() == null ? configuredRaw : settings.effectiveQuestAccessMode().toLowerCase(java.util.Locale.ROOT);
@@ -622,14 +651,76 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
         String nextMode = switch (configuredRaw) { case "menu" -> "npc"; case "npc" -> "both"; default -> "menu"; };
         Button questMode = Button.builder(Component.literal("Quest access: " + configuredMode + effectiveSuffix), ignored ->
                         action("quest_access_mode", "", "", nextMode))
-                .bounds(l.contentX(), questModeY, Math.min(260, l.contentWidth()), 18).build();
-        questMode.active = settings.quests();
+                .bounds(l.contentX(), questModeY, Math.min(300, l.contentWidth()), 18).build();
+        var questState = settings.state("quests");
+        questMode.active = questState != null ? questState.active() : settings.quests();
         addRenderableWidget(questMode);
 
         int distanceTop = questModeY + 24;
         addDistanceButtons(l, distanceTop, "holograms", settings.hologramRenderDistance(), 8);
         addDistanceButtons(l, distanceTop + 24, "claim_borders", settings.claimBorderRenderDistance(), 16);
         addDistanceButtons(l, distanceTop + 48, "region_borders", settings.regionBorderRenderDistance(), 16);
+    }
+
+    private List<ModuleSwitch> moduleSwitches(SsuMenuSnapshotPayload.ModuleSettingsSummary settings) {
+        return List.of(
+                moduleSwitch(settings, "Economy", "economy", "economy", true),
+                moduleSwitch(settings, "Permissions", "permissions", "permissions", settings.permissions()),
+                moduleSwitch(settings, "Player Claims", "claims", "claims", settings.claims()),
+                moduleSwitch(settings, "Server Regions", "regions", "regions", settings.regions()),
+                moduleSwitch(settings, "Teleport", "teleport", "teleport", true),
+                moduleSwitch(settings, "Server Spawn", "spawn", "spawn", true),
+                moduleSwitch(settings, "Homes", "homes", "homes", settings.homes()),
+                moduleSwitch(settings, "Warps", "warps", "warps", settings.warps()),
+                moduleSwitch(settings, "Dimensions", "dimensions", "dimensions", true),
+                moduleSwitch(settings, "Visualization", "visualization", "visualization", true),
+                moduleSwitch(settings, "Map Markers", "map_markers", "map_markers", true),
+                moduleSwitch(settings, "Mail", "mail", "mail", settings.mail()),
+                moduleSwitch(settings, "Auction House", "auction_house", "auction_house", settings.auctionHouse()),
+                moduleSwitch(settings, "NPC Core", "npcs", "npcs", settings.npcs()),
+                moduleSwitch(settings, "NPC Shops", "npc_shops", "npc_shops", true),
+                moduleSwitch(settings, "Quest Core", "quests", "quests", settings.quests()),
+                moduleSwitch(settings, "Minigames", "minigames", "minigames", settings.minigames()),
+                moduleSwitch(settings, "Dungeons", "dungeons", "dungeons", settings.dungeons()),
+                moduleSwitch(settings, "Mines", "mines", "mines", true),
+                moduleSwitch(settings, "Jails", "jails", "jails", true),
+                moduleSwitch(settings, "Moderation", "moderation", "moderation", true),
+                moduleSwitch(settings, "Kits", "kits", "kits", true),
+                moduleSwitch(settings, "Onboarding", "onboarding", "onboarding", true),
+                moduleSwitch(settings, "Server Ops", "server_operations", "server_operations", true),
+                moduleSwitch(settings, "Holograms", "holograms", "holograms", settings.holograms()),
+                moduleSwitch(settings, "Statistics", "statistics", "statistics", settings.statistics()),
+                moduleSwitch(settings, "Community Stats", "community_statistics", "community_statistics", false),
+                moduleSwitch(settings, "Achievements", "achievements", "achievements", settings.achievements()),
+                moduleSwitch(settings, "Block Info", "block_information", "block_information", settings.blockInformation()),
+                moduleSwitch(settings, "Identity & Titles", "identity", "identity", true),
+                moduleSwitch(settings, "Treecapitator", "treecapitator", "utility_mining", settings.treecapitator()),
+                moduleSwitch(settings, "Veinminer", "veinminer", "utility_mining", settings.veinminer()),
+                new ModuleSwitch("Crop Harvest", "crop_harvesting", settings.cropHarvesting(), settings.cropHarvesting(), "", List.of(), List.of(), List.of()),
+                new ModuleSwitch("Remote Images", "remote_hologram_images", settings.remoteHologramImages(), settings.remoteHologramImages(), "", List.of(), List.of(), List.of())
+        );
+    }
+
+    private ModuleSwitch moduleSwitch(SsuMenuSnapshotPayload.ModuleSettingsSummary settings, String label, String key,
+                                      String moduleId, boolean configuredFallback) {
+        var state = settings.state(moduleId);
+        if (state == null) return new ModuleSwitch(label, key, configuredFallback, configuredFallback, "", List.of(), List.of(), List.of());
+        boolean configured = ("treecapitator".equals(key) || "veinminer".equals(key)) ? configuredFallback : state.configuredEnabled();
+        boolean active = configured && state.active();
+        return new ModuleSwitch(label, key, configured, active, state.disabledReason(),
+                state.requiredDependencies(), state.optionalDependencies(), state.integrationDependencies());
+    }
+
+    private int moduleSettingsColumns(Layout l) { return l.contentWidth() >= 560 ? 4 : l.contentWidth() >= 390 ? 3 : 2; }
+    private int moduleSettingsVisibleRows(Layout l) {
+        int top = l.contentTop() + 34;
+        int listBottom = l.footerY() - 104;
+        return Math.max(2, (listBottom - top) / 21);
+    }
+    private int moduleSettingsOptionsTop(Layout l) { return l.footerY() - 101; }
+    private int moduleSettingsMaximumScroll(Layout l) {
+        int rows = (moduleSwitches(snapshot.moduleSettings()).size() + moduleSettingsColumns(l) - 1) / moduleSettingsColumns(l);
+        return Math.max(0, rows - moduleSettingsVisibleRows(l));
     }
 
     private void addDistanceButtons(Layout l, int y, String key, int current, int minimum) {
@@ -1701,14 +1792,14 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
                 Button blockInfo = Button.builder(Component.literal("Block information: " + onOff(s.blockInformationEnabled())), ignored ->
                                 action("setting", "block_information_enabled", "", Boolean.toString(!s.blockInformationEnabled())))
                         .bounds(twoColumns ? secondX : x, y + (twoColumns ? 0 : 27), w, 20).build();
-                blockInfo.active = snapshot.moduleSettings().blockInformation();
+                blockInfo.active = moduleActive("block_information", snapshot.moduleSettings().blockInformation());
                 addRenderableWidget(blockInfo);
                 if (s.blockInformationDebugAllowed()) {
                     int debugY = y + (twoColumns ? 27 : 54);
                     Button debug = Button.builder(Component.literal("Block info debug: " + onOff(s.blockInformationDebugEnabled())), ignored ->
                                     action("setting", "block_information_debug", "", Boolean.toString(!s.blockInformationDebugEnabled())))
                             .bounds(x, debugY, w, 20).build();
-                    debug.active = snapshot.moduleSettings().blockInformation() && s.blockInformationEnabled();
+                    debug.active = moduleActive("block_information", snapshot.moduleSettings().blockInformation()) && s.blockInformationEnabled();
                     addRenderableWidget(debug);
                 }
             }
@@ -1862,12 +1953,12 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
                 Button gameBorder = Button.builder(Component.literal("Minigame border: " + onOff(snapshot.minigameGameBorderVisible())), ignored ->
                                 action("border", "minigame_game", "", Boolean.toString(!snapshot.minigameGameBorderVisible())))
                         .bounds(twoColumns ? secondX : x, y + (twoColumns ? 27 : 81), w, 20).build();
-                gameBorder.active = snapshot.moduleSettings().minigames();
+                gameBorder.active = moduleActive("minigames", snapshot.moduleSettings().minigames());
                 addRenderableWidget(gameBorder);
                 Button spectatorBorder = Button.builder(Component.literal("Spectator border: " + onOff(snapshot.minigameSpectatorBorderVisible())), ignored ->
                                 action("border", "minigame_spectator", "", Boolean.toString(!snapshot.minigameSpectatorBorderVisible())))
                         .bounds(x, y + (twoColumns ? 54 : 108), w, 20).build();
-                spectatorBorder.active = snapshot.moduleSettings().minigames();
+                spectatorBorder.active = moduleActive("minigames", snapshot.moduleSettings().minigames());
                 addRenderableWidget(spectatorBorder);
             }
             case MAIL -> {
@@ -2609,7 +2700,7 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             selectedTransactionPlayerLabel = "";
             draftTransactionPlayer = "";
         }
-        previousPage = page; page = target; pageIndex = 0; if (target == Page.ADMIN_TOOLS) adminToolScroll = 0; if (target == Page.ADMIN) adminModuleScroll = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingDeleteHome = ""; pendingDeleteWarp = ""; pendingSetPlayerWarp = ""; pendingDeleteAdminClaim = ""; pendingDeleteRank = ""; clearRegionConfirmations(); pendingResetAllBorderColors = false; pendingEnableClaimTax = false; pendingResetStatistic = ""; pendingDeleteStatistic = "";
+        previousPage = page; page = target; pageIndex = 0; if (target == Page.ADMIN_TOOLS) adminToolScroll = 0; if (target == Page.ADMIN) adminModuleScroll = 0; if (target == Page.MODULE_SETTINGS) moduleSettingsScroll = 0; selectedRow = -1; draftSearch = ""; pendingUnrentRegion = ""; pendingDeleteHologram = ""; pendingDeleteHome = ""; pendingDeleteWarp = ""; pendingSetPlayerWarp = ""; pendingDeleteAdminClaim = ""; pendingDeleteRank = ""; clearRegionConfirmations(); pendingResetAllBorderColors = false; pendingEnableClaimTax = false; pendingResetStatistic = ""; pendingDeleteStatistic = "";
         loading = false;
         if (target != Page.PERMISSIONS) permissionLoading = false;
         if (target != Page.PLAYER_INFO) playerProfileLoading = false;
@@ -2859,6 +2950,13 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
             int next = adminToolScroll + (scrollY < 0.0 ? 1 : -1);
             int bounded = Math.max(0, Math.min(maximum, next));
             if (bounded != adminToolScroll) { adminToolScroll = bounded; rebuildWidgets(); }
+            return true;
+        }
+        if (page == Page.MODULE_SETTINGS && scrollY != 0.0) {
+            int maximum = moduleSettingsMaximumScroll(layout());
+            int next = moduleSettingsScroll + (scrollY < 0.0 ? 1 : -1);
+            int bounded = Math.max(0, Math.min(maximum, next));
+            if (bounded != moduleSettingsScroll) { moduleSettingsScroll = bounded; rebuildWidgets(); }
             return true;
         }
         if (page == Page.ADMIN && !useTexturedTiles(layout()) && scrollY != 0.0) {
@@ -3374,14 +3472,26 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
 
     private void drawModuleSettings(GuiGraphicsExtractor g, Layout l) {
         var settings = snapshot.moduleSettings();
-        g.text(font, "Disabled modules release their runtime data and make their tools inert.",
-                l.contentX(), l.contentTop(), MUTED, false);
-        int columns = l.contentWidth() >= 470 ? 3 : 2;
-        int top = l.contentTop() + 22;
-        int switchCount = 18;
-        int rows = (switchCount + columns - 1) / columns;
-        int questModeY = top + rows * 21 + 3;
-        g.text(font, "Quest entry is exclusive: the SSU menu or NPC interactions, never both.",
+        int blocked = (int) settings.moduleStates().stream().filter(v -> v.configuredEnabled() && !v.active()).count();
+        int maximum = moduleSettingsMaximumScroll(l);
+        String introPrimary = blocked == 0
+                ? "Modules run independently; required dependencies suspend dependents automatically."
+                : blocked + " configured module(s) are BLOCKED by required dependencies.";
+        String introSecondary = blocked == 0
+                ? "Core services stay active; disabled feature data is preserved."
+                : "Configured choices are preserved and resume automatically when requirements return.";
+        int firstLineWidth = Math.max(80, l.contentWidth() - (maximum > 0 ? 142 : 0));
+        g.text(font, fitToWidth(introPrimary, firstLineWidth), l.contentX(), l.contentTop(), MUTED, false);
+        g.text(font, fitToWidth(introSecondary, l.contentWidth()), l.contentX(), l.contentTop() + 11, MUTED, false);
+        if (maximum > 0) {
+            int columns = moduleSettingsColumns(l);
+            int first = moduleSettingsScroll * columns + 1;
+            int last = Math.min(moduleSwitches(settings).size(), (moduleSettingsScroll + moduleSettingsVisibleRows(l)) * columns);
+            String range = first + "–" + last + " / " + moduleSwitches(settings).size();
+            g.text(font, range, l.contentRight() - font.width(range) - 50, l.contentTop() + 5, MUTED, false);
+        }
+        int questModeY = moduleSettingsOptionsTop(l);
+        g.text(font, "Quest entry can use the SSU menu, NPC integration, or both when those modules are active.",
                 l.contentX(), questModeY + 20, MUTED, false);
         int distanceTop = questModeY + 24;
         g.text(font, "Hologram render/load distance: " + settings.hologramRenderDistance() + " blocks",
@@ -3860,6 +3970,14 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
     private static String shortDim(String v){int i=v.indexOf(':');return i>=0?v.substring(i+1):v;}
     private static String pos(double x,double y,double z){return (int)Math.floor(x)+", "+(int)Math.floor(y)+", "+(int)Math.floor(z);}
     private static String trim(String v,int max){if(v==null)return "";return v.length()<=max?v:v.substring(0,Math.max(0,max-1))+"…";}
+    private String fitToWidth(String value, int maxWidth) {
+        if (value == null || value.isEmpty() || maxWidth <= 0) return "";
+        if (font.width(value) <= maxWidth) return value;
+        String ellipsis = "…";
+        int end = value.length();
+        while (end > 0 && font.width(value.substring(0, end) + ellipsis) > maxWidth) end--;
+        return end <= 0 ? ellipsis : value.substring(0, end).stripTrailing() + ellipsis;
+    }
     private static String time(long epoch){return epoch<=0?"-":TIME.format(Instant.ofEpochMilli(epoch));}
     @Override public boolean isPauseScreen(){return false;}
 
@@ -3907,7 +4025,8 @@ public final class SsuDashboardScreen extends Screen implements SsuFixedLogicalC
     }
     private record Module(String label, String hint, Identifier icon, Page page, boolean enabled){}
     private record AdminTool(String label, String hint, String id){}
-    private record ModuleSwitch(String label, String key, boolean enabled){}
+    private record ModuleSwitch(String label, String key, boolean configured, boolean active, String reason,
+                                List<String> required, List<String> optional, List<String> integrations){}
     private record ModuleTile(Rect bounds, Module module){}
     private record SettingsTooltip(Rect bounds, List<Component> lines){}
     private record Rect(int x, int y, int width, int height) {

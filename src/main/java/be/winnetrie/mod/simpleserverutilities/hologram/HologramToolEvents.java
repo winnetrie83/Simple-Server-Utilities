@@ -1,6 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.hologram;
 
-import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
@@ -72,7 +72,7 @@ public final class HologramToolEvents {
     }
 
     private static boolean canUse(ServerPlayer player) {
-        return Config.ENABLE_HOLOGRAMS.get()
+        return SsuModuleAccess.active("holograms")
                 && PermissionService.getBoolean(player, PermissionKeys.HOLOGRAMS_ADMIN, false);
     }
 }

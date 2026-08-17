@@ -1,5 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.spawn;
 
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
@@ -14,10 +15,10 @@ public final class SpawnPolicy {
     }
 
     public static boolean canUse(ServerPlayer player, PermissionContext context) {
-        return TeleportPolicy.canTeleport(player, TeleportType.SPAWN, context);
+        return SsuModuleAccess.active("spawn") && TeleportPolicy.canTeleport(player, TeleportType.SPAWN, context);
     }
 
     public static boolean canAdmin(ServerPlayer player) {
-        return PermissionService.getBoolean(player, PermissionKeys.SPAWN_ADMIN, false);
+        return SsuModuleAccess.active("spawn") && PermissionService.getBoolean(player, PermissionKeys.SPAWN_ADMIN, false);
     }
 }

@@ -7,6 +7,7 @@ import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.content.ContentAccessPolicy;
 import be.winnetrie.mod.simpleserverutilities.content.ContentFeature;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.NpcEditorLootSlot;
 import be.winnetrie.mod.simpleserverutilities.network.NpcEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcEditorResultPayload;
@@ -85,6 +86,7 @@ public final class NpcEditorService {
 
 
     public static List<NpcEditorOpenPayload.Choice> shopChoices() {
+        if (!SsuModuleAccess.active("npc_shops")) return List.of();
         ArrayList<NpcShopDefinition> shops = new ArrayList<>(SimpleServerUtilities.NPC_SHOPS.definitions());
         shops.sort(java.util.Comparator
                 .comparing((NpcShopDefinition shop) -> shop.displayName, String.CASE_INSENSITIVE_ORDER)
@@ -138,6 +140,7 @@ public final class NpcEditorService {
     }
 
     public static void handleSubmit(NpcEditorSubmitPayload payload, IPayloadContext context) {
+        if (!SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         Result result = save(player, payload);
         PacketDistributor.sendToPlayer(player,
@@ -161,8 +164,10 @@ public final class NpcEditorService {
             if (!SimpleServerUtilities.NPCS.deleteInstance(existingInstance.id)) {
                 return Result.fail("The NPC placement could not be deleted.");
             }
-            be.winnetrie.mod.simpleserverutilities.quest.QuestNpcBridge.unlinkDeletedNpc(
-                    SimpleServerUtilities.QUESTS, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS, existingInstance.id);
+            if (SsuModuleAccess.active("quests")) {
+                be.winnetrie.mod.simpleserverutilities.quest.QuestNpcBridge.unlinkDeletedNpc(
+                        SimpleServerUtilities.QUESTS, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS, existingInstance.id);
+            }
             SimpleServerUtilities.NPCS.syncAll();
             return Result.ok("NPC placement deleted. Simple quest links were cleared; its reusable template was kept.");
         }
@@ -421,9 +426,14 @@ public final class NpcEditorService {
         if (!payload.shopId().isBlank() && !payload.shopId().trim().matches("[A-Za-z0-9._-]{1,64}")) {
             return Result.fail("Shop ID: use letters, numbers, dots, underscores or dashes.");
         }
-        if (!payload.shopId().isBlank() && SimpleServerUtilities.NPC_SHOPS.get(payload.shopId()) == null) {
-            return Result.fail("No shared shop exists with ID '" + payload.shopId().trim()
-                    + "'. Create it first in Admin Center → Shop Manager.");
+        if (!payload.shopId().isBlank()) {
+            if (!SsuModuleAccess.active("npc_shops")) {
+                return Result.fail("NPC Shops is disabled; clear the Shop ID or enable the module first.");
+            }
+            if (SimpleServerUtilities.NPC_SHOPS.get(payload.shopId()) == null) {
+                return Result.fail("No shared shop exists with ID '" + payload.shopId().trim()
+                        + "'. Create it first in Admin Center → Shop Manager.");
+            }
         }
         if (payload.functions().size() > NpcFunction.MAX_FUNCTIONS) {
             return Result.fail("An NPC may expose at most " + NpcFunction.MAX_FUNCTIONS + " functions.");

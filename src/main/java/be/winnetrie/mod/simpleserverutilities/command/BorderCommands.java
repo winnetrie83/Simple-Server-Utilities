@@ -4,6 +4,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import be.winnetrie.mod.simpleserverutilities.visualization.BorderCategory;
@@ -56,6 +57,7 @@ public final class BorderCommands {
     }
 
     private static int status(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = requirePlayer(source);
         if (player == null) {
             return 0;
@@ -73,7 +75,7 @@ public final class BorderCommands {
         if (player == null) {
             return 0;
         }
-        if (!be.winnetrie.mod.simpleserverutilities.Config.ENABLE_PLAYER_CLAIMS.get()
+        if (!SsuModuleAccess.active("visualization") || !SsuModuleAccess.active("claims")
                 || !PermissionService.getBooleanWithoutOperatorBypass(player, PermissionKeys.BORDER_CLAIMS_VIEW, true)) {
             player.sendSystemMessage(Component.literal("Claim borders are not allowed by the server."));
             return 0;
@@ -90,7 +92,7 @@ public final class BorderCommands {
         if (player == null) {
             return 0;
         }
-        if (!be.winnetrie.mod.simpleserverutilities.Config.ENABLE_ADMIN_REGIONS.get()
+        if (!SsuModuleAccess.active("visualization") || !SsuModuleAccess.active("regions")
                 || !PermissionService.getBooleanWithoutOperatorBypass(player, PermissionKeys.BORDER_REGIONS_VIEW, true)) {
             player.sendSystemMessage(Component.literal("Region borders are not allowed by the server."));
             return 0;
@@ -103,6 +105,7 @@ public final class BorderCommands {
     }
 
     private static int refresh(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = requirePlayer(source);
         if (player == null) {
             return 0;
@@ -113,6 +116,7 @@ public final class BorderCommands {
     }
 
     private static int listColors(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         if (!canManageColors(source)) {
             source.sendFailure(Component.literal("You do not have permission to manage border colors."));
             return 0;
@@ -127,6 +131,7 @@ public final class BorderCommands {
     }
 
     private static int setColor(CommandSourceStack source, String rawCategory, String rawHex) {
+        if (!requireModule(source)) return 0;
         if (!canManageColors(source)) {
             source.sendFailure(Component.literal("You do not have permission to manage border colors."));
             return 0;
@@ -153,6 +158,7 @@ public final class BorderCommands {
     }
 
     private static int resetColor(CommandSourceStack source, String rawCategory) {
+        if (!requireModule(source)) return 0;
         if (!canManageColors(source)) {
             source.sendFailure(Component.literal("You do not have permission to manage border colors."));
             return 0;
@@ -171,6 +177,7 @@ public final class BorderCommands {
     }
 
     private static int resetAllColors(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         if (!canManageColors(source)) {
             source.sendFailure(Component.literal("You do not have permission to manage border colors."));
             return 0;
@@ -220,5 +227,11 @@ public final class BorderCommands {
 
     private static String formatHex(int rgb) {
         return String.format("#%06X", rgb & 0xFFFFFF);
+    }
+
+    private static boolean requireModule(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("visualization")) return true;
+        source.sendFailure(Component.literal("Visualization is disabled or blocked by a required dependency."));
+        return false;
     }
 }

@@ -170,6 +170,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int rankHelp(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         source.sendSystemMessage(Component.literal("Rank commands:"));
         source.sendSystemMessage(Component.literal(" /ssu rank list"));
         source.sendSystemMessage(Component.literal(" /ssu rank create|delete|info <rank>"));
@@ -181,6 +182,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int permissionHelp(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         source.sendSystemMessage(Component.literal("Permission commands:"));
         source.sendSystemMessage(Component.literal(" /ssu perm rank <rank> list|set|unset ..."));
         source.sendSystemMessage(Component.literal(" /ssu perm player <player> list|set|unset ..."));
@@ -190,6 +192,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int listRanks(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         source.sendSystemMessage(Component.literal(
                 "Ranks: " + String.join(", ", SimpleServerUtilities.PERMISSIONS.getRankNames())
         ));
@@ -200,6 +203,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int createRank(CommandSourceStack source, String rankName) {
+        if (!requireModule(source)) return 0;
         if (SimpleServerUtilities.PERMISSIONS.getRank(rankName) != null) {
             source.sendFailure(Component.literal("Rank already exists: " + rankName));
             return 0;
@@ -211,6 +215,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int deleteRank(CommandSourceStack source, String rankName) {
+        if (!requireModule(source)) return 0;
         if (!SimpleServerUtilities.PERMISSIONS.deleteRank(rankName)) {
             source.sendFailure(Component.literal(
                     "Could not delete rank. The default/admin rank cannot be deleted, or the rank does not exist."
@@ -222,6 +227,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int renameRank(CommandSourceStack source, String oldName, String newName) {
+        if (!requireModule(source)) return 0;
         if (!SimpleServerUtilities.PERMISSIONS.renameRank(oldName, newName)) {
             source.sendFailure(Component.literal("Could not rename rank. Check whether both names are valid and unique."));
             return 0;
@@ -231,6 +237,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int setDefaultRank(CommandSourceStack source, String rankName) {
+        if (!requireModule(source)) return 0;
         if (SimpleServerUtilities.PERMISSIONS.getRank(rankName) == null) {
             source.sendFailure(Component.literal("Rank not found: " + rankName));
             return 0;
@@ -241,6 +248,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int assignRank(CommandSourceStack source, String playerName, String rankName) {
+        if (!requireModule(source)) return 0;
         UUID playerId = findPlayerId(source, playerName);
         if (playerId == null) {
             source.sendFailure(Component.literal("Unknown player: " + playerName));
@@ -256,6 +264,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int rankInfo(CommandSourceStack source, String rankName) {
+        if (!requireModule(source)) return 0;
         PermissionRank rank = SimpleServerUtilities.PERMISSIONS.getRank(rankName);
         if (rank == null) {
             source.sendFailure(Component.literal("Rank not found: " + rankName));
@@ -269,12 +278,14 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int setRankPermission(CommandSourceStack source, String rankName, String key, String value) {
+        if (!requireModule(source)) return 0;
         SimpleServerUtilities.PERMISSIONS.setRankPermission(rankName, key, value);
         source.sendSystemMessage(Component.literal("Rank permission set: " + key + " = " + value));
         return 1;
     }
 
     private static int unsetRankPermission(CommandSourceStack source, String rankName, String key) {
+        if (!requireModule(source)) return 0;
         if (!SimpleServerUtilities.PERMISSIONS.removeRankPermission(rankName, key)) {
             source.sendFailure(Component.literal("Permission was not directly set on rank: " + key));
             return 0;
@@ -284,6 +295,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int playerInfo(CommandSourceStack source, String playerName) {
+        if (!requireModule(source)) return 0;
         UUID playerId = findPlayerId(source, playerName);
         if (playerId == null) {
             source.sendFailure(Component.literal("Unknown player: " + playerName));
@@ -303,6 +315,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int setPlayerPermission(CommandSourceStack source, String playerName, String key, String value) {
+        if (!requireModule(source)) return 0;
         UUID playerId = findPlayerId(source, playerName);
         if (playerId == null) {
             source.sendFailure(Component.literal("Unknown player: " + playerName));
@@ -314,6 +327,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int unsetPlayerPermission(CommandSourceStack source, String playerName, String key) {
+        if (!requireModule(source)) return 0;
         UUID playerId = findPlayerId(source, playerName);
         if (playerId == null) {
             source.sendFailure(Component.literal("Unknown player: " + playerName));
@@ -328,6 +342,7 @@ public final class UnifiedPermissionCommands {
     }
 
     private static int check(CommandSourceStack source, String playerName, String key) {
+        if (!requireModule(source)) return 0;
         ServerPlayer target = source.getServer().getPlayerList().getPlayerByName(playerName);
         if (target == null) {
             source.sendFailure(Component.literal("Permission checks require an online player: " + playerName));
@@ -362,5 +377,11 @@ public final class UnifiedPermissionCommands {
                 .forEach(entry -> source.sendSystemMessage(Component.literal(
                         " - " + entry.getKey() + " = " + entry.getValue()
                 )));
+    }
+
+    private static boolean requireModule(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("permissions")) return true;
+        source.sendFailure(Component.literal("Permissions is disabled or blocked by a required dependency."));
+        return false;
     }
 }

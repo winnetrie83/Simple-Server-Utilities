@@ -21,11 +21,13 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 /** Enforces the no-world-actions onboarding state until the player explicitly completes it. */
 public final class OnboardingEvents {
     private OnboardingEvents() {}
-    private static boolean locked(ServerPlayer player) { return player != null && !SimpleServerUtilities.MODERATION.restricted(player.getUUID()) && SimpleServerUtilities.ONBOARDING.restricted(player.getUUID()); }
+    private static boolean active() { return SimpleServerUtilities.CORE.modules().isActive("onboarding"); }
+    private static boolean moderated(ServerPlayer player) { return SimpleServerUtilities.CORE.modules().isActive("moderation") && SimpleServerUtilities.MODERATION.restricted(player.getUUID()); }
+    private static boolean locked(ServerPlayer player) { return active() && player != null && !moderated(player) && SimpleServerUtilities.ONBOARDING.restricted(player.getUUID()); }
 
-    @SubscribeEvent(priority=EventPriority.LOWEST) public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) { if (event.getEntity() instanceof ServerPlayer player && !SimpleServerUtilities.MODERATION.restricted(player.getUUID())) SimpleServerUtilities.ONBOARDING.onLogin(player); }
-    @SubscribeEvent public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) { if (event.getEntity() instanceof ServerPlayer player) SimpleServerUtilities.ONBOARDING.onLogout(player); }
-    @SubscribeEvent public static void onTick(ServerTickEvent.Post event) { SimpleServerUtilities.ONBOARDING.tick(event.getServer()); }
+    @SubscribeEvent(priority=EventPriority.LOWEST) public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) { if (active() && event.getEntity() instanceof ServerPlayer player && !moderated(player)) SimpleServerUtilities.ONBOARDING.onLogin(player); }
+    @SubscribeEvent public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) { if (active() && event.getEntity() instanceof ServerPlayer player) SimpleServerUtilities.ONBOARDING.onLogout(player); }
+    @SubscribeEvent public static void onTick(ServerTickEvent.Post event) { if (active()) SimpleServerUtilities.ONBOARDING.tick(event.getServer()); }
 
     @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onRightBlock(PlayerInteractEvent.RightClickBlock event) { if (event.getEntity() instanceof ServerPlayer p && locked(p)) { event.setCanceled(true); event.setCancellationResult(InteractionResult.FAIL); } }
     @SubscribeEvent(priority=EventPriority.HIGHEST) public static void onRightItem(PlayerInteractEvent.RightClickItem event) { if (event.getEntity() instanceof ServerPlayer p && locked(p)) { event.setCanceled(true); event.setCancellationResult(InteractionResult.FAIL); } }

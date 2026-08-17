@@ -21,12 +21,14 @@ public final class DamageIndicatorEvents {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onDamage(LivingDamageEvent.Post event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("identity")) return;
         float amount = Math.max(0.0F, event.getInflictedDamage());
         if (amount > 0.0001F) send(event.getEntity(), amount, false);
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onHeal(LivingHealEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("identity")) return;
         if (event.isCanceled()) return;
         LivingEntity entity = event.getEntity();
         float actual = Math.min(Math.max(0.0F, event.getAmount()), Math.max(0.0F, entity.getMaxHealth() - entity.getHealth()));

@@ -1,5 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.dimension;
 
+import be.winnetrie.mod.simpleserverutilities.Config;
 import java.util.Set;
 
 import be.winnetrie.mod.simpleserverutilities.core.module.SsuModule;
@@ -18,10 +19,9 @@ public final class DimensionModule implements SsuModule {
         return "dimensions";
     }
 
-    @Override
-    public Set<String> dependencies() {
-        return Set.of("storage", "permissions");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage"); }
+    @Override public boolean isEnabled() { return Config.ENABLE_DIMENSIONS.get(); }
+    @Override public Set<String> optionalDependencies() { return Set.of("permissions", "server_operations"); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

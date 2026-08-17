@@ -2,6 +2,7 @@ package be.winnetrie.mod.simpleserverutilities.content;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
 import net.minecraft.server.level.ServerPlayer;
@@ -15,12 +16,12 @@ public final class ContentAccessPolicy {
     }
 
     public static boolean moduleEnabled(ContentFeature feature) {
-        return switch (feature) {
-            case NPCS -> Config.ENABLE_NPCS.get();
-            case QUESTS -> Config.ENABLE_QUESTS.get();
-            case MINIGAMES -> Config.ENABLE_MINIGAMES.get();
-            case DUNGEONS -> Config.ENABLE_DUNGEONS.get();
-        };
+        return SsuModuleAccess.active(switch (feature) {
+            case NPCS -> "npcs";
+            case QUESTS -> "quests";
+            case MINIGAMES -> "minigames";
+            case DUNGEONS -> "dungeons";
+        });
     }
 
     public static boolean canUse(ServerPlayer player, ContentFeature feature) {
@@ -29,7 +30,8 @@ public final class ContentAccessPolicy {
     }
 
     public static boolean canAdmin(ServerPlayer player, ContentFeature feature) {
-        return player != null && PermissionService.getBoolean(player, adminPermission(feature), false);
+        return player != null && moduleEnabled(feature)
+                && PermissionService.getBoolean(player, adminPermission(feature), false);
     }
 
     public static String usePermission(ContentFeature feature) {
@@ -91,7 +93,7 @@ public final class ContentAccessPolicy {
      */
     public static QuestAccessMode effectiveQuestAccessMode() {
         QuestAccessMode configured = configuredQuestAccessMode();
-        if (!Config.ENABLE_NPCS.get() || !SimpleServerUtilities.CORE.modules().isActive("npcs")) {
+        if (!SsuModuleAccess.active("npcs")) {
             return configured == QuestAccessMode.NPC ? QuestAccessMode.MENU : configured;
         }
         return configured;

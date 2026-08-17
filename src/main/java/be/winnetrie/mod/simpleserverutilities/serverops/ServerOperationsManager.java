@@ -52,6 +52,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.core.performance.SsuPerformanceMonitor;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyAccount;
@@ -217,12 +218,12 @@ public final class ServerOperationsManager {
     public ServerOperationsState state() { return state; }
 
     public boolean canAdmin(ServerPlayer player) {
-        return player != null && (PermissionService.isAdmin(player)
+        return SimpleServerUtilities.CORE.modules().isActive("server_operations") && player != null && (PermissionService.isAdmin(player)
                 || PermissionService.getBoolean(player, PermissionKeys.SERVER_OPERATIONS_ADMIN, false));
     }
 
     public boolean canUseReports(ServerPlayer player) {
-        return player != null && PermissionService.getBoolean(player, PermissionKeys.REPORTS_USE, true);
+        return SimpleServerUtilities.CORE.modules().isActive("server_operations") && player != null && PermissionService.getBoolean(player, PermissionKeys.REPORTS_USE, true);
     }
 
     public void beginTick() {
@@ -278,7 +279,8 @@ public final class ServerOperationsManager {
 
     private static boolean transientGameplay(ServerPlayer player) {
         UUID id = player.getUUID();
-        return SimpleServerUtilities.MINIGAMES.isInMatch(id, "") || SimpleServerUtilities.DUNGEONS.isInRun(id, "");
+        return (SsuModuleAccess.active("minigames") && SimpleServerUtilities.MINIGAMES.isInMatch(id, ""))
+                || (SsuModuleAccess.active("dungeons") && SimpleServerUtilities.DUNGEONS.isInRun(id, ""));
     }
 
     private synchronized void recordActivity(ActivityEntry entry) {
@@ -1332,8 +1334,10 @@ public final class ServerOperationsManager {
         for (ServerPlayer online : server.getPlayerList().getPlayers()) {
             if (!online.getUUID().equals(viewer.getUUID())) known.put(online.getUUID(), online.getName().getString());
         }
-        for (var player : SimpleServerUtilities.PERMISSIONS.getKnownPlayers()) {
-            if (!player.playerId().equals(viewer.getUUID())) known.putIfAbsent(player.playerId(), player.name());
+        if (SsuModuleAccess.active("permissions")) {
+            for (var player : SimpleServerUtilities.PERMISSIONS.getKnownPlayers()) {
+                if (!player.playerId().equals(viewer.getUUID())) known.putIfAbsent(player.playerId(), player.name());
+            }
         }
         known.entrySet().stream()
                 .sorted(Map.Entry.comparingByValue(String.CASE_INSENSITIVE_ORDER))
@@ -1422,6 +1426,20 @@ public final class ServerOperationsManager {
 
     private JsonObject economyJson() {
         JsonObject value = new JsonObject();
+        if (!SimpleServerUtilities.CORE.modules().isActive("economy")) {
+            value.addProperty("enabled", false);
+            value.addProperty("accounts", 0);
+            value.addProperty("supply", 0L);
+            value.addProperty("transactions", 0);
+            value.addProperty("prepared", 0);
+            value.addProperty("committed", 0);
+            value.add("richest", new JsonArray());
+            value.addProperty("volume24h", 0L);
+            value.add("types", new JsonArray());
+            value.add("alerts", new JsonArray());
+            return value;
+        }
+        value.addProperty("enabled", true);
         var stats = SimpleServerUtilities.ECONOMY.statistics();
         value.addProperty("accounts", stats.accounts());
         value.addProperty("supply", stats.totalSupplyMinor());
@@ -1606,15 +1624,38 @@ public final class ServerOperationsManager {
         try {
             UUID id = UUID.fromString(query);
             ServerPlayer online = server.getPlayerList().getPlayer(id);
-            String name = online == null ? SimpleServerUtilities.MODERATION.name(id) : online.getName().getString();
+            String name = online == null ? knownPlayerName(id) : online.getName().getString();
             return name == null || name.isBlank() ? null : new ResolvedPlayer(id, name);
         } catch (IllegalArgumentException ignored) { }
         ServerPlayer online = server.getPlayerList().getPlayerByName(query);
         if (online != null) return new ResolvedPlayer(online.getUUID(), online.getName().getString());
-        UUID id = SimpleServerUtilities.MODERATION.resolvePlayer(query);
+        if (SsuModuleAccess.active("moderation")) {
+            UUID id = SimpleServerUtilities.MODERATION.resolvePlayer(query);
+            if (id != null) {
+                String name = SimpleServerUtilities.MODERATION.name(id);
+                return new ResolvedPlayer(id, name == null || name.isBlank() ? query : name);
+            }
+        }
+        if (SsuModuleAccess.active("permissions")) {
+            for (var known : SimpleServerUtilities.PERMISSIONS.getKnownPlayers()) {
+                if (known.name().equalsIgnoreCase(query)) return new ResolvedPlayer(known.playerId(), known.name());
+            }
+        }
+        return null;
+    }
+
+    private String knownPlayerName(UUID id) {
         if (id == null) return null;
-        String name = SimpleServerUtilities.MODERATION.name(id);
-        return new ResolvedPlayer(id, name == null || name.isBlank() ? query : name);
+        if (SsuModuleAccess.active("moderation")) {
+            String name = SimpleServerUtilities.MODERATION.name(id);
+            if (name != null && !name.isBlank()) return name;
+        }
+        if (SsuModuleAccess.active("permissions")) {
+            for (var known : SimpleServerUtilities.PERMISSIONS.getKnownPlayers()) {
+                if (known.playerId().equals(id)) return known.name();
+            }
+        }
+        return null;
     }
 
     private ServerLevel level(String rawId) {

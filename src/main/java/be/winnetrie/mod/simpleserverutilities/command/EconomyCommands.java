@@ -8,6 +8,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyAccount;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyResult;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyTransactionRecord;
@@ -26,7 +27,7 @@ public final class EconomyCommands {
 
     public static LiteralArgumentBuilder<CommandSourceStack> buildPlayerRoot() {
         return Commands.literal("economy")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                .requires(source -> SsuModuleAccess.active("economy") && source.getEntity() instanceof ServerPlayer)
                 .executes(context -> balance(context.getSource()))
                 .then(Commands.literal("balance")
                         .executes(context -> balance(context.getSource())))
@@ -41,13 +42,13 @@ public final class EconomyCommands {
 
     public static LiteralArgumentBuilder<CommandSourceStack> buildBalanceAlias() {
         return Commands.literal("balance")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                .requires(source -> SsuModuleAccess.active("economy") && source.getEntity() instanceof ServerPlayer)
                 .executes(context -> balance(context.getSource()));
     }
 
     public static LiteralArgumentBuilder<CommandSourceStack> buildPayAlias() {
         return Commands.literal("pay")
-                .requires(source -> source.getEntity() instanceof ServerPlayer)
+                .requires(source -> SsuModuleAccess.active("economy") && source.getEntity() instanceof ServerPlayer)
                 .then(Commands.argument("player", StringArgumentType.word())
                         .then(Commands.argument("amount", StringArgumentType.word())
                                 .executes(context -> pay(
@@ -114,6 +115,7 @@ public final class EconomyCommands {
     }
 
     private static int balance(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = requirePlayer(source);
         if (player == null) {
             return 0;
@@ -135,6 +137,7 @@ public final class EconomyCommands {
     }
 
     private static int pay(CommandSourceStack source, String targetName, String rawAmount) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = requirePlayer(source);
         if (player == null) {
             return 0;
@@ -191,6 +194,7 @@ public final class EconomyCommands {
     }
 
     private static int historySelf(CommandSourceStack source, int limit) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = requirePlayer(source);
         if (player == null) {
             return 0;
@@ -204,6 +208,7 @@ public final class EconomyCommands {
     }
 
     private static int status(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) {
             source.sendFailure(Component.literal("You do not have permission to manage the economy."));
             return 0;
@@ -224,6 +229,7 @@ public final class EconomyCommands {
     }
 
     private static int showHistoryLimit(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) {
             source.sendFailure(Component.literal("You do not have permission to manage the economy."));
             return 0;
@@ -234,6 +240,7 @@ public final class EconomyCommands {
     }
 
     private static int setHistoryLimit(CommandSourceStack source, int limit) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) {
             source.sendFailure(Component.literal("You do not have permission to manage the economy."));
             return 0;
@@ -245,6 +252,7 @@ public final class EconomyCommands {
     }
 
     private static int adminBalance(CommandSourceStack source, String targetName) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) {
             source.sendFailure(Component.literal("You do not have permission to manage the economy."));
             return 0;
@@ -261,6 +269,7 @@ public final class EconomyCommands {
     }
 
     private static int adminGive(CommandSourceStack source, String targetName, String rawAmount) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) {
             source.sendFailure(Component.literal("You do not have permission to manage the economy."));
             return 0;
@@ -280,6 +289,7 @@ public final class EconomyCommands {
     }
 
     private static int adminTake(CommandSourceStack source, String targetName, String rawAmount) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) {
             source.sendFailure(Component.literal("You do not have permission to manage the economy."));
             return 0;
@@ -299,6 +309,7 @@ public final class EconomyCommands {
     }
 
     private static int adminSet(CommandSourceStack source, String targetName, String rawAmount) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) {
             source.sendFailure(Component.literal("You do not have permission to manage the economy."));
             return 0;
@@ -326,6 +337,7 @@ public final class EconomyCommands {
     }
 
     private static int adminHistory(CommandSourceStack source, String targetName, int limit) {
+        if (!requireModule(source)) return 0;
         if (!canAdmin(source)) {
             source.sendFailure(Component.literal("You do not have permission to manage the economy."));
             return 0;
@@ -338,6 +350,7 @@ public final class EconomyCommands {
     }
 
     private static int sendHistory(CommandSourceStack source, UUID playerId, String displayName, int limit) {
+        if (!requireModule(source)) return 0;
         List<EconomyTransactionRecord> history = SimpleServerUtilities.ECONOMY.history(playerId, limit);
         source.sendSystemMessage(Component.literal("Recent economy transactions for " + displayName + ":"));
         if (history.isEmpty()) {
@@ -373,6 +386,7 @@ public final class EconomyCommands {
             String verb,
             long amount
     ) {
+        if (!requireModule(source)) return 0;
         if (!result.successful()) {
             source.sendFailure(Component.literal("Balance change failed: " + result.message()));
             return 0;
@@ -428,5 +442,11 @@ public final class EconomyCommands {
 
     private static String actorName(CommandSourceStack source) {
         return source.getEntity() instanceof ServerPlayer player ? player.getName().getString() : "console";
+    }
+
+    private static boolean requireModule(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("economy")) return true;
+        source.sendFailure(Component.literal("Economy is disabled or blocked by a required dependency."));
+        return false;
     }
 }

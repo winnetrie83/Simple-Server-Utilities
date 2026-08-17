@@ -150,8 +150,9 @@ public final class AuctionHouseManager {
 
     public boolean enabled() {
         return Config.ENABLE_AUCTION_HOUSE.get()
-                && Config.ENABLE_MAIL.get()
-                && SimpleServerUtilities.ECONOMY.settings().isEnabled();
+                && SimpleServerUtilities.CORE.modules().isActive("auction_house")
+                && SimpleServerUtilities.CORE.modules().isActive("mail")
+                && SimpleServerUtilities.ECONOMY.isEnabled();
     }
 
     public boolean canAccess(ServerPlayer player) {
@@ -166,7 +167,7 @@ public final class AuctionHouseManager {
     }
 
     public boolean canAdmin(ServerPlayer player) {
-        return player != null && PermissionService.getBoolean(player, PermissionKeys.AUCTION_HOUSE_ADMIN, false);
+        return player != null && enabled() && PermissionService.getBoolean(player, PermissionKeys.AUCTION_HOUSE_ADMIN, false);
     }
 
     public int maxAuctions(ServerPlayer player) {
@@ -226,6 +227,7 @@ public final class AuctionHouseManager {
     }
 
     public void handleRequest(AuctionHouseRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("auction_house")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         synchronized (this) {
             if (!canContinueSession(player)) {
@@ -239,6 +241,7 @@ public final class AuctionHouseManager {
     }
 
     public void handleAction(AuctionHouseActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("auction_house")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         synchronized (this) {
             String action = payload.action().trim().toLowerCase(Locale.ROOT);

@@ -21,6 +21,7 @@ public final class NpcLoadoutService {
     }
 
     public static void handleOpen(NpcLoadoutOpenRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         open(player, payload.instanceId(), payload.mode());
     }
@@ -64,6 +65,7 @@ public final class NpcLoadoutService {
     }
 
     public static void handleSave(NpcLoadoutSavePayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         Result result = save(player, payload);
         PacketDistributor.sendToPlayer(player,

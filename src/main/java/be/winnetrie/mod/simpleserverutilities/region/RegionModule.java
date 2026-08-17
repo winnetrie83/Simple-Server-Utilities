@@ -20,6 +20,7 @@ public final class RegionModule implements SsuModule {
     private final RegionSnapshotManager snapshots;
     private final RegionRentJournalManager rentJournal;
     private final RegionSelectionToolManager selectionTools;
+    private boolean economyIntegrationActive;
 
     public RegionModule(
             RegionManager manager,
@@ -38,15 +39,11 @@ public final class RegionModule implements SsuModule {
         return "regions";
     }
 
-    @Override
-    public boolean isEnabled() {
-        return Config.ENABLE_ADMIN_REGIONS.get();
-    }
+    @Override public boolean isEnabled() { return Config.ENABLE_ADMIN_REGIONS.get(); }
 
-    @Override
-    public Set<String> dependencies() {
-        return Set.of("economy", "permissions", "storage", "jobs");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage", "jobs"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("economy", "permissions", "server_operations", "claims", "minigames"); }
+    @Override public Set<String> integrationDependencies() { return Set.of("teleport", "visualization"); }
 
     @Override
     public void initialize(SsuServiceRegistry services) {
@@ -60,7 +57,20 @@ public final class RegionModule implements SsuModule {
     public void onServerStarting(MinecraftServer server) {
         manager.load(server);
         snapshots.load(server);
-        rentJournal.loadAndRecover(server);
+        syncEconomyIntegration(server);
+    }
+
+    @Override
+    public void onDependencyStateChanged(MinecraftServer server) {
+        syncEconomyIntegration(server);
+    }
+
+    private void syncEconomyIntegration(MinecraftServer server) {
+        boolean active = SimpleServerUtilities.CORE.modules().isActive("economy");
+        if (active == economyIntegrationActive) return;
+        economyIntegrationActive = active;
+        if (active) rentJournal.loadAndRecover(server);
+        else rentJournal.clear();
     }
 
     @Override
@@ -74,6 +84,7 @@ public final class RegionModule implements SsuModule {
         manager.clear();
         snapshots.clear();
         rentJournal.clear();
+        economyIntegrationActive = false;
         selectionTools.clear();
         RegionInteractionEvents.clearRuntimeState();
     }

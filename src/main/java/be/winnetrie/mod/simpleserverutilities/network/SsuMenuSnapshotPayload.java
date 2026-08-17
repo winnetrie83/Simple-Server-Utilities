@@ -153,17 +153,79 @@ public record SsuMenuSnapshotPayload(
         buffer.writeVarInt(settings.hologramRenderDistance());
         buffer.writeVarInt(settings.claimBorderRenderDistance());
         buffer.writeVarInt(settings.regionBorderRenderDistance());
+        List<ModuleStateSummary> states = settings.moduleStates();
+        buffer.writeVarInt(states.size());
+        for (ModuleStateSummary state : states) {
+            buffer.writeUtf(state.id(), 64);
+            buffer.writeBoolean(state.coreInfrastructure());
+            buffer.writeBoolean(state.configuredEnabled());
+            buffer.writeBoolean(state.active());
+            buffer.writeUtf(state.disabledReason(), 256);
+            writeModuleDependencyList(buffer, state.requiredDependencies());
+            writeModuleDependencyList(buffer, state.optionalDependencies());
+            writeModuleDependencyList(buffer, state.integrationDependencies());
+        }
     }
 
     private static ModuleSettingsSummary readModuleSettings(RegistryFriendlyByteBuf buffer) {
+        boolean claims = buffer.readBoolean();
+        boolean homes = buffer.readBoolean();
+        boolean warps = buffer.readBoolean();
+        boolean regions = buffer.readBoolean();
+        boolean treecapitator = buffer.readBoolean();
+        boolean veinminer = buffer.readBoolean();
+        boolean cropHarvesting = buffer.readBoolean();
+        boolean holograms = buffer.readBoolean();
+        boolean blockInformation = buffer.readBoolean();
+        boolean statistics = buffer.readBoolean();
+        boolean achievements = buffer.readBoolean();
+        boolean mail = buffer.readBoolean();
+        boolean auctionHouse = buffer.readBoolean();
+        boolean npcs = buffer.readBoolean();
+        boolean quests = buffer.readBoolean();
+        boolean minigames = buffer.readBoolean();
+        boolean dungeons = buffer.readBoolean();
+        String questAccessMode = buffer.readUtf(16);
+        String effectiveQuestAccessMode = buffer.readUtf(16);
+        boolean permissions = buffer.readBoolean();
+        boolean remoteHologramImages = buffer.readBoolean();
+        int hologramRenderDistance = buffer.readVarInt();
+        int claimBorderRenderDistance = buffer.readVarInt();
+        int regionBorderRenderDistance = buffer.readVarInt();
+        int stateCount = readBoundedSize(buffer, 128, "module states");
+        List<ModuleStateSummary> states = new ArrayList<>(stateCount);
+        for (int i = 0; i < stateCount; i++) {
+            states.add(new ModuleStateSummary(
+                    buffer.readUtf(64),
+                    buffer.readBoolean(),
+                    buffer.readBoolean(),
+                    buffer.readBoolean(),
+                    buffer.readUtf(256),
+                    readModuleDependencyList(buffer),
+                    readModuleDependencyList(buffer),
+                    readModuleDependencyList(buffer)
+            ));
+        }
         return new ModuleSettingsSummary(
-                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
-                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
-                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
-                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
-                buffer.readBoolean(), buffer.readUtf(16), buffer.readUtf(16), buffer.readBoolean(), buffer.readBoolean(),
-                buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt()
+                claims, homes, warps, regions, treecapitator, veinminer, cropHarvesting, holograms,
+                blockInformation, statistics, achievements, mail, auctionHouse, npcs, quests, minigames,
+                dungeons, questAccessMode, effectiveQuestAccessMode, permissions, remoteHologramImages,
+                hologramRenderDistance, claimBorderRenderDistance, regionBorderRenderDistance, states
         );
+    }
+
+    private static void writeModuleDependencyList(RegistryFriendlyByteBuf buffer, List<String> values) {
+        List<String> safe = values == null ? List.of() : values;
+        if (safe.size() > 64) throw new IllegalArgumentException("Too many module dependencies: " + safe.size());
+        buffer.writeVarInt(safe.size());
+        for (String value : safe) buffer.writeUtf(value == null ? "" : value, 64);
+    }
+
+    private static List<String> readModuleDependencyList(RegistryFriendlyByteBuf buffer) {
+        int size = readBoundedSize(buffer, 64, "module dependencies");
+        List<String> values = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) values.add(buffer.readUtf(64));
+        return List.copyOf(values);
     }
 
     private static void writeAdminAccess(RegistryFriendlyByteBuf buffer, AdminAccessSummary access) {
@@ -499,7 +561,8 @@ public record SsuMenuSnapshotPayload(
             boolean remoteHologramImages,
             int hologramRenderDistance,
             int claimBorderRenderDistance,
-            int regionBorderRenderDistance
+            int regionBorderRenderDistance,
+            List<ModuleStateSummary> moduleStates
     ) {
         public ModuleSettingsSummary {
             questAccessMode = questAccessMode == null ? "menu" : questAccessMode;
@@ -507,11 +570,38 @@ public record SsuMenuSnapshotPayload(
             hologramRenderDistance = Math.max(8, Math.min(512, hologramRenderDistance));
             claimBorderRenderDistance = Math.max(16, Math.min(512, claimBorderRenderDistance));
             regionBorderRenderDistance = Math.max(16, Math.min(512, regionBorderRenderDistance));
+            moduleStates = moduleStates == null ? List.of() : List.copyOf(moduleStates);
+            if (moduleStates.size() > 128) throw new IllegalArgumentException("Too many module states: " + moduleStates.size());
+        }
+
+        public ModuleStateSummary state(String rawId) {
+            if (rawId == null) return null;
+            for (ModuleStateSummary state : moduleStates) if (state.id().equalsIgnoreCase(rawId)) return state;
+            return null;
         }
 
         public static ModuleSettingsSummary defaults() {
             return new ModuleSettingsSummary(true, true, true, true, true, true, true, true, true, true,
-                    true, true, true, false, false, false, false, "menu", "menu", true, true, 64, 128, 128);
+                    true, true, true, false, false, false, false, "menu", "menu", true, true, 64, 128, 128, List.of());
+        }
+    }
+
+    public record ModuleStateSummary(
+            String id,
+            boolean coreInfrastructure,
+            boolean configuredEnabled,
+            boolean active,
+            String disabledReason,
+            List<String> requiredDependencies,
+            List<String> optionalDependencies,
+            List<String> integrationDependencies
+    ) {
+        public ModuleStateSummary {
+            id = id == null ? "" : id;
+            disabledReason = disabledReason == null ? "" : disabledReason;
+            requiredDependencies = requiredDependencies == null ? List.of() : List.copyOf(requiredDependencies);
+            optionalDependencies = optionalDependencies == null ? List.of() : List.copyOf(optionalDependencies);
+            integrationDependencies = integrationDependencies == null ? List.of() : List.copyOf(integrationDependencies);
         }
     }
 

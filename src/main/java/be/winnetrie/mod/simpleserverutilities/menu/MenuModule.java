@@ -19,11 +19,8 @@ public final class MenuModule implements SsuModule {
         return "menu";
     }
 
-    @Override
-    public Set<String> dependencies() {
-        return Set.of("claims", "regions", "permissions", "economy", "homes", "warps",
-                "ui_preferences", "teleport", "visualization", "jobs", "performance");
-    }
+    @Override public Set<String> requiredDependencies() { return Set.of("ui_preferences", "jobs", "performance"); }
+    @Override public boolean isCoreInfrastructure() { return true; }
 
     @Override
     public void initialize(SsuServiceRegistry services) {

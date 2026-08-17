@@ -17,6 +17,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.PlayerIdentitySyncPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RankDisplayDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.RankDisplayRequestPayload;
@@ -103,7 +104,9 @@ public final class PlayerIdentityManager {
         boolean dirty = false;
         if (data == null) {
             data = new PlayerIdentityData();
-            data.selectedTitleId = legacyTitleId(SimpleServerUtilities.MINIGAMES.legacySelectedTitle(id));
+            data.selectedTitleId = SsuModuleAccess.active("minigames")
+                    ? legacyTitleId(SimpleServerUtilities.MINIGAMES.legacySelectedTitle(id))
+                    : "";
             players.put(id, data);
             dirty = true;
         }
@@ -147,11 +150,13 @@ public final class PlayerIdentityManager {
     }
 
     public void handleTitleRequest(TitleManagerRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("identity")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         sendTitleData(player, payload.adminView(), "", false, payload.requestId());
     }
 
     public void handleTitleAction(TitleManagerActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("identity")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         String notice;
         boolean error = false;
@@ -227,9 +232,15 @@ public final class PlayerIdentityManager {
     }
 
     public void handleRankDisplayRequest(RankDisplayRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("identity")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (!canAdmin(player)) {
             PacketDistributor.sendToPlayer(player, new RankDisplayDataPayload(payload.rankName(), "", "Permission administration access is required.", true));
+            return;
+        }
+        if (!SsuModuleAccess.active("permissions")) {
+            PacketDistributor.sendToPlayer(player, new RankDisplayDataPayload(payload.rankName(), "",
+                    "Permissions is disabled; rank display editing is unavailable.", true));
             return;
         }
         PermissionRank rank = SimpleServerUtilities.PERMISSIONS.getRank(payload.rankName());
@@ -238,9 +249,15 @@ public final class PlayerIdentityManager {
     }
 
     public void handleRankDisplaySave(RankDisplaySavePayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("identity")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (!canAdmin(player)) {
             PacketDistributor.sendToPlayer(player, new RankDisplayDataPayload(payload.rankName(), payload.encodedPrefix(), "Permission administration access is required.", true));
+            return;
+        }
+        if (!SsuModuleAccess.active("permissions")) {
+            PacketDistributor.sendToPlayer(player, new RankDisplayDataPayload(payload.rankName(), payload.encodedPrefix(),
+                    "Permissions is disabled; rank display editing is unavailable.", true));
             return;
         }
         PermissionRank rank = SimpleServerUtilities.PERMISSIONS.getRank(payload.rankName());
@@ -255,6 +272,7 @@ public final class PlayerIdentityManager {
     }
 
     public MutableComponent rankPrefix(UUID playerId) {
+        if (!SsuModuleAccess.active("permissions")) return Component.empty();
         String rankName = SimpleServerUtilities.PERMISSIONS.getPrimaryRankName(playerId);
         PermissionRank rank = SimpleServerUtilities.PERMISSIONS.getRank(rankName);
         String encoded = rank == null ? "" : rank.getDisplayPrefix();
@@ -291,6 +309,7 @@ public final class PlayerIdentityManager {
     }
 
     private String encodedRankPrefix(UUID playerId) {
+        if (!SsuModuleAccess.active("permissions")) return "";
         String rankName = SimpleServerUtilities.PERMISSIONS.getPrimaryRankName(playerId);
         PermissionRank rank = SimpleServerUtilities.PERMISSIONS.getRank(rankName);
         String encoded = rank == null ? "" : rank.getDisplayPrefix();
@@ -368,9 +387,12 @@ public final class PlayerIdentityManager {
         if (data.manuallyUnlockedTitles.contains(definition.id)) return true;
         return switch (definition.unlockType) {
             case FREE -> true;
-            case MINIGAME_LEVEL -> SimpleServerUtilities.MINIGAMES.progressionLevel(player.getUUID()) >= definition.requirement;
-            case MINIGAME_WINS -> SimpleServerUtilities.MINIGAMES.progressionWins(player.getUUID()) >= definition.requirement;
-            case RANK -> SimpleServerUtilities.PERMISSIONS.getAssignedRankNames(player.getUUID()).stream()
+            case MINIGAME_LEVEL -> SsuModuleAccess.active("minigames")
+                    && SimpleServerUtilities.MINIGAMES.progressionLevel(player.getUUID()) >= definition.requirement;
+            case MINIGAME_WINS -> SsuModuleAccess.active("minigames")
+                    && SimpleServerUtilities.MINIGAMES.progressionWins(player.getUUID()) >= definition.requirement;
+            case RANK -> SsuModuleAccess.active("permissions")
+                    && SimpleServerUtilities.PERMISSIONS.getAssignedRankNames(player.getUUID()).stream()
                     .anyMatch(value -> value.equalsIgnoreCase(definition.requirementValue));
             case PERMISSION -> !definition.requirementValue.isBlank()
                     && PermissionService.getBooleanWithoutOperatorBypass(player, definition.requirementValue, false);

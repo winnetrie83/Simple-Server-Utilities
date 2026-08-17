@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.claim.tax;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
@@ -12,6 +13,10 @@ public final class PlayerClaimTaxEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
+        if (!SsuModuleAccess.active("claims") || !SsuModuleAccess.active("economy")) {
+            nextTick = 0L;
+            return;
+        }
         long tick = event.getServer().getTickCount();
         if (tick + INTERVAL_TICKS < nextTick) nextTick = 0L;
         if (tick < nextTick) return;

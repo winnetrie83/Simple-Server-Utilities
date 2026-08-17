@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.region;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.command.RegionCommands;
 import be.winnetrie.mod.simpleserverutilities.economy.MoneyFormat;
 import be.winnetrie.mod.simpleserverutilities.network.RegionEditorOpenPayload;
@@ -29,6 +30,7 @@ public final class RegionEditorService {
     }
 
     public static void handleSubmit(RegionEditorSubmitPayload payload, IPayloadContext context) {
+        if (!SsuModuleAccess.active("regions")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         Result result = create(player, payload);
         PacketDistributor.sendToPlayer(player,
@@ -50,8 +52,10 @@ public final class RegionEditorService {
             return Result.fail("Use 1-64 letters, numbers, dots, underscores or dashes for the name.");
         }
 
+        boolean economyActive = SsuModuleAccess.active("economy");
         long priceMinor = 0L;
         if (payload.rentable()) {
+            if (!economyActive) return Result.fail("Economy is disabled, so a new rentable region cannot be configured.");
             try {
                 priceMinor = MoneyFormat.parseMinor(payload.rentPrice().isBlank() ? "0" : payload.rentPrice(),
                         SimpleServerUtilities.ECONOMY.settings());
@@ -94,14 +98,14 @@ public final class RegionEditorService {
 
         RegionRentData rent = region.getRentData();
         rent.setRentable(payload.rentable());
-        rent.setPriceMinor(priceMinor, SimpleServerUtilities.ECONOMY.settings());
+        if (economyActive) rent.setPriceMinor(priceMinor, SimpleServerUtilities.ECONOMY.settings());
         rent.setPeriodDays(payload.rentable() ? payload.rentPeriodDays() : -1);
         rent.setResetOnExpire(payload.resetOnExpire());
         rent.setResetOnUnrent(payload.resetOnUnrent());
 
         SimpleServerUtilities.REGIONS.save();
         RegionCommands.getSelectionManager().clear(player);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
         return Result.ok("Region '" + name + "' created.");
     }
 

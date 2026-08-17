@@ -14,7 +14,7 @@ public final class CommunityStatisticsModule implements SsuModule {
     public CommunityStatisticsModule(CommunityStatisticsManager manager) { this.manager = manager; }
 
     @Override public String id() { return "community_statistics"; }
-    @Override public Set<String> dependencies() { return Set.of("storage", "content_core"); }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage", "content_core"); }
     @Override public boolean isEnabled() { return Config.ENABLE_COMMUNITY_STATISTICS.get(); }
     @Override public void initialize(SsuServiceRegistry services) { services.register(CommunityStatisticsManager.class, manager); }
     @Override public void onServerStarting(MinecraftServer server) { manager.load(server); }

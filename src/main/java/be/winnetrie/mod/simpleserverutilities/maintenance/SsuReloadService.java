@@ -24,15 +24,29 @@ public final class SsuReloadService {
                     + " long-running job(s) are active. Finish or cancel them first.");
         }
 
+        // Remember which feature modules were already running. refreshEnabledState()
+        // starts newly enabled modules itself, so those must not be loaded a second
+        // time below. Modules that stay active are explicitly reloaded from disk.
+        boolean economyWasActive = active("economy");
+        boolean claimsWasActive = active("claims");
+        boolean permissionsWasActive = active("permissions");
+        boolean mailWasActive = active("mail");
+        boolean auctionWasActive = active("auction_house");
+        boolean homesWasActive = active("homes");
+        boolean warpsWasActive = active("warps");
+        boolean spawnWasActive = active("spawn");
+        boolean regionsWasActive = active("regions");
+        boolean visualizationWasActive = active("visualization");
         boolean achievementsWasActive = active("achievements");
         boolean statisticsWasActive = active("statistics");
         boolean mapMarkersWasActive = active("map_markers");
-        boolean auctionWasActive = active("auction_house");
         boolean npcsWasActive = active("npcs");
         boolean npcShopsWasActive = active("npc_shops");
         boolean questsWasActive = active("quests");
         boolean minigamesWasActive = active("minigames");
         boolean dungeonsWasActive = active("dungeons");
+        boolean hologramsWasActive = active("holograms");
+        boolean utilityMiningWasActive = active("utility_mining");
 
         if (achievementsWasActive) SimpleServerUtilities.ACHIEVEMENTS.saveAll();
         if (statisticsWasActive) SimpleServerUtilities.STATISTICS.saveAll();
@@ -57,51 +71,60 @@ public final class SsuReloadService {
         SimpleServerUtilities.TEMPORARY_PERMISSIONS.saveAll();
         SimpleServerUtilities.STORAGE.flush(Duration.ofSeconds(5));
 
+        // Re-evaluate configured/effective module state first. Hard dependants are
+        // cascaded off safely; newly effective modules initialize/load themselves.
         SimpleServerUtilities.CORE.modules().refreshEnabledState(server);
 
         SimpleServerUtilities.TRANSACTIONS.clear();
         SimpleServerUtilities.CONTENT_PROGRESS.load(server);
         SimpleServerUtilities.CONTENT_REWARD_LEDGER.load(server);
         SimpleServerUtilities.TEMPORARY_PERMISSIONS.load(server);
-        SimpleServerUtilities.ECONOMY.load(server);
-        if (Config.ENABLE_PLAYER_CLAIMS.get()) {
+        SimpleServerUtilities.UI_PREFERENCES.load(server);
+
+        if (stayedActive(economyWasActive, "economy")) SimpleServerUtilities.ECONOMY.load(server);
+        if (stayedActive(claimsWasActive, "claims")) {
             SimpleServerUtilities.PLAYER_CLAIMS.load(server);
             SimpleServerUtilities.CLAIM_TAX.load(server);
         }
-        if (Config.ENABLE_PERMISSION_SYSTEM.get()) {
+        if (stayedActive(permissionsWasActive, "permissions")) {
             SimpleServerUtilities.PERMISSIONS.load(server);
             SimpleServerUtilities.PERMISSIONS.migrateLegacyClaimLimitOverrides();
         }
-        if (Config.ENABLE_MAIL.get()) SimpleServerUtilities.MAIL.load(server);
-        if (active("auction_house")) SimpleServerUtilities.AUCTION_HOUSE.load(server);
-        if (Config.ENABLE_HOMES.get()) SimpleServerUtilities.HOMES.load(server);
-        if (Config.ENABLE_WARPS.get()) SimpleServerUtilities.WARPS.load(server);
-        SimpleServerUtilities.SERVER_SPAWN.load(server);
-        SimpleServerUtilities.UI_PREFERENCES.load(server);
+        if (stayedActive(mailWasActive, "mail")) SimpleServerUtilities.MAIL.load(server);
+        if (stayedActive(auctionWasActive, "auction_house")) SimpleServerUtilities.AUCTION_HOUSE.load(server);
+        if (stayedActive(homesWasActive, "homes")) SimpleServerUtilities.HOMES.load(server);
+        if (stayedActive(warpsWasActive, "warps")) SimpleServerUtilities.WARPS.load(server);
+        if (stayedActive(spawnWasActive, "spawn")) SimpleServerUtilities.SERVER_SPAWN.load(server);
 
-        if (Config.ENABLE_ADMIN_REGIONS.get()) {
+        if (stayedActive(regionsWasActive, "regions")) {
             SimpleServerUtilities.REGIONS.load(server);
             SimpleServerUtilities.REGION_SNAPSHOTS.load(server);
-            SimpleServerUtilities.REGION_RENT_JOURNAL.loadAndRecover(server);
+            if (stayedActive(economyWasActive, "economy")) {
+                SimpleServerUtilities.REGION_RENT_JOURNAL.loadAndRecover(server);
+            } else {
+                SimpleServerUtilities.REGION_RENT_JOURNAL.clear();
+            }
         }
-        SimpleServerUtilities.BORDER_SETTINGS.load(server);
+        if (stayedActive(visualizationWasActive, "visualization")) {
+            SimpleServerUtilities.BORDER_SETTINGS.load(server);
+        }
 
-        if (active("statistics")) SimpleServerUtilities.STATISTICS.load(server);
-        if (active("achievements")) SimpleServerUtilities.ACHIEVEMENTS.load(server);
-        if (active("map_markers")) SimpleServerUtilities.MAP_MARKERS.load(server);
-        if (active("npcs")) {
+        if (stayedActive(statisticsWasActive, "statistics")) SimpleServerUtilities.STATISTICS.load(server);
+        if (stayedActive(achievementsWasActive, "achievements")) SimpleServerUtilities.ACHIEVEMENTS.load(server);
+        if (stayedActive(mapMarkersWasActive, "map_markers")) SimpleServerUtilities.MAP_MARKERS.load(server);
+        if (stayedActive(npcsWasActive, "npcs")) {
             SimpleServerUtilities.NPC_DIALOGUES.clear();
             SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS.load(server);
             SimpleServerUtilities.NPCS.load(server);
         }
-        if (active("npc_shops")) SimpleServerUtilities.NPC_SHOPS.load(server);
-        if (active("quests")) SimpleServerUtilities.QUESTS.load(server);
-        if (active("minigames")) SimpleServerUtilities.MINIGAMES.load(server);
-        if (active("dungeons")) SimpleServerUtilities.DUNGEONS.load(server);
+        if (stayedActive(npcShopsWasActive, "npc_shops")) SimpleServerUtilities.NPC_SHOPS.load(server);
+        if (stayedActive(questsWasActive, "quests")) SimpleServerUtilities.QUESTS.load(server);
+        if (stayedActive(minigamesWasActive, "minigames")) SimpleServerUtilities.MINIGAMES.load(server);
+        if (stayedActive(dungeonsWasActive, "dungeons")) SimpleServerUtilities.DUNGEONS.load(server);
 
         BlockInformationService.syncAll(server);
-        if (Config.ENABLE_TREECAPITATOR.get()) {
-            SimpleServerUtilities.TREE_PLACEMENTS.load(server);
+        if (active("utility_mining") && Config.ENABLE_TREECAPITATOR.get()) {
+            if (utilityMiningWasActive) SimpleServerUtilities.TREE_PLACEMENTS.load(server);
         } else {
             SimpleServerUtilities.TREE_PLACEMENTS.save();
             SimpleServerUtilities.STORAGE.flush(Duration.ofSeconds(5));
@@ -109,16 +132,26 @@ public final class SsuReloadService {
         }
         SimpleServerUtilities.UTILITY_MINING.clearClients(server);
         SimpleServerUtilities.UTILITY_MINING.clear();
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(server);
-        if (Config.ENABLE_HOLOGRAMS.get()) {
+
+        if (active("visualization")) {
+            SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshAll(server);
+        } else {
+            SimpleServerUtilities.BORDER_VISUALIZATIONS.clearAllClients(server);
+        }
+        if (stayedActive(hologramsWasActive, "holograms")) {
             SimpleServerUtilities.HOLOGRAMS.load(server);
             SimpleServerUtilities.HOLOGRAMS.syncAll();
-        } else {
+        } else if (!active("holograms")) {
             SimpleServerUtilities.HOLOGRAMS.clearClients(server);
         }
 
-        return new ReloadResult(true, "Simple Server Utilities reloaded. Managed dimension changes still require a server restart.",
+        return new ReloadResult(true,
+                "Simple Server Utilities reloaded. Effective module dependencies were refreshed; managed dimension changes still require a server restart.",
                 List.of("managed_dimensions"));
+    }
+
+    private static boolean stayedActive(boolean wasActive, String module) {
+        return wasActive && active(module);
     }
 
     private static boolean active(String module) {

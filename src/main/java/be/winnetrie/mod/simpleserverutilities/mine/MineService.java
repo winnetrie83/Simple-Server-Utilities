@@ -7,7 +7,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
-import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.MineActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MineDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.MineRequestPayload;
@@ -22,9 +22,11 @@ public final class MineService {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private MineService() { }
 
-    public static void request(MineRequestPayload payload,IPayloadContext context){if(!(context.player() instanceof ServerPlayer player))return;send(player,payload.admin(),payload.selectedId(),payload.requestId(),"",false);}
+    public static void request(MineRequestPayload payload,IPayloadContext context){
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("mines")) return;if(!(context.player() instanceof ServerPlayer player))return;send(player,payload.admin(),payload.selectedId(),payload.requestId(),"",false);}
 
-    public static void action(MineActionPayload payload,IPayloadContext context){if(!(context.player() instanceof ServerPlayer player))return;boolean admin=payload.action().startsWith("admin_");if(admin&&!canAdmin(player)){send(player,true,payload.mineId(),payload.requestId(),"Mine administration denied.",true);return;}String selected=payload.mineId();String notice;boolean error=false;try{switch(payload.action()){
+    public static void action(MineActionPayload payload,IPayloadContext context){
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("mines")) return;if(!(context.player() instanceof ServerPlayer player))return;boolean admin=payload.action().startsWith("admin_");if(admin&&!canAdmin(player)){send(player,true,payload.mineId(),payload.requestId(),"Mine administration denied.",true);return;}String selected=payload.mineId();String notice;boolean error=false;try{switch(payload.action()){
         case "teleport"->{SimpleServerUtilities.MINES.teleportToMine(player.level().getServer(),player,payload.mineId());notice="Teleported to mine.";}
         case "admin_create"->{MineDefinition input=GSON.fromJson(payload.json(),MineDefinition.class);if(input==null)throw new IllegalArgumentException("Mine data is missing.");input.normalize();MineDefinition created=SimpleServerUtilities.MINES.create(input.id,input.displayName);input.id=created.id;if(input.permissionKey.isBlank()||"ssu.mines.use.new_mine".equals(input.permissionKey)||"ssu.mines.new_mine.use".equals(input.permissionKey))input.permissionKey=created.permissionKey;SimpleServerUtilities.MINES.update(input);selected=input.id;notice="Mine created. Use the Mine Setup Tool from Admin Tools to select its bounds inside a Region.";}
         case "admin_save"->{MineDefinition input=GSON.fromJson(payload.json(),MineDefinition.class);if(input==null)throw new IllegalArgumentException("Mine data is missing.");input.normalize();if(SimpleServerUtilities.MINES.definition(input.id)==null)throw new IllegalArgumentException("Mine not found.");SimpleServerUtilities.MINES.update(input);selected=input.id;notice="Mine settings saved.";}
@@ -39,7 +41,7 @@ public final class MineService {
         case "admin_remove_hologram"->{SimpleServerUtilities.MINES.removeHologram(payload.mineId());notice="Mine status hologram removed.";}
         case "admin_reset"->{var id=SimpleServerUtilities.MINES.scheduleReset(player.level().getServer(),payload.mineId(),true);notice="Mine reset scheduled as job "+id+".";}
         default->throw new IllegalArgumentException("Unknown mine action.");
-    }}catch(Exception ex){notice=ex.getMessage()==null?"Mine action failed safely.":ex.getMessage();error=true;}if(admin&&!error)SimpleServerUtilities.SERVER_OPERATIONS.audit(player,"mines."+payload.action(),selected,"");send(player,admin,selected,payload.requestId(),notice,error);}
+    }}catch(Exception ex){notice=ex.getMessage()==null?"Mine action failed safely.":ex.getMessage();error=true;}if(admin&&!error&&SsuModuleAccess.active("server_operations"))SimpleServerUtilities.SERVER_OPERATIONS.audit(player,"mines."+payload.action(),selected,"");send(player,admin,selected,payload.requestId(),notice,error);}
 
     public static void send(ServerPlayer player,boolean admin,String selected,long request,String notice,boolean error){
         if(admin&&!canAdmin(player)){PacketDistributor.sendToPlayer(player,new MineDataPayload(true,"","{}","Mine administration denied.",true,request));return;}

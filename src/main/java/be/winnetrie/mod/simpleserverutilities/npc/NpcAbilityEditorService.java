@@ -31,11 +31,13 @@ public final class NpcAbilityEditorService {
     }
 
     public static void handleRequest(NpcAbilityLibraryRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> sendManager(player, payload.query(), payload.pageIndex(), payload.requestId(), "", false));
     }
 
     public static void handleAction(NpcAbilityLibraryActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> {
             if (!canAdmin(player)) {
@@ -52,6 +54,7 @@ public final class NpcAbilityEditorService {
     }
 
     public static void handleSubmit(NpcAbilityEditorSubmitPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> {
             if (!canAdmin(player)) {

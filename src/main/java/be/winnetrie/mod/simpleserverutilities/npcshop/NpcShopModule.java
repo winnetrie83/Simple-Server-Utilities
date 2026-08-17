@@ -13,8 +13,9 @@ public final class NpcShopModule implements SsuModule {
     private final NpcShopManager manager;
     public NpcShopModule(NpcShopManager manager) { this.manager = manager; }
     @Override public String id() { return "npc_shops"; }
-    @Override public Set<String> dependencies() { return Set.of("storage", "transactions", "economy", "permissions", "npcs"); }
-    @Override public boolean isEnabled() { return Config.ENABLE_NPCS.get(); }
+    @Override public Set<String> requiredDependencies() { return Set.of("storage", "transactions", "economy", "npcs"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("permissions"); }
+    @Override public boolean isEnabled() { return Config.ENABLE_NPC_SHOPS.get(); }
     @Override public void initialize(SsuServiceRegistry services) {
         services.register(NpcShopManager.class, manager);
         SimpleServerUtilities.NPC_SERVICES.register("shop", manager::validateService, manager::executeService);

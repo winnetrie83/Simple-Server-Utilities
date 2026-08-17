@@ -20,6 +20,7 @@ public final class RedstoneProtectionEvents {
 
     @SubscribeEvent
     public static void onNeighborNotify(BlockEvent.NeighborNotifyEvent event) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.anyActive("claims", "regions")) return;
         if (!(event.getLevel() instanceof Level level)) {
             return;
         }

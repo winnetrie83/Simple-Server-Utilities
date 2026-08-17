@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.core.job.SsuJobLocks;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyResult;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyTransactionType;
 import be.winnetrie.mod.simpleserverutilities.economy.MoneyFormat;
@@ -65,7 +66,7 @@ public final class RegionRentalService {
             if (rentData.isPermanent()) {
                 return RentalResult.fail("This region is rented permanently and cannot be extended.");
             }
-            if (!SimpleServerUtilities.ECONOMY.isEnabled()) {
+            if (!SsuModuleAccess.active("economy") || !SimpleServerUtilities.ECONOMY.isEnabled()) {
                 return RentalResult.fail("The economy module is disabled, so paid rent cannot be extended.");
             }
             if (SimpleServerUtilities.JOBS.isResourceLocked(
@@ -97,7 +98,7 @@ public final class RegionRentalService {
         if (!SimpleServerUtilities.REGIONS.isRentingEnabled()) {
             return RentalResult.fail("Region renting is currently disabled.");
         }
-        if (!SimpleServerUtilities.ECONOMY.isEnabled()) {
+        if (!SsuModuleAccess.active("economy") || !SimpleServerUtilities.ECONOMY.isEnabled()) {
             return RentalResult.fail("The economy module is disabled, so paid regions cannot be rented.");
         }
         if (!region.getRentData().isRentable()) {
@@ -317,6 +318,9 @@ public final class RegionRentalService {
             Region region,
             boolean resetAllowed
     ) {
+        if (!SsuModuleAccess.active("economy") || !SimpleServerUtilities.ECONOMY.isEnabled()) {
+            return RentalResult.fail("The economy module is disabled, so rental cancellation/refunds are paused.");
+        }
         RegionRentData rentData = region.getRentData();
         if (!rentData.isRented()) {
             return RentalResult.fail("This region is not currently rented.");

@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Set;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.NpcAdminActionPayload;
 import be.winnetrie.mod.simpleserverutilities.network.NpcAdminEntry;
 import be.winnetrie.mod.simpleserverutilities.network.NpcAdminListPayload;
@@ -30,11 +31,13 @@ public final class NpcAdminService {
     }
 
     public static void handleList(NpcAdminListRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         sendPage(player, payload.mode(), payload.query(), payload.page(), payload.pageSize(), "", false, payload.requestId());
     }
 
     public static void handleAction(NpcAdminActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return;
         if (!(context.player() instanceof ServerPlayer player) || !NpcEditorService.canAdmin(player)) return;
         String action = payload.action().trim().toLowerCase(Locale.ROOT);
         String target = payload.target().trim();
@@ -113,8 +116,10 @@ public final class NpcAdminService {
         if (instance == null || !SimpleServerUtilities.NPCS.deleteInstance(instance.id)) {
             return Result.fail("The NPC placement no longer exists.");
         }
-        be.winnetrie.mod.simpleserverutilities.quest.QuestNpcBridge.unlinkDeletedNpc(
-                SimpleServerUtilities.QUESTS, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS, instance.id);
+        if (SsuModuleAccess.active("quests")) {
+            be.winnetrie.mod.simpleserverutilities.quest.QuestNpcBridge.unlinkDeletedNpc(
+                    SimpleServerUtilities.QUESTS, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS, instance.id);
+        }
         SimpleServerUtilities.NPCS.syncAll();
         return Result.ok("NPC placement deleted. Simple quest links were cleared; its reusable template was kept.");
     }

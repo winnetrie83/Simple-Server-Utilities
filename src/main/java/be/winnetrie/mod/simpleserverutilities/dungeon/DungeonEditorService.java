@@ -18,11 +18,13 @@ public final class DungeonEditorService {
     private DungeonEditorService() {}
 
     public static void handleRequest(DungeonEditorRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("dungeons")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> open(player, payload.dungeonId(), payload.requestId()));
     }
 
     public static void handleSubmit(DungeonEditorSubmitPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("dungeons")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> {
             if (!canAdmin(player)) { send(player, false, "Dungeon administrator permission is required.", "", payload.requestId()); return; }

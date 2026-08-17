@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.command.RegionCommands;
 import be.winnetrie.mod.simpleserverutilities.economy.MoneyFormat;
 import be.winnetrie.mod.simpleserverutilities.network.RegionSetupActionPayload;
@@ -77,6 +78,7 @@ public final class RegionSetupToolService {
     }
 
     public static void handleRequest(RegionSetupRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("regions")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> {
             String operation = payload.operation().trim().toLowerCase(Locale.ROOT);
@@ -97,11 +99,13 @@ public final class RegionSetupToolService {
     }
 
     public static void handleSave(RegionSetupSavePayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("regions")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> save(player, payload));
     }
 
     public static void handleAction(RegionSetupActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("regions")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> action(player, payload));
     }
@@ -145,8 +149,9 @@ public final class RegionSetupToolService {
 
         // Validate every user-controlled field before creating or mutating a region. This keeps
         // failed CREATE requests transactional instead of leaving a partially configured region.
+        boolean economyActive = SsuModuleAccess.active("economy");
         long priceMinor = 0L;
-        if (payload.rentable()) {
+        if (payload.rentable() && economyActive) {
             try {
                 priceMinor = MoneyFormat.parseMinor(payload.rentPrice().isBlank() ? "0" : payload.rentPrice(),
                         SimpleServerUtilities.ECONOMY.settings());
@@ -158,6 +163,10 @@ public final class RegionSetupToolService {
                 reopen(player, create, name, "Rent period must be -1 for permanent or at least 1 day.", true, payload.requestId());
                 return;
             }
+        }
+        if (create && payload.rentable() && !economyActive) {
+            reopen(player, true, name, "Economy is disabled, so a new rentable region cannot be configured.", true, payload.requestId());
+            return;
         }
 
         String weightedPreset = create ? "" : region.getResetSettings().getWeightedPreset();
@@ -213,11 +222,13 @@ public final class RegionSetupToolService {
         region.setLeaveMessage(payload.leaveMessage());
 
         RegionRentData rent = region.getRentData();
-        rent.setRentable(payload.rentable());
-        rent.setPriceMinor(priceMinor, SimpleServerUtilities.ECONOMY.settings());
-        rent.setPeriodDays(payload.rentable() ? payload.rentPeriodDays() : -1);
-        rent.setResetOnExpire(payload.resetOnExpire());
-        rent.setResetOnUnrent(payload.resetOnUnrent());
+        if (economyActive) {
+            rent.setRentable(payload.rentable());
+            rent.setPriceMinor(priceMinor, SimpleServerUtilities.ECONOMY.settings());
+            rent.setPeriodDays(payload.rentable() ? payload.rentPeriodDays() : -1);
+            rent.setResetOnExpire(payload.resetOnExpire());
+            rent.setResetOnUnrent(payload.resetOnUnrent());
+        }
 
         RegionResetSettings reset = region.getResetSettings();
         boolean scheduleChanged = reset.isEnabled() != payload.scheduledResetEnabled()
@@ -235,10 +246,12 @@ public final class RegionSetupToolService {
         SimpleServerUtilities.REGIONS.save();
         if (create) {
             RegionCommands.getSelectionManager().clear(player);
-            SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+            if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
         }
-        SimpleServerUtilities.SERVER_OPERATIONS.audit(player, create ? "region.create" : "region.save", region.getName(),
-                "priority=" + region.getPriority() + ", reset=" + region.getResetSettings().isEnabled());
+        if (SsuModuleAccess.active("server_operations")) {
+            SimpleServerUtilities.SERVER_OPERATIONS.audit(player, create ? "region.create" : "region.save", region.getName(),
+                    "priority=" + region.getPriority() + ", reset=" + region.getResetSettings().isEnabled());
+        }
         sendEdit(player, region, create ? "Region created and configured." : "Region settings saved.", false, payload.requestId());
     }
 
@@ -292,7 +305,7 @@ public final class RegionSetupToolService {
                 case "capture_snapshot" -> captureSnapshot(player, region, payload.requestId());
                 case "reset_now" -> {
                     RegionResetScheduler.Result result = RegionResetScheduler.triggerNow(player, region);
-                    if (result.success()) SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "region.reset", region.getName(), result.message());
+                    if (result.success() && SsuModuleAccess.active("server_operations")) SimpleServerUtilities.SERVER_OPERATIONS.audit(player, "region.reset", region.getName(), result.message());
                     sendEdit(player, region, result.message(), !result.success(), payload.requestId());
                 }
                 case "redefine" -> redefine(player, region, payload.requestId());
@@ -324,8 +337,12 @@ public final class RegionSetupToolService {
             default -> { sendSelect(player, "Unknown selection action.", true, requestId); return; }
         }
         RegionSelection selection = manager.getSelection(player);
-        if (selection.isComplete()) SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, selection);
-        else if (!selection.isComplete()) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+        if (SsuModuleAccess.active("visualization")) {
+            if (SsuModuleAccess.active("visualization")) {
+                if (selection.isComplete()) SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, selection);
+                else SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+            }
+        }
         sendSelect(player, "Selection updated.", false, requestId);
     }
 
@@ -505,7 +522,9 @@ public final class RegionSetupToolService {
             PacketDistributor.sendToPlayer(online, clearPreviewPayload());
             selections.setPoint1(online, new BlockPos(raw.minX(), raw.minY(), raw.minZ()));
             selections.setPoint2(online, new BlockPos(raw.maxX(), raw.maxY(), raw.maxZ()));
-            SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(online, selections.getSelection(online));
+            if (SsuModuleAccess.active("visualization")) {
+                SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(online, selections.getSelection(online));
+            }
             RegionSelectionSnapshotManager.PasteJob actual = RegionSelectionSnapshotManager.createPasteJob(
                     online.level(), session.origin, session.template);
             scheduleSelectionJob(online, actual, "Snapshot placement", requestId);
@@ -595,13 +614,13 @@ public final class RegionSetupToolService {
                 && sameBounds(selection.getPoint1(), selection.getPoint2(), min, max);
         if (selected) {
             manager.clear(player);
-            SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+            if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
             sendEdit(player, region, "Region selection cleared.", false, requestId);
             return;
         }
         selection.setPoint1(region.getDimension(), min);
         selection.setPoint2(region.getDimension(), max);
-        SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, selection);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.showSelection(player, selection);
         sendEdit(player, region, "Region bounds selected in the Region Tool.", false, requestId);
     }
 
@@ -643,7 +662,8 @@ public final class RegionSetupToolService {
         if (!result.isSuccess()) { sendEdit(player, region, operationMessage(result), true, requestId); return; }
         try { SimpleServerUtilities.REGION_SNAPSHOTS.archiveSnapshot(region.getName(), "redefined"); }
         catch (IOException exception) { SimpleServerUtilities.LOGGER.warn("Could not archive redefined region snapshot {}", region.getName(), exception); }
-        RegionCommands.getSelectionManager().clear(player); SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
+        RegionCommands.getSelectionManager().clear(player);
+        if (SsuModuleAccess.active("visualization")) SimpleServerUtilities.BORDER_VISUALIZATIONS.hideSelection(player);
         sendEdit(player, SimpleServerUtilities.REGIONS.get(region.getName()), "Region bounds redefined.", false, requestId);
     }
 
@@ -767,7 +787,7 @@ public final class RegionSetupToolService {
                 s.isAllowPistons(), s.isAllowWaterFlow(), s.isAllowLavaFlow(), s.isAllowRedstone(), s.isAllowHoppers(), s.isAllowFireSpread(),
                 region.getWelcomeMessage(), region.getLeaveMessage(), spawn != null, spawn == null ? 0L : spawn.asLong(),
                 region.getSpawnYaw(), region.getSpawnPitch(), rent.isRentable(),
-                MoneyFormat.format(rent.getPriceMinor(SimpleServerUtilities.ECONOMY.settings()), SimpleServerUtilities.ECONOMY.settings()),
+                formatRentPrice(rent),
                 rent.getPeriodDays(), rent.isResetOnExpire(), rent.isResetOnUnrent(), region.getManagers().size(), region.getMembers().size(),
                 SimpleServerUtilities.REGION_SNAPSHOTS.hasSnapshot(region.getName()), reset.isEnabled(), reset.getIntervalSeconds(),
                 reset.getMode().name(), reset.isOnlyWhenEmpty(), presetSummary(reset.getWeightedPreset()), reset.getNextResetAt(), reset.getLastResetAt(),
@@ -775,6 +795,13 @@ public final class RegionSetupToolService {
                 selection.dimension(), selection.hasPoint1(), selection.point1(), selection.hasPoint2(), selection.point2(), selection.volume(),
                 localRegionName(player), regionEntries(player), RegionSelectionSnapshotManager.list(player.level().getServer()),
                 PREVIEWS.containsKey(player.getUUID()), PREVIEWS.containsKey(player.getUUID()) ? PREVIEWS.get(player.getUUID()).name : ""));
+    }
+
+    private static String formatRentPrice(RegionRentData rent) {
+        if (SsuModuleAccess.active("economy")) {
+            return MoneyFormat.format(rent.getPriceMinor(SimpleServerUtilities.ECONOMY.settings()), SimpleServerUtilities.ECONOMY.settings());
+        }
+        return rent.getStoredPriceMinor() >= 0L ? Long.toString(rent.getStoredPriceMinor()) : Integer.toString(rent.getAmount());
     }
 
     private static RegionSetupOpenPayload emptyPayload(ServerPlayer player,String mode,String notice,boolean error,long requestId,String name,String dimension,

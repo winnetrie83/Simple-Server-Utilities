@@ -10,7 +10,8 @@ import net.minecraft.server.MinecraftServer;
 /** Lightweight lifecycle gate for the client-side block information overlay. */
 public final class BlockInformationModule implements SsuModule {
     @Override public String id() { return "block_information"; }
-    @Override public Set<String> dependencies() { return Set.of("permissions", "ui_preferences"); }
+    @Override public Set<String> requiredDependencies() { return Set.of("ui_preferences"); }
+    @Override public Set<String> optionalDependencies() { return Set.of("permissions"); }
     @Override public boolean isEnabled() { return Config.ENABLE_BLOCK_INFORMATION.get(); }
     @Override public void initialize(SsuServiceRegistry services) { services.register(BlockInformationModule.class, this); }
     @Override public void onServerStarting(MinecraftServer server) { BlockInformationService.syncAll(server); }

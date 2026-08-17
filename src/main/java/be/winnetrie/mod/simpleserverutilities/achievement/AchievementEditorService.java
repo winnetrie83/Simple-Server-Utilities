@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.achievement;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.network.AchievementEditorOpenPayload;
 import be.winnetrie.mod.simpleserverutilities.network.AchievementEditorRequestPayload;
 import be.winnetrie.mod.simpleserverutilities.network.AchievementEditorResultPayload;
@@ -15,6 +16,7 @@ public final class AchievementEditorService {
     }
 
     public static void handleRequest(AchievementEditorRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("achievements")) return;
         if (!(context.player() instanceof ServerPlayer player)) {
             return;
         }
@@ -40,14 +42,15 @@ public final class AchievementEditorService {
                 new AchievementEditorOpenPayload(
                         requestedId,
                         SimpleServerUtilities.ACHIEVEMENTS.toJson(definition),
-                        SimpleServerUtilities.ECONOMY.settings().getCurrencySymbol(),
-                        SimpleServerUtilities.ECONOMY.settings().getDecimalPlaces(),
+                        SsuModuleAccess.active("economy") ? SimpleServerUtilities.ECONOMY.settings().getCurrencySymbol() : "",
+                        SsuModuleAccess.active("economy") ? SimpleServerUtilities.ECONOMY.settings().getDecimalPlaces() : 0,
                         payload.requestId()
                 )
         );
     }
 
     public static void handleSubmit(AchievementEditorSubmitPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("achievements")) return;
         if (!(context.player() instanceof ServerPlayer player)) {
             return;
         }

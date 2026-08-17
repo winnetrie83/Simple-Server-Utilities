@@ -1,6 +1,6 @@
 package be.winnetrie.mod.simpleserverutilities.region;
 
-import be.winnetrie.mod.simpleserverutilities.Config;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -17,7 +17,7 @@ public class RegionRentEvents {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (!Config.ENABLE_ADMIN_REGIONS.get()) {
+        if (!SsuModuleAccess.active("regions") || !SsuModuleAccess.active("economy")) {
             nextCheckTick = 0L;
             return;
         }

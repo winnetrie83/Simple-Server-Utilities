@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.minigame;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -18,6 +19,7 @@ public final class MinigameSetupToolEvents {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (!SsuModuleAccess.active("minigames")) return;
         if (!(event.getEntity() instanceof ServerPlayer player) || event.getHand() != InteractionHand.MAIN_HAND) return;
         if (!SimpleServerUtilities.MINIGAME_SETUP_TOOLS.isTool(player, player.getMainHandItem())) return;
         MinigameSetupToolService.open(player);
@@ -27,6 +29,7 @@ public final class MinigameSetupToolEvents {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        if (!SsuModuleAccess.active("minigames")) return;
         if (!(event.getEntity() instanceof ServerPlayer player) || event.getHand() != InteractionHand.MAIN_HAND) return;
         if (!SimpleServerUtilities.MINIGAME_SETUP_TOOLS.isTool(player, player.getMainHandItem())) return;
         MinigameSetupToolService.open(player);
@@ -36,6 +39,7 @@ public final class MinigameSetupToolEvents {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
+        if (!SsuModuleAccess.active("minigames")) return;
         if (event.getAction() != PlayerInteractEvent.LeftClickBlock.Action.START
                 || !(event.getEntity() instanceof ServerPlayer player)) return;
         if (!SimpleServerUtilities.MINIGAME_SETUP_TOOLS.isTool(player, player.getMainHandItem())) return;
@@ -44,12 +48,14 @@ public final class MinigameSetupToolEvents {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void afterBreak(BreakBlockEvent event) {
+        if (!SsuModuleAccess.active("minigames")) return;
         if (event.isCanceled() || !(event.getPlayer() instanceof ServerPlayer player)) return;
         MinigameSetupToolService.onArenaBlockEdited(player, event.getPos());
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void afterPlace(BlockEvent.EntityPlaceEvent event) {
+        if (!SsuModuleAccess.active("minigames")) return;
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)) return;
         MinigameSetupToolService.onArenaBlockEdited(player, event.getPos());
     }

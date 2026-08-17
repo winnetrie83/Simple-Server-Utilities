@@ -31,11 +31,13 @@ public final class NpcShopEditorService {
     private NpcShopEditorService() {}
 
     public static void handleAdminRequest(NpcShopAdminRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npc_shops")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> sendManager(player, payload.query(), payload.pageIndex(), payload.requestId(), "", false));
     }
 
     public static void handleAdminAction(NpcShopAdminActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npc_shops")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> {
             if (!canAdmin(player)) {
@@ -54,6 +56,7 @@ public final class NpcShopEditorService {
     }
 
     public static void handleEditorSubmit(NpcShopEditorSubmitPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npc_shops")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         context.enqueueWork(() -> {
             if (!canAdmin(player)) {
@@ -304,8 +307,7 @@ public final class NpcShopEditorService {
     }
 
     private static boolean canAdmin(ServerPlayer player) {
-        return player != null && Config.ENABLE_NPCS.get()
-                && SimpleServerUtilities.CORE.modules().isActive("npc_shops")
+        return player != null && SimpleServerUtilities.CORE.modules().isActive("npc_shops")
                 && NpcEditorService.canAdmin(player)
                 && PermissionService.getBoolean(player, PermissionKeys.NPC_SHOPS_ADMIN, false);
     }

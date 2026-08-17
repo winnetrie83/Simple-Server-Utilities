@@ -20,6 +20,7 @@ import com.google.gson.GsonBuilder;
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.content.ContentAccessPolicy;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyResult;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyTransactionType;
@@ -370,6 +371,9 @@ public final class NpcShopManager {
 
     public synchronized NpcServiceRegistry.ServiceResult validateService(
             ServerPlayer player, NpcInstance instance, NpcDefinition definition, String target) {
+        if (!SsuModuleAccess.active("npc_shops")) {
+            return NpcServiceRegistry.ServiceResult.fail("NPC Shops are unavailable because a required module is disabled.");
+        }
         if (!PermissionService.getBoolean(player, PermissionKeys.NPCS_SERVICE_SHOPS, true)
                 || !PermissionService.getBoolean(player, PermissionKeys.NPC_SHOPS_USE, true)) {
             return NpcServiceRegistry.ServiceResult.fail("You cannot use NPC shops.");
@@ -398,10 +402,12 @@ public final class NpcShopManager {
     }
 
     public static void handleRequest(NpcShopRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npc_shops")) return;
         if (context.player() instanceof ServerPlayer player) SimpleServerUtilities.NPC_SHOPS.request(player, payload);
     }
 
     public static void handleAction(NpcShopActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npc_shops")) return;
         if (context.player() instanceof ServerPlayer player) SimpleServerUtilities.NPC_SHOPS.action(player, payload);
     }
 
@@ -734,7 +740,8 @@ public final class NpcShopManager {
     }
 
     private static boolean canUseNpc(ServerPlayer player, NpcInstance instance, NpcDefinition definition) {
-        if (player == null || instance == null || definition == null || !Config.ENABLE_NPCS.get()
+        if (player == null || instance == null || definition == null || !SsuModuleAccess.active("npc_shops")
+                || !SsuModuleAccess.active("npcs")
                 || !ContentAccessPolicy.canInteractWithNpc(player) || !definition.enabled || !instance.enabled || instance.dead) return false;
         if (!instance.dimension.equals(player.level().dimension().identifier().toString())) return false;
         double dx = player.getX() - instance.x, dy = player.getY() - instance.y, dz = player.getZ() - instance.z;

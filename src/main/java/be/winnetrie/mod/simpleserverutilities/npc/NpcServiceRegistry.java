@@ -9,6 +9,7 @@ import java.util.Objects;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionKeys;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionService;
@@ -172,6 +173,9 @@ public final class NpcServiceRegistry {
     }
 
     private static ServiceResult validateWarp(ServerPlayer player, String target) {
+        if (!SsuModuleAccess.active("warps") || !SsuModuleAccess.active("teleport")) {
+            return ServiceResult.fail("Warp teleport service is unavailable because Warps or Teleport is disabled.");
+        }
         if (!servicePermission(player, PermissionKeys.NPCS_SERVICE_TELEPORT)) {
             return ServiceResult.fail("You cannot use NPC teleport services.");
         }

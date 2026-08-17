@@ -23,6 +23,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.storage.JsonStorage;
 import be.winnetrie.mod.simpleserverutilities.storage.StoragePaths;
 import net.minecraft.core.BlockPos;
@@ -155,7 +156,9 @@ public final class ManagedDimensionManager {
         String id = normalizeManagedId(rawId);
         if (definitions.remove(id) == null) return false;
         persistAndGenerate();
-        SimpleServerUtilities.PERMISSIONS.removeDimensionOverrides("simpleserverutilities:" + id);
+        if (SsuModuleAccess.active("permissions")) {
+            SimpleServerUtilities.PERMISSIONS.removeDimensionOverrides("simpleserverutilities:" + id);
+        }
         return true;
     }
 
@@ -211,7 +214,9 @@ public final class ManagedDimensionManager {
             saveDefinitions();
             restartRequired |= synchronizeDatapack();
             revision++;
-            SimpleServerUtilities.PERMISSIONS.invalidateResolutionCache();
+            if (SsuModuleAccess.active("permissions")) {
+                SimpleServerUtilities.PERMISSIONS.invalidateResolutionCache();
+            }
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to save managed dimensions.", exception);
         }

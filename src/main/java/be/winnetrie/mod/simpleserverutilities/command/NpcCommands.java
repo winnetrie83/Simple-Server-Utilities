@@ -62,6 +62,7 @@ public final class NpcCommands {
     }
 
     private static int list(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         source.sendSystemMessage(Component.literal("SSU NPC placements ("
                 + SimpleServerUtilities.NPCS.instances().size() + "):"));
         for (NpcInstance instance : SimpleServerUtilities.NPCS.instances()) {
@@ -75,6 +76,7 @@ public final class NpcCommands {
     }
 
     private static int tool(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source);
         if (player == null) return 0;
         SimpleServerUtilities.NPC_TOOLS.giveTool(player);
@@ -84,6 +86,7 @@ public final class NpcCommands {
     }
 
     private static int manage(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source);
         if (player == null) return 0;
         SimpleServerUtilities.NPC_TOOLS.openManager(player);
@@ -91,12 +94,14 @@ public final class NpcCommands {
     }
 
     private static int refresh(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         SimpleServerUtilities.NPCS.refreshAll();
         source.sendSystemMessage(Component.literal("NPC placements reconciled with their saved templates."));
         return 1;
     }
 
     private static int edit(CommandSourceStack source, String rawId) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source);
         if (player == null) return 0;
         if (!NpcEditorService.openEditor(player, rawId)) {
@@ -107,6 +112,7 @@ public final class NpcCommands {
     }
 
     private static int delete(CommandSourceStack source, String rawId) {
+        if (!requireModule(source)) return 0;
         NpcInstance instance = SimpleServerUtilities.NPCS.instance(rawId);
         if (instance == null || !SimpleServerUtilities.NPCS.deleteInstance(instance.id)) {
             source.sendFailure(Component.literal("Unknown NPC placement: " + rawId));
@@ -120,6 +126,7 @@ public final class NpcCommands {
     }
 
     private static int copy(CommandSourceStack source, String rawId) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source);
         if (player == null) return 0;
         NpcInstance instance = SimpleServerUtilities.NPCS.instance(rawId);
@@ -133,6 +140,7 @@ public final class NpcCommands {
     }
 
     private static int paste(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source);
         if (player == null) return 0;
         NpcInstance original = SimpleServerUtilities.NPC_TOOLS.clipboard(player, SimpleServerUtilities.NPCS);
@@ -153,6 +161,7 @@ public final class NpcCommands {
     }
 
     private static int respawn(CommandSourceStack source, String rawId) {
+        if (!requireModule(source)) return 0;
         if (!SimpleServerUtilities.NPCS.respawnNow(rawId)) {
             source.sendFailure(Component.literal("Unknown NPC placement or respawn location unavailable: " + rawId));
             return 0;
@@ -162,6 +171,7 @@ public final class NpcCommands {
     }
 
     private static int bring(CommandSourceStack source, String rawId) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source);
         if (player == null) return 0;
         NpcInstance instance = SimpleServerUtilities.NPCS.instance(rawId);
@@ -248,12 +258,16 @@ public final class NpcCommands {
     }
 
     private static int showBuybackMinutes(CommandSourceStack source) {
+        if (!requireNpcShops(source)) return 0;
+        if (!requireModule(source)) return 0;
         source.sendSystemMessage(Component.literal("NPC shop buy-back retention: "
                 + Config.NPC_SHOP_BUYBACK_MINUTES.get() + " minute(s)."));
         return 1;
     }
 
     private static int setBuybackMinutes(CommandSourceStack source, int minutes) {
+        if (!requireNpcShops(source)) return 0;
+        if (!requireModule(source)) return 0;
         Config.NPC_SHOP_BUYBACK_MINUTES.set(minutes);
         source.sendSystemMessage(Component.literal("NPC shop buy-back retention set to "
                 + minutes + " minute(s). Existing transactions keep their original expiry time."));
@@ -261,6 +275,8 @@ public final class NpcCommands {
     }
 
     private static int manageShops(CommandSourceStack source) {
+        if (!requireNpcShops(source)) return 0;
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source);
         if (player == null) return 0;
         NpcShopEditorService.openManager(player);
@@ -268,6 +284,8 @@ public final class NpcCommands {
     }
 
     private static int editShop(CommandSourceStack source, String id) {
+        if (!requireNpcShops(source)) return 0;
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source);
         if (player == null) return 0;
         NpcShopEditorService.openEditor(player, id);
@@ -275,6 +293,8 @@ public final class NpcCommands {
     }
 
     private static int listShops(CommandSourceStack source) {
+        if (!requireNpcShops(source)) return 0;
+        if (!requireModule(source)) return 0;
         var shops = SimpleServerUtilities.NPC_SHOPS.definitions();
         source.sendSystemMessage(Component.literal("SSU NPC shops (" + shops.size() + "):"));
         for (NpcShopDefinition shop : shops) {
@@ -297,6 +317,8 @@ public final class NpcCommands {
     }
 
     private static int createShop(CommandSourceStack source, String id) {
+        if (!requireNpcShops(source)) return 0;
+        if (!requireModule(source)) return 0;
         NpcShopDefinition created = SimpleServerUtilities.NPC_SHOPS.create(id);
         if (created == null) { source.sendFailure(Component.literal("That shop already exists or the shop limit was reached.")); return 0; }
         source.sendSystemMessage(Component.literal("Created NPC shop '" + created.id + "'. Configure an NPC function with service=shop and target=" + created.id + "."));
@@ -304,18 +326,24 @@ public final class NpcCommands {
     }
 
     private static int deleteShop(CommandSourceStack source, String id) {
+        if (!requireNpcShops(source)) return 0;
+        if (!requireModule(source)) return 0;
         if (!SimpleServerUtilities.NPC_SHOPS.delete(id)) { source.sendFailure(Component.literal("Unknown NPC shop: " + id)); return 0; }
         source.sendSystemMessage(Component.literal("Deleted NPC shop " + id + "."));
         return 1;
     }
 
     private static int nameShop(CommandSourceStack source, String id, String name) {
+        if (!requireNpcShops(source)) return 0;
+        if (!requireModule(source)) return 0;
         if (!SimpleServerUtilities.NPC_SHOPS.setName(id, name)) { source.sendFailure(Component.literal("Unknown NPC shop: " + id)); return 0; }
         source.sendSystemMessage(Component.literal("Renamed NPC shop " + id + " to " + name + "."));
         return 1;
     }
 
     private static int enableShop(CommandSourceStack source, String id, boolean enabled) {
+        if (!requireNpcShops(source)) return 0;
+        if (!requireModule(source)) return 0;
         if (!SimpleServerUtilities.NPC_SHOPS.setEnabled(id, enabled)) { source.sendFailure(Component.literal("Unknown NPC shop: " + id)); return 0; }
         source.sendSystemMessage(Component.literal("NPC shop " + id + " is now " + (enabled ? "enabled" : "disabled") + "."));
         return 1;
@@ -323,6 +351,8 @@ public final class NpcCommands {
 
     private static int addHeldShopEntry(CommandSourceStack source, String shop, String entry,
                                         String buyRaw, String sellRaw, int stock) {
+        if (!requireNpcShops(source)) return 0;
+        if (!requireModule(source)) return 0;
         ServerPlayer player = player(source);
         if (player == null) return 0;
         if (player.getMainHandItem().isEmpty()) { source.sendFailure(Component.literal("Hold the exact item stack you want this offer to use.")); return 0; }
@@ -343,6 +373,8 @@ public final class NpcCommands {
     }
 
     private static int removeShopEntry(CommandSourceStack source, String shop, String entry) {
+        if (!requireNpcShops(source)) return 0;
+        if (!requireModule(source)) return 0;
         if (!SimpleServerUtilities.NPC_SHOPS.removeEntry(shop, entry)) { source.sendFailure(Component.literal("Unknown shop offer.")); return 0; }
         source.sendSystemMessage(Component.literal("Removed offer " + entry + " from shop " + shop + "."));
         return 1;
@@ -350,6 +382,8 @@ public final class NpcCommands {
 
     private static int restockShopEntry(CommandSourceStack source, String shop, String entry,
                                         int stock, int maxStock, int amount, int minutes) {
+        if (!requireNpcShops(source)) return 0;
+        if (!requireModule(source)) return 0;
         if (stock > maxStock) { source.sendFailure(Component.literal("Stock cannot exceed max_stock.")); return 0; }
         if (!SimpleServerUtilities.NPC_SHOPS.configureRestock(shop, entry, stock, maxStock, amount, minutes)) {
             source.sendFailure(Component.literal("Unknown shop offer.")); return 0;
@@ -374,5 +408,17 @@ public final class NpcCommands {
 
     private static String one(double value) {
         return String.format(java.util.Locale.ROOT, "%.1f", value);
+    }
+
+    private static boolean requireModule(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npcs")) return true;
+        source.sendFailure(Component.literal("NPCs is disabled or blocked by a required dependency."));
+        return false;
+    }
+
+    private static boolean requireNpcShops(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("npc_shops")) return true;
+        source.sendFailure(Component.literal("NPC Shops is disabled or blocked by a required dependency."));
+        return false;
     }
 }

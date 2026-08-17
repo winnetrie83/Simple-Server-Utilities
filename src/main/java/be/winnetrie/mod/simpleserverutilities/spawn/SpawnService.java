@@ -1,6 +1,7 @@
 package be.winnetrie.mod.simpleserverutilities.spawn;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.permission.PermissionContext;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportOptions;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportPolicy;
@@ -20,6 +21,14 @@ public final class SpawnService {
     }
 
     public static int requestTeleport(ServerPlayer player) {
+        if (!SsuModuleAccess.active("spawn")) {
+            player.sendSystemMessage(Component.literal("Server Spawn is disabled."));
+            return 0;
+        }
+        if (!SsuModuleAccess.active("teleport")) {
+            player.sendSystemMessage(Component.literal("The Teleport module is disabled; /spawn travel is unavailable."));
+            return 0;
+        }
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
         if (!SpawnPolicy.canUse(player, context)) {
             player.sendSystemMessage(Component.literal(TeleportPolicy.denialMessage(TeleportType.SPAWN, context)));

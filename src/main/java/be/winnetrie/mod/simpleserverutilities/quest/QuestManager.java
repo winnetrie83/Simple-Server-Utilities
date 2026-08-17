@@ -27,6 +27,7 @@ import be.winnetrie.mod.simpleserverutilities.content.ContentEvent;
 import be.winnetrie.mod.simpleserverutilities.content.ContentEventBus;
 import be.winnetrie.mod.simpleserverutilities.content.ContentEventTypes;
 import be.winnetrie.mod.simpleserverutilities.content.ContentId;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.core.storage.DirtyJsonRecordStore;
 import be.winnetrie.mod.simpleserverutilities.network.QuestBookDataPayload;
 import be.winnetrie.mod.simpleserverutilities.network.QuestBookRequestPayload;
@@ -267,6 +268,7 @@ public final class QuestManager {
     }
 
     public void handleRequest(QuestBookRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("quests")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         String source = normalizeSource(payload.source());
         String action = payload.action().trim().toLowerCase(Locale.ROOT);
@@ -399,8 +401,10 @@ public final class QuestManager {
         }
         String id = ContentId.require(rawQuestId, "Quest ID");
         if (!deleteDefinition(id)) throw new IllegalArgumentException("Quest not found: " + id);
-        QuestNpcBridge.rebuildManagedDialogues(this, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS);
-        SimpleServerUtilities.NPCS.syncAll();
+        if (SsuModuleAccess.active("npcs")) {
+            QuestNpcBridge.rebuildManagedDialogues(this, SimpleServerUtilities.NPC_DIALOGUE_DEFINITIONS);
+            SimpleServerUtilities.NPCS.syncAll();
+        }
         return "Quest deleted: " + id;
     }
 
@@ -577,6 +581,7 @@ public final class QuestManager {
             String summary = switch (reward.type()) {
                 case "give_item" -> reward.parameter("count") + "× " + reward.parameter("item");
                 case "give_money" -> {
+                    if (!SsuModuleAccess.active("economy")) yield "Money reward (Economy unavailable)";
                     try { yield SimpleServerUtilities.ECONOMY.format(Long.parseLong(reward.parameter("amount_minor"))); }
                     catch (RuntimeException ignored) { yield "Money reward"; }
                 }
@@ -598,7 +603,7 @@ public final class QuestManager {
     }
 
     private String routeDenial(String source) {
-        if (!Config.ENABLE_QUESTS.get()) return "The quest module is disabled.";
+        if (!SsuModuleAccess.active("quests")) return "The quest module is disabled or blocked by a required dependency.";
         if ("npc".equals(normalizeSource(source))) return "Quests are not configured for NPC access, or you lack quest/NPC permissions.";
         return "Quests are configured for NPC access, or you lack quest permission.";
     }

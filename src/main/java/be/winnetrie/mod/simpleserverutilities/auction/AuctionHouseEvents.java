@@ -13,7 +13,7 @@ public final class AuctionHouseEvents {
 
     @SubscribeEvent
     public static void onTick(ServerTickEvent.Post event) {
-        if (!Config.ENABLE_AUCTION_HOUSE.get()) { nextTick = 0L; return; }
+        if (!SimpleServerUtilities.CORE.modules().isActive("auction_house")) { nextTick = 0L; return; }
         long tick = event.getServer().getTickCount();
         if (tick < nextTick) return;
         nextTick = tick + INTERVAL;
@@ -22,6 +22,6 @@ public final class AuctionHouseEvents {
 
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-        SimpleServerUtilities.AUCTION_HOUSE.closeSession(event.getEntity().getUUID());
+        if (SimpleServerUtilities.CORE.modules().isActive("auction_house")) SimpleServerUtilities.AUCTION_HOUSE.closeSession(event.getEntity().getUUID());
     }
 }

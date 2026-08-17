@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimChunk;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.network.BorderVisualizationPayload;
@@ -38,6 +39,7 @@ public class BorderVisualizationService {
     private long nextRefreshTick;
 
     public void tick(MinecraftServer server) {
+        if (!SsuModuleAccess.active("visualization")) return;
         if (server.getTickCount() < nextRefreshTick) {
             return;
         }
@@ -53,6 +55,12 @@ public class BorderVisualizationService {
     }
 
     public void syncOverview(ServerPlayer player, boolean force) {
+        if (!SsuModuleAccess.active("visualization")) {
+            clearClientLayers(player);
+            syncStates.remove(player.getUUID());
+            activeSelections.remove(player.getUUID());
+            return;
+        }
         PlayerBorderPreferences preferences = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID());
         String dimension = player.level().dimension().identifier().toString();
         ChunkPos chunk = player.chunkPosition();
@@ -125,7 +133,7 @@ public class BorderVisualizationService {
     }
 
     public void setClaimVisible(ServerPlayer player, PlayerClaim claim, boolean visible) {
-        if (claim == null || !claim.isOwner(player.getUUID()) || !Config.ENABLE_PLAYER_CLAIMS.get()) return;
+        if (!SsuModuleAccess.active("claims") || claim == null || !claim.isOwner(player.getUUID())) return;
         SimpleServerUtilities.BORDER_SETTINGS.setClaimVisible(player.getUUID(), claim.getId(), visible);
         syncOverview(player, true);
     }
@@ -141,6 +149,7 @@ public class BorderVisualizationService {
     }
 
     public void showRegion(ServerPlayer player, Region region) {
+        if (!SsuModuleAccess.active("regions")) return;
         if (region == null) {
             return;
         }
@@ -149,21 +158,25 @@ public class BorderVisualizationService {
     }
 
     public void hideRegion(ServerPlayer player, String regionName) {
+        if (!SsuModuleAccess.active("regions")) return;
         SimpleServerUtilities.REGIONS.setBorderVisible(regionName, false);
         refreshAll(player.level().getServer());
     }
 
     public void hideRegion(ServerPlayer player) {
+        if (!SsuModuleAccess.active("regions")) return;
         SimpleServerUtilities.REGIONS.setAllBordersVisible(false);
         refreshAll(player.level().getServer());
     }
 
     public boolean isRegionShown(ServerPlayer player, String regionName) {
+        if (!SsuModuleAccess.active("regions")) return false;
         Region region = SimpleServerUtilities.REGIONS.get(regionName);
         return region != null && region.isBorderVisible();
     }
 
     public Set<String> shownRegions(ServerPlayer player) {
+        if (!SsuModuleAccess.active("regions")) return Set.of();
         Set<String> visible = new HashSet<>();
         for (Region region : SimpleServerUtilities.REGIONS.getAll()) {
             if (region.isBorderVisible()) {
@@ -179,6 +192,7 @@ public class BorderVisualizationService {
     }
 
     public void showSelection(ServerPlayer player, RegionSelection selection) {
+        if (!SsuModuleAccess.active("regions")) { hideSelection(player); return; }
         PlayerBorderPreferences preferences = SimpleServerUtilities.BORDER_SETTINGS.preferences(player.getUUID());
         if (!canShowRegionBorders(player, preferences)
                 || !RegionPolicy.canVisualizeRegions(player)
@@ -241,9 +255,22 @@ public class BorderVisualizationService {
         }
     }
 
+    public void clearAllClients(MinecraftServer server) {
+        if (server == null) return;
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) clearClientLayers(player);
+    }
+
     public void clearPlayer(ServerPlayer player) {
+        if (player == null) return;
+        clearClientLayers(player);
         activeSelections.remove(player.getUUID());
         syncStates.remove(player.getUUID());
+    }
+
+    private static void clearClientLayers(ServerPlayer player) {
+        for (BorderLayer layer : BorderLayer.values()) {
+            PacketDistributor.sendToPlayer(player, BorderVisualizationPayload.clear(layer));
+        }
     }
 
     public void clear() {
@@ -294,13 +321,13 @@ public class BorderVisualizationService {
     }
 
     private static boolean serverAllowsClaimBorders(ServerPlayer player) {
-        return Config.ENABLE_PLAYER_CLAIMS.get()
+        return SsuModuleAccess.active("claims")
                 && PermissionService.getBooleanWithoutOperatorBypass(
                         player, PermissionKeys.BORDER_CLAIMS_VIEW, true);
     }
 
     private static boolean serverAllowsRegionBorders(ServerPlayer player) {
-        return Config.ENABLE_ADMIN_REGIONS.get()
+        return SsuModuleAccess.active("regions")
                 && PermissionService.getBooleanWithoutOperatorBypass(
                         player, PermissionKeys.BORDER_REGIONS_VIEW, true);
     }

@@ -13,6 +13,7 @@ import be.winnetrie.mod.simpleserverutilities.permission.policy.TeleportType;
 import be.winnetrie.mod.simpleserverutilities.permission.policy.WarpPolicy;
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.warp.Warp;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -31,7 +32,7 @@ public class WarpCommands {
 
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("warps")
-                .requires(source -> Config.ENABLE_WARPS.get() && source.getEntity() instanceof ServerPlayer)
+                .requires(source -> SsuModuleAccess.active("warps") && source.getEntity() instanceof ServerPlayer)
 
                 // /warps
                 .executes(context -> listWarps(context.getSource()))
@@ -87,6 +88,7 @@ public class WarpCommands {
     }
 
     private static int listWarps(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
@@ -117,7 +119,12 @@ public class WarpCommands {
     }
 
     private static int teleportWarp(CommandSourceStack source, String warpName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!SsuModuleAccess.active("teleport")) {
+            player.sendSystemMessage(Component.literal("The Teleport module is disabled."));
+            return 0;
+        }
 
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
 
@@ -167,6 +174,7 @@ public class WarpCommands {
     }
 
     private static int setWarp(CommandSourceStack source, String warpName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
@@ -194,6 +202,7 @@ public class WarpCommands {
     }
 
     private static int deleteWarp(CommandSourceStack source, String warpName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
@@ -220,6 +229,7 @@ public class WarpCommands {
     }
 
     private static int infoWarp(CommandSourceStack source, String warpName) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         PermissionContext context = PermissionContext.at(player, player.blockPosition());
@@ -256,6 +266,7 @@ public class WarpCommands {
     }
 
     private static int help(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
 
         player.sendSystemMessage(Component.literal("Warp commands:"));
@@ -291,7 +302,12 @@ public class WarpCommands {
 
 
     private static int cancelTeleport(CommandSourceStack source) {
+        if (!requireModule(source)) return 0;
         ServerPlayer player = (ServerPlayer) source.getEntity();
+        if (!SsuModuleAccess.active("teleport")) {
+            player.sendSystemMessage(Component.literal("The Teleport module is disabled."));
+            return 0;
+        }
 
         boolean cancelled = SimpleServerUtilities.TELEPORTS.cancel(player);
 
@@ -302,5 +318,11 @@ public class WarpCommands {
 
         player.sendSystemMessage(Component.literal("Pending teleport cancelled."));
         return 1;
+    }
+
+    private static boolean requireModule(CommandSourceStack source) {
+        if (be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("warps")) return true;
+        source.sendFailure(Component.literal("Warps is disabled or blocked by a required dependency."));
+        return false;
     }
 }

@@ -8,7 +8,10 @@ import com.google.gson.JsonParser;
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
 import be.winnetrie.mod.simpleserverutilities.core.transaction.SsuTransactionManager;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.economy.EconomyResult;
+import be.winnetrie.mod.simpleserverutilities.economy.EconomyService;
+import be.winnetrie.mod.simpleserverutilities.economy.EconomyServices;
 import be.winnetrie.mod.simpleserverutilities.mail.MailOperationResult;
 import be.winnetrie.mod.simpleserverutilities.mail.MailSource;
 import be.winnetrie.mod.simpleserverutilities.mail.MailItemCodec;
@@ -54,8 +57,8 @@ public final class ContentRewardHandlers {
     }
 
     private static PreparedContentAction claimChunks(ContentAction action, ContentActionContext context) {
-        if (!Config.ENABLE_PERMISSION_SYSTEM.get()) {
-            throw new IllegalArgumentException("The permission system is disabled.");
+        if (!SsuModuleAccess.active("permissions")) {
+            throw new IllegalArgumentException("The Permissions module must be active to grant claim capacity.");
         }
         ServerPlayer player = requirePlayer(context);
         int amount = (int) Math.min(1_000_000L, positiveLong(action.parameter("amount"), "amount"));
@@ -84,12 +87,11 @@ public final class ContentRewardHandlers {
 
     private static PreparedContentAction money(ContentAction action, ContentActionContext context) {
         ServerPlayer player = requirePlayer(context);
-        if (!SimpleServerUtilities.CORE.modules().isActive("economy")
-                || !SimpleServerUtilities.ECONOMY.isEnabled()) {
-            throw new IllegalArgumentException("The Economy module must be active to grant a money reward.");
-        }
+        EconomyService economy = EconomyServices.activeService()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "The Economy module must be active to grant a money reward."));
         long amount = positiveLong(action.parameter("amount_minor"), "amount_minor");
-        long before = SimpleServerUtilities.ECONOMY.balance(player.getUUID());
+        long before = economy.balance(player.getUUID());
         String module = sourceModule(context);
         String source = sourceLabel(context);
         String key = rewardStepKey(context, "money");
@@ -98,7 +100,7 @@ public final class ContentRewardHandlers {
 
             @Override
             public void apply() throws Exception {
-                EconomyResult result = SimpleServerUtilities.ECONOMY.credit(
+                EconomyResult result = economy.credit(
                         null, "server", player.getUUID(), amount, module, source + " reward", key);
                 if (!result.successful()) {
                     // A durable economy duplicate means this exact content action was
@@ -116,10 +118,10 @@ public final class ContentRewardHandlers {
             @Override
             public void rollback() throws Exception {
                 if (!credited) return;
-                long current = SimpleServerUtilities.ECONOMY.balance(player.getUUID());
+                long current = economy.balance(player.getUUID());
                 long rollbackAmount = Math.min(amount, Math.max(0L, current - before));
                 if (rollbackAmount <= 0L) return;
-                EconomyResult result = SimpleServerUtilities.ECONOMY.debit(
+                EconomyResult result = economy.debit(
                         null, "server", player.getUUID(), rollbackAmount, module,
                         source + " reward rollback", key.isBlank() ? "" : key + ":rollback");
                 if (!result.successful() && !"duplicate".equals(result.code())) {
@@ -206,6 +208,7 @@ public final class ContentRewardHandlers {
         ServerPlayer player = requirePlayer(context);
         String id = required(action.parameter("id"), "id").trim().toLowerCase(java.util.Locale.ROOT);
         if (id.startsWith("minigame:")) {
+            if (!SsuModuleAccess.active("minigames")) throw new IllegalArgumentException("The Minigames module must be active to unlock a minigame cosmetic.");
             String minigameCosmetic = id.substring("minigame:".length());
             if (minigameCosmetic.isBlank()) throw new IllegalArgumentException("Minigame cosmetic ID is required.");
             boolean before = SimpleServerUtilities.MINIGAMES.progressionCosmeticUnlocked(player.getUUID(), minigameCosmetic);
@@ -226,6 +229,7 @@ public final class ContentRewardHandlers {
 
     private static PreparedContentAction title(ContentAction action, ContentActionContext context) {
         ServerPlayer player = requirePlayer(context);
+        if (!SsuModuleAccess.active("identity")) throw new IllegalArgumentException("The Identity module must be active to unlock a title.");
         String id = required(action.parameter("title"), "title");
         return new PreparedContentAction("Unlock title " + id, new SsuTransactionManager.TransactionStep() {
             private boolean changed;

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.claim.player.PlayerClaim;
 import be.winnetrie.mod.simpleserverutilities.claim.player.ClaimOperationResult;
 import be.winnetrie.mod.simpleserverutilities.network.ClaimMapActionPayload;
@@ -24,6 +25,7 @@ public final class ClaimMapService {
     }
 
     public static void handleRequest(ClaimMapRequestPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("claims")) return;
         if (!(context.player() instanceof ServerPlayer player)) {
             return;
         }
@@ -53,6 +55,7 @@ public final class ClaimMapService {
     }
 
     public static void handleAction(ClaimMapActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("claims")) return;
         if (!(context.player() instanceof ServerPlayer player)) {
             return;
         }
@@ -84,11 +87,11 @@ public final class ClaimMapService {
             boolean deleted = SimpleServerUtilities.PLAYER_CLAIMS.deleteClaimGroup(
                     player.getUUID(), payload.claimName(), ClaimPolicy.hasAdminBypass(player));
             if (deleted) {
-                if (deletedClaim != null) {
+                if (deletedClaim != null && SsuModuleAccess.active("visualization")) {
                     SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player, deletedClaim);
                 }
                 sendMap(player, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), "",
-                        "Deleted claim '" + payload.claimName() + "' and its linked homes.", false);
+                        "Deleted claim '" + payload.claimName() + "'.", false);
             } else {
                 sendMap(player, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(), payload.claimName(),
                         "Claim could not be deleted.", true);
@@ -118,7 +121,7 @@ public final class ClaimMapService {
         String notice = formatResult(payload.operation(), selectedClaim, result);
         boolean error = !result.isSuccess();
 
-        if (result.isSuccess()) {
+        if (result.isSuccess() && SsuModuleAccess.active("visualization")) {
             SimpleServerUtilities.BORDER_VISUALIZATIONS.refreshShownClaim(player);
         }
 
@@ -134,6 +137,7 @@ public final class ClaimMapService {
     }
 
     public static void handleTaxDelete(ClaimTaxDeleteActionPayload payload, IPayloadContext context) {
+        if (!be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess.active("claims")) return;
         if (!(context.player() instanceof ServerPlayer player)) return;
         if (!ClaimPolicy.canUseMap(player) || !ClaimPolicy.canDeleteClaim(player)) return;
         if (!isSafeViewport(player, payload.centerChunkX(), payload.centerChunkZ(), payload.claimName(), payload.radius())) {
@@ -152,7 +156,7 @@ public final class ClaimMapService {
                 : be.winnetrie.mod.simpleserverutilities.claim.tax.PlayerClaimTaxManager.VoluntaryDeleteMode.PAY_AND_DELETE;
         var result = SimpleServerUtilities.CLAIM_TAX.settleVoluntaryDeletion(player, payload.claimName(), mode);
         PlayerClaim remaining = SimpleServerUtilities.PLAYER_CLAIMS.getClaimGroup(player.getUUID(), payload.claimName());
-        if (result.successful() && remaining == null) {
+        if (result.successful() && remaining == null && SsuModuleAccess.active("visualization")) {
             SimpleServerUtilities.BORDER_VISUALIZATIONS.hideClaim(player, claim);
         }
         sendMap(player, payload.centerChunkX(), payload.centerChunkZ(), payload.radius(),

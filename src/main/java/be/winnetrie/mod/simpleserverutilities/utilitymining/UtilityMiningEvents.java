@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import be.winnetrie.mod.simpleserverutilities.Config;
 import be.winnetrie.mod.simpleserverutilities.SimpleServerUtilities;
+import be.winnetrie.mod.simpleserverutilities.core.module.SsuModuleAccess;
 import be.winnetrie.mod.simpleserverutilities.protection.ProtectionHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -29,6 +30,7 @@ public final class UtilityMiningEvents {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onBlockPlaced(BlockEvent.EntityPlaceEvent event) {
+        if (!SsuModuleAccess.active("utility_mining")) return;
         if (!Config.ENABLE_TREECAPITATOR.get()) return;
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer)
                 || !(event.getLevel() instanceof ServerLevel level)
@@ -40,6 +42,7 @@ public final class UtilityMiningEvents {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onBlockBreak(BreakBlockEvent event) {
+        if (!SsuModuleAccess.active("utility_mining")) return;
         if (!Config.ENABLE_TREECAPITATOR.get() && !Config.ENABLE_VEINMINER.get()) return;
         if (event.isCanceled() || !(event.getPlayer() instanceof ServerPlayer player)
                 || !(player.level() instanceof ServerLevel level)
@@ -82,6 +85,7 @@ public final class UtilityMiningEvents {
 
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (!SsuModuleAccess.active("utility_mining")) return;
         if (event.getEntity() instanceof ServerPlayer player) {
             SimpleServerUtilities.UTILITY_MINING.forget(player.getUUID());
             ACTIVE_BREAK_CHAINS.remove(player.getUUID());
@@ -97,6 +101,7 @@ public final class UtilityMiningEvents {
             List<BlockPos> naturalLeaves,
             boolean completeSelectedTreeSection
     ) {
+        if (!SsuModuleAccess.active("utility_mining")) return;
         if (!player.isAlive() || player.level() != level
                 || !UtilityMiningResolver.hasRequiredTool(player, expectedType)
                 || !SimpleServerUtilities.UTILITY_MINING.isEnabledAndActive(player, expectedType)) {
