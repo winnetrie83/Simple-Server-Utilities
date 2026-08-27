@@ -1,7 +1,0 @@
-SSU 1.8.0-dev16.4 validation
-- mod_version: 1.8.0-dev16.4
-- network protocol: 63
-- storage schemas: unchanged from dev16.3
-- new payloads: trusted_players_request, trusted_players_action, trusted_players_data
-- Claim Settings: one Trusted players Manage navigation entry
-- server validation: owner + claims trust permission + known player/add state/removal state

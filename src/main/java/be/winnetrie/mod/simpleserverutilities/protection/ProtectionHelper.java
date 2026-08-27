@@ -100,29 +100,24 @@ public class ProtectionHelper {
             return true;
         }
 
-        Region sourceRegion = getRegionAt(level, sourcePos);
-        Region targetRegion = getRegionAt(level, targetPos);
-
-        if (targetRegion != null) {
-            if (sourceRegion != null && sameRegion(sourceRegion, targetRegion)) {
-                return true;
-            }
-
-            return isFluidAllowedInRegion(targetRegion, fluidState);
+        ProtectionBoundary.Relation relation = ProtectionBoundary.relation(level, sourcePos, targetPos);
+        if (relation == ProtectionBoundary.Relation.CROSSES_PROTECTION_BOUNDARY) {
+            return false;
         }
 
-        PlayerClaim sourceClaim = getClaimAt(level, sourcePos);
-        PlayerClaim targetClaim = getClaimAt(level, targetPos);
-
-        if (targetClaim == null) {
+        if (relation == ProtectionBoundary.Relation.UNPROTECTED) {
             return true;
         }
 
-        if (sourceClaim != null && sameClaim(sourceClaim, targetClaim)) {
-            return true;
+        Region region = getRegionAt(level, sourcePos);
+        if (region == null) region = getRegionAt(level, targetPos);
+        if (region != null) {
+            return isFluidAllowedInRegion(region, fluidState);
         }
 
-        return isFluidAllowedInClaim(targetClaim, fluidState);
+        PlayerClaim claim = getClaimAt(level, sourcePos);
+        if (claim == null) claim = getClaimAt(level, targetPos);
+        return claim != null && isFluidAllowedInClaim(claim, fluidState);
     }
 
     private static boolean isFluidAllowedInRegion(Region region, FluidState fluidState) {
@@ -134,7 +129,9 @@ public class ProtectionHelper {
             return region.getSettings().isAllowLavaFlow();
         }
 
-        return false;
+        // Regions currently have no separate "other fluids" toggle. Preserve
+        // the old behaviour for modded fluids that stay entirely inside one region.
+        return true;
     }
 
     private static boolean isFluidAllowedInClaim(PlayerClaim claim, FluidState fluidState) {
@@ -166,75 +163,45 @@ public class ProtectionHelper {
     }
 
     public static boolean canPistonMove(Level level, BlockPos from, BlockPos to) {
-        Region fromRegion = getRegionAt(level, from);
-        Region toRegion = getRegionAt(level, to);
-
-        if (fromRegion != null || toRegion != null) {
-            if (fromRegion != null && toRegion != null && sameRegion(fromRegion, toRegion)) {
-                return fromRegion.getSettings().isAllowPistons();
-            }
-
-            if (fromRegion != null && !fromRegion.getSettings().isAllowPistons()) {
-                return false;
-            }
-
-            if (toRegion != null && !toRegion.getSettings().isAllowPistons()) {
-                return false;
-            }
-
-            return true;
-        }
-
-        PlayerClaim fromClaim = getClaimAt(level, from);
-        PlayerClaim toClaim = getClaimAt(level, to);
-
-        if (fromClaim == null && toClaim == null) {
-            return true;
-        }
-
-        if (fromClaim != null && toClaim != null && sameClaim(fromClaim, toClaim)) {
-            return fromClaim.getSettings().isAllowPistons();
-        }
-
-        if (fromClaim != null && !fromClaim.getSettings().isAllowPistons()) {
+        ProtectionBoundary.Relation relation = ProtectionBoundary.relation(level, from, to);
+        if (relation == ProtectionBoundary.Relation.CROSSES_PROTECTION_BOUNDARY) {
             return false;
         }
 
-        if (toClaim != null && !toClaim.getSettings().isAllowPistons()) {
-            return false;
+        if (relation == ProtectionBoundary.Relation.UNPROTECTED) {
+            return true;
         }
 
-        return true;
+        Region region = getRegionAt(level, from);
+        if (region == null) region = getRegionAt(level, to);
+        if (region != null) {
+            return region.getSettings().isAllowPistons();
+        }
+
+        PlayerClaim claim = getClaimAt(level, from);
+        if (claim == null) claim = getClaimAt(level, to);
+        return claim != null && claim.getSettings().isAllowPistons();
     }
 
     public static boolean canRedstoneAffect(Level level, BlockPos sourcePos, BlockPos targetPos) {
-        Region sourceRegion = getRegionAt(level, sourcePos);
-        Region targetRegion = getRegionAt(level, targetPos);
+        ProtectionBoundary.Relation relation = ProtectionBoundary.relation(level, sourcePos, targetPos);
+        if (relation == ProtectionBoundary.Relation.CROSSES_PROTECTION_BOUNDARY) {
+            return false;
+        }
 
-        if (sourceRegion != null || targetRegion != null) {
-            if (sourceRegion != null && !sourceRegion.getSettings().isAllowRedstone()) {
-                return false;
-            }
-
-            if (targetRegion != null && !targetRegion.getSettings().isAllowRedstone()) {
-                return false;
-            }
-
+        if (relation == ProtectionBoundary.Relation.UNPROTECTED) {
             return true;
         }
 
-        PlayerClaim sourceClaim = getClaimAt(level, sourcePos);
-        PlayerClaim targetClaim = getClaimAt(level, targetPos);
-
-        if (sourceClaim != null && !sourceClaim.getSettings().isAllowRedstone()) {
-            return false;
+        Region region = getRegionAt(level, sourcePos);
+        if (region == null) region = getRegionAt(level, targetPos);
+        if (region != null) {
+            return region.getSettings().isAllowRedstone();
         }
 
-        if (targetClaim != null && !targetClaim.getSettings().isAllowRedstone()) {
-            return false;
-        }
-
-        return true;
+        PlayerClaim claim = getClaimAt(level, sourcePos);
+        if (claim == null) claim = getClaimAt(level, targetPos);
+        return claim != null && claim.getSettings().isAllowRedstone();
     }
 
     private static boolean sameRegion(Region a, Region b) {
@@ -371,37 +338,31 @@ public class ProtectionHelper {
     }
 
     public static boolean canHopperTransfer(Level level, BlockPos from, BlockPos to) {
-        Region fromRegion = getRegionAt(level, from);
-        Region toRegion = getRegionAt(level, to);
-
-        if (fromRegion != null || toRegion != null) {
-            if (fromRegion == null || toRegion == null) {
-                return false;
-            }
-
-            if (!sameRegion(fromRegion, toRegion)) {
-                return false;
-            }
-
-            return fromRegion.getSettings().isAllowHoppers();
+        ProtectionBoundary.Relation relation = ProtectionBoundary.relation(level, from, to);
+        if (relation == ProtectionBoundary.Relation.CROSSES_PROTECTION_BOUNDARY) {
+            return false;
         }
 
-        PlayerClaim fromClaim = getClaimAt(level, from);
-        PlayerClaim toClaim = getClaimAt(level, to);
-
-        if (fromClaim != null || toClaim != null) {
-            if (fromClaim == null || toClaim == null) {
-                return false;
-            }
-
-            if (!sameClaim(fromClaim, toClaim)) {
-                return false;
-            }
-
-            return fromClaim.getSettings().isAllowHoppers();
+        if (relation == ProtectionBoundary.Relation.UNPROTECTED) {
+            return true;
         }
 
-        return true;
+        Region region = getRegionAt(level, from);
+        if (region == null) region = getRegionAt(level, to);
+        if (region != null) {
+            return region.getSettings().isAllowHoppers();
+        }
+
+        PlayerClaim claim = getClaimAt(level, from);
+        if (claim == null) claim = getClaimAt(level, to);
+        return claim != null && claim.getSettings().isAllowHoppers();
+    }
+
+    public static boolean canFireAffect(Level level, BlockPos sourcePos, BlockPos targetPos) {
+        if (!ProtectionBoundary.canCross(level, sourcePos, targetPos)) {
+            return false;
+        }
+        return canFireAffect(level, targetPos);
     }
 
     public static boolean canFireAffect(Level level, BlockPos pos) {

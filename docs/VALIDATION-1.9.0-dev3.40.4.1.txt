@@ -1,8 +1,0 @@
-SSU 1.9.0-dev3.40.4.1 static validation
-- Based on dev3.40.4.
-- Reverted only Player-NPC client renderer/model/render-state/equipment-layer bootstrap to dev3.40.3 known-working files.
-- Removed custom armor layer registrations from SimpleServerUtilitiesClient.
-- Preserved dev3.40.4 NpcAdminScreen single-init/single-widget changes.
-- Preserved dev3.40.4 NPC movement ownership/pathfinding changes and associated admin save semantics.
-- Protocol 118 and persistence schemas unchanged.
-- Full Gradle build not available in this environment because project requires Java 25/toolchain dependencies unavailable locally.

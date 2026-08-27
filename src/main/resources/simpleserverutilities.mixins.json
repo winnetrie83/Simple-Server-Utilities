@@ -8,7 +8,28 @@
     "BucketItemMixin",
     "LiquidBlockMixin",
     "HopperBlockEntityMixin",
-    "FireBlockMixin"
+    "FireBlockMixin",
+    "DispenserBlockMixin",
+    "DropperBlockMixin",
+    "CreateContraptionAssemblyMixin",
+    "CreateWholeContraptionBoundaryMixin",
+    "CreateContraptionDisassemblyMixin",
+    "CreateControllerDisassemblyMixin",
+    "CreateStationaryBlockBreakerMixin",
+    "CreateMovingBlockBreakerMixin",
+    "CreateHarvesterMovementMixin",
+    "CreatePloughMovementMixin",
+    "CreateStationaryDeployerMixin",
+    "CreateMovingDeployerMixin",
+    "CreateStationarySawCascadeMixin",
+    "CreateMovingSawCascadeMixin",
+    "CreateBlockHelperDestroyMixin",
+    "CreatePortableStorageInterfaceMixin",
+    "CreateCapabilityBoundaryMixin",
+    "CreateFluidSearchBoundaryMixin",
+    "CreateFluidFillingBoundaryMixin",
+    "CreateRollerMovementMixin",
+    "CreateMountedDispenserMovementMixin"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -22,7 +43,7 @@
     "LivingEntityRendererTextureMixin",
     "MultiLineEditBoxAccessor",
     "MultilineTextFieldAccessor",
-    "MultiLineEditBoxRichTextMixin",
     "ScreenSsuGuiScaleMixin"
-  ]
+  ],
+  "plugin": "be.winnetrie.mod.simpleserverutilities.mixin.SsuMixinConfigPlugin"
 }

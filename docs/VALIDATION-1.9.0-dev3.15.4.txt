@@ -1,5 +1,0 @@
-SSU 1.9.0-dev3.15.4 validation
-
-Target: Jail community contribution excludes the completing prisoner.
-Protocol unchanged: 99
-Schema changes: none

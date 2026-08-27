@@ -80,10 +80,10 @@ public final class PropertySettingsService {
         List<SsuPropertySettingsDataPayload.Entry> entries = new ArrayList<>();
         entries.add(editable(bool("allow_pvp", "Allow PvP", s.isAllowPvp(), false, "Allows players to damage each other inside this claim."), canEditFlags));
         entries.add(editable(bool("allow_explosions", "Allow explosions", s.isAllowExplosions(), false, "Allows explosions to damage blocks inside this claim."), canEditFlags));
-        entries.add(editable(bool("allow_pistons", "Allow pistons", s.isAllowPistons(), false, "Allows pistons to move blocks across or inside the claim boundary."), canEditFlags));
-        entries.add(editable(bool("allow_water_flow", "Allow water flow", s.isAllowWaterFlow(), false, "Allows water to flow into or through this claim."), canEditFlags));
-        entries.add(editable(bool("allow_lava_flow", "Allow lava flow", s.isAllowLavaFlow(), false, "Allows lava to flow into or through this claim."), canEditFlags));
-        entries.add(editable(bool("allow_other_fluid_flow", "Allow other fluids", s.isAllowOtherFluidFlow(), false, "Allows modded or other non-water fluids to flow through the claim."), canEditFlags));
+        entries.add(editable(bool("allow_pistons", "Allow pistons", s.isAllowPistons(), false, "Allows piston movement inside this claim. Protected boundaries always remain sealed."), canEditFlags));
+        entries.add(editable(bool("allow_water_flow", "Allow water flow", s.isAllowWaterFlow(), false, "Allows water to flow inside this claim. Water cannot cross a protected boundary."), canEditFlags));
+        entries.add(editable(bool("allow_lava_flow", "Allow lava flow", s.isAllowLavaFlow(), false, "Allows lava to flow inside this claim. Lava cannot cross a protected boundary."), canEditFlags));
+        entries.add(editable(bool("allow_other_fluid_flow", "Allow other fluids", s.isAllowOtherFluidFlow(), false, "Allows modded or other non-water fluids to flow inside the claim. Protected boundaries remain sealed."), canEditFlags));
         entries.add(editable(bool("allow_redstone", "Allow redstone", s.isAllowRedstone(), true, "Allows redstone components to update and operate inside the claim."), canEditFlags));
         entries.add(editable(bool("allow_hoppers", "Allow hoppers", s.isAllowHoppers(), true, "Allows hoppers to move items across inventories in this claim."), canEditFlags));
         entries.add(editable(bool("allow_ownerless_projectiles", "Ownerless projectiles", s.isAllowOwnerlessProjectiles(), false, "Allows projectiles without a known owner to affect the claim."), canEditFlags));
@@ -113,9 +113,9 @@ public final class PropertySettingsService {
         entries.add(editable(bool("allow_interact", "Allow interaction", s.isAllowInteract(), false, "Allows interaction with blocks and entities inside this region."), canEdit));
         entries.add(editable(bool("allow_pvp", "Allow PvP", s.isAllowPvp(), false, "Allows players to damage each other inside this region."), canEdit));
         entries.add(editable(bool("allow_explosions", "Allow explosions", s.isAllowExplosions(), false, "Allows explosions to damage blocks inside this region."), canEdit));
-        entries.add(editable(bool("allow_pistons", "Allow pistons", s.isAllowPistons(), false, "Allows piston movement inside or across the region boundary."), canEdit));
-        entries.add(editable(bool("allow_water_flow", "Allow water flow", s.isAllowWaterFlow(), false, "Allows water to flow through the region boundary."), canEdit));
-        entries.add(editable(bool("allow_lava_flow", "Allow lava flow", s.isAllowLavaFlow(), false, "Allows lava to flow through the region boundary."), canEdit));
+        entries.add(editable(bool("allow_pistons", "Allow pistons", s.isAllowPistons(), false, "Allows piston movement inside this region. Protected boundaries always remain sealed."), canEdit));
+        entries.add(editable(bool("allow_water_flow", "Allow water flow", s.isAllowWaterFlow(), false, "Allows water to flow inside this region. Water cannot cross a protected boundary."), canEdit));
+        entries.add(editable(bool("allow_lava_flow", "Allow lava flow", s.isAllowLavaFlow(), false, "Allows lava to flow inside this region. Lava cannot cross a protected boundary."), canEdit));
         entries.add(editable(bool("allow_redstone", "Allow redstone", s.isAllowRedstone(), true, "Allows redstone components to update inside the region."), canEdit));
         entries.add(editable(bool("allow_hoppers", "Allow hoppers", s.isAllowHoppers(), false, "Allows hoppers to transfer items inside the region."), canEdit));
         entries.add(editable(bool("allow_fire_spread", "Allow fire spread", s.isAllowFireSpread(), false, "Allows fire to spread and burn blocks inside the region."), canEdit));

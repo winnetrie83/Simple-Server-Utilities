@@ -1,8 +1,0 @@
-SSU 1.8.0-dev16.5 validation
-- mod_version: 1.8.0-dev16.5
-- network protocol: 63
-- public storage schemas: unchanged from dev16.4
-- economy account record schema: 2 (internal system-account marker)
-- deterministic internal accounts: mail escrow + auction house tax
-- player-facing selectors use playerAccounts/findPlayerAccount APIs
-- Block Information living entity stats: health, positive armor, positive toughness

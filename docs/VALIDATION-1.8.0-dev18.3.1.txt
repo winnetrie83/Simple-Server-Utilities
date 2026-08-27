@@ -1,8 +1,0 @@
-SSU 1.8.0-dev18.3.1 validation
-
-- Restored AuctionHouseManager.maintenanceTick() from the last known-good dev18.2.1 implementation.
-- Verified exactly one maintenanceTick declaration and the existing startup/event call sites.
-- Balanced-delimiter lexical scan passed for 520 Java source files.
-- JSON parse validation passed for 14 JSON files.
-- Targeted javac source pass reported only unavailable Minecraft/NeoForge dependencies and no parser-level syntax diagnostics.
-- Full Java 25 / Gradle 9.2.1 NeoForge compilation was not available in this offline container.

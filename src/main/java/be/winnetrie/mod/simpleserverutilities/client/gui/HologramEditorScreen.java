@@ -439,7 +439,31 @@ public final class HologramEditorScreen extends Screen {
         g.drawString(font, "Rows / refresh", right, y + 198, scoreboardLabelColor, false);
         if (!notice.isBlank()) g.drawString(font, trim(notice, 66), x + 14, y + 314, noticeError ? ERROR : GOOD, false);
         super.render(g, mouseX, mouseY, partialTick);
+        renderRichTextEditorOverlay(g);
         if (paletteTarget != PaletteTarget.NONE) drawPalette(g, mouseX, mouseY);
+    }
+
+    /**
+     * Draws the hologram editor's styled text without injecting into Minecraft's
+     * {@link MultiLineEditBox} implementation. Vanilla still owns input, cursor
+     * movement, selection and scrolling; we only replace the visible content
+     * after the widget has rendered. Keeping this at screen level avoids fragile
+     * mixin targets when Mojang renames or restructures MultiLineEditBox methods.
+     */
+    private void renderRichTextEditorOverlay(GuiGraphics g) {
+        if (text == null || richDocument == null) return;
+
+        // Hide only vanilla's text/content area. Leave the widget border and
+        // scrollbar intact, then let the registered SSU renderer redraw text,
+        // selection and cursor using the rich document.
+        int left = text.getX() + 3;
+        int top = text.getY() + 3;
+        int right = text.getRight() - text.scrollbarWidth() - 2;
+        int bottom = text.getBottom() - 3;
+        if (right > left && bottom > top) {
+            g.fill(left, top, right, bottom, 0xFF000000);
+        }
+        RichTextEditBoxRenderer.render(text, g);
     }
 
     private void drawPalette(GuiGraphics g, int mouseX, int mouseY) {
