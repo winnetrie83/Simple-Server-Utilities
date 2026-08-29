@@ -268,7 +268,7 @@ public class Config {
 
     /**
      * Old name kept as code compatibility alias.
-     * Use MAX_PLAYER_CLAIM_CHUNKS instead. Has to be removed eventually.
+     * Use MAX_PLAYER_CLAIM_CHUNKS instead.
      */
     @Deprecated
     public static final ModConfigSpec.IntValue MAX_PLAYER_CLAIMS = MAX_PLAYER_CLAIM_CHUNKS;
